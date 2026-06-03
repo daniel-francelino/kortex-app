@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { JournalEntry, MetricDefinition, MetricValueWithDefinition } from '~/types/journal'
+import type { JournalEntry } from '~/types/journal'
 
 const props = defineProps<{
   open: boolean
@@ -11,22 +11,18 @@ const emit = defineEmits<{
   'updated': []
 }>()
 
-const { fetchEntryByDate, upsertEntry, metricDefinitions } = useJournal()
+const { fetchEntryByDate, upsertEntry } = useJournal()
 
 const loading = ref(false)
 const entry = ref<JournalEntry | null>(null)
 const entryTags = ref<string[]>([])
-const entryMetrics = ref<MetricValueWithDefinition[]>([])
 
-const title = ref('')
 const content = ref('')
 const editing = ref(false)
 const saving = ref(false)
 
 watch(() => props.open, async (isOpen) => {
-  if (isOpen && props.date) {
-    await loadEntry()
-  }
+  if (isOpen && props.date) await loadEntry()
 }, { immediate: true })
 
 watch(() => props.date, async () => {
@@ -43,8 +39,6 @@ async function loadEntry() {
     if (data) {
       entry.value = data.entry
       entryTags.value = (data.tags ?? []).map((t: unknown) => (t as { name: string }).name)
-      entryMetrics.value = data.metrics ?? []
-      title.value = data.entry?.title ?? ''
       content.value = data.entry?.content ?? ''
     }
   } finally {
@@ -52,11 +46,6 @@ async function loadEntry() {
   }
 }
 
-function startEditing() {
-  editing.value = true
-}
-
-// Check if Tiptap JSON document has actual text content
 function isContentEmpty(val: string): boolean {
   if (!val) return true
   try {
@@ -72,13 +61,12 @@ function isContentEmpty(val: string): boolean {
 }
 
 async function onSave() {
-  if (isContentEmpty(content.value)) return
-  if (saving.value) return
+  if (isContentEmpty(content.value) || saving.value) return
   saving.value = true
   try {
     const result = await upsertEntry({
       entryDate: props.date,
-      title: title.value || null,
+      title: null,
       content: content.value,
       tags: entryTags.value.length > 0 ? entryTags.value : undefined
     })
@@ -100,8 +88,6 @@ function formatDate(dateStr: string): string {
     year: 'numeric'
   })
 }
-
-const defs = computed<MetricDefinition[]>(() => metricDefinitions.value ?? [])
 </script>
 
 <template>
@@ -111,18 +97,20 @@ const defs = computed<MetricDefinition[]>(() => metricDefinitions.value ?? [])
     @update:open="emit('update:open', $event)"
   >
     <template #body>
+      <!-- Loading -->
       <div
         v-if="loading"
         class="space-y-4"
       >
-        <USkeleton class="h-6 w-2/3" />
         <USkeleton class="h-4 w-full" />
+        <USkeleton class="h-4 w-5/6" />
+        <USkeleton class="h-4 w-4/5" />
         <USkeleton class="h-40 w-full" />
       </div>
 
       <div
         v-else
-        class="space-y-6"
+        class="space-y-5"
       >
         <!-- No entry yet -->
         <div
@@ -139,30 +127,25 @@ const defs = computed<MetricDefinition[]>(() => metricDefinitions.value ?? [])
           <UButton
             label="Criar entrada"
             icon="i-lucide-plus"
-            @click="startEditing"
+            @click="editing = true"
           />
         </div>
 
-        <!-- View mode — NotionEditor in read-only renders rich blocks -->
+        <!-- View mode -->
         <template v-if="entry && !editing">
-          <div class="flex items-start justify-between gap-2">
-            <h3
-              v-if="entry.title"
-              class="text-lg font-semibold text-highlighted"
-            >
-              {{ entry.title }}
-            </h3>
+          <!-- Edit action -->
+          <div class="flex justify-end">
             <UButton
               icon="i-lucide-pencil"
+              label="Editar"
               color="neutral"
               variant="ghost"
               size="sm"
-              class="shrink-0"
-              @click="startEditing"
+              @click="editing = true"
             />
           </div>
 
-          <!-- Read-only rich content renderer -->
+          <!-- Rich content (read-only) -->
           <ClientOnly>
             <NotionEditor
               :key="props.date + '-view'"
@@ -177,7 +160,7 @@ const defs = computed<MetricDefinition[]>(() => metricDefinitions.value ?? [])
           <!-- Tags -->
           <div
             v-if="entry.tags && entry.tags.length > 0"
-            class="flex flex-wrap gap-1"
+            class="flex flex-wrap gap-1.5"
           >
             <UBadge
               v-for="tag in entry.tags"
@@ -188,25 +171,10 @@ const defs = computed<MetricDefinition[]>(() => metricDefinitions.value ?? [])
               size="xs"
             />
           </div>
-
-          <!-- Metrics -->
-          <JournalMetricsPanel
-            :definitions="defs"
-            :existing-values="entryMetrics"
-            :entry-date="props.date"
-            @saved="loadEntry(); emit('updated')"
-          />
         </template>
 
         <!-- Edit mode -->
         <template v-if="editing">
-          <UInput
-            v-model="title"
-            placeholder="Título (opcional)"
-            size="lg"
-          />
-
-          <!-- Notion editor for editing — key resets when date changes -->
           <ClientOnly>
             <NotionEditor
               :key="props.date + '-edit'"

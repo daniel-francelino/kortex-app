@@ -16,15 +16,32 @@ const emit = defineEmits<{
 
 function formatDate(dateStr: string): string {
   return new Date(dateStr + 'T12:00:00').toLocaleDateString('pt-BR', {
+    weekday: 'short',
     day: '2-digit',
     month: 'long',
     year: 'numeric'
   })
 }
 
-function truncateContent(text: string, maxLen: number = 120): string {
-  if (text.length <= maxLen) return text
-  return text.substring(0, maxLen).trimEnd() + '...'
+// Extracts plain text from Tiptap JSON content (or returns legacy plain text as-is)
+function extractPreview(jsonContent: string): string {
+  if (!jsonContent?.trim()) return ''
+  try {
+    const doc = JSON.parse(jsonContent)
+    if (doc?.type !== 'doc') throw new Error()
+    const parts: string[] = []
+
+    function walk(node: { type: string; text?: string; content?: unknown[] }): void {
+      if (node.type === 'text' && node.text) parts.push(node.text)
+      if (node.content) (node.content as typeof node[]).forEach(walk)
+    }
+
+    ;(doc.content ?? []).forEach(walk)
+    return parts.join(' ').replace(/\s+/g, ' ').trim()
+  } catch {
+    // Legacy plain text
+    return jsonContent.replace(/\s+/g, ' ').trim()
+  }
 }
 </script>
 
@@ -39,9 +56,10 @@ function truncateContent(text: string, maxLen: number = 120): string {
       :key="i"
     >
       <div class="space-y-2">
-        <USkeleton class="h-4 w-32" />
-        <USkeleton class="h-4 w-full" />
-        <USkeleton class="h-3 w-2/3" />
+        <USkeleton class="h-4 w-40" />
+        <USkeleton class="h-3 w-full" />
+        <USkeleton class="h-3 w-4/5" />
+        <USkeleton class="h-3 w-3/5" />
       </div>
     </UCard>
   </div>
@@ -60,7 +78,7 @@ function truncateContent(text: string, maxLen: number = 120): string {
     </p>
   </div>
 
-  <!-- Entry list -->
+  <!-- Entry cards -->
   <div
     v-else
     class="space-y-3"
@@ -68,21 +86,30 @@ function truncateContent(text: string, maxLen: number = 120): string {
     <UCard
       v-for="entry in entries"
       :key="entry.id"
-      class="cursor-pointer hover:ring-1 hover:ring-primary transition-all"
+      class="cursor-pointer transition-all hover:ring-1 hover:ring-primary"
       @click="emit('select', entry.entryDate)"
     >
-      <div class="space-y-1">
-        <div class="flex items-center justify-between">
-          <span class="text-sm font-medium text-highlighted">
-            {{ entry.title || formatDate(entry.entryDate) }}
-          </span>
-          <span class="text-xs text-muted">
-            {{ formatDate(entry.entryDate) }}
-          </span>
-        </div>
-        <p class="text-sm text-muted">
-          {{ truncateContent(entry.content) }}
+      <div class="space-y-2">
+        <!-- Date -->
+        <p class="text-xs font-medium text-muted capitalize">
+          {{ formatDate(entry.entryDate) }}
         </p>
+
+        <!-- Content preview — up to 5 visual lines -->
+        <p
+          v-if="extractPreview(entry.content)"
+          class="text-sm text-highlighted line-clamp-5 leading-relaxed"
+        >
+          {{ extractPreview(entry.content) }}
+        </p>
+        <p
+          v-else
+          class="text-sm text-dimmed italic"
+        >
+          Sem conteúdo
+        </p>
+
+        <!-- Tags -->
         <div
           v-if="entry.tags && entry.tags.length > 0"
           class="flex flex-wrap gap-1 pt-1"
