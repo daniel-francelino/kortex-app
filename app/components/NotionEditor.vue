@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { useEditor, EditorContent, BubbleMenu } from '@tiptap/vue-3'
+import { useEditor, EditorContent } from '@tiptap/vue-3'
 import StarterKit from '@tiptap/starter-kit'
 import Placeholder from '@tiptap/extension-placeholder'
 import Underline from '@tiptap/extension-underline'
@@ -22,81 +22,61 @@ const ALL_COMMANDS: CommandItem[] = [
     title: 'Texto',
     description: 'Parágrafo normal',
     icon: 'i-lucide-type',
-    command: ({ editor, range }) => {
-      editor.chain().focus().deleteRange(range).setParagraph().run()
-    },
+    command: ({ editor, range }) => editor.chain().focus().deleteRange(range).setParagraph().run(),
   },
   {
     title: 'Título 1',
     description: 'Título grande',
     icon: 'i-lucide-heading-1',
-    command: ({ editor, range }) => {
-      editor.chain().focus().deleteRange(range).setHeading({ level: 1 }).run()
-    },
+    command: ({ editor, range }) => editor.chain().focus().deleteRange(range).setHeading({ level: 1 }).run(),
   },
   {
     title: 'Título 2',
     description: 'Título médio',
     icon: 'i-lucide-heading-2',
-    command: ({ editor, range }) => {
-      editor.chain().focus().deleteRange(range).setHeading({ level: 2 }).run()
-    },
+    command: ({ editor, range }) => editor.chain().focus().deleteRange(range).setHeading({ level: 2 }).run(),
   },
   {
     title: 'Título 3',
     description: 'Título pequeno',
     icon: 'i-lucide-heading-3',
-    command: ({ editor, range }) => {
-      editor.chain().focus().deleteRange(range).setHeading({ level: 3 }).run()
-    },
+    command: ({ editor, range }) => editor.chain().focus().deleteRange(range).setHeading({ level: 3 }).run(),
   },
   {
     title: 'Lista com marcadores',
     description: 'Lista não ordenada',
     icon: 'i-lucide-list',
-    command: ({ editor, range }) => {
-      editor.chain().focus().deleteRange(range).toggleBulletList().run()
-    },
+    command: ({ editor, range }) => editor.chain().focus().deleteRange(range).toggleBulletList().run(),
   },
   {
     title: 'Lista numerada',
     description: 'Lista ordenada',
     icon: 'i-lucide-list-ordered',
-    command: ({ editor, range }) => {
-      editor.chain().focus().deleteRange(range).toggleOrderedList().run()
-    },
+    command: ({ editor, range }) => editor.chain().focus().deleteRange(range).toggleOrderedList().run(),
   },
   {
     title: 'Lista de tarefas',
     description: 'Lista com checkboxes',
     icon: 'i-lucide-list-checks',
-    command: ({ editor, range }) => {
-      editor.chain().focus().deleteRange(range).toggleTaskList().run()
-    },
+    command: ({ editor, range }) => editor.chain().focus().deleteRange(range).toggleTaskList().run(),
   },
   {
     title: 'Citação',
     description: 'Bloco de citação',
     icon: 'i-lucide-quote',
-    command: ({ editor, range }) => {
-      editor.chain().focus().deleteRange(range).toggleBlockquote().run()
-    },
+    command: ({ editor, range }) => editor.chain().focus().deleteRange(range).toggleBlockquote().run(),
   },
   {
     title: 'Bloco de código',
-    description: 'Código com destaque de sintaxe',
+    description: 'Código com destaque',
     icon: 'i-lucide-code-2',
-    command: ({ editor, range }) => {
-      editor.chain().focus().deleteRange(range).toggleCodeBlock().run()
-    },
+    command: ({ editor, range }) => editor.chain().focus().deleteRange(range).toggleCodeBlock().run(),
   },
   {
     title: 'Divisor',
     description: 'Linha separadora',
     icon: 'i-lucide-minus',
-    command: ({ editor, range }) => {
-      editor.chain().focus().deleteRange(range).setHorizontalRule().run()
-    },
+    command: ({ editor, range }) => editor.chain().focus().deleteRange(range).setHorizontalRule().run(),
   },
 ]
 
@@ -114,39 +94,68 @@ const emit = defineEmits<{
   'update:modelValue': [value: string]
 }>()
 
-// --- Slash menu state ---
-const slashMenuVisible = ref(false)
-const slashMenuItems = ref<CommandItem[]>([])
-const slashMenuSelectedIndex = ref(0)
-const slashMenuPosition = ref({ x: 0, y: 0 })
-const slashMenuRef = ref<HTMLElement | null>(null)
+// ── Bubble menu state ──────────────────────────────────────────────────────────
+const bubbleVisible = ref(false)
+const bubblePos = ref({ x: 0, y: 0 })
+const bubbleRef = ref<HTMLElement | null>(null)
 
-// We keep a reference to the current suggestion props using a closure variable
-// so the render callbacks can share state across onStart/onUpdate/onKeyDown
-let currentSuggestionRange: Range | null = null
-let currentSuggestionEditor: Editor | null = null
-
-function selectCommand(item: CommandItem) {
-  if (!currentSuggestionEditor || !currentSuggestionRange) return
-  item.command({ editor: currentSuggestionEditor, range: currentSuggestionRange })
-  slashMenuVisible.value = false
+function updateBubble() {
+  const ed = editor.value
+  if (!ed || !ed.isEditable) {
+    bubbleVisible.value = false
+    return
+  }
+  const { from, to } = ed.state.selection
+  if (from === to) {
+    bubbleVisible.value = false
+    return
+  }
+  const sel = window.getSelection()
+  if (!sel || sel.rangeCount === 0 || sel.isCollapsed) {
+    bubbleVisible.value = false
+    return
+  }
+  const rect = sel.getRangeAt(0).getBoundingClientRect()
+  if (!rect.width) {
+    bubbleVisible.value = false
+    return
+  }
+  bubblePos.value = {
+    x: Math.round(rect.left + rect.width / 2),
+    y: Math.round(rect.top),
+  }
+  bubbleVisible.value = true
 }
 
-watch(slashMenuSelectedIndex, (idx) => {
+// ── Slash menu state ───────────────────────────────────────────────────────────
+const slashVisible = ref(false)
+const slashItems = ref<CommandItem[]>([])
+const slashIndex = ref(0)
+const slashPos = ref({ x: 0, y: 0 })
+const slashMenuRef = ref<HTMLElement | null>(null)
+let slashRange: Range | null = null
+let slashEditor: Editor | null = null
+
+function selectSlashCommand(item: CommandItem) {
+  if (!slashEditor || !slashRange) return
+  item.command({ editor: slashEditor, range: slashRange })
+  slashVisible.value = false
+}
+
+watch(slashIndex, (idx) => {
   nextTick(() => {
-    const item = slashMenuRef.value?.children[idx] as HTMLElement | undefined
-    item?.scrollIntoView({ block: 'nearest' })
+    const el = slashMenuRef.value?.children[idx] as HTMLElement | undefined
+    el?.scrollIntoView({ block: 'nearest' })
   })
 })
 
-// --- Parse / serialize content ---
+// ── Content parse / serialize ──────────────────────────────────────────────────
 function parseContent(value: string): object | undefined {
   if (!value?.trim()) return undefined
   try {
     const parsed = JSON.parse(value)
-    // Tiptap JSON has type: 'doc'
-    if (parsed && typeof parsed === 'object' && parsed.type === 'doc') return parsed
-  } catch { /* legacy plain text below */ }
+    if (parsed?.type === 'doc') return parsed
+  } catch { /* fallthrough to plain text */ }
   if (value.trim()) {
     return {
       type: 'doc',
@@ -156,7 +165,7 @@ function parseContent(value: string): object | undefined {
   return undefined
 }
 
-// --- Build the slash command extension ---
+// ── Slash command extension ────────────────────────────────────────────────────
 const SlashCommandExtension = Extension.create({
   name: 'slashCommand',
   addProseMirrorPlugins() {
@@ -167,62 +176,47 @@ const SlashCommandExtension = Extension.create({
         items: ({ query }: { query: string }) => {
           const q = query.toLowerCase()
           return q
-            ? ALL_COMMANDS.filter(c =>
-                c.title.toLowerCase().includes(q) || c.description.toLowerCase().includes(q)
-              )
+            ? ALL_COMMANDS.filter(c => c.title.toLowerCase().includes(q) || c.description.toLowerCase().includes(q))
             : ALL_COMMANDS
         },
         command: ({ editor, range, props: item }: { editor: Editor; range: Range; props: CommandItem }) => {
           item.command({ editor, range })
-          slashMenuVisible.value = false
+          slashVisible.value = false
         },
         render: () => ({
-          onStart(suggProps: { editor: Editor; range: Range; items: CommandItem[]; clientRect?: (() => DOMRect | null) | null }) {
-            currentSuggestionEditor = suggProps.editor
-            currentSuggestionRange = suggProps.range
-            slashMenuItems.value = suggProps.items
-            slashMenuSelectedIndex.value = 0
-            slashMenuVisible.value = true
-            if (suggProps.clientRect) {
-              const rect = suggProps.clientRect()
-              if (rect) slashMenuPosition.value = { x: rect.left, y: rect.bottom + 6 }
-            }
+          onStart(p: { editor: Editor; range: Range; items: CommandItem[]; clientRect?: (() => DOMRect | null) | null }) {
+            slashEditor = p.editor
+            slashRange = p.range
+            slashItems.value = p.items
+            slashIndex.value = 0
+            slashVisible.value = true
+            const rect = p.clientRect?.()
+            if (rect) slashPos.value = { x: rect.left, y: rect.bottom + 6 }
           },
-          onUpdate(suggProps: { editor: Editor; range: Range; items: CommandItem[]; clientRect?: (() => DOMRect | null) | null }) {
-            currentSuggestionEditor = suggProps.editor
-            currentSuggestionRange = suggProps.range
-            slashMenuItems.value = suggProps.items
-            if (suggProps.clientRect) {
-              const rect = suggProps.clientRect()
-              if (rect) slashMenuPosition.value = { x: rect.left, y: rect.bottom + 6 }
-            }
+          onUpdate(p: { editor: Editor; range: Range; items: CommandItem[]; clientRect?: (() => DOMRect | null) | null }) {
+            slashEditor = p.editor
+            slashRange = p.range
+            slashItems.value = p.items
+            const rect = p.clientRect?.()
+            if (rect) slashPos.value = { x: rect.left, y: rect.bottom + 6 }
           },
           onKeyDown({ event }: { event: KeyboardEvent }) {
-            const len = slashMenuItems.value.length
-            if (event.key === 'Escape') {
-              slashMenuVisible.value = false
-              return true
-            }
+            const len = slashItems.value.length
+            if (event.key === 'Escape') { slashVisible.value = false; return true }
             if (!len) return false
-            if (event.key === 'ArrowDown') {
-              slashMenuSelectedIndex.value = (slashMenuSelectedIndex.value + 1) % len
-              return true
-            }
-            if (event.key === 'ArrowUp') {
-              slashMenuSelectedIndex.value = (slashMenuSelectedIndex.value - 1 + len) % len
-              return true
-            }
+            if (event.key === 'ArrowDown') { slashIndex.value = (slashIndex.value + 1) % len; return true }
+            if (event.key === 'ArrowUp') { slashIndex.value = (slashIndex.value - 1 + len) % len; return true }
             if (event.key === 'Enter') {
-              const item = slashMenuItems.value[slashMenuSelectedIndex.value]
-              if (item) selectCommand(item)
+              const item = slashItems.value[slashIndex.value]
+              if (item) selectSlashCommand(item)
               return true
             }
             return false
           },
           onExit() {
-            slashMenuVisible.value = false
-            currentSuggestionEditor = null
-            currentSuggestionRange = null
+            slashVisible.value = false
+            slashEditor = null
+            slashRange = null
           },
         }),
       }),
@@ -230,7 +224,7 @@ const SlashCommandExtension = Extension.create({
   },
 })
 
-// --- Create editor ---
+// ── Editor instance ────────────────────────────────────────────────────────────
 const editor = useEditor({
   content: parseContent(props.modelValue),
   extensions: [
@@ -243,105 +237,115 @@ const editor = useEditor({
     SlashCommandExtension,
   ],
   editable: props.editable,
-  onUpdate: ({ editor: ed }) => {
-    emit('update:modelValue', JSON.stringify(ed.getJSON()))
+  onUpdate: ({ editor: ed }) => emit('update:modelValue', JSON.stringify(ed.getJSON())),
+  onSelectionUpdate: () => nextTick(updateBubble),
+  onBlur: () => {
+    // Delay to allow bubble menu clicks to fire before hiding
+    setTimeout(() => {
+      if (!bubbleRef.value?.matches(':hover')) bubbleVisible.value = false
+    }, 150)
   },
 })
 
 onBeforeUnmount(() => editor.value?.destroy())
-
-watch(() => props.editable, (val) => editor.value?.setEditable(val))
+watch(() => props.editable, val => editor.value?.setEditable(val))
 </script>
 
 <template>
   <div class="notion-editor">
-    <!-- Bubble menu (inline formatting toolbar on text selection) -->
-    <BubbleMenu
-      v-if="editor && editable"
-      :editor="editor"
-      :tippy-options="{ duration: 100, maxWidth: 'none' }"
-      class="notion-bubble"
-    >
-      <button
-        type="button"
-        :class="['notion-bubble-btn', { active: editor.isActive('bold') }]"
-        title="Negrito (Ctrl+B)"
-        @click="editor.chain().focus().toggleBold().run()"
-      >
-        <UIcon name="i-lucide-bold" class="size-3.5" />
-      </button>
-      <button
-        type="button"
-        :class="['notion-bubble-btn', { active: editor.isActive('italic') }]"
-        title="Itálico (Ctrl+I)"
-        @click="editor.chain().focus().toggleItalic().run()"
-      >
-        <UIcon name="i-lucide-italic" class="size-3.5" />
-      </button>
-      <button
-        type="button"
-        :class="['notion-bubble-btn', { active: editor.isActive('underline') }]"
-        title="Sublinhado (Ctrl+U)"
-        @click="editor.chain().focus().toggleUnderline().run()"
-      >
-        <UIcon name="i-lucide-underline" class="size-3.5" />
-      </button>
-      <button
-        type="button"
-        :class="['notion-bubble-btn', { active: editor.isActive('strike') }]"
-        title="Tachado"
-        @click="editor.chain().focus().toggleStrike().run()"
-      >
-        <UIcon name="i-lucide-strikethrough" class="size-3.5" />
-      </button>
-      <button
-        type="button"
-        :class="['notion-bubble-btn', { active: editor.isActive('code') }]"
-        title="Código inline"
-        @click="editor.chain().focus().toggleCode().run()"
-      >
-        <UIcon name="i-lucide-code" class="size-3.5" />
-      </button>
-      <div class="notion-bubble-sep" />
-      <button
-        type="button"
-        :class="['notion-bubble-btn notion-bubble-btn--text', { active: editor.isActive('heading', { level: 1 }) }]"
-        title="Título 1"
-        @click="editor.chain().focus().toggleHeading({ level: 1 }).run()"
-      >H1</button>
-      <button
-        type="button"
-        :class="['notion-bubble-btn notion-bubble-btn--text', { active: editor.isActive('heading', { level: 2 }) }]"
-        title="Título 2"
-        @click="editor.chain().focus().toggleHeading({ level: 2 }).run()"
-      >H2</button>
-      <button
-        type="button"
-        :class="['notion-bubble-btn notion-bubble-btn--text', { active: editor.isActive('heading', { level: 3 }) }]"
-        title="Título 3"
-        @click="editor.chain().focus().toggleHeading({ level: 3 }).run()"
-      >H3</button>
-    </BubbleMenu>
-
-    <!-- Main editor content -->
+    <!-- Editor content -->
     <EditorContent :editor="editor" class="notion-content" />
 
-    <!-- Slash command menu (teleported to body for correct z-index) -->
+    <!-- Custom bubble menu (inline formatting toolbar on text selection) -->
     <Teleport to="body">
       <div
-        v-if="slashMenuVisible && slashMenuItems.length > 0"
+        v-if="bubbleVisible && editable"
+        ref="bubbleRef"
+        class="notion-bubble"
+        :style="{
+          left: `${bubblePos.x}px`,
+          top: `${bubblePos.y}px`,
+        }"
+        @mousedown.prevent
+      >
+        <button
+          type="button"
+          :class="['notion-bubble-btn', { active: editor?.isActive('bold') }]"
+          title="Negrito (Ctrl+B)"
+          @click="editor?.chain().focus().toggleBold().run()"
+        >
+          <UIcon name="i-lucide-bold" class="size-3.5" />
+        </button>
+        <button
+          type="button"
+          :class="['notion-bubble-btn', { active: editor?.isActive('italic') }]"
+          title="Itálico (Ctrl+I)"
+          @click="editor?.chain().focus().toggleItalic().run()"
+        >
+          <UIcon name="i-lucide-italic" class="size-3.5" />
+        </button>
+        <button
+          type="button"
+          :class="['notion-bubble-btn', { active: editor?.isActive('underline') }]"
+          title="Sublinhado (Ctrl+U)"
+          @click="editor?.chain().focus().toggleUnderline().run()"
+        >
+          <UIcon name="i-lucide-underline" class="size-3.5" />
+        </button>
+        <button
+          type="button"
+          :class="['notion-bubble-btn', { active: editor?.isActive('strike') }]"
+          title="Tachado"
+          @click="editor?.chain().focus().toggleStrike().run()"
+        >
+          <UIcon name="i-lucide-strikethrough" class="size-3.5" />
+        </button>
+        <button
+          type="button"
+          :class="['notion-bubble-btn', { active: editor?.isActive('code') }]"
+          title="Código inline"
+          @click="editor?.chain().focus().toggleCode().run()"
+        >
+          <UIcon name="i-lucide-code" class="size-3.5" />
+        </button>
+        <div class="notion-bubble-sep" />
+        <button
+          type="button"
+          :class="['notion-bubble-btn notion-bubble-btn--text', { active: editor?.isActive('heading', { level: 1 }) }]"
+          title="Título 1"
+          @click="editor?.chain().focus().toggleHeading({ level: 1 }).run()"
+        >H1</button>
+        <button
+          type="button"
+          :class="['notion-bubble-btn notion-bubble-btn--text', { active: editor?.isActive('heading', { level: 2 }) }]"
+          title="Título 2"
+          @click="editor?.chain().focus().toggleHeading({ level: 2 }).run()"
+        >H2</button>
+        <button
+          type="button"
+          :class="['notion-bubble-btn notion-bubble-btn--text', { active: editor?.isActive('heading', { level: 3 }) }]"
+          title="Título 3"
+          @click="editor?.chain().focus().toggleHeading({ level: 3 }).run()"
+        >H3</button>
+      </div>
+    </Teleport>
+
+    <!-- Slash command menu -->
+    <Teleport to="body">
+      <div
+        v-if="slashVisible && slashItems.length > 0"
         ref="slashMenuRef"
         class="notion-slash-menu"
-        :style="{ top: `${slashMenuPosition.y}px`, left: `${slashMenuPosition.x}px` }"
+        :style="{ top: `${slashPos.y}px`, left: `${slashPos.x}px` }"
       >
         <p class="notion-slash-label">Blocos básicos</p>
         <button
-          v-for="(item, i) in slashMenuItems"
+          v-for="(item, i) in slashItems"
           :key="item.title"
           type="button"
-          :class="['notion-slash-item', { selected: i === slashMenuSelectedIndex }]"
-          @mouseenter="slashMenuSelectedIndex = i"
-          @click="selectCommand(item)"
+          :class="['notion-slash-item', { selected: i === slashIndex }]"
+          @mouseenter="slashIndex = i"
+          @click="selectSlashCommand(item)"
         >
           <span class="notion-slash-icon">
             <UIcon :name="item.icon" class="size-4" />
@@ -357,7 +361,6 @@ watch(() => props.editable, (val) => editor.value?.setEditable(val))
 </template>
 
 <style scoped>
-/* ── Editor wrapper ── */
 .notion-editor {
   position: relative;
   width: 100%;
@@ -365,6 +368,9 @@ watch(() => props.editable, (val) => editor.value?.setEditable(val))
 
 /* ── Bubble menu ── */
 .notion-bubble {
+  position: fixed;
+  z-index: 9999;
+  transform: translateX(-50%) translateY(calc(-100% - 8px));
   display: flex;
   align-items: center;
   gap: 1px;
@@ -373,6 +379,7 @@ watch(() => props.editable, (val) => editor.value?.setEditable(val))
   background: var(--ui-bg);
   border: 1px solid var(--ui-border);
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12), 0 1px 4px rgba(0, 0, 0, 0.08);
+  white-space: nowrap;
 }
 
 .notion-bubble-btn {
@@ -388,6 +395,9 @@ watch(() => props.editable, (val) => editor.value?.setEditable(val))
   color: var(--ui-text-muted);
   cursor: pointer;
   transition: background 0.1s, color 0.1s;
+}
+
+.notion-bubble-btn--text {
   font-size: 0.7rem;
   font-weight: 700;
   letter-spacing: -0.03em;
@@ -411,7 +421,7 @@ watch(() => props.editable, (val) => editor.value?.setEditable(val))
   flex-shrink: 0;
 }
 
-/* ── Slash command menu ── */
+/* ── Slash menu ── */
 .notion-slash-menu {
   position: fixed;
   z-index: 9999;
@@ -495,7 +505,7 @@ watch(() => props.editable, (val) => editor.value?.setEditable(val))
 </style>
 
 <style>
-/* ── Editor content styles (global, scoped by .notion-content prefix) ── */
+/* ── Tiptap editor content (global, prefixed by .notion-content) ── */
 
 .notion-content .tiptap {
   outline: none;
@@ -507,7 +517,6 @@ watch(() => props.editable, (val) => editor.value?.setEditable(val))
   caret-color: var(--ui-color-primary, #18b981);
 }
 
-/* Paragraphs */
 .notion-content .tiptap p {
   margin: 0;
 }
@@ -516,7 +525,6 @@ watch(() => props.editable, (val) => editor.value?.setEditable(val))
   margin-top: 0.2rem;
 }
 
-/* Headings — Notion-style */
 .notion-content .tiptap h1 {
   font-size: 1.875rem;
   font-weight: 700;
@@ -543,7 +551,6 @@ watch(() => props.editable, (val) => editor.value?.setEditable(val))
   color: var(--ui-text-highlighted);
 }
 
-/* Lists */
 .notion-content .tiptap ul,
 .notion-content .tiptap ol {
   padding-left: 1.5rem;
@@ -558,7 +565,7 @@ watch(() => props.editable, (val) => editor.value?.setEditable(val))
   margin: 0;
 }
 
-/* Task list (checkboxes) */
+/* Task list */
 .notion-content .tiptap ul[data-type="taskList"] {
   padding-left: 0.25rem;
   list-style: none;
@@ -605,7 +612,7 @@ watch(() => props.editable, (val) => editor.value?.setEditable(val))
 
 /* Inline code */
 .notion-content .tiptap code {
-  font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', ui-monospace, monospace;
+  font-family: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
   background: var(--ui-bg-muted);
   border: 1px solid var(--ui-border);
   border-radius: 4px;
@@ -622,7 +629,6 @@ watch(() => props.editable, (val) => editor.value?.setEditable(val))
   padding: 1rem 1.25rem;
   margin: 0.5rem 0;
   overflow-x: auto;
-  position: relative;
 }
 
 .notion-content .tiptap pre code {
@@ -646,11 +652,6 @@ watch(() => props.editable, (val) => editor.value?.setEditable(val))
   text-decoration: underline;
   text-underline-offset: 2px;
   text-decoration-thickness: 1px;
-  cursor: pointer;
-}
-
-.notion-content .tiptap a:hover {
-  opacity: 0.8;
 }
 
 /* Placeholder */
@@ -662,7 +663,6 @@ watch(() => props.editable, (val) => editor.value?.setEditable(val))
   height: 0;
 }
 
-/* Bold, italic, underline, strike, mark */
 .notion-content .tiptap strong { font-weight: 700; }
 .notion-content .tiptap em { font-style: italic; }
 .notion-content .tiptap u { text-decoration: underline; text-underline-offset: 2px; }
