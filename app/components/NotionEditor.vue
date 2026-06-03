@@ -576,16 +576,32 @@ watch(() => props.editable, val => editor.value?.setEditable(val))
   margin: 0.5rem 0 0.15rem;
 }
 
-/* Lists */
-.notion-content .tiptap ul,
-.notion-content .tiptap ol {
+/* Lists — restore markers removed by Tailwind preflight */
+.notion-content .tiptap ul {
+  list-style-type: disc;
   padding-left: 1.5rem;
   margin: 0.1rem 0;
   color: var(--ui-text-highlighted) !important;
 }
 
+.notion-content .tiptap ol {
+  list-style-type: decimal;
+  padding-left: 1.5rem;
+  margin: 0.1rem 0;
+  color: var(--ui-text-highlighted) !important;
+}
+
+.notion-content .tiptap ul ul {
+  list-style-type: circle;
+}
+
+.notion-content .tiptap ul ul ul {
+  list-style-type: square;
+}
+
 .notion-content .tiptap li {
   margin: 0.1rem 0;
+  display: list-item;
 }
 
 .notion-content .tiptap li p {
