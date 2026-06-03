@@ -103,12 +103,6 @@ const tagFilterOptions = computed(() => [
 
         <template #right>
           <NotificationsButton />
-          <UButton
-            label="Novo indicador"
-            icon="i-lucide-gauge"
-            variant="outline"
-            @click="metricCreateModalOpen = true"
-          />
         </template>
       </UDashboardNavbar>
     </template>
@@ -222,14 +216,6 @@ const tagFilterOptions = computed(() => [
       </div>
     </template>
   </UDashboardPanel>
-
-  <!-- Modals -->
-  <JournalMetricCreateModal
-    :open="metricCreateModalOpen"
-    :metric-type-options="metricTypeOptions"
-    :on-create-metric-definition="createMetricDefinition"
-    @update:open="metricCreateModalOpen = $event"
-  />
 
   <JournalEntryDetailSlideover
     v-if="selectedDate"

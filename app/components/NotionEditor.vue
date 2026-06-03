@@ -84,10 +84,12 @@ const props = withDefaults(defineProps<{
   modelValue?: string
   placeholder?: string
   editable?: boolean
+  minHeight?: string
 }>(), {
   modelValue: '',
   placeholder: 'Escreva algo, ou pressione "/" para inserir blocos...',
   editable: true,
+  minHeight: '8rem',
 })
 
 const emit = defineEmits<{
@@ -252,7 +254,7 @@ watch(() => props.editable, val => editor.value?.setEditable(val))
 </script>
 
 <template>
-  <div class="notion-editor">
+  <div class="notion-editor" :style="{ '--notion-min-height': minHeight }">
     <!-- Editor content -->
     <EditorContent :editor="editor" class="notion-content" />
 
@@ -509,20 +511,30 @@ watch(() => props.editable, val => editor.value?.setEditable(val))
 
 .notion-content .tiptap {
   outline: none;
-  min-height: 8rem;
+  min-height: var(--notion-min-height, 8rem);
   font-family: inherit;
   font-size: 0.9375rem;
   line-height: 1.75;
-  color: var(--ui-text-highlighted);
+  /* Explicitly override browser defaults for dark mode compatibility */
+  color: var(--ui-text-highlighted) !important;
+  background: transparent !important;
   caret-color: var(--ui-color-primary, #18b981);
 }
 
 .notion-content .tiptap p {
   margin: 0;
+  color: var(--ui-text-highlighted) !important;
 }
 
 .notion-content .tiptap > * + * {
-  margin-top: 0.2rem;
+  margin-top: 0.25rem;
+}
+
+/* Headings — Notion-style */
+.notion-content .tiptap h1,
+.notion-content .tiptap h2,
+.notion-content .tiptap h3 {
+  color: var(--ui-text-highlighted) !important;
 }
 
 .notion-content .tiptap h1 {
@@ -530,7 +542,6 @@ watch(() => props.editable, val => editor.value?.setEditable(val))
   font-weight: 700;
   line-height: 1.25;
   margin: 1rem 0 0.25rem;
-  color: var(--ui-text-highlighted);
   letter-spacing: -0.02em;
 }
 
@@ -539,7 +550,6 @@ watch(() => props.editable, val => editor.value?.setEditable(val))
   font-weight: 600;
   line-height: 1.3;
   margin: 0.75rem 0 0.2rem;
-  color: var(--ui-text-highlighted);
   letter-spacing: -0.01em;
 }
 
@@ -548,13 +558,14 @@ watch(() => props.editable, val => editor.value?.setEditable(val))
   font-weight: 600;
   line-height: 1.4;
   margin: 0.5rem 0 0.15rem;
-  color: var(--ui-text-highlighted);
 }
 
+/* Lists */
 .notion-content .tiptap ul,
 .notion-content .tiptap ol {
   padding-left: 1.5rem;
   margin: 0.1rem 0;
+  color: var(--ui-text-highlighted) !important;
 }
 
 .notion-content .tiptap li {
@@ -573,19 +584,21 @@ watch(() => props.editable, val => editor.value?.setEditable(val))
 
 .notion-content .tiptap ul[data-type="taskList"] li {
   display: flex;
-  align-items: baseline;
+  align-items: flex-start;
   gap: 0.5rem;
 }
 
 .notion-content .tiptap ul[data-type="taskList"] li > label {
   flex-shrink: 0;
   user-select: none;
-  margin-top: 0.2rem;
+  padding-top: 0.25rem;
 }
 
 .notion-content .tiptap ul[data-type="taskList"] li > label input[type="checkbox"] {
   cursor: pointer;
   accent-color: var(--ui-color-primary, #18b981);
+  width: 15px;
+  height: 15px;
 }
 
 .notion-content .tiptap ul[data-type="taskList"] li > div {
@@ -594,31 +607,35 @@ watch(() => props.editable, val => editor.value?.setEditable(val))
 
 .notion-content .tiptap ul[data-type="taskList"] li[data-checked="true"] > div {
   text-decoration: line-through;
-  opacity: 0.55;
+  opacity: 0.5;
 }
 
 /* Blockquote */
 .notion-content .tiptap blockquote {
   border-left: 3px solid var(--ui-color-primary, #18b981);
-  padding-left: 1rem;
-  margin: 0.4rem 0;
-  color: var(--ui-text-muted);
+  padding-left: 0.875rem;
+  margin: 0.5rem 0;
+  color: var(--ui-text-muted) !important;
   font-style: italic;
+  background: color-mix(in srgb, var(--ui-color-primary, #18b981) 5%, transparent);
+  border-radius: 0 4px 4px 0;
+  padding-block: 0.25rem;
 }
 
 .notion-content .tiptap blockquote p {
   margin: 0;
+  color: var(--ui-text-muted) !important;
 }
 
 /* Inline code */
 .notion-content .tiptap code {
   font-family: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
-  background: var(--ui-bg-muted);
-  border: 1px solid var(--ui-border);
+  background: color-mix(in srgb, var(--ui-color-primary, #18b981) 10%, var(--ui-bg-muted));
+  border: 1px solid color-mix(in srgb, var(--ui-color-primary, #18b981) 20%, var(--ui-border));
   border-radius: 4px;
-  padding: 0.1em 0.3em;
+  padding: 0.1em 0.35em;
   font-size: 0.85em;
-  color: var(--ui-text-highlighted);
+  color: var(--ui-color-primary, #18b981) !important;
 }
 
 /* Code block */
@@ -632,11 +649,12 @@ watch(() => props.editable, val => editor.value?.setEditable(val))
 }
 
 .notion-content .tiptap pre code {
-  background: transparent;
-  border: none;
+  background: transparent !important;
+  border: none !important;
   padding: 0;
   font-size: 0.875rem;
   line-height: 1.6;
+  color: var(--ui-text-highlighted) !important;
 }
 
 /* Horizontal rule */
@@ -648,23 +666,40 @@ watch(() => props.editable, val => editor.value?.setEditable(val))
 
 /* Links */
 .notion-content .tiptap a {
-  color: var(--ui-color-primary, #18b981);
+  color: var(--ui-color-primary, #18b981) !important;
   text-decoration: underline;
   text-underline-offset: 2px;
   text-decoration-thickness: 1px;
+  cursor: pointer;
+}
+
+.notion-content .tiptap a:hover {
+  opacity: 0.8;
 }
 
 /* Placeholder */
 .notion-content .tiptap p.is-editor-empty:first-child::before {
   content: attr(data-placeholder);
-  color: var(--ui-text-dimmed);
+  color: var(--ui-text-dimmed) !important;
   pointer-events: none;
   float: left;
   height: 0;
+  font-style: normal;
 }
 
-.notion-content .tiptap strong { font-weight: 700; }
+/* Text decorations */
+.notion-content .tiptap strong {
+  font-weight: 700;
+  color: var(--ui-text-highlighted) !important;
+}
+
 .notion-content .tiptap em { font-style: italic; }
 .notion-content .tiptap u { text-decoration: underline; text-underline-offset: 2px; }
-.notion-content .tiptap s { text-decoration: line-through; }
+.notion-content .tiptap s { text-decoration: line-through; opacity: 0.7; }
+
+/* Read-only mode: disable text cursor */
+.notion-content .tiptap[contenteditable="false"] {
+  cursor: default;
+  user-select: text;
+}
 </style>

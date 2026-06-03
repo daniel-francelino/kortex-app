@@ -30,47 +30,47 @@ const emit = defineEmits<{
 }>()
 
 const today = new Date().toISOString().split('T')[0] ?? ''
-
-const title = ref(props.todayEntry?.title ?? '')
-const content = ref(props.todayEntry?.content ?? '')
+const content = ref('')
 const tagInput = ref('')
 const entryTags = ref<string[]>([])
 
+// Last successfully saved content — prevents triggering auto-save on initial load
+const savedContent = ref('')
+
+// ── Auto-save state ────────────────────────────────────────────────────────────
+type SaveStatus = 'idle' | 'unsaved' | 'saving' | 'saved' | 'error'
+const saveStatus = ref<SaveStatus>('idle')
+const savedAt = ref<Date | null>(null)
+let autoSaveTimer: ReturnType<typeof setTimeout> | null = null
+
+const savedAtText = computed(() =>
+  savedAt.value?.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) ?? ''
+)
+
+// Sync entry data when it loads; mark it as already saved
 watch(() => props.todayEntry, (entry) => {
   if (entry) {
-    title.value = entry.title ?? ''
-    content.value = entry.content ?? ''
+    const c = entry.content ?? ''
+    content.value = c
+    savedContent.value = c
     entryTags.value = (entry.tags ?? []).map(t => t.name)
   } else {
-    title.value = ''
     content.value = ''
+    savedContent.value = ''
     entryTags.value = []
+    saveStatus.value = 'idle'
   }
 }, { immediate: true })
 
-function addTag() {
-  const tag = tagInput.value.trim()
-  if (tag && !entryTags.value.includes(tag)) {
-    entryTags.value.push(tag)
-  }
-  tagInput.value = ''
-}
-
-function removeTag(tag: string) {
-  entryTags.value = entryTags.value.filter(t => t !== tag)
-}
-
-const saving = ref(false)
-
-// Check if Tiptap JSON document has actual text content
+// ── Empty content check ────────────────────────────────────────────────────────
 const isContentEmpty = computed(() => {
   const val = content.value
   if (!val) return true
   try {
     const doc = JSON.parse(val)
-    function nodeHasText(node: { type: string; text?: string; content?: unknown[] }): boolean {
-      if (node.type === 'text' && node.text?.trim()) return true
-      return (node.content ?? []).some(n => nodeHasText(n as typeof node))
+    function nodeHasText(n: { type: string; text?: string; content?: unknown[] }): boolean {
+      if (n.type === 'text' && n.text?.trim()) return true
+      return (n.content ?? []).some(c => nodeHasText(c as typeof n))
     }
     return !(doc.content ?? []).some((n: { type: string; text?: string; content?: unknown[] }) => nodeHasText(n))
   } catch {
@@ -78,23 +78,73 @@ const isContentEmpty = computed(() => {
   }
 })
 
-async function onSave() {
-  if (isContentEmpty.value) return
-  if (saving.value) return
-  saving.value = true
+// ── Save logic ─────────────────────────────────────────────────────────────────
+async function doSave() {
+  if (isContentEmpty.value) {
+    saveStatus.value = 'idle'
+    return
+  }
+  saveStatus.value = 'saving'
   try {
     const result = await props.onUpsertEntry({
       entryDate: today,
-      title: title.value || null,
+      title: null,
       content: content.value,
       tags: entryTags.value.length > 0 ? entryTags.value : undefined
     })
     if (result) {
+      savedContent.value = content.value
+      saveStatus.value = 'saved'
+      savedAt.value = new Date()
       emit('saved')
+    } else {
+      saveStatus.value = 'error'
     }
-  } finally {
-    saving.value = false
+  } catch {
+    saveStatus.value = 'error'
   }
+}
+
+function clearTimer() {
+  if (autoSaveTimer) clearTimeout(autoSaveTimer)
+  autoSaveTimer = null
+}
+
+function scheduleAutoSave() {
+  clearTimer()
+  autoSaveTimer = setTimeout(doSave, 1500)
+}
+
+// Watch content — only trigger auto-save when content actually changed from last save
+watch(content, (val) => {
+  if (val === savedContent.value) return
+  if (isContentEmpty.value) {
+    saveStatus.value = 'idle'
+    clearTimer()
+    return
+  }
+  saveStatus.value = 'unsaved'
+  scheduleAutoSave()
+})
+
+// Tag changes also trigger auto-save (when there's content)
+watch(entryTags, () => {
+  if (isContentEmpty.value) return
+  saveStatus.value = 'unsaved'
+  scheduleAutoSave()
+}, { deep: true })
+
+onBeforeUnmount(() => clearTimer())
+
+// ── Tags ───────────────────────────────────────────────────────────────────────
+function addTag() {
+  const tag = tagInput.value.trim()
+  if (tag && !entryTags.value.includes(tag)) entryTags.value.push(tag)
+  tagInput.value = ''
+}
+
+function removeTag(tag: string) {
+  entryTags.value = entryTags.value.filter(t => t !== tag)
 }
 
 function formatToday(): string {
@@ -112,14 +162,13 @@ function formatToday(): string {
     <!-- Loading skeleton -->
     <template v-if="props.loading">
       <USkeleton class="h-6 w-48" />
-      <USkeleton class="h-10 w-full" />
-      <USkeleton class="h-40 w-full" />
+      <USkeleton class="h-64 w-full" />
       <USkeleton class="h-32 w-full" />
     </template>
 
     <template v-else>
-      <!-- Date header -->
-      <div class="flex items-center justify-between">
+      <!-- Header: date + auto-save indicator -->
+      <div class="flex items-center justify-between gap-4">
         <div>
           <h3 class="text-lg font-semibold text-highlighted capitalize">
             {{ formatToday() }}
@@ -128,21 +177,33 @@ function formatToday(): string {
             Seu diário de bordo de hoje.
           </p>
         </div>
-        <UButton
-          label="Salvar"
-          icon="i-lucide-save"
-          :loading="saving"
-          :disabled="saving || isContentEmpty"
-          @click="onSave"
-        />
-      </div>
 
-      <!-- Title -->
-      <UInput
-        v-model="title"
-        placeholder="Título da entrada (opcional)"
-        size="lg"
-      />
+        <!-- Auto-save status indicator -->
+        <div class="flex items-center gap-1.5 text-xs shrink-0">
+          <template v-if="saveStatus === 'unsaved'">
+            <span class="size-1.5 rounded-full bg-amber-400 dark:bg-amber-500 animate-pulse" />
+            <span class="text-muted">Não salvo</span>
+          </template>
+          <template v-else-if="saveStatus === 'saving'">
+            <UIcon name="i-lucide-loader" class="size-3 text-muted animate-spin" />
+            <span class="text-muted">Salvando...</span>
+          </template>
+          <template v-else-if="saveStatus === 'saved'">
+            <UIcon name="i-lucide-check-circle" class="size-3 text-success" />
+            <span class="text-muted">Salvo às {{ savedAtText }}</span>
+          </template>
+          <template v-else-if="saveStatus === 'error'">
+            <UIcon name="i-lucide-alert-circle" class="size-3 text-error" />
+            <span class="text-error">Erro ao salvar —</span>
+            <button
+              class="text-primary underline underline-offset-2 cursor-pointer"
+              @click="doSave"
+            >
+              Tentar novamente
+            </button>
+          </template>
+        </div>
+      </div>
 
       <!-- Notion-like editor — key is stable per day so editor is NOT recreated on save -->
       <ClientOnly>
@@ -150,16 +211,20 @@ function formatToday(): string {
           :key="today"
           v-model="content"
           placeholder="Escreva livremente sobre o seu dia... use '/' para inserir blocos."
+          :min-height="'14rem'"
         />
         <template #fallback>
-          <USkeleton class="h-40 w-full" />
+          <USkeleton class="h-56 w-full" />
         </template>
       </ClientOnly>
 
       <!-- Tags -->
       <div class="space-y-2">
         <label class="text-sm font-medium text-highlighted">Tags</label>
-        <div class="flex flex-wrap gap-1 mb-2">
+        <div
+          v-if="entryTags.length"
+          class="flex flex-wrap gap-1.5 mb-2"
+        >
           <UBadge
             v-for="tag in entryTags"
             :key="tag"
@@ -173,37 +238,13 @@ function formatToday(): string {
                 size="xs"
                 color="neutral"
                 variant="ghost"
-                class="ml-1"
+                class="ml-1 -mr-1"
                 @click="removeTag(tag)"
               />
             </template>
           </UBadge>
         </div>
-        <div class="flex items-center gap-2">
-          <UInput
-            v-model="tagInput"
-            placeholder="Adicionar tag..."
-            size="sm"
-            class="flex-1"
-            @keydown.enter.prevent="addTag"
-          />
-          <UButton
-            icon="i-lucide-plus"
-            size="sm"
-            :disabled="!tagInput.trim()"
-            @click="addTag"
-          />
-        </div>
       </div>
-
-      <!-- Metrics panel -->
-      <JournalMetricsPanel
-        :definitions="metricDefinitions"
-        :existing-values="todayMetrics"
-        :entry-date="today"
-        :on-upsert-metric-values="props.onUpsertMetricValues"
-        @saved="emit('metricsSaved')"
-      />
     </template>
   </div>
 </template>
