@@ -120,13 +120,9 @@ const tagFilterOptions = computed(() => [
         <div v-if="activeTab === 'today'">
           <JournalTodayEditor
             :today-entry="todayData?.entry ?? null"
-            :today-metrics="todayData?.metrics ?? []"
-            :metric-definitions="metricDefinitions ?? []"
-            :loading="todayStatus === 'pending' || metricDefinitionsStatus === 'pending'"
+            :loading="todayStatus === 'pending'"
             :on-upsert-entry="upsertEntry"
-            :on-upsert-metric-values="upsertMetricValues"
             @saved="refreshToday()"
-            @metrics-saved="refreshToday()"
           />
         </div>
 

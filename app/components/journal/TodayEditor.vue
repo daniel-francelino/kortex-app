@@ -1,40 +1,24 @@
 <script setup lang="ts">
-import type { JournalEntry, MetricDefinition, MetricValueWithDefinition } from '~/types/journal'
+import type { JournalEntry } from '~/types/journal'
 
 const props = defineProps<{
   todayEntry: JournalEntry | null
-  todayMetrics: MetricValueWithDefinition[]
-  metricDefinitions: MetricDefinition[]
   loading: boolean
   onUpsertEntry: (payload: {
     entryDate: string
     title?: string | null
     content: string
     mood?: string | null
-    tags?: string[]
   }, options?: { silent?: boolean }) => Promise<JournalEntry | null>
-  onUpsertMetricValues: (payload: {
-    entryDate: string
-    values: Array<{
-      metricKey: string
-      numberValue: number | null
-      booleanValue: boolean | null
-      textValue: string | null
-      selectValue: string | null
-    }>
-  }) => Promise<boolean>
 }>()
 
 const emit = defineEmits<{
   saved: []
-  metricsSaved: []
 }>()
 
 const today = new Date().toISOString().split('T')[0] ?? ''
 const content = ref('')
 const mood = ref<string | null>(null)
-const tagInput = ref('')
-const entryTags = ref<string[]>([])
 
 // Last successfully saved snapshot — used to detect real changes
 const savedContent = ref('')
@@ -59,13 +43,11 @@ watch(() => props.todayEntry, (entry) => {
     savedContent.value = c
     mood.value = entry.mood ?? null
     savedMood.value = entry.mood ?? null
-    entryTags.value = (entry.tags ?? []).map(t => t.name)
   } else {
     content.value = ''
     savedContent.value = ''
     mood.value = null
     savedMood.value = null
-    entryTags.value = []
     saveStatus.value = 'idle'
   }
 }, { immediate: true })
@@ -99,8 +81,7 @@ async function doSave() {
       entryDate: today,
       title: null,
       content: content.value,
-      mood: mood.value,
-      tags: entryTags.value.length > 0 ? entryTags.value : undefined
+      mood: mood.value
     }, { silent: true })
     if (result) {
       savedContent.value = content.value
@@ -121,7 +102,6 @@ function clearTimer() {
   autoSaveTimer = null
 }
 
-// Schedule a save 60 s after the last change — resets on every new change
 function scheduleAutoSave() {
   clearTimer()
   autoSaveTimer = setTimeout(doSave, 60_000)
@@ -129,7 +109,7 @@ function scheduleAutoSave() {
 
 function markUnsaved() {
   if (!hasChanges.value || isContentEmpty.value) {
-    saveStatus.value = isContentEmpty.value ? 'idle' : saveStatus.value
+    if (isContentEmpty.value) saveStatus.value = 'idle'
     clearTimer()
     return
   }
@@ -152,27 +132,10 @@ watch(mood, (val) => {
   markUnsaved()
 })
 
-watch(entryTags, () => {
-  if (isContentEmpty.value) return
-  markUnsaved()
-}, { deep: true })
-
-// Save immediately on unmount if there are pending unsaved changes
 onBeforeUnmount(() => {
   clearTimer()
   if (saveStatus.value === 'unsaved') doSave()
 })
-
-// ── Tags ───────────────────────────────────────────────────────────────────────
-function addTag() {
-  const tag = tagInput.value.trim()
-  if (tag && !entryTags.value.includes(tag)) entryTags.value.push(tag)
-  tagInput.value = ''
-}
-
-function removeTag(tag: string) {
-  entryTags.value = entryTags.value.filter(t => t !== tag)
-}
 
 function formatToday(): string {
   return new Date(today + 'T12:00:00').toLocaleDateString('pt-BR', {
@@ -189,12 +152,12 @@ function formatToday(): string {
     <!-- Loading skeleton -->
     <template v-if="props.loading">
       <USkeleton class="h-6 w-48" />
-      <USkeleton class="h-64 w-full" />
-      <USkeleton class="h-32 w-full" />
+      <USkeleton class="h-8 w-40" />
+      <USkeleton class="h-64 w-full rounded-lg" />
     </template>
 
     <template v-else>
-      <!-- Header: date on left, auto-save indicator on right -->
+      <!-- Header: date + auto-save indicator -->
       <div class="flex items-start justify-between gap-4">
         <div>
           <h3 class="text-lg font-semibold text-highlighted capitalize">
@@ -228,7 +191,7 @@ function formatToday(): string {
         </div>
       </div>
 
-      <!-- Mood selector — right-aligned, no label -->
+      <!-- Mood selector — right-aligned -->
       <div class="flex justify-end">
         <JournalMoodSelector v-model="mood" />
       </div>
@@ -242,61 +205,9 @@ function formatToday(): string {
           :min-height="'14rem'"
         />
         <template #fallback>
-          <USkeleton class="h-56 w-full" />
+          <USkeleton class="h-56 w-full rounded-lg" />
         </template>
       </ClientOnly>
-
-      <!-- Tags -->
-      <div class="space-y-2">
-        <label class="text-sm font-medium text-highlighted">Tags</label>
-        <div
-          v-if="entryTags.length"
-          class="flex flex-wrap gap-1.5 mb-2"
-        >
-          <UBadge
-            v-for="tag in entryTags"
-            :key="tag"
-            :label="tag"
-            variant="subtle"
-            color="neutral"
-          >
-            <template #trailing>
-              <UButton
-                icon="i-lucide-x"
-                size="xs"
-                color="neutral"
-                variant="ghost"
-                class="ml-1 -mr-1"
-                @click="removeTag(tag)"
-              />
-            </template>
-          </UBadge>
-        </div>
-        <div class="flex items-center gap-2">
-          <UInput
-            v-model="tagInput"
-            placeholder="Adicionar tag..."
-            size="sm"
-            class="flex-1"
-            @keydown.enter.prevent="addTag"
-          />
-          <UButton
-            icon="i-lucide-plus"
-            size="sm"
-            :disabled="!tagInput.trim()"
-            @click="addTag"
-          />
-        </div>
-      </div>
-
-      <!-- Metrics panel -->
-      <JournalMetricsPanel
-        :definitions="metricDefinitions"
-        :existing-values="todayMetrics"
-        :entry-date="today"
-        :on-upsert-metric-values="props.onUpsertMetricValues"
-        @saved="emit('metricsSaved')"
-      />
     </template>
   </div>
 </template>
