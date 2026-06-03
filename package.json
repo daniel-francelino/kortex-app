@@ -38,6 +38,7 @@
     "@standard-schema/spec": "^1.1.0",
     "@supabase/supabase-js": "^2.98.0",
     "@tanstack/table-core": "^8.21.3",
+    "@tiptap/core": "^3.25.0",
     "@tiptap/extension-bubble-menu": "^3.25.0",
     "@tiptap/extension-link": "^3.25.0",
     "@tiptap/extension-placeholder": "^3.25.0",
