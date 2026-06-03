@@ -43,21 +43,17 @@ const activeTab = ref('today')
 const tabItems = [
   { label: 'Hoje', value: 'today', icon: 'i-lucide-pen-line' },
   { label: 'Calendário', value: 'calendar', icon: 'i-lucide-calendar' },
-  { label: 'Entradas', value: 'entries', icon: 'i-lucide-list' },
   { label: 'Insights', value: 'insights', icon: 'i-lucide-bar-chart-3' }
 ]
 
+// View mode inside the Calendar tab: 'calendar' | 'list'
+const calendarViewMode = ref<'calendar' | 'list'>('calendar')
+
 watch(activeTab, (tab) => {
-  if (tab === 'today') {
-    refreshToday()
-  }
-  if (tab === 'insights') {
-    refreshInsights()
-  }
+  if (tab === 'today') refreshToday()
+  if (tab === 'insights') refreshInsights()
   if (tab === 'calendar') {
     refreshCalendar()
-  }
-  if (tab === 'entries') {
     listPage.value = 1
   }
 })
@@ -140,59 +136,79 @@ const tagFilterOptions = computed(() => [
           />
         </div>
 
-        <!-- CALENDAR TAB -->
-        <div v-if="activeTab === 'calendar'">
+        <!-- CALENDAR TAB — toggle between calendar and list view -->
+        <div
+          v-if="activeTab === 'calendar'"
+          class="space-y-4"
+        >
+          <!-- View mode toggle -->
+          <div class="flex items-center justify-end">
+            <div class="flex items-center gap-1 rounded-lg border border-default bg-elevated p-1">
+              <UButton
+                icon="i-lucide-calendar"
+                size="xs"
+                :color="calendarViewMode === 'calendar' ? 'primary' : 'neutral'"
+                :variant="calendarViewMode === 'calendar' ? 'soft' : 'ghost'"
+                @click="calendarViewMode = 'calendar'"
+              />
+              <UButton
+                icon="i-lucide-list"
+                size="xs"
+                :color="calendarViewMode === 'list' ? 'primary' : 'neutral'"
+                :variant="calendarViewMode === 'list' ? 'soft' : 'ghost'"
+                @click="calendarViewMode = 'list'"
+              />
+            </div>
+          </div>
+
+          <!-- Calendar view -->
           <JournalCalendarView
+            v-if="calendarViewMode === 'calendar'"
             :entry-dates="calendarDates ?? []"
             :loading="calendarStatus === 'pending'"
             @select-date="onSelectDate"
             @month-change="onCalendarMonthChange"
           />
-        </div>
 
-        <!-- ENTRIES TAB -->
-        <div
-          v-if="activeTab === 'entries'"
-          class="space-y-4"
-        >
-          <!-- Filters -->
-          <div class="flex flex-wrap items-center gap-2">
-            <UInput
-              v-model="listSearch"
-              icon="i-lucide-search"
-              placeholder="Buscar entradas..."
-              class="max-w-xs"
+          <!-- List view -->
+          <template v-else>
+            <div class="flex flex-wrap items-center gap-2">
+              <UInput
+                v-model="listSearch"
+                icon="i-lucide-search"
+                placeholder="Buscar entradas..."
+                class="max-w-xs"
+              />
+              <UInput
+                v-model="listFrom"
+                type="date"
+                placeholder="De"
+                class="max-w-40"
+              />
+              <UInput
+                v-model="listTo"
+                type="date"
+                placeholder="Até"
+                class="max-w-40"
+              />
+              <USelect
+                v-model="listTagModel"
+                :items="tagFilterOptions"
+                value-key="value"
+                placeholder="Tag"
+                class="min-w-28"
+              />
+            </div>
+            <JournalEntryList
+              :entries="listData?.data ?? []"
+              :total="listData?.total ?? 0"
+              :page="listPage"
+              :page-size="listPageSize"
+              :loading="listFetchStatus === 'pending'"
+              @update:page="listPage = $event"
+              @select="onSelectDate"
             />
-            <UInput
-              v-model="listFrom"
-              type="date"
-              placeholder="De"
-              class="max-w-40"
-            />
-            <UInput
-              v-model="listTo"
-              type="date"
-              placeholder="Até"
-              class="max-w-40"
-            />
-            <USelect
-              v-model="listTagModel"
-              :items="tagFilterOptions"
-              value-key="value"
-              placeholder="Tag"
-              class="min-w-28"
-            />
-          </div>
-
-          <JournalEntryList
-            :entries="listData?.data ?? []"
-            :total="listData?.total ?? 0"
-            :page="listPage"
-            :page-size="listPageSize"
-            :loading="listFetchStatus === 'pending'"
-            @update:page="listPage = $event"
-            @select="onSelectDate"
-          />
+          </template>
         </div>
 
         <!-- INSIGHTS TAB -->
