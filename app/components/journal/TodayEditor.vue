@@ -20,34 +20,42 @@ const today = new Date().toISOString().split('T')[0] ?? ''
 const content = ref('')
 const mood = ref<string | null>(null)
 
-// Last successfully saved snapshot — used to detect real changes
+// Last saved snapshot — what the server currently has
 const savedContent = ref('')
 const savedMood = ref<string | null>(null)
 
+// Timestamp of the last user-initiated change (0 = no pending change)
+const lastChangeAt = ref(0)
+
 // ── Auto-save state ────────────────────────────────────────────────────────────
-// 'saving' is intentionally absent — save happens silently, user keeps editing
 type SaveStatus = 'idle' | 'unsaved' | 'saved' | 'error'
 const saveStatus = ref<SaveStatus>('idle')
 const savedAt = ref<Date | null>(null)
-let autoSaveTimer: ReturnType<typeof setTimeout> | null = null
 
 const savedAtText = computed(() =>
   savedAt.value?.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) ?? ''
 )
 
-// Sync entry on load — mark it as already saved so watchers don't trigger
+// ── Sync entry from props ──────────────────────────────────────────────────────
 watch(() => props.todayEntry, (entry) => {
   if (entry) {
     const c = entry.content ?? ''
-    content.value = c
+    if (c !== content.value) {
+      content.value = c
+    }
     savedContent.value = c
-    mood.value = entry.mood ?? null
-    savedMood.value = entry.mood ?? null
+
+    const m = entry.mood ?? null
+    if (m !== mood.value) {
+      mood.value = m
+    }
+    savedMood.value = m
   } else {
     content.value = ''
     savedContent.value = ''
     mood.value = null
     savedMood.value = null
+    lastChangeAt.value = 0
     saveStatus.value = 'idle'
   }
 }, { immediate: true })
@@ -58,22 +66,22 @@ const isContentEmpty = computed(() => {
   if (!val) return true
   try {
     const doc = JSON.parse(val)
-    function nodeHasText(n: { type: string; text?: string; content?: unknown[] }): boolean {
+    function hasText(n: { type: string; text?: string; content?: unknown[] }): boolean {
       if (n.type === 'text' && n.text?.trim()) return true
-      return (n.content ?? []).some(c => nodeHasText(c as typeof n))
+      return (n.content ?? []).some(c => hasText(c as typeof n))
     }
-    return !(doc.content ?? []).some((n: { type: string; text?: string; content?: unknown[] }) => nodeHasText(n))
+    return !(doc.content ?? []).some((n: { type: string; text?: string; content?: unknown[] }) => hasText(n))
   } catch {
     return !val.trim()
   }
 })
 
-// True when current state differs from last save
+// True when editor has unsaved changes
 const hasChanges = computed(() =>
   content.value !== savedContent.value || mood.value !== savedMood.value
 )
 
-// ── Save logic — runs silently, user is never blocked ──────────────────────────
+// ── Save logic ─────────────────────────────────────────────────────────────────
 async function doSave() {
   if (isContentEmpty.value || !hasChanges.value) return
   try {
@@ -86,6 +94,7 @@ async function doSave() {
     if (result) {
       savedContent.value = content.value
       savedMood.value = mood.value
+      lastChangeAt.value = 0
       saveStatus.value = 'saved'
       savedAt.value = new Date()
       emit('saved')
@@ -97,46 +106,52 @@ async function doSave() {
   }
 }
 
-function clearTimer() {
-  if (autoSaveTimer) clearTimeout(autoSaveTimer)
-  autoSaveTimer = null
-}
+// ── Polling-based auto-save ────────────────────────────────────────────────────
+// Polling avoids the "debounce resets on every keystroke" problem.
+// Checks every 10s — saves when there are changes older than 60s.
+const SAVE_AFTER_MS = 60_000
+const POLL_INTERVAL_MS = 10_000
 
-function scheduleAutoSave() {
-  clearTimer()
-  autoSaveTimer = setTimeout(doSave, 60_000)
-}
+let pollTimer: ReturnType<typeof setInterval> | null = null
 
-function markUnsaved() {
-  if (!hasChanges.value || isContentEmpty.value) {
-    if (isContentEmpty.value) saveStatus.value = 'idle'
-    clearTimer()
-    return
+onMounted(() => {
+  pollTimer = setInterval(() => {
+    if (!hasChanges.value || isContentEmpty.value || lastChangeAt.value === 0) return
+    if (Date.now() - lastChangeAt.value < SAVE_AFTER_MS) return
+    doSave()
+  }, POLL_INTERVAL_MS)
+})
+
+onBeforeUnmount(() => {
+  if (pollTimer) {
+    clearInterval(pollTimer)
+    pollTimer = null
   }
-  saveStatus.value = 'unsaved'
-  scheduleAutoSave()
-}
+  // Best-effort immediate save on unmount
+  if (saveStatus.value === 'unsaved') doSave()
+})
 
+// ── Watch for user changes ─────────────────────────────────────────────────────
 watch(content, (val) => {
   if (val === savedContent.value) return
   if (isContentEmpty.value) {
     saveStatus.value = 'idle'
-    clearTimer()
+    lastChangeAt.value = 0
     return
   }
-  markUnsaved()
+  lastChangeAt.value = Date.now()
+  saveStatus.value = 'unsaved'
 })
 
 watch(mood, (val) => {
   if (val === savedMood.value) return
-  markUnsaved()
+  if (!isContentEmpty.value) {
+    lastChangeAt.value = Date.now()
+    saveStatus.value = 'unsaved'
+  }
 })
 
-onBeforeUnmount(() => {
-  clearTimer()
-  if (saveStatus.value === 'unsaved') doSave()
-})
-
+// ── Helpers ────────────────────────────────────────────────────────────────────
 function formatToday(): string {
   return new Date(today + 'T12:00:00').toLocaleDateString('pt-BR', {
     weekday: 'long',
@@ -168,7 +183,7 @@ function formatToday(): string {
           </p>
         </div>
 
-        <!-- Auto-save status — minimal, no spinner -->
+        <!-- Auto-save status — no spinner, save is invisible to user -->
         <div class="flex items-center gap-1.5 text-xs shrink-0 pt-0.5">
           <template v-if="saveStatus === 'unsaved'">
             <span class="size-1.5 rounded-full bg-amber-400 dark:bg-amber-500 animate-pulse" />
