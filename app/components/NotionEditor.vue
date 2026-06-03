@@ -255,8 +255,10 @@ watch(() => props.editable, val => editor.value?.setEditable(val))
 
 <template>
   <div class="notion-editor" :style="{ '--notion-min-height': minHeight }">
-    <!-- Editor content -->
-    <EditorContent :editor="editor" class="notion-content" />
+    <!-- Editor content — bordered like other inputs -->
+    <div class="notion-border">
+      <EditorContent :editor="editor" class="notion-content" />
+    </div>
 
     <!-- Custom bubble menu (inline formatting toolbar on text selection) -->
     <Teleport to="body">
@@ -366,6 +368,20 @@ watch(() => props.editable, val => editor.value?.setEditable(val))
 .notion-editor {
   position: relative;
   width: 100%;
+}
+
+/* Border matching UInput/UTextarea style */
+.notion-border {
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius, 0.375rem);
+  padding: 0.625rem 0.875rem;
+  background: var(--ui-bg);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.notion-border:focus-within {
+  border-color: var(--ui-color-primary, #18b981);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--ui-color-primary, #18b981) 15%, transparent);
 }
 
 /* ── Bubble menu ── */

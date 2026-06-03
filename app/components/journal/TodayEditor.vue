@@ -10,7 +10,7 @@ const props = defineProps<{
     entryDate: string
     title?: string | null
     content: string
-    mood?: number | null
+    mood?: string | null
     tags?: string[]
   }, options?: { silent?: boolean }) => Promise<JournalEntry | null>
   onUpsertMetricValues: (payload: {
@@ -36,11 +36,13 @@ const mood = ref<string | null>(null)
 const tagInput = ref('')
 const entryTags = ref<string[]>([])
 
-// Last successfully saved content — prevents triggering auto-save on initial load
+// Last successfully saved snapshot — used to detect real changes
 const savedContent = ref('')
+const savedMood = ref<string | null>(null)
 
 // ── Auto-save state ────────────────────────────────────────────────────────────
-type SaveStatus = 'idle' | 'unsaved' | 'saving' | 'saved' | 'error'
+// 'saving' is intentionally absent — save happens silently, user keeps editing
+type SaveStatus = 'idle' | 'unsaved' | 'saved' | 'error'
 const saveStatus = ref<SaveStatus>('idle')
 const savedAt = ref<Date | null>(null)
 let autoSaveTimer: ReturnType<typeof setTimeout> | null = null
@@ -49,18 +51,20 @@ const savedAtText = computed(() =>
   savedAt.value?.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) ?? ''
 )
 
-// Sync entry data when it loads; mark it as already saved
+// Sync entry on load — mark it as already saved so watchers don't trigger
 watch(() => props.todayEntry, (entry) => {
   if (entry) {
     const c = entry.content ?? ''
     content.value = c
     savedContent.value = c
     mood.value = entry.mood ?? null
+    savedMood.value = entry.mood ?? null
     entryTags.value = (entry.tags ?? []).map(t => t.name)
   } else {
     content.value = ''
     savedContent.value = ''
     mood.value = null
+    savedMood.value = null
     entryTags.value = []
     saveStatus.value = 'idle'
   }
@@ -82,13 +86,14 @@ const isContentEmpty = computed(() => {
   }
 })
 
-// ── Save logic ─────────────────────────────────────────────────────────────────
+// True when current state differs from last save
+const hasChanges = computed(() =>
+  content.value !== savedContent.value || mood.value !== savedMood.value
+)
+
+// ── Save logic — runs silently, user is never blocked ──────────────────────────
 async function doSave() {
-  if (isContentEmpty.value) {
-    saveStatus.value = 'idle'
-    return
-  }
-  saveStatus.value = 'saving'
+  if (isContentEmpty.value || !hasChanges.value) return
   try {
     const result = await props.onUpsertEntry({
       entryDate: today,
@@ -99,6 +104,7 @@ async function doSave() {
     }, { silent: true })
     if (result) {
       savedContent.value = content.value
+      savedMood.value = mood.value
       saveStatus.value = 'saved'
       savedAt.value = new Date()
       emit('saved')
@@ -115,12 +121,22 @@ function clearTimer() {
   autoSaveTimer = null
 }
 
+// Schedule a save 60 s after the last change — resets on every new change
 function scheduleAutoSave() {
   clearTimer()
-  autoSaveTimer = setTimeout(doSave, 1500)
+  autoSaveTimer = setTimeout(doSave, 60_000)
 }
 
-// Watch content — only trigger auto-save when content actually changed from last save
+function markUnsaved() {
+  if (!hasChanges.value || isContentEmpty.value) {
+    saveStatus.value = isContentEmpty.value ? 'idle' : saveStatus.value
+    clearTimer()
+    return
+  }
+  saveStatus.value = 'unsaved'
+  scheduleAutoSave()
+}
+
 watch(content, (val) => {
   if (val === savedContent.value) return
   if (isContentEmpty.value) {
@@ -128,24 +144,24 @@ watch(content, (val) => {
     clearTimer()
     return
   }
-  saveStatus.value = 'unsaved'
-  scheduleAutoSave()
+  markUnsaved()
 })
 
-// Mood or tag changes also trigger auto-save (when there's content)
-watch(mood, () => {
-  if (isContentEmpty.value) return
-  saveStatus.value = 'unsaved'
-  scheduleAutoSave()
+watch(mood, (val) => {
+  if (val === savedMood.value) return
+  markUnsaved()
 })
 
 watch(entryTags, () => {
   if (isContentEmpty.value) return
-  saveStatus.value = 'unsaved'
-  scheduleAutoSave()
+  markUnsaved()
 }, { deep: true })
 
-onBeforeUnmount(() => clearTimer())
+// Save immediately on unmount if there are pending unsaved changes
+onBeforeUnmount(() => {
+  clearTimer()
+  if (saveStatus.value === 'unsaved') doSave()
+})
 
 // ── Tags ───────────────────────────────────────────────────────────────────────
 function addTag() {
@@ -169,7 +185,7 @@ function formatToday(): string {
 </script>
 
 <template>
-  <div class="space-y-6">
+  <div class="space-y-5">
     <!-- Loading skeleton -->
     <template v-if="props.loading">
       <USkeleton class="h-6 w-48" />
@@ -178,8 +194,8 @@ function formatToday(): string {
     </template>
 
     <template v-else>
-      <!-- Header: date + auto-save indicator -->
-      <div class="flex items-center justify-between gap-4">
+      <!-- Header: date on left, auto-save indicator on right -->
+      <div class="flex items-start justify-between gap-4">
         <div>
           <h3 class="text-lg font-semibold text-highlighted capitalize">
             {{ formatToday() }}
@@ -189,15 +205,11 @@ function formatToday(): string {
           </p>
         </div>
 
-        <!-- Auto-save status indicator -->
-        <div class="flex items-center gap-1.5 text-xs shrink-0">
+        <!-- Auto-save status — minimal, no spinner -->
+        <div class="flex items-center gap-1.5 text-xs shrink-0 pt-0.5">
           <template v-if="saveStatus === 'unsaved'">
             <span class="size-1.5 rounded-full bg-amber-400 dark:bg-amber-500 animate-pulse" />
             <span class="text-muted">Não salvo</span>
-          </template>
-          <template v-else-if="saveStatus === 'saving'">
-            <UIcon name="i-lucide-loader" class="size-3 text-muted animate-spin" />
-            <span class="text-muted">Salvando...</span>
           </template>
           <template v-else-if="saveStatus === 'saved'">
             <UIcon name="i-lucide-check-circle" class="size-3 text-success" />
@@ -205,7 +217,7 @@ function formatToday(): string {
           </template>
           <template v-else-if="saveStatus === 'error'">
             <UIcon name="i-lucide-alert-circle" class="size-3 text-error" />
-            <span class="text-error">Erro ao salvar —</span>
+            <span class="text-error">Erro —</span>
             <button
               class="text-primary underline underline-offset-2 cursor-pointer"
               @click="doSave"
@@ -216,10 +228,12 @@ function formatToday(): string {
         </div>
       </div>
 
-      <!-- Mood selector -->
-      <JournalMoodSelector v-model="mood" />
+      <!-- Mood selector — right-aligned, no label -->
+      <div class="flex justify-end">
+        <JournalMoodSelector v-model="mood" />
+      </div>
 
-      <!-- Notion-like editor — key is stable per day so editor is NOT recreated on save -->
+      <!-- Notion editor -->
       <ClientOnly>
         <NotionEditor
           :key="today"
@@ -258,7 +272,31 @@ function formatToday(): string {
             </template>
           </UBadge>
         </div>
+        <div class="flex items-center gap-2">
+          <UInput
+            v-model="tagInput"
+            placeholder="Adicionar tag..."
+            size="sm"
+            class="flex-1"
+            @keydown.enter.prevent="addTag"
+          />
+          <UButton
+            icon="i-lucide-plus"
+            size="sm"
+            :disabled="!tagInput.trim()"
+            @click="addTag"
+          />
+        </div>
       </div>
+
+      <!-- Metrics panel -->
+      <JournalMetricsPanel
+        :definitions="metricDefinitions"
+        :existing-values="todayMetrics"
+        :entry-date="today"
+        :on-upsert-metric-values="props.onUpsertMetricValues"
+        @saved="emit('metricsSaved')"
+      />
     </template>
   </div>
 </template>

@@ -4,10 +4,8 @@ import { MOOD_OPTIONS } from '~/types/journal'
 
 const props = withDefaults(defineProps<{
   modelValue?: string | null
-  label?: string
 }>(), {
-  modelValue: null,
-  label: 'Como foi o seu dia?',
+  modelValue: null
 })
 
 const emit = defineEmits<{
@@ -15,7 +13,6 @@ const emit = defineEmits<{
 }>()
 
 function select(value: MoodValue) {
-  // Click same → deselect
   emit('update:modelValue', props.modelValue === value ? null : value)
 }
 
@@ -37,44 +34,28 @@ const hoverClasses: Record<MoodValue, string> = {
 </script>
 
 <template>
-  <div class="space-y-2">
-    <p class="text-sm font-medium text-muted">
-      {{ label }}
-    </p>
-
-    <div class="flex items-stretch gap-2">
-      <button
-        v-for="mood in MOOD_OPTIONS"
-        :key="mood.value"
-        type="button"
+  <div class="flex items-center gap-1">
+    <button
+      v-for="mood in MOOD_OPTIONS"
+      :key="mood.value"
+      type="button"
+      :class="[
+        'group flex flex-col items-center justify-center gap-1 w-12 h-12 rounded-xl',
+        'border transition-all duration-150 cursor-pointer select-none',
+        modelValue === mood.value
+          ? ['ring-2 border-transparent', bgClasses[mood.value]]
+          : ['border-transparent', hoverClasses[mood.value]],
+      ]"
+      :title="mood.label"
+      @click="select(mood.value)"
+    >
+      <span
         :class="[
-          'flex flex-col items-center justify-center gap-1.5 flex-1 py-3 px-1 rounded-xl',
-          'border transition-all duration-150 cursor-pointer select-none',
-          modelValue === mood.value
-            ? ['ring-2 border-transparent', bgClasses[mood.value]]
-            : ['border-transparent', hoverClasses[mood.value]],
+          'text-xl leading-none transition-all duration-150',
+          modelValue === mood.value ? 'scale-110' : '',
+          modelValue !== null && modelValue !== mood.value ? 'opacity-35' : 'opacity-100',
         ]"
-        :title="mood.label"
-        @click="select(mood.value)"
-      >
-        <!-- Emoji -->
-        <span
-          :class="[
-            'transition-transform duration-150 leading-none',
-            modelValue === mood.value ? 'text-3xl scale-110' : 'text-2xl',
-            modelValue !== null && modelValue !== mood.value ? 'opacity-40' : 'opacity-100',
-          ]"
-        >{{ mood.emoji }}</span>
-
-        <!-- Label — always visible on selected, hidden on others -->
-        <span
-          :class="[
-            'text-[10px] font-medium leading-none text-center transition-all duration-150 whitespace-nowrap',
-            modelValue === mood.value ? 'opacity-100' : 'opacity-0',
-          ]"
-          :style="{ color: mood.color }"
-        >{{ mood.label }}</span>
-      </button>
-    </div>
+      >{{ mood.emoji }}</span>
+    </button>
   </div>
 </template>
