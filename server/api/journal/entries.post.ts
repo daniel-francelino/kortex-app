@@ -6,6 +6,7 @@ const bodySchema = z.object({
   entryDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   title: z.string().max(200).nullable().optional(),
   content: z.string().min(1),
+  mood: z.enum(['very_bad', 'bad', 'neutral', 'good', 'very_good']).nullable().optional(),
   tags: z.array(z.string().max(50)).optional()
 })
 
@@ -24,6 +25,7 @@ export default eventHandler(async (event) => {
       entry_date: parsed.entryDate,
       title: parsed.title ?? null,
       content: parsed.content,
+      mood: parsed.mood ?? null,
       updated_at: new Date().toISOString()
     }, { onConflict: 'user_id,entry_date' })
     .select('*')

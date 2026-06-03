@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { JournalEntry } from '~/types/journal'
+import { getMoodOption } from '~/types/journal'
 
 const props = defineProps<{
   open: boolean
@@ -18,6 +19,7 @@ const entry = ref<JournalEntry | null>(null)
 const entryTags = ref<string[]>([])
 
 const content = ref('')
+const mood = ref<string | null>(null)
 const editing = ref(false)
 const saving = ref(false)
 
@@ -40,6 +42,7 @@ async function loadEntry() {
       entry.value = data.entry
       entryTags.value = (data.tags ?? []).map((t: unknown) => (t as { name: string }).name)
       content.value = data.entry?.content ?? ''
+      mood.value = data.entry?.mood ?? null
     }
   } finally {
     loading.value = false
@@ -68,6 +71,7 @@ async function onSave() {
       entryDate: props.date,
       title: null,
       content: content.value,
+      mood: mood.value,
       tags: entryTags.value.length > 0 ? entryTags.value : undefined
     })
     if (result) {
@@ -133,8 +137,19 @@ function formatDate(dateStr: string): string {
 
         <!-- View mode -->
         <template v-if="entry && !editing">
-          <!-- Edit action -->
-          <div class="flex justify-end">
+          <!-- Mood display + edit action -->
+          <div class="flex items-center justify-between gap-3">
+            <div
+              v-if="getMoodOption(entry.mood)"
+              class="flex items-center gap-2"
+            >
+              <span class="text-2xl leading-none">{{ getMoodOption(entry.mood)?.emoji }}</span>
+              <span
+                class="text-sm font-medium"
+                :style="{ color: getMoodOption(entry.mood)?.color }"
+              >{{ getMoodOption(entry.mood)?.label }}</span>
+            </div>
+            <div v-else />
             <UButton
               icon="i-lucide-pencil"
               label="Editar"
@@ -175,6 +190,8 @@ function formatDate(dateStr: string): string {
 
         <!-- Edit mode -->
         <template v-if="editing">
+          <JournalMoodSelector v-model="mood" />
+
           <ClientOnly>
             <NotionEditor
               :key="props.date + '-edit'"

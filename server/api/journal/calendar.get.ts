@@ -9,7 +9,7 @@ export default eventHandler(async (event) => {
 
   let queryBuilder = supabase
     .from('journal_entries')
-    .select('entry_date')
+    .select('entry_date, mood')
     .eq('user_id', user.id)
     .is('archived_at', null)
 
@@ -26,6 +26,9 @@ export default eventHandler(async (event) => {
     throw createError({ statusCode: 500, statusMessage: error.message })
   }
 
-  // Return array of dates that have entries
-  return (data ?? []).map((e: Record<string, unknown>) => e.entry_date as string)
+  // Return array of { date, mood } for calendar display
+  return (data ?? []).map((e: Record<string, unknown>) => ({
+    date: e.entry_date as string,
+    mood: (e.mood ?? null) as string | null
+  }))
 })

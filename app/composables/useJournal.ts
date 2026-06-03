@@ -117,7 +117,7 @@ export function useJournal() {
     data: calendarDates,
     status: calendarStatus,
     refresh: refreshCalendar
-  } = useFetch<string[]>('/api/journal/calendar', {
+  } = useFetch<{ date: string; mood: string | null }[]>('/api/journal/calendar', {
     query: computed(() => ({
       from: calendarFrom.value || undefined,
       to: calendarTo.value || undefined
@@ -129,19 +129,23 @@ export function useJournal() {
 
   // ─── Entry Actions ────────────────────────────────────────────────────────
 
-  async function upsertEntry(payload: UpsertEntryPayload): Promise<JournalEntry | null> {
+  async function upsertEntry(payload: UpsertEntryPayload, options?: { silent?: boolean }): Promise<JournalEntry | null> {
     try {
       const entry = await $fetch<JournalEntry>('/api/journal/entries', {
         method: 'POST',
         body: payload
       })
-      toast.add({ title: 'Entrada salva', description: 'Sua entrada foi salva com sucesso.', color: 'success' })
+      if (!options?.silent) {
+        toast.add({ title: 'Entrada salva', description: 'Sua entrada foi salva com sucesso.', color: 'success' })
+      }
       await refreshList()
       await refreshToday()
       await refreshCalendar()
       return entry
     } catch {
-      toast.add({ title: 'Erro', description: 'Não foi possível salvar a entrada.', color: 'error' })
+      if (!options?.silent) {
+        toast.add({ title: 'Erro', description: 'Não foi possível salvar a entrada.', color: 'error' })
+      }
       return null
     }
   }

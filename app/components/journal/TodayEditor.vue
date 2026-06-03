@@ -10,8 +10,9 @@ const props = defineProps<{
     entryDate: string
     title?: string | null
     content: string
+    mood?: number | null
     tags?: string[]
-  }) => Promise<JournalEntry | null>
+  }, options?: { silent?: boolean }) => Promise<JournalEntry | null>
   onUpsertMetricValues: (payload: {
     entryDate: string
     values: Array<{
@@ -31,6 +32,7 @@ const emit = defineEmits<{
 
 const today = new Date().toISOString().split('T')[0] ?? ''
 const content = ref('')
+const mood = ref<string | null>(null)
 const tagInput = ref('')
 const entryTags = ref<string[]>([])
 
@@ -53,10 +55,12 @@ watch(() => props.todayEntry, (entry) => {
     const c = entry.content ?? ''
     content.value = c
     savedContent.value = c
+    mood.value = entry.mood ?? null
     entryTags.value = (entry.tags ?? []).map(t => t.name)
   } else {
     content.value = ''
     savedContent.value = ''
+    mood.value = null
     entryTags.value = []
     saveStatus.value = 'idle'
   }
@@ -90,8 +94,9 @@ async function doSave() {
       entryDate: today,
       title: null,
       content: content.value,
+      mood: mood.value,
       tags: entryTags.value.length > 0 ? entryTags.value : undefined
-    })
+    }, { silent: true })
     if (result) {
       savedContent.value = content.value
       saveStatus.value = 'saved'
@@ -127,7 +132,13 @@ watch(content, (val) => {
   scheduleAutoSave()
 })
 
-// Tag changes also trigger auto-save (when there's content)
+// Mood or tag changes also trigger auto-save (when there's content)
+watch(mood, () => {
+  if (isContentEmpty.value) return
+  saveStatus.value = 'unsaved'
+  scheduleAutoSave()
+})
+
 watch(entryTags, () => {
   if (isContentEmpty.value) return
   saveStatus.value = 'unsaved'
@@ -204,6 +215,9 @@ function formatToday(): string {
           </template>
         </div>
       </div>
+
+      <!-- Mood selector -->
+      <JournalMoodSelector v-model="mood" />
 
       <!-- Notion-like editor — key is stable per day so editor is NOT recreated on save -->
       <ClientOnly>

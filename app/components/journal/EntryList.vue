@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { JournalEntry } from '~/types/journal'
+import { getMoodOption } from '~/types/journal'
 
 defineProps<{
   entries: JournalEntry[]
@@ -90,11 +91,17 @@ function extractPreview(jsonContent: string): string {
       @click="emit('select', entry.entryDate)"
     >
       <div class="space-y-2">
-        <!-- Date -->
-        <p class="text-xs font-medium text-muted capitalize">
-          {{ formatDate(entry.entryDate) }}
-        </p>
-
+        <!-- Date + mood -->
+        <div class="flex items-center justify-between gap-2">
+          <p class="text-xs font-medium text-muted capitalize">
+            {{ formatDate(entry.entryDate) }}
+          </p>
+          <span
+            v-if="getMoodOption(entry.mood)"
+            class="text-base leading-none"
+            :title="getMoodOption(entry.mood)?.label"
+          >{{ getMoodOption(entry.mood)?.emoji }}</span>
+        </div>
         <!-- Content preview — up to 5 visual lines -->
         <p
           v-if="extractPreview(entry.content)"
