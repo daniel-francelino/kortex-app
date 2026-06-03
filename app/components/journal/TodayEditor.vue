@@ -62,8 +62,24 @@ function removeTag(tag: string) {
 
 const saving = ref(false)
 
+// Check if Tiptap JSON document has actual text content
+const isContentEmpty = computed(() => {
+  const val = content.value
+  if (!val) return true
+  try {
+    const doc = JSON.parse(val)
+    function nodeHasText(node: { type: string; text?: string; content?: unknown[] }): boolean {
+      if (node.type === 'text' && node.text?.trim()) return true
+      return (node.content ?? []).some(n => nodeHasText(n as typeof node))
+    }
+    return !(doc.content ?? []).some((n: { type: string; text?: string; content?: unknown[] }) => nodeHasText(n))
+  } catch {
+    return !val.trim()
+  }
+})
+
 async function onSave() {
-  if (!content.value.trim()) return
+  if (isContentEmpty.value) return
   if (saving.value) return
   saving.value = true
   try {
@@ -116,26 +132,29 @@ function formatToday(): string {
           label="Salvar"
           icon="i-lucide-save"
           :loading="saving"
-          :disabled="saving || !content.trim()"
+          :disabled="saving || isContentEmpty"
           @click="onSave"
         />
       </div>
 
-      <!-- Entry editor -->
-      <div class="space-y-3">
-        <UInput
-          v-model="title"
-          placeholder="Título da entrada (opcional)"
-          size="lg"
-        />
+      <!-- Title -->
+      <UInput
+        v-model="title"
+        placeholder="Título da entrada (opcional)"
+        size="lg"
+      />
 
-        <UTextarea
+      <!-- Notion-like editor — key is stable per day so editor is NOT recreated on save -->
+      <ClientOnly>
+        <NotionEditor
+          :key="today"
           v-model="content"
-          placeholder="Escreva livremente sobre o seu dia: o que aconteceu, como você se sentiu e o que aprendeu."
-          :rows="8"
-          autoresize
+          placeholder="Escreva livremente sobre o seu dia... use '/' para inserir blocos."
         />
-      </div>
+        <template #fallback>
+          <USkeleton class="h-40 w-full" />
+        </template>
+      </ClientOnly>
 
       <!-- Tags -->
       <div class="space-y-2">

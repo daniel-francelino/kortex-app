@@ -56,8 +56,23 @@ function startEditing() {
   editing.value = true
 }
 
+// Check if Tiptap JSON document has actual text content
+function isContentEmpty(val: string): boolean {
+  if (!val) return true
+  try {
+    const doc = JSON.parse(val)
+    function nodeHasText(node: { type: string; text?: string; content?: unknown[] }): boolean {
+      if (node.type === 'text' && node.text?.trim()) return true
+      return (node.content ?? []).some(n => nodeHasText(n as typeof node))
+    }
+    return !(doc.content ?? []).some((n: { type: string; text?: string; content?: unknown[] }) => nodeHasText(n))
+  } catch {
+    return !val.trim()
+  }
+}
+
 async function onSave() {
-  if (!content.value.trim()) return
+  if (isContentEmpty(content.value)) return
   if (saving.value) return
   saving.value = true
   try {
@@ -102,7 +117,7 @@ const defs = computed<MetricDefinition[]>(() => metricDefinitions.value ?? [])
       >
         <USkeleton class="h-6 w-2/3" />
         <USkeleton class="h-4 w-full" />
-        <USkeleton class="h-32 w-full" />
+        <USkeleton class="h-40 w-full" />
       </div>
 
       <div
@@ -128,9 +143,9 @@ const defs = computed<MetricDefinition[]>(() => metricDefinitions.value ?? [])
           />
         </div>
 
-        <!-- View mode -->
+        <!-- View mode — NotionEditor in read-only renders rich blocks -->
         <template v-if="entry && !editing">
-          <div class="flex items-start justify-between">
+          <div class="flex items-start justify-between gap-2">
             <h3
               v-if="entry.title"
               class="text-lg font-semibold text-highlighted"
@@ -142,13 +157,22 @@ const defs = computed<MetricDefinition[]>(() => metricDefinitions.value ?? [])
               color="neutral"
               variant="ghost"
               size="sm"
+              class="shrink-0"
               @click="startEditing"
             />
           </div>
 
-          <div class="text-sm text-highlighted whitespace-pre-wrap">
-            {{ entry.content }}
-          </div>
+          <!-- Read-only rich content renderer -->
+          <ClientOnly>
+            <NotionEditor
+              :key="props.date + '-view'"
+              :model-value="entry.content ?? ''"
+              :editable="false"
+            />
+            <template #fallback>
+              <USkeleton class="h-32 w-full" />
+            </template>
+          </ClientOnly>
 
           <!-- Tags -->
           <div
@@ -176,19 +200,23 @@ const defs = computed<MetricDefinition[]>(() => metricDefinitions.value ?? [])
 
         <!-- Edit mode -->
         <template v-if="editing">
-          <div class="space-y-3">
-            <UInput
-              v-model="title"
-              placeholder="Título (opcional)"
-              size="lg"
-            />
-            <UTextarea
+          <UInput
+            v-model="title"
+            placeholder="Título (opcional)"
+            size="lg"
+          />
+
+          <!-- Notion editor for editing — key resets when date changes -->
+          <ClientOnly>
+            <NotionEditor
+              :key="props.date + '-edit'"
               v-model="content"
-              placeholder="Escreva sua entrada..."
-              :rows="8"
-              autoresize
+              placeholder="Escreva sua entrada... use '/' para inserir blocos."
             />
-          </div>
+            <template #fallback>
+              <USkeleton class="h-40 w-full" />
+            </template>
+          </ClientOnly>
 
           <div class="flex justify-end gap-2">
             <UButton
@@ -200,7 +228,7 @@ const defs = computed<MetricDefinition[]>(() => metricDefinitions.value ?? [])
             <UButton
               label="Salvar"
               :loading="saving"
-              :disabled="saving || !content.trim()"
+              :disabled="saving || isContentEmpty(content)"
               @click="onSave"
             />
           </div>
