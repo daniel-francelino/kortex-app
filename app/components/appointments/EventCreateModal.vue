@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { z } from 'zod'
+import type { DateValue, TimeValue } from '@internationalized/date'
 import type { Calendar } from '~/types/appointments'
 import { ReminderType } from '~/types/appointments'
+import { strToDateValue, dateValueToStr, strToTimeValue, timeValueToStr } from '~/utils/calendarDate'
 
 const props = defineProps<{
   open: boolean
@@ -77,6 +79,27 @@ const selectedCalendar = computed(() =>
 )
 
 const calendarColor = computed(() => selectedCalendar.value?.color ?? '#10b981')
+
+// ─── Date / time bindings for UInputDate + UInputTime ─────────────────────
+const startDateValue = computed({
+  get: () => strToDateValue(state.startDate),
+  set: (v: DateValue | undefined) => { state.startDate = dateValueToStr(v) }
+})
+
+const endDateValue = computed({
+  get: () => strToDateValue(state.endDate),
+  set: (v: DateValue | undefined) => { state.endDate = dateValueToStr(v) }
+})
+
+const startTimeValue = computed({
+  get: () => strToTimeValue(state.startTime),
+  set: (v: TimeValue | undefined) => { state.startTime = timeValueToStr(v) }
+})
+
+const endTimeValue = computed({
+  get: () => strToTimeValue(state.endTime),
+  set: (v: TimeValue | undefined) => { state.endTime = timeValueToStr(v) }
+})
 
 watch(() => props.calendars, (cals) => {
   if (cals?.length && !state.calendarId) state.calendarId = cals[0]?.id ?? ''
@@ -219,36 +242,32 @@ function formatDateDisplay(dateStr: string): string {
                   />
 
                   <!-- Date/time row -->
-                  <div class="flex flex-wrap items-center gap-2 text-sm">
-                    <div class="flex items-center gap-1.5 rounded-lg border border-default px-2 py-1.5">
-                      <input
-                        v-model="state.startDate"
-                        type="date"
-                        class="bg-transparent text-sm text-highlighted outline-none"
-                      />
-                      <input
-                        v-if="!state.allDay"
-                        v-model="state.startTime"
-                        type="time"
-                        class="bg-transparent text-sm text-muted outline-none"
-                      />
-                    </div>
+                  <div class="flex flex-wrap items-center gap-2">
+                    <UInputDate
+                      v-model="startDateValue"
+                      size="sm"
+                      :leading-icon="null"
+                    />
+                    <UInputTime
+                      v-if="!state.allDay"
+                      v-model="startTimeValue"
+                      granularity="minute"
+                      size="sm"
+                    />
 
                     <UIcon name="i-lucide-arrow-right" class="size-3.5 shrink-0 text-muted" />
 
-                    <div class="flex items-center gap-1.5 rounded-lg border border-default px-2 py-1.5">
-                      <input
-                        v-model="state.endDate"
-                        type="date"
-                        class="bg-transparent text-sm text-highlighted outline-none"
-                      />
-                      <input
-                        v-if="!state.allDay"
-                        v-model="state.endTime"
-                        type="time"
-                        class="bg-transparent text-sm text-muted outline-none"
-                      />
-                    </div>
+                    <UInputDate
+                      v-model="endDateValue"
+                      size="sm"
+                      :leading-icon="null"
+                    />
+                    <UInputTime
+                      v-if="!state.allDay"
+                      v-model="endTimeValue"
+                      granularity="minute"
+                      size="sm"
+                    />
                   </div>
 
                   <!-- Friendly date summary -->

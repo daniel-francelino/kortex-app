@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { z } from 'zod'
+import type { DateValue, TimeValue } from '@internationalized/date'
 import type { Calendar, CalendarEvent } from '~/types/appointments'
+import { strToDateValue, dateValueToStr, strToTimeValue, timeValueToStr } from '~/utils/calendarDate'
 
 const props = defineProps<{
   open: boolean
@@ -67,6 +69,24 @@ const selectedCalendar = computed(() =>
 const eventColor = computed(() =>
   props.event?.calendar?.color ?? selectedCalendar.value?.color ?? '#10b981'
 )
+
+// ─── Date / time bindings for UInputDate + UInputTime ─────────────────────
+const startDateValue = computed({
+  get: () => strToDateValue(state.startDate),
+  set: (v: DateValue | undefined) => { state.startDate = dateValueToStr(v) }
+})
+const endDateValue = computed({
+  get: () => strToDateValue(state.endDate),
+  set: (v: DateValue | undefined) => { state.endDate = dateValueToStr(v) }
+})
+const startTimeValue = computed({
+  get: () => strToTimeValue(state.startTime),
+  set: (v: TimeValue | undefined) => { state.startTime = timeValueToStr(v) }
+})
+const endTimeValue = computed({
+  get: () => strToTimeValue(state.endTime),
+  set: (v: TimeValue | undefined) => { state.endTime = timeValueToStr(v) }
+})
 
 watch(() => props.event, (event) => {
   if (!event) return
@@ -329,11 +349,11 @@ function formatTimeRange(evt: CalendarEvent): string {
                 />
               </div>
               <div class="flex flex-wrap items-center gap-2">
-                <UInput v-model="state.startDate" type="date" size="sm" class="w-36" />
-                <UInput v-if="!state.allDay" v-model="state.startTime" type="time" size="sm" class="w-28" />
+                <UInputDate v-model="startDateValue" size="sm" :leading-icon="null" />
+                <UInputTime v-if="!state.allDay" v-model="startTimeValue" granularity="minute" size="sm" />
                 <span class="text-xs text-muted">até</span>
-                <UInput v-model="state.endDate" type="date" size="sm" class="w-36" />
-                <UInput v-if="!state.allDay" v-model="state.endTime" type="time" size="sm" class="w-28" />
+                <UInputDate v-model="endDateValue" size="sm" :leading-icon="null" />
+                <UInputTime v-if="!state.allDay" v-model="endTimeValue" granularity="minute" size="sm" />
               </div>
             </div>
           </div>
