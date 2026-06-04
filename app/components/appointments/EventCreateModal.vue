@@ -20,40 +20,50 @@ const schema = z.object({
   title: z.string().min(1, 'Título é obrigatório').max(200),
   description: z.string().max(2000).optional(),
   location: z.string().max(500).optional(),
-  startDate: z.string().min(1, 'Data de início é obrigatória'),
-  startTime: z.string().min(1, 'Hora de início é obrigatória'),
-  endDate: z.string().min(1, 'Data de término é obrigatória'),
-  endTime: z.string().min(1, 'Hora de término é obrigatória'),
+  startDate: z.string().min(1),
+  startTime: z.string().min(1),
+  endDate: z.string().min(1),
+  endTime: z.string().min(1),
   allDay: z.boolean().default(false),
   rrule: z.string().optional(),
-  reminderMinutes: z.coerce.number().int().min(0).max(10080).default(10)
+  reminderMinutes: z.coerce.number().int().min(-1).max(10080).default(10)
 })
 
 type FormState = z.infer<typeof schema>
 
-const now = new Date()
-const todayStr = now.toISOString().split('T')[0] ?? ''
-const hourNow = String(now.getHours()).padStart(2, '0')
-const minuteSnapped = String(Math.ceil(now.getMinutes() / 15) * 15 % 60).padStart(2, '0')
-const startTimeDefault = `${minuteSnapped === '00' && now.getMinutes() >= 45 ? String(now.getHours() + 1).padStart(2, '0') : hourNow}:${minuteSnapped}`
+function buildDefaults(): FormState {
+  const now = new Date()
+  const h = now.getHours()
+  const snapped = Math.ceil(now.getMinutes() / 15) * 15
+  const startH = snapped >= 60 ? h + 1 : h
+  const startM = snapped >= 60 ? 0 : snapped
+  const endH = startH + 1
 
-const state = reactive<FormState>({
-  calendarId: '',
-  title: '',
-  description: '',
-  location: '',
-  startDate: todayStr,
-  startTime: startTimeDefault,
-  endDate: todayStr,
-  endTime: `${String(Number(startTimeDefault.split(':')[0]) + 1).padStart(2, '0')}:${startTimeDefault.split(':')[1]}`,
-  allDay: false,
-  rrule: '',
-  reminderMinutes: 10
+  return {
+    calendarId: props.calendars?.[0]?.id ?? '',
+    title: '',
+    description: '',
+    location: '',
+    startDate: now.toISOString().split('T')[0] ?? '',
+    startTime: `${String(startH).padStart(2, '0')}:${String(startM).padStart(2, '0')}`,
+    endDate: now.toISOString().split('T')[0] ?? '',
+    endTime: `${String(endH).padStart(2, '0')}:${String(startM).padStart(2, '0')}`,
+    allDay: false,
+    rrule: '',
+    reminderMinutes: 10
+  }
+}
+
+const state = reactive<FormState>(buildDefaults())
+
+// Reset when opened
+watch(() => props.open, (val) => {
+  if (val) Object.assign(state, buildDefaults())
 })
 
 const rruleModel = computed({
   get: () => state.rrule || NONE_RECURRENCE_VALUE,
-  set: (value: string) => { state.rrule = value === NONE_RECURRENCE_VALUE ? '' : value }
+  set: (v: string) => { state.rrule = v === NONE_RECURRENCE_VALUE ? '' : v }
 })
 
 const loading = ref(false)
@@ -66,19 +76,19 @@ const selectedCalendar = computed(() =>
   (props.calendars ?? []).find(c => c.id === state.calendarId)
 )
 
+const calendarColor = computed(() => selectedCalendar.value?.color ?? '#10b981')
+
 watch(() => props.calendars, (cals) => {
-  if (cals && cals.length > 0 && !state.calendarId) {
-    state.calendarId = cals[0]?.id ?? ''
-  }
+  if (cals?.length && !state.calendarId) state.calendarId = cals[0]?.id ?? ''
 }, { immediate: true })
 
 const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone
 
 async function onSubmit() {
-  if (loading.value) return
+  if (loading.value || !state.title.trim()) return
+
   const startAt = `${state.startDate}T${state.allDay ? '00:00:00' : state.startTime + ':00'}`
   const endAt = `${state.endDate}T${state.allDay ? '23:59:59' : state.endTime + ':00'}`
-
   if (new Date(endAt) <= new Date(startAt)) return
 
   loading.value = true
@@ -99,12 +109,6 @@ async function onSubmit() {
     })
 
     if (result) {
-      state.title = ''
-      state.description = ''
-      state.location = ''
-      state.rrule = ''
-      state.allDay = false
-      state.reminderMinutes = 10
       emit('update:open', false)
       emit('created')
     }
@@ -112,6 +116,18 @@ async function onSubmit() {
     loading.value = false
   }
 }
+
+function close() {
+  emit('update:open', false)
+}
+
+// Escape to close
+function onKeydown(e: KeyboardEvent) {
+  if (e.key === 'Escape') close()
+}
+
+onMounted(() => window.addEventListener('keydown', onKeydown))
+onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 
 const reminderOptions = [
   { label: 'Sem lembrete', value: -1 },
@@ -122,189 +138,212 @@ const reminderOptions = [
   { label: '1 hora antes', value: 60 },
   { label: '1 dia antes', value: 1440 }
 ]
+
+// ─── Date display helpers ─────────────────────────────────────────────────
+function formatDateDisplay(dateStr: string): string {
+  if (!dateStr) return ''
+  const [y, m, d] = dateStr.split('-').map(Number)
+  return new Date(y!, m! - 1, d!).toLocaleDateString('pt-BR', {
+    weekday: 'short', day: '2-digit', month: 'short', year: 'numeric'
+  })
+}
 </script>
 
 <template>
-  <UModal
-    :open="open"
-    @update:open="emit('update:open', $event)"
-  >
-    <template #header>
-      <div class="flex items-center gap-2">
-        <UIcon name="i-lucide-calendar-plus" class="size-4 text-muted" />
-        <span class="text-sm font-semibold text-highlighted">Novo evento</span>
-      </div>
-    </template>
-
-    <template #body>
-      <UForm
-        :schema="schema"
-        :state="state"
-        class="space-y-0"
-        @submit="onSubmit"
+  <Teleport to="body">
+    <Transition
+      enter-active-class="transition duration-200 ease-out"
+      enter-from-class="opacity-0"
+      enter-to-class="opacity-100"
+      leave-active-class="transition duration-150 ease-in"
+      leave-from-class="opacity-100"
+      leave-to-class="opacity-0"
+    >
+      <div
+        v-if="open"
+        class="fixed inset-0 z-50 flex flex-col bg-default"
       >
-        <!-- Title — prominent, no label -->
-        <div class="pb-4">
-          <UInput
-            v-model="state.title"
-            placeholder="Adicionar título"
-            variant="none"
-            size="lg"
-            autofocus
-            class="w-full text-lg font-medium [&_input]:text-base [&_input]:font-medium [&_input]:placeholder:text-muted/50"
+        <!-- ── Top bar ──────────────────────────────────────────────── -->
+        <div
+          class="flex h-14 shrink-0 items-center justify-between border-b border-default px-4"
+        >
+          <!-- Left: close + title -->
+          <div class="flex items-center gap-3">
+            <button
+              class="rounded-full p-1.5 text-muted transition-colors hover:bg-elevated hover:text-highlighted"
+              @click="close"
+            >
+              <UIcon name="i-lucide-x" class="size-5" />
+            </button>
+            <span class="text-base font-semibold text-highlighted">Novo evento</span>
+          </div>
+
+          <!-- Right: save -->
+          <UButton
+            label="Salvar"
+            :loading="loading"
+            :disabled="!state.title.trim() || loading"
+            @click="onSubmit"
           />
-          <div class="border-b border-default" />
         </div>
 
-        <!-- Date / Time / All-day -->
-        <div class="py-3">
-          <div class="flex items-start gap-3">
-            <UIcon name="i-lucide-clock" class="mt-2 size-4 shrink-0 text-muted" />
-            <div class="flex-1 space-y-2">
-              <!-- All-day toggle -->
-              <div class="flex items-center gap-2">
-                <UCheckbox
-                  :model-value="state.allDay"
-                  label="Dia inteiro"
-                  size="sm"
-                  @update:model-value="state.allDay = Boolean($event)"
-                />
+        <!-- ── Scrollable form body ─────────────────────────────────── -->
+        <div class="flex-1 overflow-y-auto">
+          <UForm
+            :schema="schema"
+            :state="state"
+            class="mx-auto max-w-2xl space-y-0 px-6 py-8"
+            @submit="onSubmit"
+          >
+            <!-- Title -->
+            <div class="pb-6">
+              <input
+                v-model="state.title"
+                type="text"
+                placeholder="Adicionar título"
+                autofocus
+                class="w-full border-0 border-b-2 border-default bg-transparent pb-2 text-2xl font-medium text-highlighted placeholder:font-normal placeholder:text-muted/40 outline-none focus:border-primary transition-colors"
+              />
+            </div>
+
+            <!-- Date / Time / All-day -->
+            <div class="py-4">
+              <div class="flex items-start gap-4">
+                <UIcon name="i-lucide-clock" class="mt-1 size-5 shrink-0 text-muted" />
+                <div class="flex-1 space-y-3">
+                  <!-- All-day toggle -->
+                  <UCheckbox
+                    :model-value="state.allDay"
+                    label="Dia inteiro"
+                    @update:model-value="state.allDay = Boolean($event)"
+                  />
+
+                  <!-- Date/time row -->
+                  <div class="flex flex-wrap items-center gap-2 text-sm">
+                    <div class="flex items-center gap-1.5 rounded-lg border border-default px-2 py-1.5">
+                      <input
+                        v-model="state.startDate"
+                        type="date"
+                        class="bg-transparent text-sm text-highlighted outline-none"
+                      />
+                      <input
+                        v-if="!state.allDay"
+                        v-model="state.startTime"
+                        type="time"
+                        class="bg-transparent text-sm text-muted outline-none"
+                      />
+                    </div>
+
+                    <UIcon name="i-lucide-arrow-right" class="size-3.5 shrink-0 text-muted" />
+
+                    <div class="flex items-center gap-1.5 rounded-lg border border-default px-2 py-1.5">
+                      <input
+                        v-model="state.endDate"
+                        type="date"
+                        class="bg-transparent text-sm text-highlighted outline-none"
+                      />
+                      <input
+                        v-if="!state.allDay"
+                        v-model="state.endTime"
+                        type="time"
+                        class="bg-transparent text-sm text-muted outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  <!-- Friendly date summary -->
+                  <p class="text-xs text-muted">
+                    {{ formatDateDisplay(state.startDate) }}
+                    <template v-if="state.startDate !== state.endDate">
+                      → {{ formatDateDisplay(state.endDate) }}
+                    </template>
+                  </p>
+                </div>
               </div>
-              <!-- Start row -->
-              <div class="flex items-center gap-2">
-                <UInput
-                  v-model="state.startDate"
-                  type="date"
-                  size="sm"
-                  class="w-36"
-                />
-                <UInput
-                  v-if="!state.allDay"
-                  v-model="state.startTime"
-                  type="time"
-                  size="sm"
-                  class="w-28"
-                />
-                <span class="text-xs text-muted">até</span>
-                <UInput
-                  v-model="state.endDate"
-                  type="date"
-                  size="sm"
-                  class="w-36"
-                />
-                <UInput
-                  v-if="!state.allDay"
-                  v-model="state.endTime"
-                  type="time"
-                  size="sm"
-                  class="w-28"
+            </div>
+
+            <div class="border-t border-default/40" />
+
+            <!-- Location -->
+            <div class="py-4">
+              <div class="flex items-center gap-4">
+                <UIcon name="i-lucide-map-pin" class="size-5 shrink-0 text-muted" />
+                <input
+                  v-model="state.location"
+                  type="text"
+                  placeholder="Adicionar local ou link da videochamada"
+                  class="flex-1 bg-transparent text-sm text-highlighted placeholder:text-muted/50 outline-none"
                 />
               </div>
             </div>
-          </div>
+
+            <div class="border-t border-default/40" />
+
+            <!-- Description -->
+            <div class="py-4">
+              <div class="flex items-start gap-4">
+                <UIcon name="i-lucide-align-left" class="mt-1 size-5 shrink-0 text-muted" />
+                <textarea
+                  v-model="state.description"
+                  placeholder="Adicionar descrição"
+                  rows="3"
+                  class="flex-1 resize-none bg-transparent text-sm text-highlighted placeholder:text-muted/50 outline-none"
+                />
+              </div>
+            </div>
+
+            <div class="border-t border-default/40" />
+
+            <!-- Calendar -->
+            <div class="py-4">
+              <div class="flex items-center gap-4">
+                <span
+                  class="inline-block size-5 shrink-0 rounded-full transition-colors"
+                  :style="{ backgroundColor: calendarColor }"
+                />
+                <USelect
+                  v-model="state.calendarId"
+                  :items="calendarOptions"
+                  variant="none"
+                  size="sm"
+                  class="w-56 text-sm"
+                />
+              </div>
+            </div>
+
+            <div class="border-t border-default/40" />
+
+            <!-- Recurrence + Reminder row -->
+            <div class="flex flex-wrap gap-6 py-4">
+              <!-- Recurrence -->
+              <div class="flex items-center gap-4">
+                <UIcon name="i-lucide-repeat" class="size-5 shrink-0 text-muted" />
+                <USelect
+                  v-model="rruleModel"
+                  :items="recurrenceOptions"
+                  value-key="value"
+                  variant="none"
+                  size="sm"
+                  class="w-52 text-sm"
+                />
+              </div>
+
+              <!-- Reminder -->
+              <div class="flex items-center gap-4">
+                <UIcon name="i-lucide-bell" class="size-5 shrink-0 text-muted" />
+                <USelect
+                  v-model="state.reminderMinutes"
+                  :items="reminderOptions"
+                  value-key="value"
+                  variant="none"
+                  size="sm"
+                  class="w-44 text-sm"
+                />
+              </div>
+            </div>
+          </UForm>
         </div>
-
-        <div class="border-t border-default/50" />
-
-        <!-- Location -->
-        <div class="py-3">
-          <div class="flex items-center gap-3">
-            <UIcon name="i-lucide-map-pin" class="size-4 shrink-0 text-muted" />
-            <UInput
-              v-model="state.location"
-              placeholder="Adicionar local"
-              variant="none"
-              size="sm"
-              class="flex-1"
-            />
-          </div>
-        </div>
-
-        <div class="border-t border-default/50" />
-
-        <!-- Recurrence -->
-        <div class="py-3">
-          <div class="flex items-center gap-3">
-            <UIcon name="i-lucide-repeat" class="size-4 shrink-0 text-muted" />
-            <USelect
-              v-model="rruleModel"
-              :items="recurrenceOptions"
-              value-key="value"
-              size="sm"
-              class="w-48"
-            />
-          </div>
-        </div>
-
-        <div class="border-t border-default/50" />
-
-        <!-- Reminder -->
-        <div class="py-3">
-          <div class="flex items-center gap-3">
-            <UIcon name="i-lucide-bell" class="size-4 shrink-0 text-muted" />
-            <USelect
-              v-model="state.reminderMinutes"
-              :items="reminderOptions"
-              value-key="value"
-              size="sm"
-              class="w-44"
-            />
-          </div>
-        </div>
-
-        <div class="border-t border-default/50" />
-
-        <!-- Calendar -->
-        <div class="py-3">
-          <div class="flex items-center gap-3">
-            <span
-              class="inline-flex size-4 shrink-0 items-center justify-center rounded-full"
-              :style="{ backgroundColor: selectedCalendar?.color ?? '#10b981' }"
-            />
-            <USelect
-              v-model="state.calendarId"
-              :items="calendarOptions"
-              placeholder="Selecione um calendário"
-              size="sm"
-              class="w-52"
-            />
-          </div>
-        </div>
-
-        <div class="border-t border-default/50" />
-
-        <!-- Description -->
-        <div class="py-3">
-          <div class="flex items-start gap-3">
-            <UIcon name="i-lucide-align-left" class="mt-1.5 size-4 shrink-0 text-muted" />
-            <UTextarea
-              v-model="state.description"
-              placeholder="Adicionar descrição"
-              variant="none"
-              :rows="2"
-              class="flex-1 resize-none"
-            />
-          </div>
-        </div>
-
-        <!-- Actions -->
-        <div class="flex justify-end gap-2 border-t border-default pt-4">
-          <UButton
-            label="Cancelar"
-            variant="ghost"
-            color="neutral"
-            size="sm"
-            @click="emit('update:open', false)"
-          />
-          <UButton
-            type="submit"
-            label="Salvar"
-            size="sm"
-            :loading="loading"
-            :disabled="!state.title.trim() || loading"
-          />
-        </div>
-      </UForm>
-    </template>
-  </UModal>
+      </div>
+    </Transition>
+  </Teleport>
 </template>
