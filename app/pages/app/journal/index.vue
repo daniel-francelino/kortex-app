@@ -29,7 +29,7 @@ watch(activeView, (view) => {
 })
 
 // ─── Editor ref (for unsaved-changes check) ───────────────────────────────────
-const editorRef = ref<{ hasChanges: ComputedRef<boolean>, doSave: () => Promise<void> } | null>(null)
+const editorRef = ref<{ isUnsaved: () => boolean, doSave: () => Promise<void> } | null>(null)
 
 // ─── Unsaved-changes confirmation on route leave ──────────────────────────────
 const confirmLeaveOpen = ref(false)
@@ -37,7 +37,7 @@ let resolvePendingNav: ((allow: boolean) => void) | null = null
 
 onBeforeRouteLeave(async () => {
   const editor = editorRef.value
-  if (!editor?.hasChanges.value) return // nothing unsaved, allow navigation
+  if (!editor?.isUnsaved()) return // nothing unsaved, allow navigation
 
   return new Promise<boolean | undefined>((resolve) => {
     resolvePendingNav = resolve
