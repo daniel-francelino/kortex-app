@@ -20,46 +20,30 @@ const {
   listTo,
   listTag,
   tags,
-  metricDefinitions,
-  metricDefinitionsStatus,
-  metricTypeOptions,
-  insights,
-  insightsStatus,
-  insightsRange,
-  refreshInsights,
   calendarDates,
   calendarStatus,
   calendarFrom,
   calendarTo,
   refreshCalendar,
-  upsertEntry,
-  createMetricDefinition,
-  upsertMetricValues
+  upsertEntry
 } = useJournal()
 
-// ─── Active tab ───────────────────────────────────────────────────────────────
-const activeTab = ref('today')
+// ─── View mode ────────────────────────────────────────────────────────────────
+type JournalView = 'editor' | 'calendar'
+const activeView = ref<JournalView>('editor')
 
-const tabItems = [
-  { label: 'Hoje', value: 'today', icon: 'i-lucide-pen-line' },
-  { label: 'Calendário', value: 'calendar', icon: 'i-lucide-calendar' },
-  { label: 'Insights', value: 'insights', icon: 'i-lucide-bar-chart-3' }
-]
-
-// View mode inside the Calendar tab: 'calendar' | 'list'
+// Sub-view inside calendar: calendar grid or list
 const calendarViewMode = ref<'calendar' | 'list'>('calendar')
 
-watch(activeTab, (tab) => {
-  if (tab === 'today') refreshToday()
-  if (tab === 'insights') refreshInsights()
-  if (tab === 'calendar') {
+watch(activeView, (view) => {
+  if (view === 'editor') refreshToday()
+  if (view === 'calendar') {
     refreshCalendar()
     listPage.value = 1
   }
 })
 
-// ─── Modals / Slideover ───────────────────────────────────────────────────────
-const metricCreateModalOpen = ref(false)
+// ─── Calendar slideover ───────────────────────────────────────────────────────
 const detailSlideoverOpen = ref(false)
 const selectedDate = ref('')
 
@@ -71,10 +55,6 @@ function onSelectDate(date: string) {
 function onCalendarMonthChange(from: string, to: string) {
   calendarFrom.value = from
   calendarTo.value = to
-}
-
-function onInsightsRangeChange(range: '7d' | '30d' | '90d') {
-  insightsRange.value = range
 }
 
 // ─── Tag filter options ───────────────────────────────────────────────────────
@@ -91,6 +71,12 @@ const tagFilterOptions = computed(() => [
   { label: 'Todas', value: ALL_FILTER_VALUE },
   ...(tags.value ?? []).map(t => ({ label: t.name, value: t.name }))
 ])
+
+// ─── View options ─────────────────────────────────────────────────────────────
+const viewOptions: { value: JournalView, icon: string, tooltip: string }[] = [
+  { value: 'editor', icon: 'i-lucide-pen-line', tooltip: 'Editor de hoje' },
+  { value: 'calendar', icon: 'i-lucide-calendar-days', tooltip: 'Calendário' }
+]
 </script>
 
 <template>
@@ -102,22 +88,32 @@ const tagFilterOptions = computed(() => [
         </template>
 
         <template #right>
+          <!-- View switcher -->
+          <div class="flex items-center gap-0.5 rounded-lg border border-default p-0.5">
+            <UTooltip
+              v-for="opt in viewOptions"
+              :key="opt.value"
+              :text="opt.tooltip"
+            >
+              <UButton
+                :icon="opt.icon"
+                size="xs"
+                :color="activeView === opt.value ? 'primary' : 'neutral'"
+                :variant="activeView === opt.value ? 'soft' : 'ghost'"
+                @click="activeView = opt.value"
+              />
+            </UTooltip>
+          </div>
+
           <NotificationsButton />
         </template>
       </UDashboardNavbar>
     </template>
 
     <template #body>
-      <div class="space-y-6">
-        <!-- Tabs -->
-        <UTabs
-          :items="tabItems"
-          :model-value="activeTab"
-          @update:model-value="activeTab = $event as string"
-        />
-
-        <!-- TODAY TAB -->
-        <div v-if="activeTab === 'today'">
+      <div class="space-y-4">
+        <!-- EDITOR VIEW -->
+        <div v-if="activeView === 'editor'">
           <JournalTodayEditor
             :today-entry="todayData?.entry ?? null"
             :loading="todayStatus === 'pending'"
@@ -125,32 +121,33 @@ const tagFilterOptions = computed(() => [
           />
         </div>
 
-        <!-- CALENDAR TAB — toggle between calendar and list view -->
-        <div
-          v-if="activeTab === 'calendar'"
-          class="space-y-4"
-        >
-          <!-- View mode toggle -->
+        <!-- CALENDAR VIEW -->
+        <div v-else-if="activeView === 'calendar'" class="space-y-4">
+          <!-- Sub-view toggle: grid vs list -->
           <div class="flex items-center justify-end">
-            <div class="flex items-center gap-1 rounded-lg border border-default bg-elevated p-1">
-              <UButton
-                icon="i-lucide-calendar"
-                size="xs"
-                :color="calendarViewMode === 'calendar' ? 'primary' : 'neutral'"
-                :variant="calendarViewMode === 'calendar' ? 'soft' : 'ghost'"
-                @click="calendarViewMode = 'calendar'"
-              />
-              <UButton
-                icon="i-lucide-list"
-                size="xs"
-                :color="calendarViewMode === 'list' ? 'primary' : 'neutral'"
-                :variant="calendarViewMode === 'list' ? 'soft' : 'ghost'"
-                @click="calendarViewMode = 'list'"
-              />
+            <div class="flex items-center gap-0.5 rounded-lg border border-default p-0.5">
+              <UTooltip text="Calendário">
+                <UButton
+                  icon="i-lucide-calendar"
+                  size="xs"
+                  :color="calendarViewMode === 'calendar' ? 'primary' : 'neutral'"
+                  :variant="calendarViewMode === 'calendar' ? 'soft' : 'ghost'"
+                  @click="calendarViewMode = 'calendar'"
+                />
+              </UTooltip>
+              <UTooltip text="Lista">
+                <UButton
+                  icon="i-lucide-list"
+                  size="xs"
+                  :color="calendarViewMode === 'list' ? 'primary' : 'neutral'"
+                  :variant="calendarViewMode === 'list' ? 'soft' : 'ghost'"
+                  @click="calendarViewMode = 'list'"
+                />
+              </UTooltip>
             </div>
           </div>
 
-          <!-- Calendar view -->
+          <!-- Calendar grid -->
           <JournalCalendarView
             v-if="calendarViewMode === 'calendar'"
             :entry-dates="calendarDates ?? []"
@@ -198,15 +195,6 @@ const tagFilterOptions = computed(() => [
               @select="onSelectDate"
             />
           </template>
-        </div>
-
-        <!-- INSIGHTS TAB -->
-        <div v-if="activeTab === 'insights'">
-          <JournalInsightsPanel
-            :insights="insights ?? null"
-            :loading="insightsStatus === 'pending'"
-            @range-change="onInsightsRangeChange"
-          />
         </div>
       </div>
     </template>
