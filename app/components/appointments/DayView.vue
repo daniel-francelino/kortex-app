@@ -223,25 +223,28 @@ defineExpose({ viewDate })
 
 <template>
   <div
-    class="flex flex-col"
+    class="overflow-hidden rounded-lg border border-default"
     @pointermove="onPointerMove"
     @pointerup="onPointerUp"
     @pointercancel="onPointerCancel"
   >
     <!-- Loading -->
-    <div v-if="loading" class="space-y-1">
-      <USkeleton v-for="i in 12" :key="i" class="h-12 w-full" />
+    <div v-if="loading" class="space-y-px p-1">
+      <USkeleton v-for="i in 12" :key="i" class="h-12 w-full rounded-none" />
     </div>
 
     <div v-else>
       <!-- All-day section -->
-      <div v-if="allDayEvents.length" class="mb-2 border-b border-default pb-2">
-        <div class="mb-1 px-14 text-xs font-medium text-muted">Dia inteiro</div>
-        <div class="flex flex-wrap gap-1 px-14">
+      <div
+        v-if="allDayEvents.length"
+        class="flex items-start gap-3 border-b border-default/50 px-3 py-1.5"
+      >
+        <span class="w-10 shrink-0 text-right text-[10px] text-muted/60 pt-0.5">dia int.</span>
+        <div class="flex flex-wrap gap-1">
           <div
             v-for="evt in allDayEvents"
             :key="evt.id"
-            class="max-w-50 cursor-pointer truncate rounded px-2 py-0.5 text-xs text-white"
+            class="max-w-50 cursor-pointer truncate rounded px-2 py-0.5 text-xs font-medium text-white"
             :style="{ backgroundColor: getEventColor(evt) }"
             @click="onEventClick(evt, $event)"
           >
@@ -262,16 +265,17 @@ defineExpose({ viewDate })
             <div
               v-for="hour in hours"
               :key="hour"
-              class="flex cursor-pointer border-b border-default/50 hover:bg-elevated/30"
+              class="flex cursor-pointer hover:bg-elevated/20"
+              :class="hour < 23 ? 'border-b border-default/30' : ''"
               :style="{ height: `${HOUR_HEIGHT}px` }"
               @click="onSlotClick(hour, $event)"
             >
               <div class="w-12 shrink-0 pr-2 text-right">
-                <span class="-translate-y-1.5 block select-none text-[10px] text-muted">
+                <span class="-translate-y-2 block select-none text-[10px] leading-none text-muted/60">
                   {{ formatHourLabel(hour) }}
                 </span>
               </div>
-              <div data-day-col class="flex-1 border-l border-default/30" />
+              <div data-day-col class="flex-1 border-l border-default/20" />
             </div>
 
             <!-- Current time indicator -->
@@ -281,11 +285,11 @@ defineExpose({ viewDate })
               style="left: 3rem; right: 0"
               :style="{ top: `${currentTimePx}px` }"
             >
-              <div class="-ml-1 size-2 rounded-full bg-red-500" />
-              <div class="h-px flex-1 bg-red-500" />
+              <div class="-ml-1 size-2 rounded-full bg-red-500 shadow-sm" />
+              <div class="h-px flex-1 bg-red-500/80" />
             </div>
 
-            <!-- Timed events (positioned absolutely, offset by time gutter) -->
+            <!-- Timed events -->
             <div
               v-for="evt in timedEvents"
               :key="`${evt.id}-${evt.recurrenceId ?? ''}`"
@@ -295,14 +299,14 @@ defineExpose({ viewDate })
               @pointerdown.stop="startDrag(evt, $event)"
             >
               <div
-                class="truncate font-medium leading-tight"
+                class="truncate font-semibold leading-tight"
                 :style="{ color: getEventColor(evt) }"
               >
                 {{ evt.title }}
               </div>
-              <div class="mt-0.5 text-[10px] text-muted">
+              <div class="mt-px text-[10px] leading-tight text-muted">
                 {{ new Date(evt.startAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) }}
-                —
+                –
                 {{ new Date(evt.endAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) }}
               </div>
             </div>

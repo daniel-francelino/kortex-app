@@ -266,14 +266,19 @@ function getEventStyle(evt: PositionedEvent, day: DayColumn) {
 
     <template v-else>
       <!-- ── Header ────────────────────────────────────────────── -->
-      <div class="flex shrink-0 border-b border-default bg-default">
+      <div class="flex shrink-0 border-b border-default bg-elevated/30">
         <div class="w-14 shrink-0" />
         <div
           v-for="day in weekDays"
           :key="day.dateStr"
-          class="flex flex-1 flex-col items-center border-l border-default/50 py-2"
+          class="flex flex-1 flex-col items-center border-l border-default/30 py-2"
         >
-          <span class="text-[10px] font-medium uppercase text-muted">{{ day.label }}</span>
+          <span
+            class="text-[10px] font-semibold uppercase tracking-wide"
+            :class="day.isToday ? 'text-primary' : 'text-muted'"
+          >
+            {{ day.label }}
+          </span>
           <span
             class="mt-0.5 flex size-7 items-center justify-center rounded-full text-sm font-semibold"
             :class="day.isToday ? 'bg-primary text-white' : 'text-highlighted'"
@@ -286,20 +291,20 @@ function getEventStyle(evt: PositionedEvent, day: DayColumn) {
       <!-- ── All-day row ────────────────────────────────────────── -->
       <div
         v-if="hasAllDayEvents"
-        class="flex shrink-0 border-b border-default/50 bg-default"
+        class="flex shrink-0 border-b border-default/30 bg-default"
       >
-        <div class="flex w-14 shrink-0 items-start justify-end pr-2 pt-1">
-          <span class="text-[10px] text-muted">dia int.</span>
+        <div class="flex w-14 shrink-0 items-start justify-end pr-2 pt-1.5">
+          <span class="text-[10px] text-muted/60">dia int.</span>
         </div>
         <div
           v-for="day in weekDays"
           :key="day.dateStr"
-          class="min-h-6 flex-1 border-l border-default/50 p-0.5"
+          class="min-h-6 flex-1 border-l border-default/20 p-0.5"
         >
           <div
             v-for="evt in day.allDayEvents"
             :key="evt.id"
-            class="mb-0.5 cursor-pointer truncate rounded px-1 py-0.5 text-[11px] text-white"
+            class="mb-0.5 cursor-pointer truncate rounded px-1 py-px text-[11px] font-medium text-white"
             :style="{ backgroundColor: getEventColor(evt) }"
             @click="onEventClick(evt, $event)"
           >
@@ -319,7 +324,7 @@ function getEventStyle(evt: PositionedEvent, day: DayColumn) {
               class="relative flex justify-end pr-2"
               :style="{ height: `${HOUR_HEIGHT}px` }"
             >
-              <span class="absolute -top-2 select-none text-[10px] text-muted">
+              <span class="absolute -top-2 select-none text-[10px] leading-none text-muted/60">
                 {{ formatHourLabel(hour) }}
               </span>
             </div>
@@ -331,14 +336,15 @@ function getEventStyle(evt: PositionedEvent, day: DayColumn) {
               v-for="day in weekDays"
               :key="day.dateStr"
               data-day-col
-              class="relative flex-1 border-l border-default/30"
+              class="relative flex-1 border-l border-default/20"
               :class="day.isToday ? 'bg-primary/2' : ''"
             >
               <!-- Hour rows (click targets) -->
               <div
                 v-for="hour in hours"
                 :key="hour"
-                class="cursor-pointer border-b border-default/30 hover:bg-elevated/40"
+                class="cursor-pointer hover:bg-elevated/20"
+                :class="hour < 23 ? 'border-b border-default/20' : ''"
                 :style="{ height: `${HOUR_HEIGHT}px` }"
                 @click="onSlotClick(day, $event)"
               />
@@ -349,8 +355,8 @@ function getEventStyle(evt: PositionedEvent, day: DayColumn) {
                 class="pointer-events-none absolute left-0 right-0 z-10 flex items-center"
                 :style="{ top: `${currentTimePx}px` }"
               >
-                <div class="-ml-1 size-2 rounded-full bg-red-500" />
-                <div class="h-px flex-1 bg-red-500" />
+                <div class="-ml-1 size-2 rounded-full bg-red-500 shadow-sm" />
+                <div class="h-px flex-1 bg-red-500/80" />
               </div>
 
               <!-- Timed events -->
@@ -363,12 +369,12 @@ function getEventStyle(evt: PositionedEvent, day: DayColumn) {
                 @pointerdown.stop="startDrag(evt, $event)"
               >
                 <div
-                  class="truncate font-medium leading-tight"
+                  class="truncate font-semibold leading-tight"
                   :style="{ color: getEventColor(evt) }"
                 >
                   {{ evt.title }}
                 </div>
-                <div class="mt-0.5 text-[10px] text-muted">
+                <div class="mt-px text-[10px] leading-tight text-muted">
                   {{ new Date(evt.startAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) }}
                 </div>
               </div>

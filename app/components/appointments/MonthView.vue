@@ -99,7 +99,7 @@ function getEventColor(evt: CalendarEvent): string {
 
 // ─── Drag state ───────────────────────────────────────────────────────────
 const dragEvent = ref<CalendarEvent | null>(null)
-const dragOver = ref<string>('')  // dateStr of hovered cell
+const dragOver = ref<string>('')
 
 function onEventDragStart(evt: CalendarEvent, e: DragEvent) {
   dragEvent.value = evt
@@ -148,89 +148,101 @@ const MAX_VISIBLE = 3
 </script>
 
 <template>
-  <div>
+  <div class="overflow-hidden rounded-lg border border-default">
     <!-- Loading -->
-    <div v-if="loading" class="grid grid-cols-7 gap-px">
-      <USkeleton v-for="i in 35" :key="i" class="h-24" />
+    <div v-if="loading" class="grid grid-cols-7">
+      <USkeleton v-for="i in 35" :key="i" class="h-28 rounded-none" />
     </div>
 
-    <!-- Grid -->
-    <div v-else>
+    <template v-else>
       <!-- Day headers -->
-      <div class="grid grid-cols-7 border-b border-default">
+      <div class="grid grid-cols-7 border-b border-default bg-elevated/30">
         <div
           v-for="header in dayHeaders"
           :key="header"
-          class="py-2 text-center text-xs font-medium text-muted"
+          class="py-2.5 text-center text-[11px] font-semibold uppercase tracking-wide text-muted"
         >
           {{ header }}
         </div>
       </div>
 
       <!-- Weeks -->
-      <div
-        v-for="(week, wi) in calendarGrid"
-        :key="wi"
-        class="grid grid-cols-7 border-b border-default last:border-b-0"
-      >
+      <div>
         <div
-          v-for="cell in week"
-          :key="cell.dateStr"
-          class="min-h-24 cursor-pointer border-r border-default p-1 transition-colors last:border-r-0 hover:bg-elevated/50"
-          :class="[
-            !cell.isCurrentMonth ? 'bg-muted/5' : '',
-            dragOver === cell.dateStr ? 'bg-primary/10' : ''
-          ]"
-          @click="onDayClick(cell, $event)"
-          @dragover="onDragOver(cell.dateStr, $event)"
-          @dragleave="onDragLeave"
-          @drop="onDrop(cell.dateStr, $event)"
+          v-for="(week, wi) in calendarGrid"
+          :key="wi"
+          class="grid grid-cols-7 border-b border-default/50 last:border-b-0"
         >
-          <!-- Date number -->
-          <div class="mb-1 flex justify-end">
-            <span
-              class="flex size-6 items-center justify-center rounded-full text-xs"
-              :class="[
-                cell.isToday ? 'bg-primary font-bold text-white' : '',
-                !cell.isCurrentMonth ? 'text-muted' : 'text-highlighted'
-              ]"
-            >
-              {{ cell.day }}
-            </span>
-          </div>
-
-          <!-- Events (max 3 visible) -->
-          <div class="space-y-0.5">
-            <div
-              v-for="(evt, ei) in cell.events.slice(0, MAX_VISIBLE)"
-              :key="ei"
-              class="cursor-grab truncate rounded px-1 py-0.5 text-xs"
-              :class="evt.allDay ? 'text-white' : ''"
-              :style="evt.allDay
-                ? { backgroundColor: getEventColor(evt) }
-                : { backgroundColor: getEventColor(evt) + '20', color: getEventColor(evt), borderLeft: `3px solid ${getEventColor(evt)}` }"
-              draggable="true"
-              @click="onEventClick(evt, $event)"
-              @dragstart="onEventDragStart(evt, $event)"
-              @dragend="onDragEnd"
-            >
-              <span v-if="!evt.allDay" class="mr-1 opacity-70">
-                {{ new Date(evt.startAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) }}
+          <div
+            v-for="cell in week"
+            :key="cell.dateStr"
+            class="group min-h-28 cursor-pointer border-r border-default/50 p-1.5 transition-colors last:border-r-0"
+            :class="[
+              !cell.isCurrentMonth ? 'bg-muted/3' : 'hover:bg-elevated/40',
+              dragOver === cell.dateStr ? 'bg-primary/10' : ''
+            ]"
+            @click="onDayClick(cell, $event)"
+            @dragover="onDragOver(cell.dateStr, $event)"
+            @dragleave="onDragLeave"
+            @drop="onDrop(cell.dateStr, $event)"
+          >
+            <!-- Date number -->
+            <div class="mb-1">
+              <span
+                class="inline-flex size-6 items-center justify-center rounded-full text-xs font-medium transition-colors"
+                :class="[
+                  cell.isToday
+                    ? 'bg-primary text-white'
+                    : !cell.isCurrentMonth
+                      ? 'text-muted/50'
+                      : 'text-muted group-hover:bg-elevated'
+                ]"
+              >
+                {{ cell.day }}
               </span>
-              {{ evt.title }}
             </div>
 
-            <!-- Overflow indicator -->
-            <div
-              v-if="cell.events.length > MAX_VISIBLE"
-              class="cursor-pointer px-1 text-xs text-muted hover:text-highlighted"
-              @click.stop="onDayClick(cell, $event)"
-            >
-              +{{ cell.events.length - MAX_VISIBLE }} mais
+            <!-- Events (max 3 visible) -->
+            <div class="space-y-0.5">
+              <div
+                v-for="(evt, ei) in cell.events.slice(0, MAX_VISIBLE)"
+                :key="ei"
+                class="flex cursor-grab items-center gap-1 truncate rounded-sm px-1 py-px text-[11px] leading-4 font-medium"
+                :class="evt.allDay ? 'text-white' : ''"
+                :style="evt.allDay
+                  ? { backgroundColor: getEventColor(evt) }
+                  : { color: getEventColor(evt) }"
+                draggable="true"
+                @click.stop="onEventClick(evt, $event)"
+                @dragstart="onEventDragStart(evt, $event)"
+                @dragend="onDragEnd"
+              >
+                <!-- Dot for timed events -->
+                <span
+                  v-if="!evt.allDay"
+                  class="inline-block size-1.5 shrink-0 rounded-full"
+                  :style="{ backgroundColor: getEventColor(evt) }"
+                />
+                <span class="truncate">
+                  <span v-if="!evt.allDay" class="mr-0.5 font-normal opacity-75">
+                    {{ new Date(evt.startAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) }}
+                  </span>
+                  {{ evt.title }}
+                </span>
+              </div>
+
+              <!-- Overflow indicator -->
+              <div
+                v-if="cell.events.length > MAX_VISIBLE"
+                class="cursor-pointer px-1 text-[11px] font-medium text-muted hover:text-highlighted"
+                @click.stop="onDayClick(cell, $event)"
+              >
+                +{{ cell.events.length - MAX_VISIBLE }} mais
+              </div>
             </div>
           </div>
         </div>
       </div>
-    </div>
+    </template>
   </div>
 </template>

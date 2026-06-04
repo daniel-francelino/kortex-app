@@ -107,89 +107,78 @@ onBeforeUnmount(() => {
         v-if="visible && event"
         ref="popoverRef"
         :style="popoverStyle"
-        class="w-80 rounded-lg border border-default bg-default shadow-xl ring-1 ring-black/5"
+        class="w-72 overflow-hidden rounded-xl border border-default bg-default shadow-2xl"
       >
-        <!-- Header with color bar -->
+        <!-- Top color bar -->
         <div
-          class="flex items-start justify-between rounded-t-lg p-3"
-          :style="{ borderTop: `3px solid ${event.calendar?.color ?? '#10b981'}` }"
-        >
-          <div class="min-w-0 flex-1">
-            <h4 class="truncate text-sm font-semibold text-highlighted">
+          class="h-1 w-full"
+          :style="{ backgroundColor: event.calendar?.color ?? '#10b981' }"
+        />
+
+        <!-- Header -->
+        <div class="flex items-start justify-between px-3 pt-3 pb-1">
+          <div class="min-w-0 flex-1 pr-2">
+            <h4 class="text-sm font-semibold leading-snug text-highlighted">
               {{ event.title }}
             </h4>
-            <p class="mt-0.5 text-xs text-muted">
+            <p class="mt-0.5 text-[11px] text-muted">
               {{ getTimeRange(event) }}
             </p>
           </div>
-          <UButton
-            icon="i-lucide-x"
-            size="xs"
-            variant="ghost"
-            class="-mr-1 -mt-1 shrink-0"
+          <button
+            class="-mr-1 -mt-0.5 rounded p-0.5 text-muted transition-colors hover:bg-elevated hover:text-highlighted"
             @click="emit('close')"
-          />
+          >
+            <UIcon name="i-lucide-x" class="size-3.5" />
+          </button>
         </div>
 
         <!-- Details -->
-        <div class="space-y-2 px-3 pb-2">
-          <div
-            v-if="event.location"
-            class="flex items-center gap-2 text-xs text-muted"
-          >
-            <UIcon name="i-lucide-map-pin" class="size-3.5 shrink-0" />
+        <div class="space-y-1.5 px-3 py-2 text-[11px] text-muted">
+          <div v-if="event.location" class="flex items-center gap-2">
+            <UIcon name="i-lucide-map-pin" class="size-3 shrink-0" />
             <span class="truncate">{{ event.location }}</span>
           </div>
-
-          <div
-            v-if="event.calendar?.name"
-            class="flex items-center gap-2 text-xs text-muted"
-          >
+          <div v-if="event.calendar?.name" class="flex items-center gap-2">
             <span
-              class="inline-block size-2.5 rounded-full shrink-0"
+              class="inline-block size-2.5 shrink-0 rounded-full"
               :style="{ backgroundColor: event.calendar.color ?? '#10b981' }"
             />
             <span class="truncate">{{ event.calendar.name }}</span>
           </div>
-
-          <div
-            v-if="event.rrule"
-            class="flex items-center gap-2 text-xs text-muted"
-          >
-            <UIcon name="i-lucide-repeat" class="size-3.5 shrink-0" />
+          <div v-if="event.rrule" class="flex items-center gap-2">
+            <UIcon name="i-lucide-repeat" class="size-3 shrink-0" />
             <span>Recorrente</span>
           </div>
-
-          <p
-            v-if="event.description"
-            class="line-clamp-2 text-xs text-muted"
-          >
+          <p v-if="event.description" class="line-clamp-2 leading-relaxed">
             {{ event.description }}
           </p>
         </div>
 
         <!-- Actions -->
-        <div class="flex items-center gap-1 border-t border-default px-3 py-2">
+        <div class="flex items-center justify-end gap-0.5 border-t border-default/50 px-2 py-1.5">
           <UButton
             icon="i-lucide-pencil"
-            label="Editar"
             size="xs"
             variant="ghost"
+            color="neutral"
+            title="Editar"
             @click="emit('edit', event)"
           />
           <UButton
             icon="i-lucide-copy"
-            label="Duplicar"
             size="xs"
             variant="ghost"
+            color="neutral"
+            title="Duplicar"
             @click="emit('duplicate', event)"
           />
           <UButton
             icon="i-lucide-trash-2"
-            label="Remover"
             size="xs"
             variant="ghost"
             color="error"
+            title="Remover"
             @click="emit('archive', event)"
           />
         </div>
