@@ -109,63 +109,101 @@ onMounted(() => emitRange())
 </script>
 
 <template>
-  <div class="space-y-4">
+  <div class="overflow-hidden rounded-xl border border-default">
     <!-- Navigation header -->
-    <div class="flex items-center justify-between">
-      <div class="flex items-center gap-2">
-        <UButton icon="i-lucide-chevron-left" color="neutral" variant="ghost" size="sm" @click="prevMonth" />
-        <h4 class="text-sm font-semibold text-highlighted min-w-36 text-center">
+    <div class="flex items-center justify-between border-b border-default bg-elevated/30 px-4 py-3">
+      <div class="flex items-center gap-1">
+        <UButton
+          icon="i-lucide-chevron-left"
+          color="neutral"
+          variant="ghost"
+          size="sm"
+          @click="prevMonth"
+        />
+        <h4 class="min-w-40 text-center text-sm font-semibold capitalize text-highlighted">
           {{ monthNames[currentMonth] }} {{ currentYear }}
         </h4>
-        <UButton icon="i-lucide-chevron-right" color="neutral" variant="ghost" size="sm" @click="nextMonth" />
+        <UButton
+          icon="i-lucide-chevron-right"
+          color="neutral"
+          variant="ghost"
+          size="sm"
+          @click="nextMonth"
+        />
       </div>
-      <UButton label="Hoje" size="xs" variant="outline" @click="goToToday" />
+      <UButton
+        label="Hoje"
+        size="xs"
+        variant="outline"
+        color="neutral"
+        @click="goToToday"
+      />
     </div>
 
-    <!-- Loading -->
-    <div v-if="props.loading" class="grid grid-cols-7 gap-1">
-      <USkeleton v-for="i in 42" :key="i" class="h-12 w-full" />
-    </div>
-
-    <!-- Calendar grid -->
-    <div v-else class="grid grid-cols-7 gap-1">
-      <!-- Day headers -->
+    <!-- Day headers -->
+    <div class="grid grid-cols-7 border-b border-default/50">
       <div
         v-for="header in dayHeaders"
         :key="header"
-        class="text-center text-xs font-medium text-muted py-1"
+        class="py-2 text-center text-[11px] font-semibold uppercase tracking-wide text-muted"
       >
         {{ header }}
       </div>
+    </div>
 
-      <!-- Day cells -->
+    <!-- Loading -->
+    <div v-if="props.loading" class="grid grid-cols-7">
+      <USkeleton
+        v-for="i in 42"
+        :key="i"
+        class="h-16 rounded-none"
+      />
+    </div>
+
+    <!-- Calendar grid -->
+    <div v-else class="grid grid-cols-7">
       <button
         v-for="(day, idx) in calendarDays"
         :key="idx"
+        class="group relative flex flex-col items-center gap-1 border-b border-r border-default/30 py-2 transition-colors last:border-r-0"
         :class="[
-          'relative flex flex-col items-center justify-center h-12 rounded-xl text-sm transition-colors gap-0.5',
-          day.isCurrentMonth ? 'text-highlighted' : 'text-dimmed',
-          day.isToday ? 'ring-2 ring-primary font-bold' : '',
-          day.hasEntry
-            ? 'bg-primary/8 hover:bg-primary/15'
-            : 'hover:bg-elevated',
+          (idx + 1) % 7 === 0 ? 'border-r-0' : '',
+          idx >= 35 ? 'border-b-0' : '',
+          day.isCurrentMonth ? 'hover:bg-elevated/60' : 'hover:bg-elevated/30',
         ]"
         @click="emit('selectDate', day.date)"
       >
-        <span class="text-sm leading-none">{{ day.day }}</span>
+        <!-- Day number -->
+        <span
+          class="flex size-7 items-center justify-center rounded-full text-sm font-medium transition-colors"
+          :class="[
+            day.isToday
+              ? 'bg-primary font-bold text-white'
+              : day.isCurrentMonth
+                ? 'text-highlighted group-hover:bg-elevated'
+                : 'text-muted/40',
+          ]"
+        >
+          {{ day.day }}
+        </span>
 
-        <!-- Mood emoji — shown when entry has mood -->
+        <!-- Mood emoji -->
         <span
           v-if="day.hasEntry && day.mood"
-          class="text-sm leading-none"
+          class="text-base leading-none"
           :title="getMoodOption(day.mood)?.label"
-        >{{ getMoodOption(day.mood)?.emoji }}</span>
+        >
+          {{ getMoodOption(day.mood)?.emoji }}
+        </span>
 
-        <!-- Fallback dot — shown when entry exists but no mood set -->
+        <!-- Written dot (entry without mood) -->
         <span
           v-else-if="day.hasEntry"
-          class="size-1 rounded-full bg-primary"
+          class="size-1.5 rounded-full bg-primary/60"
         />
+
+        <!-- Empty spacer to keep height consistent -->
+        <span v-else class="size-1.5" />
       </button>
     </div>
   </div>

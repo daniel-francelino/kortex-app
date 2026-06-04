@@ -363,7 +363,7 @@ onMounted(() => {
               :class="calendarsExpanded ? 'text-primary' : ''"
               @click="toggleCalendarsPanel"
             >
-              <UIcon name="i-lucide-panel-left" class="size-5 shrink-0" />
+              <UIcon name="i-lucide-calendar-range" class="size-5 shrink-0" />
             </UButton>
           </UTooltip>
 
