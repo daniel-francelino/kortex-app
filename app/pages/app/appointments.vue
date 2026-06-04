@@ -21,6 +21,7 @@ const {
   refreshCalendars,
   refreshEvents,
   createEvent,
+  updateEvent,
   archiveEvent
 } = useAppointments()
 
@@ -276,6 +277,24 @@ function onToggleCalendar(calendarId: string) {
 
 const eventsList = computed(() => eventsData.value?.data ?? [])
 
+async function onEventDrop(eventId: string, newStartAt: string, newEndAt: string) {
+  const success = await updateEvent(eventId, { startAt: newStartAt, endAt: newEndAt })
+  if (success) refreshEvents()
+}
+
+async function onMonthEventDrop(eventId: string, newDate: string) {
+  const event = eventsList.value.find(e => e.id === eventId)
+  if (!event) return
+  const origStart = new Date(event.startAt)
+  const origEnd = new Date(event.endAt)
+  const durationMs = origEnd.getTime() - origStart.getTime()
+  const [y, m, d] = newDate.split('-').map(Number)
+  const newStart = new Date(y!, m! - 1, d!, origStart.getHours(), origStart.getMinutes(), origStart.getSeconds())
+  const newEnd = new Date(newStart.getTime() + durationMs)
+  const success = await updateEvent(eventId, { startAt: newStart.toISOString(), endAt: newEnd.toISOString() })
+  if (success) refreshEvents()
+}
+
 onMounted(() => {
   refreshCalendars()
 })
@@ -398,6 +417,7 @@ onMounted(() => {
             @select-event="onSelectEvent"
             @select-slot="onSelectSlot"
             @month-change="onMonthChange"
+            @drop-event="onMonthEventDrop"
           />
 
           <!-- Week view -->
@@ -409,6 +429,7 @@ onMounted(() => {
             @select-event="onSelectEvent"
             @select-slot="onSelectSlot"
             @week-change="onWeekChange"
+            @drop-event="onEventDrop"
           />
 
           <!-- Day view -->
@@ -420,6 +441,7 @@ onMounted(() => {
             @select-event="onSelectEvent"
             @select-slot="onDaySlotSelect"
             @day-change="onDayChange"
+            @drop-event="onEventDrop"
           />
         </div>
       </div>

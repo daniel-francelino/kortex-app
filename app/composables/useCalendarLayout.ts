@@ -1,0 +1,108 @@
+import type { CalendarEvent } from '~/types/appointments'
+
+export interface PositionedEvent extends CalendarEvent {
+  leftRatio: number
+  widthRatio: number
+}
+
+export const HOUR_HEIGHT = 48 // px per hour
+
+export function getEventTopPx(event: CalendarEvent, dayDate: Date): number {
+  const dayStart = new Date(dayDate.getFullYear(), dayDate.getMonth(), dayDate.getDate())
+  const evtStart = new Date(event.startAt)
+  const startMinutes = Math.max(0, (evtStart.getTime() - dayStart.getTime()) / 60000)
+  return (startMinutes / 60) * HOUR_HEIGHT
+}
+
+export function getEventHeightPx(event: CalendarEvent, dayDate: Date): number {
+  const dayStart = new Date(dayDate.getFullYear(), dayDate.getMonth(), dayDate.getDate())
+  const evtStart = new Date(event.startAt)
+  const evtEnd = new Date(event.endAt)
+  const startMinutes = Math.max(0, (evtStart.getTime() - dayStart.getTime()) / 60000)
+  const endMinutes = Math.min(1440, (evtEnd.getTime() - dayStart.getTime()) / 60000)
+  const duration = Math.max(endMinutes - startMinutes, 15)
+  return Math.max((duration / 60) * HOUR_HEIGHT, 20)
+}
+
+export function layoutTimedEvents(events: CalendarEvent[]): PositionedEvent[] {
+  if (events.length === 0) return []
+
+  const sorted = [...events].sort(
+    (a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime()
+  )
+
+  // Build groups of overlapping events
+  const groups: CalendarEvent[][] = []
+  let currentGroup: CalendarEvent[] = []
+  let groupEnd: Date | null = null
+
+  for (const evt of sorted) {
+    const start = new Date(evt.startAt)
+    const end = new Date(evt.endAt)
+
+    if (groupEnd === null || start >= groupEnd) {
+      if (currentGroup.length > 0) groups.push(currentGroup)
+      currentGroup = [evt]
+      groupEnd = end
+    } else {
+      currentGroup.push(evt)
+      if (end > groupEnd) groupEnd = end
+    }
+  }
+  if (currentGroup.length > 0) groups.push(currentGroup)
+
+  const result: PositionedEvent[] = []
+
+  for (const group of groups) {
+    // Greedy column packing: assign each event to the first column it fits in
+    const columns: CalendarEvent[][] = []
+
+    for (const evt of group) {
+      const evtStart = new Date(evt.startAt)
+      let placed = false
+
+      for (const col of columns) {
+        const lastInCol = col[col.length - 1]!
+        if (evtStart >= new Date(lastInCol.endAt)) {
+          col.push(evt)
+          placed = true
+          break
+        }
+      }
+
+      if (!placed) {
+        columns.push([evt])
+      }
+    }
+
+    const colCount = columns.length
+
+    columns.forEach((col, colIndex) => {
+      col.forEach(evt => {
+        result.push({
+          ...evt,
+          leftRatio: colIndex / colCount,
+          widthRatio: 1 / colCount
+        })
+      })
+    })
+  }
+
+  return result
+}
+
+export function getCurrentTimePx(): number {
+  const now = new Date()
+  return ((now.getHours() * 60 + now.getMinutes()) / 60) * HOUR_HEIGHT
+}
+
+export function formatHourLabel(hour: number): string {
+  if (hour === 0) return ''
+  const suffix = hour < 12 ? 'AM' : 'PM'
+  const h = hour % 12 === 0 ? 12 : hour % 12
+  return `${h} ${suffix}`
+}
+
+export function snapMinutes(minutes: number, snap = 15): number {
+  return Math.round(minutes / snap) * snap
+}

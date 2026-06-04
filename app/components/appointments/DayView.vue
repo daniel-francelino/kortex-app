@@ -1,5 +1,15 @@
 <script setup lang="ts">
 import type { CalendarEvent } from '~/types/appointments'
+import {
+  layoutTimedEvents,
+  getEventTopPx,
+  getEventHeightPx,
+  getCurrentTimePx,
+  formatHourLabel,
+  snapMinutes,
+  HOUR_HEIGHT,
+  type PositionedEvent
+} from '~/composables/useCalendarLayout'
 
 const props = defineProps<{
   events: CalendarEvent[]
@@ -11,152 +21,227 @@ const emit = defineEmits<{
   selectEvent: [event: CalendarEvent, mouseEvent: MouseEvent]
   selectSlot: [date: string, time: string, mouseEvent: MouseEvent]
   dayChange: [from: string, to: string]
+  dropEvent: [eventId: string, newStartAt: string, newEndAt: string]
 }>()
 
 const viewDate = ref(new Date(props.currentDate))
 
 const dayStr = computed(() => formatDate(viewDate.value))
 
-function prevDay() {
-  const d = new Date(viewDate.value)
-  d.setDate(d.getDate() - 1)
-  viewDate.value = d
-  emitRange()
-}
-
-function nextDay() {
-  const d = new Date(viewDate.value)
-  d.setDate(d.getDate() + 1)
-  viewDate.value = d
-  emitRange()
-}
-
-function goToToday() {
-  viewDate.value = new Date()
-  emitRange()
-}
-
-function setDate(date: Date) {
-  viewDate.value = date
-  emitRange()
-}
-
-function emitRange() {
-  const dateStr = formatDate(viewDate.value)
-  emit('dayChange', dateStr, dateStr)
-}
-
 function formatDate(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
-// ─── Hours grid ────────────────────────────────────────────────────────
+function emitRange() {
+  emit('dayChange', dayStr.value, dayStr.value)
+}
+
+watch(() => props.currentDate, (d) => {
+  viewDate.value = new Date(d)
+  emitRange()
+})
+
+onMounted(() => emitRange())
+
 const hours = Array.from({ length: 24 }, (_, i) => i)
 
-const allDayEvents = computed(() =>
-  props.events.filter(evt => evt.allDay && isOnDay(evt))
-)
-
-const timedEvents = computed(() =>
-  props.events.filter(evt => !evt.allDay && isOnDay(evt))
-)
-
+// ─── All-day vs timed events ──────────────────────────────────────────────
 function isOnDay(evt: CalendarEvent): boolean {
+  if (!evt.startAt || !evt.endAt) return false
   const dayStart = new Date(viewDate.value.getFullYear(), viewDate.value.getMonth(), viewDate.value.getDate())
   const dayEnd = new Date(dayStart)
   dayEnd.setDate(dayEnd.getDate() + 1)
-  const evtStart = new Date(evt.startAt)
-  const evtEnd = new Date(evt.endAt)
-  return evtStart < dayEnd && evtEnd > dayStart
+  return new Date(evt.startAt) < dayEnd && new Date(evt.endAt) > dayStart
 }
 
-function getEventPosition(evt: CalendarEvent): { top: string, height: string } {
-  const dayStart = new Date(viewDate.value.getFullYear(), viewDate.value.getMonth(), viewDate.value.getDate())
-  const evtStart = new Date(evt.startAt)
-  const evtEnd = new Date(evt.endAt)
+const allDayEvents = computed(() => props.events.filter(e => e.allDay && isOnDay(e)))
+const timedEvents = computed(() => layoutTimedEvents(props.events.filter(e => !e.allDay && isOnDay(e))))
 
-  const startMinutes = Math.max(0, (evtStart.getTime() - dayStart.getTime()) / 60000)
-  const endMinutes = Math.min(1440, (evtEnd.getTime() - dayStart.getTime()) / 60000)
-  const duration = Math.max(endMinutes - startMinutes, 15)
+// ─── Current time ─────────────────────────────────────────────────────────
+const isToday = computed(() => formatDate(new Date()) === dayStr.value)
 
-  const hourHeight = 48
-  const top = (startMinutes / 60) * hourHeight
-  const height = (duration / 60) * hourHeight
+const currentTimePx = ref(getCurrentTimePx())
+let timerId: ReturnType<typeof setInterval>
+onMounted(() => { timerId = setInterval(() => { currentTimePx.value = getCurrentTimePx() }, 60_000) })
+onUnmounted(() => clearInterval(timerId))
+
+// ─── Drag state ───────────────────────────────────────────────────────────
+interface DragState {
+  active: boolean
+  event: CalendarEvent | null
+  durationMs: number
+  pointerId: number
+  targetMinutes: number
+  originalStart: string
+}
+
+const drag = reactive<DragState>({
+  active: false,
+  event: null,
+  durationMs: 0,
+  pointerId: -1,
+  targetMinutes: 0,
+  originalStart: ''
+})
+
+const gridRef = ref<HTMLElement | null>(null)
+
+const ghostStyle = computed(() => {
+  if (!drag.active || !drag.event) return { display: 'none' }
+  const color = drag.event.calendar?.color ?? '#10b981'
+  const col = gridRef.value?.querySelector<HTMLElement>('[data-day-col]')
+  if (!col) return { display: 'none' }
+  const colRect = col.getBoundingClientRect()
+  const scrollEl = gridRef.value?.querySelector<HTMLElement>('[data-scroll-body]')
+  const scrollTop = scrollEl?.scrollTop ?? 0
+  const bodyRect = scrollEl?.getBoundingClientRect()
+  const topInViewport = bodyRect
+    ? bodyRect.top + (drag.targetMinutes / 60) * HOUR_HEIGHT - scrollTop
+    : 0
 
   return {
-    top: `${top}px`,
-    height: `${Math.max(height, 20)}px`
+    position: 'fixed' as const,
+    left: `${colRect.left + 2}px`,
+    top: `${topInViewport}px`,
+    width: `${colRect.width - 4}px`,
+    height: `${Math.max((drag.durationMs / 3_600_000) * HOUR_HEIGHT, 20)}px`,
+    backgroundColor: color + '30',
+    borderLeft: `3px solid ${color}`,
+    borderRadius: '4px',
+    zIndex: 9999,
+    pointerEvents: 'none' as const,
+    opacity: 0.85
   }
+})
+
+function startDrag(evt: CalendarEvent, e: PointerEvent) {
+  e.stopPropagation()
+  drag.active = true
+  drag.event = evt
+  drag.originalStart = evt.startAt
+  drag.durationMs = new Date(evt.endAt).getTime() - new Date(evt.startAt).getTime()
+  drag.pointerId = e.pointerId
+  drag.targetMinutes = getSnappedMinutes(e)
+  ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
+}
+
+function onPointerMove(e: PointerEvent) {
+  if (!drag.active || e.pointerId !== drag.pointerId) return
+  drag.targetMinutes = getSnappedMinutes(e)
+}
+
+function onPointerUp(e: PointerEvent) {
+  if (!drag.active || e.pointerId !== drag.pointerId) return
+  commitDrop()
+  endDrag()
+}
+
+function onPointerCancel() { endDrag() }
+
+function commitDrop() {
+  if (!drag.event) return
+  const newStart = new Date(
+    viewDate.value.getFullYear(),
+    viewDate.value.getMonth(),
+    viewDate.value.getDate(),
+    0,
+    drag.targetMinutes
+  )
+  if (newStart.getTime() === new Date(drag.originalStart).getTime()) return
+  const newEnd = new Date(newStart.getTime() + drag.durationMs)
+  emit('dropEvent', drag.event.id, newStart.toISOString(), newEnd.toISOString())
+}
+
+function endDrag() {
+  drag.active = false
+  drag.event = null
+  drag.pointerId = -1
+}
+
+function getSnappedMinutes(e: PointerEvent): number {
+  const scrollEl = gridRef.value?.querySelector<HTMLElement>('[data-scroll-body]')
+  if (!scrollEl) return 0
+  const rect = scrollEl.getBoundingClientRect()
+  const scrollTop = scrollEl.scrollTop
+  const relY = e.clientY - rect.top + scrollTop
+  return Math.max(0, Math.min(1425, snapMinutes((relY / HOUR_HEIGHT) * 60)))
+}
+
+function onKeydown(e: KeyboardEvent) {
+  if (e.key === 'Escape' && drag.active) endDrag()
+}
+
+onMounted(() => window.addEventListener('keydown', onKeydown))
+onUnmounted(() => window.removeEventListener('keydown', onKeydown))
+
+// ─── Slot and event click ─────────────────────────────────────────────────
+function onSlotClick(hour: number, e: MouseEvent) {
+  if (drag.active) return
+  const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+  const offsetY = e.clientY - rect.top
+  const minutes = snapMinutes(Math.floor((offsetY / HOUR_HEIGHT) * 60))
+  const h = String(hour).padStart(2, '0')
+  const m = String(minutes % 60).padStart(2, '0')
+  emit('selectSlot', dayStr.value, `${h}:${m}`, e)
+}
+
+function onEventClick(evt: CalendarEvent, e: MouseEvent) {
+  if (drag.active) return
+  e.stopPropagation()
+  emit('selectEvent', evt, e)
 }
 
 function getEventColor(evt: CalendarEvent): string {
   return evt.calendar?.color ?? '#10b981'
 }
 
-function formatTime(dateStr: string): string {
-  return new Date(dateStr).toLocaleTimeString('pt-BR', {
-    hour: '2-digit',
-    minute: '2-digit'
-  })
+function getEventStyle(evt: PositionedEvent) {
+  const color = getEventColor(evt)
+  const top = getEventTopPx(evt, viewDate.value)
+  const height = getEventHeightPx(evt, viewDate.value)
+  const isDragging = drag.active && drag.event?.id === evt.id
+
+  // Day column occupies (100% - 3rem). leftRatio/widthRatio are fractions of that column.
+  return {
+    position: 'absolute' as const,
+    top: `${top}px`,
+    height: `${height}px`,
+    left: `calc(3rem + ${evt.leftRatio} * (100% - 3rem) + 2px)`,
+    width: `calc(${evt.widthRatio} * (100% - 3rem) - 4px)`,
+    backgroundColor: color + '20',
+    borderLeft: `3px solid ${color}`,
+    borderRadius: '3px',
+    zIndex: isDragging ? 1 : 5,
+    opacity: isDragging ? 0.3 : 1,
+    cursor: isDragging ? 'grabbing' : 'grab',
+    userSelect: 'none' as const
+  }
 }
 
-function onSlotClick(hour: number, e: MouseEvent) {
-  const time = `${String(hour).padStart(2, '0')}:00`
-  emit('selectSlot', dayStr.value, time, e)
-}
-
-function onEventClick(evt: CalendarEvent, e: MouseEvent) {
-  e.stopPropagation()
-  emit('selectEvent', evt, e)
-}
-
-const isToday = computed(() => {
-  const today = new Date()
-  return formatDate(today) === formatDate(viewDate.value)
-})
-
-const currentTimeTop = computed(() => {
-  if (!isToday.value) return null
-  const now = new Date()
-  const minutes = now.getHours() * 60 + now.getMinutes()
-  return `${(minutes / 60) * 48}px`
-})
-
-onMounted(() => {
-  emitRange()
-})
-
-defineExpose({ prevDay, nextDay, goToToday, setDate, viewDate })
+defineExpose({ viewDate })
 </script>
 
 <template>
-  <div class="flex flex-col">
+  <div
+    class="flex flex-col"
+    @pointermove="onPointerMove"
+    @pointerup="onPointerUp"
+    @pointercancel="onPointerCancel"
+  >
     <!-- Loading -->
-    <div
-      v-if="loading"
-      class="space-y-1"
-    >
-      <USkeleton
-        v-for="i in 12"
-        :key="i"
-        class="h-12 w-full"
-      />
+    <div v-if="loading" class="space-y-1">
+      <USkeleton v-for="i in 12" :key="i" class="h-12 w-full" />
     </div>
 
     <div v-else>
-      <!-- All-day events -->
-      <div
-        v-if="allDayEvents.length"
-        class="mb-2 border-b border-default pb-2"
-      >
-        <div class="mb-1 text-xs font-medium text-muted px-12">
-          Dia inteiro
-        </div>
-        <div class="flex flex-wrap gap-1 px-12">
+      <!-- All-day section -->
+      <div v-if="allDayEvents.length" class="mb-2 border-b border-default pb-2">
+        <div class="mb-1 px-14 text-xs font-medium text-muted">Dia inteiro</div>
+        <div class="flex flex-wrap gap-1 px-14">
           <div
             v-for="evt in allDayEvents"
             :key="evt.id"
-            class="cursor-pointer rounded px-2 py-0.5 text-xs text-white truncate max-w-[200px]"
+            class="max-w-50 cursor-pointer truncate rounded px-2 py-0.5 text-xs text-white"
             :style="{ backgroundColor: getEventColor(evt) }"
             @click="onEventClick(evt, $event)"
           >
@@ -166,53 +251,69 @@ defineExpose({ prevDay, nextDay, goToToday, setDate, viewDate })
       </div>
 
       <!-- Time grid -->
-      <div class="relative overflow-y-auto" style="max-height: calc(100vh - 220px)">
-        <div class="relative" style="min-height: 1152px">
-          <!-- Hour rows -->
-          <div
-            v-for="hour in hours"
-            :key="hour"
-            class="flex border-b border-default/50 hover:bg-elevated/30 cursor-pointer"
-            style="height: 48px"
-            @click="onSlotClick(hour, $event)"
-          >
-            <div class="w-12 shrink-0 pr-2 pt-0 text-right text-[10px] text-muted -translate-y-1.5">
-              {{ hour === 0 ? '' : `${String(hour).padStart(2, '0')}:00` }}
+      <div ref="gridRef" class="overflow-hidden">
+        <div
+          data-scroll-body
+          class="overflow-y-auto"
+          style="max-height: calc(100vh - 220px)"
+        >
+          <div class="relative" :style="{ minHeight: `${24 * HOUR_HEIGHT}px` }">
+            <!-- Hour rows -->
+            <div
+              v-for="hour in hours"
+              :key="hour"
+              class="flex cursor-pointer border-b border-default/50 hover:bg-elevated/30"
+              :style="{ height: `${HOUR_HEIGHT}px` }"
+              @click="onSlotClick(hour, $event)"
+            >
+              <div class="w-12 shrink-0 pr-2 text-right">
+                <span class="-translate-y-1.5 block select-none text-[10px] text-muted">
+                  {{ formatHourLabel(hour) }}
+                </span>
+              </div>
+              <div data-day-col class="flex-1 border-l border-default/30" />
             </div>
-            <div class="flex-1 border-l border-default/30" />
-          </div>
 
-          <!-- Current time indicator -->
-          <div
-            v-if="currentTimeTop"
-            class="absolute left-12 right-0 z-10 flex items-center pointer-events-none"
-            :style="{ top: currentTimeTop }"
-          >
-            <div class="size-2 rounded-full bg-red-500 -ml-1" />
-            <div class="h-px flex-1 bg-red-500" />
-          </div>
-
-          <!-- Timed events -->
-          <div
-            v-for="evt in timedEvents"
-            :key="evt.id"
-            class="absolute left-14 right-2 z-[5] cursor-pointer rounded px-2 py-0.5 text-xs transition-opacity hover:opacity-90"
-            :style="{
-              ...getEventPosition(evt),
-              backgroundColor: getEventColor(evt) + '20',
-              borderLeft: `3px solid ${getEventColor(evt)}`
-            }"
-            @click="onEventClick(evt, $event)"
-          >
-            <div class="font-medium truncate" :style="{ color: getEventColor(evt) }">
-              {{ evt.title }}
+            <!-- Current time indicator -->
+            <div
+              v-if="isToday"
+              class="pointer-events-none absolute z-10 flex items-center"
+              style="left: 3rem; right: 0"
+              :style="{ top: `${currentTimePx}px` }"
+            >
+              <div class="-ml-1 size-2 rounded-full bg-red-500" />
+              <div class="h-px flex-1 bg-red-500" />
             </div>
-            <div class="text-muted text-[10px]">
-              {{ formatTime(evt.startAt) }} — {{ formatTime(evt.endAt) }}
+
+            <!-- Timed events (positioned absolutely, offset by time gutter) -->
+            <div
+              v-for="evt in timedEvents"
+              :key="`${evt.id}-${evt.recurrenceId ?? ''}`"
+              class="overflow-hidden px-1 py-0.5 text-xs"
+              :style="getEventStyle(evt)"
+              @click.stop="onEventClick(evt, $event)"
+              @pointerdown.stop="startDrag(evt, $event)"
+            >
+              <div
+                class="truncate font-medium leading-tight"
+                :style="{ color: getEventColor(evt) }"
+              >
+                {{ evt.title }}
+              </div>
+              <div class="mt-0.5 text-[10px] text-muted">
+                {{ new Date(evt.startAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) }}
+                —
+                {{ new Date(evt.endAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) }}
+              </div>
             </div>
           </div>
         </div>
       </div>
     </div>
   </div>
+
+  <!-- Drag ghost -->
+  <Teleport to="body">
+    <div v-if="drag.active && drag.event" :style="ghostStyle" />
+  </Teleport>
 </template>

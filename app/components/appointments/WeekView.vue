@@ -1,5 +1,14 @@
 <script setup lang="ts">
 import type { CalendarEvent } from '~/types/appointments'
+import {
+  layoutTimedEvents,
+  getEventTopPx,
+  getEventHeightPx,
+  getCurrentTimePx,
+  formatHourLabel,
+  HOUR_HEIGHT,
+  type PositionedEvent
+} from '~/composables/useCalendarLayout'
 
 const props = defineProps<{
   events: CalendarEvent[]
@@ -11,46 +20,39 @@ const emit = defineEmits<{
   selectEvent: [event: CalendarEvent, mouseEvent: MouseEvent]
   selectSlot: [date: string, mouseEvent: MouseEvent]
   weekChange: [from: string, to: string]
+  dropEvent: [eventId: string, newStartAt: string, newEndAt: string]
 }>()
 
-function getWeekEnd(start: Date): Date {
-  const d = new Date(start)
-  d.setDate(d.getDate() + 6)
-  d.setHours(23, 59, 59, 999)
-  return d
-}
-
-function emitRange() {
-  const from = formatDate(props.weekStartDate)
-  const end = getWeekEnd(props.weekStartDate)
-  const to = formatDate(end)
-  emit('weekChange', from, to)
-}
-
+// ─── Helpers ──────────────────────────────────────────────────────────────
 function formatDate(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
-watch(() => props.weekStartDate, () => {
-  emitRange()
-})
+function emitRange() {
+  const from = formatDate(props.weekStartDate)
+  const end = new Date(props.weekStartDate)
+  end.setDate(end.getDate() + 6)
+  emit('weekChange', from, formatDate(end))
+}
+
+watch(() => props.weekStartDate, () => emitRange(), { immediate: false })
+onMounted(() => emitRange())
 
 // ─── Day columns ──────────────────────────────────────────────────────────
 interface DayColumn {
   date: Date
   dateStr: string
-  dayLabel: string
+  label: string
   dayNumber: number
   isToday: boolean
-  events: CalendarEvent[]
+  allDayEvents: CalendarEvent[]
+  timedEvents: PositionedEvent[]
 }
 
-const weekDays = computed((): DayColumn[] => {
-  const today = new Date()
-  const todayStr = formatDate(today)
-  const days: DayColumn[] = []
+const todayStr = computed(() => formatDate(new Date()))
 
-  for (let i = 0; i < 7; i++) {
+const weekDays = computed((): DayColumn[] => {
+  return Array.from({ length: 7 }, (_, i) => {
     const date = new Date(props.weekStartDate)
     date.setDate(date.getDate() + i)
     const dateStr = formatDate(date)
@@ -60,129 +62,328 @@ const weekDays = computed((): DayColumn[] => {
     dayEnd.setDate(dayEnd.getDate() + 1)
 
     const dayEvents = (props.events ?? []).filter((evt: CalendarEvent) => {
+      if (!evt.startAt || !evt.endAt) return false
       const evtStart = new Date(evt.startAt)
       const evtEnd = new Date(evt.endAt)
       return evtStart < dayEnd && evtEnd > dayStart
-    }).sort((a: CalendarEvent, b: CalendarEvent) =>
-      new Date(a.startAt).getTime() - new Date(b.startAt).getTime()
-    )
+    })
 
-    days.push({
+    return {
       date,
       dateStr,
-      dayLabel: date.toLocaleDateString('pt-BR', { weekday: 'short' }),
+      label: date.toLocaleDateString('pt-BR', { weekday: 'short' }),
       dayNumber: date.getDate(),
-      isToday: dateStr === todayStr,
-      events: dayEvents
-    })
-  }
-
-  return days
+      isToday: dateStr === todayStr.value,
+      allDayEvents: dayEvents.filter(e => e.allDay),
+      timedEvents: layoutTimedEvents(dayEvents.filter(e => !e.allDay))
+    }
+  })
 })
+
+const hasAllDayEvents = computed(() => weekDays.value.some(d => d.allDayEvents.length > 0))
+const hours = Array.from({ length: 24 }, (_, i) => i)
+
+// ─── Current time indicator ───────────────────────────────────────────────
+const currentTimePx = ref(getCurrentTimePx())
+let timerId: ReturnType<typeof setInterval>
+onMounted(() => { timerId = setInterval(() => { currentTimePx.value = getCurrentTimePx() }, 60_000) })
+onUnmounted(() => clearInterval(timerId))
+
+// ─── Drag state ───────────────────────────────────────────────────────────
+interface DragState {
+  active: boolean
+  event: CalendarEvent | null
+  durationMs: number
+  pointerId: number
+  targetDayIndex: number
+  targetMinutes: number
+  originalStart: string
+}
+
+const drag = reactive<DragState>({
+  active: false,
+  event: null,
+  durationMs: 0,
+  pointerId: -1,
+  targetDayIndex: 0,
+  targetMinutes: 0,
+  originalStart: ''
+})
+
+const gridRef = ref<HTMLElement | null>(null)
+
+const ghostStyle = computed(() => {
+  if (!drag.active || !drag.event) return { display: 'none' }
+  const color = drag.event.calendar?.color ?? '#10b981'
+  const cols = gridRef.value?.querySelectorAll<HTMLElement>('[data-day-col]')
+  const dayEl = cols?.[drag.targetDayIndex]
+  if (!dayEl) return { display: 'none' }
+  const rect = dayEl.getBoundingClientRect()
+  const scrollEl = gridRef.value?.querySelector<HTMLElement>('[data-scroll-body]')
+  const scrollOffset = scrollEl?.scrollTop ?? 0
+  const bodyRect = scrollEl?.getBoundingClientRect()
+  const topInViewport = bodyRect ? (bodyRect.top + (drag.targetMinutes / 60) * HOUR_HEIGHT - scrollOffset) : 0
+  return {
+    position: 'fixed' as const,
+    left: `${rect.left + 2}px`,
+    top: `${topInViewport}px`,
+    width: `${rect.width - 4}px`,
+    height: `${Math.max((drag.durationMs / 3_600_000) * HOUR_HEIGHT, 20)}px`,
+    backgroundColor: color + '30',
+    borderLeft: `3px solid ${color}`,
+    borderRadius: '4px',
+    zIndex: 9999,
+    pointerEvents: 'none' as const,
+    opacity: 0.85
+  }
+})
+
+function startDrag(evt: CalendarEvent, e: PointerEvent) {
+  e.stopPropagation()
+  drag.active = true
+  drag.event = evt
+  drag.originalStart = evt.startAt
+  drag.durationMs = new Date(evt.endAt).getTime() - new Date(evt.startAt).getTime()
+  drag.pointerId = e.pointerId
+  drag.targetDayIndex = getColIndexFromPointer(e)
+  drag.targetMinutes = getSnappedMinutes(e)
+  ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
+}
+
+function onPointerMove(e: PointerEvent) {
+  if (!drag.active || e.pointerId !== drag.pointerId) return
+  drag.targetDayIndex = getColIndexFromPointer(e)
+  drag.targetMinutes = getSnappedMinutes(e)
+}
+
+function onPointerUp(e: PointerEvent) {
+  if (!drag.active || e.pointerId !== drag.pointerId) return
+  commitDrop()
+  endDrag()
+}
+
+function onPointerCancel() { endDrag() }
+
+function commitDrop() {
+  if (!drag.event) return
+  const targetDay = weekDays.value[drag.targetDayIndex]
+  if (!targetDay) return
+  const newStart = new Date(
+    targetDay.date.getFullYear(),
+    targetDay.date.getMonth(),
+    targetDay.date.getDate(),
+    0,
+    drag.targetMinutes
+  )
+  if (newStart.getTime() === new Date(drag.originalStart).getTime()) return
+  const newEnd = new Date(newStart.getTime() + drag.durationMs)
+  emit('dropEvent', drag.event.id, newStart.toISOString(), newEnd.toISOString())
+}
+
+function endDrag() {
+  drag.active = false
+  drag.event = null
+  drag.pointerId = -1
+}
+
+function getColIndexFromPointer(e: PointerEvent): number {
+  const cols = gridRef.value?.querySelectorAll<HTMLElement>('[data-day-col]')
+  if (!cols) return 0
+  for (let i = 0; i < cols.length; i++) {
+    const rect = cols[i]!.getBoundingClientRect()
+    if (e.clientX >= rect.left && e.clientX < rect.right) return i
+  }
+  return 0
+}
+
+function getSnappedMinutes(e: PointerEvent): number {
+  const scrollEl = gridRef.value?.querySelector<HTMLElement>('[data-scroll-body]')
+  if (!scrollEl) return 0
+  const rect = scrollEl.getBoundingClientRect()
+  const scrollTop = scrollEl.scrollTop
+  const relY = e.clientY - rect.top + scrollTop
+  const raw = (relY / HOUR_HEIGHT) * 60
+  return Math.max(0, Math.min(1425, Math.round(raw / 15) * 15))
+}
+
+function onKeydown(e: KeyboardEvent) {
+  if (e.key === 'Escape' && drag.active) endDrag()
+}
+
+onMounted(() => window.addEventListener('keydown', onKeydown))
+onUnmounted(() => window.removeEventListener('keydown', onKeydown))
+
+// ─── Event/slot handlers ──────────────────────────────────────────────────
+function onSlotClick(day: DayColumn, e: MouseEvent) {
+  if (drag.active) return
+  emit('selectSlot', day.dateStr, e)
+}
+
+function onEventClick(evt: CalendarEvent, e: MouseEvent) {
+  if (drag.active) return
+  e.stopPropagation()
+  emit('selectEvent', evt, e)
+}
 
 function getEventColor(evt: CalendarEvent): string {
   return evt.calendar?.color ?? '#10b981'
 }
 
-function formatTime(dateStr: string): string {
-  return new Date(dateStr).toLocaleTimeString('pt-BR', {
-    hour: '2-digit',
-    minute: '2-digit'
-  })
-}
+function getEventStyle(evt: PositionedEvent, day: DayColumn) {
+  const color = getEventColor(evt)
+  const top = getEventTopPx(evt, day.date)
+  const height = getEventHeightPx(evt, day.date)
+  const isDragging = drag.active && drag.event?.id === evt.id
 
-function onDaySlotClick(day: DayColumn, e: MouseEvent) {
-  emit('selectSlot', day.dateStr, e)
+  return {
+    position: 'absolute' as const,
+    top: `${top}px`,
+    height: `${height}px`,
+    left: `calc(${evt.leftRatio * 100}% + 2px)`,
+    width: `calc(${evt.widthRatio * 100}% - 4px)`,
+    backgroundColor: color + '20',
+    borderLeft: `3px solid ${color}`,
+    borderRadius: '3px',
+    zIndex: isDragging ? 1 : 5,
+    opacity: isDragging ? 0.3 : 1,
+    cursor: isDragging ? 'grabbing' : 'grab',
+    userSelect: 'none' as const
+  }
 }
-
-function onEventClick(evt: CalendarEvent, e: MouseEvent) {
-  e.stopPropagation()
-  emit('selectEvent', evt, e)
-}
-
-onMounted(() => {
-  emitRange()
-})
 </script>
 
 <template>
-  <div>
+  <div
+    class="flex flex-col overflow-hidden rounded-lg border border-default"
+    @pointermove="onPointerMove"
+    @pointerup="onPointerUp"
+    @pointercancel="onPointerCancel"
+  >
     <!-- Loading -->
-    <div
-      v-if="loading"
-      class="grid grid-cols-7 gap-2"
-    >
-      <USkeleton
-        v-for="i in 7"
-        :key="i"
-        class="h-48"
-      />
+    <div v-if="loading" class="flex flex-1 gap-px p-2">
+      <USkeleton v-for="i in 7" :key="i" class="h-48 flex-1" />
     </div>
 
-    <!-- Week grid -->
-    <div
-      v-else
-      class="grid grid-cols-7 gap-px overflow-hidden rounded-lg border border-default"
-    >
-      <div
-        v-for="day in weekDays"
-        :key="day.dateStr"
-        class="min-h-48 cursor-pointer bg-default"
-        :class="day.isToday ? 'bg-primary/5' : ''"
-        @click="onDaySlotClick(day, $event)"
-      >
-        <!-- Day header -->
+    <template v-else>
+      <!-- ── Header ────────────────────────────────────────────── -->
+      <div class="flex shrink-0 border-b border-default bg-default">
+        <div class="w-14 shrink-0" />
         <div
-          class="border-b border-default px-2 py-2 text-center"
-          :class="day.isToday ? 'border-primary/30' : ''"
+          v-for="day in weekDays"
+          :key="day.dateStr"
+          class="flex flex-1 flex-col items-center border-l border-default/50 py-2"
         >
-          <span class="text-xs uppercase text-muted">{{ day.dayLabel }}</span>
-          <div
-            class="mt-0.5 flex items-center justify-center"
+          <span class="text-[10px] font-medium uppercase text-muted">{{ day.label }}</span>
+          <span
+            class="mt-0.5 flex size-7 items-center justify-center rounded-full text-sm font-semibold"
+            :class="day.isToday ? 'bg-primary text-white' : 'text-highlighted'"
           >
-            <span
-              class="flex size-7 items-center justify-center rounded-full text-sm font-semibold"
-              :class="day.isToday ? 'bg-primary text-white' : 'text-highlighted'"
-            >
-              {{ day.dayNumber }}
-            </span>
-          </div>
+            {{ day.dayNumber }}
+          </span>
         </div>
+      </div>
 
-        <!-- Events -->
-        <div class="space-y-1 p-1">
+      <!-- ── All-day row ────────────────────────────────────────── -->
+      <div
+        v-if="hasAllDayEvents"
+        class="flex shrink-0 border-b border-default/50 bg-default"
+      >
+        <div class="flex w-14 shrink-0 items-start justify-end pr-2 pt-1">
+          <span class="text-[10px] text-muted">dia int.</span>
+        </div>
+        <div
+          v-for="day in weekDays"
+          :key="day.dateStr"
+          class="min-h-6 flex-1 border-l border-default/50 p-0.5"
+        >
           <div
-            v-for="(evt, index) in day.events"
-            :key="index"
-            class="cursor-pointer rounded px-1.5 py-1 text-xs transition-opacity hover:opacity-80"
-            :style="{ backgroundColor: getEventColor(evt) + '20', borderLeft: `3px solid ${getEventColor(evt)}` }"
+            v-for="evt in day.allDayEvents"
+            :key="evt.id"
+            class="mb-0.5 cursor-pointer truncate rounded px-1 py-0.5 text-[11px] text-white"
+            :style="{ backgroundColor: getEventColor(evt) }"
             @click="onEventClick(evt, $event)"
           >
-            <div class="font-medium truncate" :style="{ color: getEventColor(evt) }">
-              {{ evt.title }}
-            </div>
-            <div
-              v-if="!evt.allDay"
-              class="text-muted mt-0.5"
-            >
-              {{ formatTime(evt.startAt) }} - {{ formatTime(evt.endAt) }}
-            </div>
-            <div
-              v-else
-              class="text-muted mt-0.5"
-            >
-              Dia inteiro
-            </div>
-          </div>
-
-          <div
-            v-if="day.events.length === 0"
-            class="py-4 text-center text-xs text-muted opacity-50"
-          >
-            —
+            {{ evt.title }}
           </div>
         </div>
       </div>
-    </div>
+
+      <!-- ── Scrollable body ───────────────────────────────────── -->
+      <div ref="gridRef" class="overflow-hidden">
+        <div data-scroll-body class="flex overflow-y-auto" style="max-height: calc(100vh - 200px)">
+          <!-- Hour labels -->
+          <div class="w-14 shrink-0">
+            <div
+              v-for="hour in hours"
+              :key="hour"
+              class="relative flex justify-end pr-2"
+              :style="{ height: `${HOUR_HEIGHT}px` }"
+            >
+              <span class="absolute -top-2 select-none text-[10px] text-muted">
+                {{ formatHourLabel(hour) }}
+              </span>
+            </div>
+          </div>
+
+          <!-- Day columns -->
+          <div class="flex flex-1">
+            <div
+              v-for="day in weekDays"
+              :key="day.dateStr"
+              data-day-col
+              class="relative flex-1 border-l border-default/30"
+              :class="day.isToday ? 'bg-primary/2' : ''"
+            >
+              <!-- Hour rows (click targets) -->
+              <div
+                v-for="hour in hours"
+                :key="hour"
+                class="cursor-pointer border-b border-default/30 hover:bg-elevated/40"
+                :style="{ height: `${HOUR_HEIGHT}px` }"
+                @click="onSlotClick(day, $event)"
+              />
+
+              <!-- Current time line (today only) -->
+              <div
+                v-if="day.isToday"
+                class="pointer-events-none absolute left-0 right-0 z-10 flex items-center"
+                :style="{ top: `${currentTimePx}px` }"
+              >
+                <div class="-ml-1 size-2 rounded-full bg-red-500" />
+                <div class="h-px flex-1 bg-red-500" />
+              </div>
+
+              <!-- Timed events -->
+              <div
+                v-for="evt in day.timedEvents"
+                :key="`${evt.id}-${evt.recurrenceId ?? ''}`"
+                class="overflow-hidden px-1 py-0.5 text-xs"
+                :style="getEventStyle(evt, day)"
+                @click="onEventClick(evt, $event)"
+                @pointerdown.stop="startDrag(evt, $event)"
+              >
+                <div
+                  class="truncate font-medium leading-tight"
+                  :style="{ color: getEventColor(evt) }"
+                >
+                  {{ evt.title }}
+                </div>
+                <div class="mt-0.5 text-[10px] text-muted">
+                  {{ new Date(evt.startAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) }}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </template>
   </div>
+
+  <!-- Drag ghost (teleported to body) -->
+  <Teleport to="body">
+    <div
+      v-if="drag.active && drag.event"
+      :style="ghostStyle"
+    />
+  </Teleport>
 </template>
