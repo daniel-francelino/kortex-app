@@ -169,7 +169,11 @@ onMounted(() => emitRange())
         :class="[
           (idx + 1) % 7 === 0 ? 'border-r-0' : '',
           idx >= 35 ? 'border-b-0' : '',
-          day.isCurrentMonth ? 'hover:bg-elevated/60' : 'hover:bg-elevated/30',
+          day.hasEntry && day.isCurrentMonth
+            ? 'bg-primary/8 hover:bg-primary/[0.14]'
+            : day.isCurrentMonth
+              ? 'hover:bg-elevated/60'
+              : 'hover:bg-elevated/30',
         ]"
         @click="emit('selectDate', day.date)"
       >
@@ -187,7 +191,7 @@ onMounted(() => emitRange())
           {{ day.day }}
         </span>
 
-        <!-- Mood emoji -->
+        <!-- Mood emoji (entry with mood) -->
         <span
           v-if="day.hasEntry && day.mood"
           class="text-base leading-none"
@@ -196,14 +200,15 @@ onMounted(() => emitRange())
           {{ getMoodOption(day.mood)?.emoji }}
         </span>
 
-        <!-- Written dot (entry without mood) -->
-        <span
+        <!-- Pencil icon (entry without mood) -->
+        <UIcon
           v-else-if="day.hasEntry"
-          class="size-1.5 rounded-full bg-primary/60"
+          name="i-lucide-pencil-line"
+          class="size-3 text-primary/60"
         />
 
-        <!-- Empty spacer to keep height consistent -->
-        <span v-else class="size-1.5" />
+        <!-- Spacer to keep height consistent -->
+        <span v-else class="size-3" />
       </button>
     </div>
   </div>
