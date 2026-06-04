@@ -14,7 +14,6 @@ const {
   calendarsStatus,
   eventsData,
   eventsStatus,
-  searchQuery,
   activeCalendarIds,
   setViewRange,
   fetchEventDetail,
@@ -39,8 +38,8 @@ watch(activeView, (v) => {
 })
 
 const viewModes: { label: string, value: CalendarViewMode, icon: string }[] = [
-  { label: 'Dia', value: 'day', icon: 'i-lucide-calendar' },
-  { label: 'Semana', value: 'week', icon: 'i-lucide-calendar-days' },
+  { label: 'Dia', value: 'day', icon: 'i-lucide-square' },
+  { label: 'Semana', value: 'week', icon: 'i-lucide-columns-3' },
   { label: 'Mês', value: 'month', icon: 'i-lucide-grid-3x3' }
 ]
 
@@ -309,13 +308,13 @@ onMounted(() => {
         </template>
 
         <template #default>
-          <!-- Google Calendar-style toolbar -->
-          <div class="flex w-full items-center gap-2">
-            <!-- Today + Nav arrows -->
+          <!-- Navigation: today + arrows + period label -->
+          <div class="flex items-center gap-1">
             <UButton
               label="Hoje"
               variant="outline"
               size="sm"
+              class="hidden sm:flex"
               @click="goToday"
             />
             <UButton
@@ -330,58 +329,52 @@ onMounted(() => {
               size="sm"
               @click="goNext"
             />
-
-            <!-- Current period label -->
-            <h2 class="min-w-44 text-base font-semibold capitalize text-highlighted">
+            <h2 class="ml-1 min-w-36 text-sm font-semibold capitalize text-highlighted">
               {{ headerLabel }}
             </h2>
+          </div>
+        </template>
 
-            <div class="flex-1" />
-
-            <!-- Search -->
-            <UInput
-              v-model="searchQuery"
-              placeholder="Buscar..."
-              icon="i-lucide-search"
-              size="sm"
-              class="w-40"
-            />
-
-            <!-- View mode switcher -->
-            <div class="flex items-center rounded-md border border-default">
-              <button
-                v-for="mode in viewModes"
-                :key="mode.value"
-                type="button"
-                class="px-2.5 py-1 text-xs font-medium transition-colors first:rounded-l-md last:rounded-r-md"
-                :class="activeView === mode.value
-                  ? 'bg-primary text-white'
-                  : 'text-muted hover:bg-elevated/50'"
+        <template #right>
+          <!-- View mode (icon + tooltip) -->
+          <div class="flex items-center gap-0.5 rounded-lg border border-default p-0.5">
+            <UTooltip
+              v-for="mode in viewModes"
+              :key="mode.value"
+              :text="mode.label"
+            >
+              <UButton
+                :icon="mode.icon"
+                size="xs"
+                :color="activeView === mode.value ? 'primary' : 'neutral'"
+                :variant="activeView === mode.value ? 'soft' : 'ghost'"
                 @click="activeView = mode.value"
-              >
-                {{ mode.label }}
-              </button>
-            </div>
+              />
+            </UTooltip>
+          </div>
 
-            <!-- Calendar list toggle -->
+          <!-- Calendar sidebar toggle -->
+          <UTooltip text="Calendários">
             <UButton
               icon="i-lucide-panel-left"
               variant="ghost"
               size="sm"
-              :class="calendarsExpanded ? 'text-primary' : ''"
+              :color="calendarsExpanded ? 'primary' : 'neutral'"
               @click="toggleCalendarsPanel"
             />
+          </UTooltip>
 
-            <!-- Notifications -->
-            <NotificationsButton />
-
-            <!-- New event -->
+          <!-- New event -->
+          <UTooltip text="Novo evento">
             <UButton
               icon="i-lucide-plus"
               size="sm"
               @click="eventCreateOpen = true"
             />
-          </div>
+          </UTooltip>
+
+          <!-- Notifications always last -->
+          <NotificationsButton />
         </template>
       </UDashboardNavbar>
     </template>
