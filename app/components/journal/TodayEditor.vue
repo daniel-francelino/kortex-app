@@ -174,43 +174,43 @@ function formatToday(): string {
     </template>
 
     <template v-else>
-      <!-- Header: date + auto-save indicator -->
-      <div class="flex items-start justify-between gap-4">
-        <div>
+      <!-- Header: date + mood selector na mesma linha -->
+      <div class="flex items-center justify-between gap-4">
+        <div class="min-w-0">
           <h3 class="text-lg font-semibold text-highlighted capitalize">
             {{ formatToday() }}
           </h3>
-          <p class="text-sm text-muted">
-            Seu diário de bordo de hoje.
-          </p>
+          <div class="flex items-center gap-2 mt-0.5">
+            <p class="text-sm text-muted">
+              Seu diário de bordo de hoje.
+            </p>
+            <!-- Auto-save status -->
+            <div class="flex items-center gap-1 text-xs shrink-0">
+              <template v-if="saveStatus === 'unsaved'">
+                <span class="size-1.5 rounded-full bg-amber-400 dark:bg-amber-500 animate-pulse" />
+                <span class="text-muted">Não salvo</span>
+              </template>
+              <template v-else-if="saveStatus === 'saved'">
+                <UIcon name="i-lucide-check-circle" class="size-3 text-success" />
+                <span class="text-muted">Salvo às {{ savedAtText }}</span>
+              </template>
+              <template v-else-if="saveStatus === 'error'">
+                <UIcon name="i-lucide-alert-circle" class="size-3 text-error" />
+                <button
+                  class="text-primary underline underline-offset-2 cursor-pointer"
+                  @click="doSave"
+                >
+                  Tentar novamente
+                </button>
+              </template>
+            </div>
+          </div>
         </div>
 
-        <!-- Auto-save status — no spinner, save is invisible to user -->
-        <div class="flex items-center gap-1.5 text-xs shrink-0 pt-0.5">
-          <template v-if="saveStatus === 'unsaved'">
-            <span class="size-1.5 rounded-full bg-amber-400 dark:bg-amber-500 animate-pulse" />
-            <span class="text-muted">Não salvo</span>
-          </template>
-          <template v-else-if="saveStatus === 'saved'">
-            <UIcon name="i-lucide-check-circle" class="size-3 text-success" />
-            <span class="text-muted">Salvo às {{ savedAtText }}</span>
-          </template>
-          <template v-else-if="saveStatus === 'error'">
-            <UIcon name="i-lucide-alert-circle" class="size-3 text-error" />
-            <span class="text-error">Erro —</span>
-            <button
-              class="text-primary underline underline-offset-2 cursor-pointer"
-              @click="doSave"
-            >
-              Tentar novamente
-            </button>
-          </template>
+        <!-- Mood selector -->
+        <div class="shrink-0">
+          <JournalMoodSelector v-model="mood" />
         </div>
-      </div>
-
-      <!-- Mood selector — right-aligned -->
-      <div class="flex justify-end">
-        <JournalMoodSelector v-model="mood" />
       </div>
 
       <!-- Notion editor -->
