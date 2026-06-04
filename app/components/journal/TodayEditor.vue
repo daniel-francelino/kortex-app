@@ -163,7 +163,7 @@ function formatToday(): string {
   })
 }
 
-defineExpose({ hasChanges, doSave })
+defineExpose({ isUnsaved: () => hasChanges.value, doSave })
 </script>
 
 <template>

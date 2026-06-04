@@ -82,12 +82,12 @@ const calendarColor = computed(() => selectedCalendar.value?.color ?? '#10b981')
 // ─── Date / time bindings for UInputDate + UInputTime ─────────────────────
 const startDateValue = computed({
   get: () => strToDateValue(state.startDate),
-  set: (v: DateValue | undefined) => { state.startDate = dateValueToStr(v) }
+  set: (v: ReturnType<typeof strToDateValue>) => { state.startDate = dateValueToStr(v) }
 })
 
 const endDateValue = computed({
   get: () => strToDateValue(state.endDate),
-  set: (v: DateValue | undefined) => { state.endDate = dateValueToStr(v) }
+  set: (v: ReturnType<typeof strToDateValue>) => { state.endDate = dateValueToStr(v) }
 })
 
 const startTimeValue = computed({
