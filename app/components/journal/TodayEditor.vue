@@ -162,6 +162,8 @@ function formatToday(): string {
     year: 'numeric'
   })
 }
+
+defineExpose({ hasChanges, doSave })
 </script>
 
 <template>

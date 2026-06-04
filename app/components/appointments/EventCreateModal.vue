@@ -1,9 +1,8 @@
 <script setup lang="ts">
 import { z } from 'zod'
-import type { DateValue, TimeValue } from '@internationalized/date'
 import type { Calendar } from '~/types/appointments'
 import { ReminderType } from '~/types/appointments'
-import { strToDateValue, dateValueToStr, strToTimeValue, timeValueToStr } from '~/utils/calendarDate'
+import { strToDateValue, dateValueToStr, strToTimeValue, timeValueToStr, type TimeValue } from '~/utils/calendarDate'
 
 const props = defineProps<{
   open: boolean

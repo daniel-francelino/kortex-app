@@ -1,8 +1,7 @@
 <script setup lang="ts">
 import { z } from 'zod'
-import type { DateValue, TimeValue } from '@internationalized/date'
 import type { Calendar, CalendarEvent } from '~/types/appointments'
-import { strToDateValue, dateValueToStr, strToTimeValue, timeValueToStr } from '~/utils/calendarDate'
+import { strToDateValue, dateValueToStr, strToTimeValue, timeValueToStr, type TimeValue } from '~/utils/calendarDate'
 
 const props = defineProps<{
   open: boolean
@@ -72,19 +71,19 @@ const eventColor = computed(() =>
 
 // ─── Date / time bindings for UInputDate + UInputTime ─────────────────────
 const startDateValue = computed({
-  get: () => strToDateValue(state.startDate),
-  set: (v: DateValue | undefined) => { state.startDate = dateValueToStr(v) }
+  get: () => strToDateValue(state.startDate ?? ''),
+  set: (v: ReturnType<typeof strToDateValue>) => { state.startDate = dateValueToStr(v) }
 })
 const endDateValue = computed({
-  get: () => strToDateValue(state.endDate),
-  set: (v: DateValue | undefined) => { state.endDate = dateValueToStr(v) }
+  get: () => strToDateValue(state.endDate ?? ''),
+  set: (v: ReturnType<typeof strToDateValue>) => { state.endDate = dateValueToStr(v) }
 })
 const startTimeValue = computed({
-  get: () => strToTimeValue(state.startTime),
+  get: () => strToTimeValue(state.startTime ?? ''),
   set: (v: TimeValue | undefined) => { state.startTime = timeValueToStr(v) }
 })
 const endTimeValue = computed({
-  get: () => strToTimeValue(state.endTime),
+  get: () => strToTimeValue(state.endTime ?? ''),
   set: (v: TimeValue | undefined) => { state.endTime = timeValueToStr(v) }
 })
 

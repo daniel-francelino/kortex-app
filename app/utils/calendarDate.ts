@@ -1,19 +1,21 @@
-import { parseDate, parseTime } from '@internationalized/date'
-import type { DateValue, TimeValue } from '@internationalized/date'
+import { parseDate, parseTime, CalendarDate, Time } from '@internationalized/date'
 
-export function strToDateValue(str: string): DateValue | undefined {
+export type CalendarDateValue = InstanceType<typeof CalendarDate>
+export type TimeValue = InstanceType<typeof Time>
+
+export function strToDateValue(str: string): CalendarDateValue | undefined {
   if (!str) return undefined
-  try { return parseDate(str) } catch { return undefined }
+  try { return parseDate(str) as CalendarDateValue } catch { return undefined }
 }
 
-export function dateValueToStr(d: DateValue | null | undefined): string {
+export function dateValueToStr(d: CalendarDateValue | null | undefined): string {
   return d ? d.toString() : ''
 }
 
 export function strToTimeValue(str: string): TimeValue | undefined {
   if (!str) return undefined
   try {
-    return parseTime(str.length === 5 ? str + ':00' : str)
+    return parseTime(str.length === 5 ? str + ':00' : str) as TimeValue
   } catch { return undefined }
 }
 
