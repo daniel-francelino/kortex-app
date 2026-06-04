@@ -122,7 +122,6 @@ const tagFilterOptions = computed(() => [
             :today-entry="todayData?.entry ?? null"
             :loading="todayStatus === 'pending'"
             :on-upsert-entry="upsertEntry"
-            @saved="refreshToday()"
           />
         </div>
 

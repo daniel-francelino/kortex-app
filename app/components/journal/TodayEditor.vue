@@ -12,10 +12,6 @@ const props = defineProps<{
   }, options?: { silent?: boolean }) => Promise<JournalEntry | null>
 }>()
 
-const emit = defineEmits<{
-  saved: []
-}>()
-
 const today = new Date().toISOString().split('T')[0] ?? ''
 const content = ref('')
 const mood = ref<string | null>(null)
@@ -31,6 +27,10 @@ const lastChangeAt = ref(0)
 type SaveStatus = 'idle' | 'unsaved' | 'saved' | 'error'
 const saveStatus = ref<SaveStatus>('idle')
 const savedAt = ref<Date | null>(null)
+
+// Once the entry has loaded at least once, never show the skeleton again —
+// background saves must not interrupt the editor.
+const initialized = ref(false)
 
 const savedAtText = computed(() =>
   savedAt.value?.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) ?? ''
@@ -50,13 +50,16 @@ watch(() => props.todayEntry, (entry) => {
       mood.value = m
     }
     savedMood.value = m
-  } else {
+    initialized.value = true
+  } else if (!props.loading) {
+    // Only reset when truly no entry and not mid-fetch
     content.value = ''
     savedContent.value = ''
     mood.value = null
     savedMood.value = null
     lastChangeAt.value = 0
     saveStatus.value = 'idle'
+    initialized.value = true
   }
 }, { immediate: true })
 
@@ -97,7 +100,6 @@ async function doSave() {
       lastChangeAt.value = 0
       saveStatus.value = 'saved'
       savedAt.value = new Date()
-      emit('saved')
     } else {
       saveStatus.value = 'error'
     }
@@ -164,8 +166,8 @@ function formatToday(): string {
 
 <template>
   <div class="space-y-5">
-    <!-- Loading skeleton -->
-    <template v-if="props.loading">
+    <!-- Loading skeleton — only on initial load, not on background saves -->
+    <template v-if="!initialized">
       <USkeleton class="h-6 w-48" />
       <USkeleton class="h-8 w-40" />
       <USkeleton class="h-64 w-full rounded-lg" />
