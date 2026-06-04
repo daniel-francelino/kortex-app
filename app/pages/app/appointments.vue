@@ -344,33 +344,37 @@ onMounted(() => {
               :text="mode.label"
             >
               <UButton
-                :icon="mode.icon"
-                size="xs"
+                square
                 :color="activeView === mode.value ? 'primary' : 'neutral'"
                 :variant="activeView === mode.value ? 'soft' : 'ghost'"
                 @click="activeView = mode.value"
-              />
+              >
+                <UIcon :name="mode.icon" class="size-5 shrink-0" />
+              </UButton>
             </UTooltip>
           </div>
 
           <!-- Calendar sidebar toggle -->
           <UTooltip text="Calendários">
             <UButton
-              icon="i-lucide-panel-left"
+              color="neutral"
               variant="ghost"
-              size="sm"
-              :color="calendarsExpanded ? 'primary' : 'neutral'"
+              square
+              :class="calendarsExpanded ? 'text-primary' : ''"
               @click="toggleCalendarsPanel"
-            />
+            >
+              <UIcon name="i-lucide-panel-left" class="size-5 shrink-0" />
+            </UButton>
           </UTooltip>
 
           <!-- New event -->
           <UTooltip text="Novo evento">
             <UButton
-              icon="i-lucide-plus"
-              size="sm"
+              square
               @click="eventCreateOpen = true"
-            />
+            >
+              <UIcon name="i-lucide-plus" class="size-5 shrink-0" />
+            </UButton>
           </UTooltip>
 
           <!-- Notifications always last -->

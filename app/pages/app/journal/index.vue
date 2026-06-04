@@ -96,12 +96,13 @@ const viewOptions: { value: JournalView, icon: string, tooltip: string }[] = [
               :text="opt.tooltip"
             >
               <UButton
-                :icon="opt.icon"
-                size="xs"
+                square
                 :color="activeView === opt.value ? 'primary' : 'neutral'"
                 :variant="activeView === opt.value ? 'soft' : 'ghost'"
                 @click="activeView = opt.value"
-              />
+              >
+                <UIcon :name="opt.icon" class="size-5 shrink-0" />
+              </UButton>
             </UTooltip>
           </div>
 
