@@ -15,24 +15,27 @@ const emit = defineEmits<{
 }>()
 
 const popoverRef = ref<HTMLElement | null>(null)
+const inputRef = ref<HTMLInputElement | null>(null)
 const title = ref('')
 const calendarId = ref('')
+
+// ─── Position ─────────────────────────────────────────────────────────────
+const CARD_W = 320
+const CARD_H = 220
 
 const popoverStyle = computed(() => {
   if (!props.visible) return { display: 'none' }
 
-  const viewportW = typeof window !== 'undefined' ? window.innerWidth : 1200
-  const viewportH = typeof window !== 'undefined' ? window.innerHeight : 800
-  const cardW = 300
-  const cardH = 200
+  const vw = typeof window !== 'undefined' ? window.innerWidth : 1200
+  const vh = typeof window !== 'undefined' ? window.innerHeight : 800
 
-  let left = props.position.x + 8
-  let top = props.position.y - 20
+  let left = props.position.x + 12
+  let top = props.position.y - 32
 
-  if (left + cardW > viewportW - 16) left = props.position.x - cardW - 8
-  if (top + cardH > viewportH - 16) top = viewportH - cardH - 16
-  if (top < 16) top = 16
-  if (left < 16) left = 16
+  if (left + CARD_W > vw - 12) left = props.position.x - CARD_W - 12
+  if (top + CARD_H > vh - 12) top = vh - CARD_H - 12
+  if (top < 12) top = 12
+  if (left < 12) left = 12
 
   return {
     position: 'fixed' as const,
@@ -42,30 +45,35 @@ const popoverStyle = computed(() => {
   }
 })
 
-const dateLabel = computed(() => {
-  if (!props.date) return ''
-  const [year, month, day] = props.date.split('-').map(Number)
-  const d = new Date(year ?? 0, (month ?? 1) - 1, day ?? 1)
-  return d.toLocaleDateString('pt-BR', {
-    weekday: 'long',
-    day: '2-digit',
-    month: 'long'
-  })
-})
-
+// ─── Calendar helpers ──────────────────────────────────────────────────────
 const calendarOptions = computed(() =>
   (props.calendars ?? []).map(c => ({ label: c.name, value: c.id }))
 )
 
-watch(() => props.visible, (val) => {
+const selectedCalendar = computed<Calendar | undefined>(() =>
+  (props.calendars ?? []).find(c => c.id === calendarId.value)
+)
+
+const calendarColor = computed(() => selectedCalendar.value?.color ?? '#10b981')
+
+// ─── Date label ────────────────────────────────────────────────────────────
+const dateLabel = computed(() => {
+  if (!props.date) return ''
+  const [year, month, day] = props.date.split('-').map(Number)
+  const d = new Date(year ?? 0, (month ?? 1) - 1, day ?? 1)
+  return d.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' })
+})
+
+// ─── Visibility / focus ────────────────────────────────────────────────────
+watch(() => props.visible, async (val) => {
   if (val) {
     title.value = ''
     if (props.calendars?.length && !calendarId.value) {
       calendarId.value = props.calendars[0]?.id ?? ''
     }
-    setTimeout(() => {
-      document.addEventListener('mousedown', onClickOutside)
-    }, 10)
+    await nextTick()
+    inputRef.value?.focus()
+    setTimeout(() => document.addEventListener('mousedown', onClickOutside), 10)
   } else {
     document.removeEventListener('mousedown', onClickOutside)
   }
@@ -77,39 +85,27 @@ function onClickOutside(e: MouseEvent) {
   }
 }
 
+onBeforeUnmount(() => document.removeEventListener('mousedown', onClickOutside))
+
+// ─── Actions ───────────────────────────────────────────────────────────────
 function onQuickCreate() {
   if (!title.value.trim()) return
-
-  emit('create', {
-    title: title.value.trim(),
-    date: props.date,
-    calendarId: calendarId.value
-  })
-
+  emit('create', { title: title.value.trim(), date: props.date, calendarId: calendarId.value })
   title.value = ''
 }
 
 function onKeydown(e: KeyboardEvent) {
-  if (e.key === 'Enter') {
-    e.preventDefault()
-    onQuickCreate()
-  }
-  if (e.key === 'Escape') {
-    emit('close')
-  }
+  if (e.key === 'Enter') { e.preventDefault(); onQuickCreate() }
+  if (e.key === 'Escape') emit('close')
 }
-
-onBeforeUnmount(() => {
-  document.removeEventListener('mousedown', onClickOutside)
-})
 </script>
 
 <template>
   <Teleport to="body">
     <Transition
       enter-active-class="transition duration-150 ease-out"
-      enter-from-class="opacity-0 scale-95"
-      enter-to-class="opacity-100 scale-100"
+      enter-from-class="opacity-0 translate-y-1 scale-[0.98]"
+      enter-to-class="opacity-100 translate-y-0 scale-100"
       leave-active-class="transition duration-100 ease-in"
       leave-from-class="opacity-100 scale-100"
       leave-to-class="opacity-0 scale-95"
@@ -118,55 +114,74 @@ onBeforeUnmount(() => {
         v-if="visible"
         ref="popoverRef"
         :style="popoverStyle"
-        class="w-[300px] rounded-lg border border-default bg-default shadow-xl ring-1 ring-black/5"
+        class="w-80 overflow-hidden rounded-xl border border-default bg-default shadow-2xl"
       >
-        <div class="p-3 space-y-3">
-          <div class="flex items-center justify-between">
-            <p class="text-xs font-medium capitalize text-muted">
-              {{ dateLabel }}
-            </p>
-            <UButton
-              icon="i-lucide-x"
-              size="xs"
-              variant="ghost"
-              class="-mr-1 -mt-1"
-              @click="emit('close')"
-            />
-          </div>
+        <!-- Color bar (calendar color) -->
+        <div
+          class="h-1 w-full transition-colors duration-200"
+          :style="{ backgroundColor: calendarColor }"
+        />
 
-          <UInput
+        <!-- Header: date + close -->
+        <div class="flex items-center justify-between px-4 pt-3 pb-1">
+          <div class="flex items-center gap-1.5 text-xs text-muted">
+            <UIcon name="i-lucide-calendar" class="size-3.5 shrink-0" />
+            <span class="capitalize font-medium">{{ dateLabel }}</span>
+          </div>
+          <button
+            class="rounded p-0.5 text-muted transition-colors hover:bg-elevated hover:text-highlighted"
+            @click="emit('close')"
+          >
+            <UIcon name="i-lucide-x" class="size-3.5" />
+          </button>
+        </div>
+
+        <!-- Title input -->
+        <div class="px-4 py-2">
+          <input
+            ref="inputRef"
             v-model="title"
+            type="text"
             placeholder="Adicionar título"
-            autofocus
-            class="w-full"
-            size="sm"
+            class="w-full border-0 border-b border-default bg-transparent pb-1.5 text-sm font-medium text-highlighted placeholder:font-normal placeholder:text-muted/50 outline-none focus:border-primary transition-colors"
             @keydown="onKeydown"
           />
+        </div>
 
+        <!-- Calendar selector (only if multiple) -->
+        <div
+          v-if="calendarOptions.length > 1"
+          class="flex items-center gap-2.5 px-4 py-2"
+        >
+          <span
+            class="inline-block size-3 shrink-0 rounded-full transition-colors duration-200"
+            :style="{ backgroundColor: calendarColor }"
+          />
           <USelect
-            v-if="calendarOptions.length > 1"
             v-model="calendarId"
             :items="calendarOptions"
-            placeholder="Calendário"
+            variant="none"
             size="sm"
-            class="w-full"
+            class="flex-1 text-xs"
           />
+        </div>
 
-          <div class="flex items-center justify-between gap-2 pt-1">
-            <UButton
-              label="Mais opções"
-              size="xs"
-              variant="ghost"
-              icon="i-lucide-settings-2"
-              @click="emit('moreOptions', date)"
-            />
-            <UButton
-              label="Salvar"
-              size="xs"
-              :disabled="!title.trim()"
-              @click="onQuickCreate"
-            />
-          </div>
+        <!-- Footer actions -->
+        <div class="flex items-center justify-between px-3 py-2.5 border-t border-default/50">
+          <button
+            class="flex items-center gap-1 rounded px-2 py-1 text-xs text-muted transition-colors hover:bg-elevated hover:text-highlighted"
+            @click="emit('moreOptions', date)"
+          >
+            <UIcon name="i-lucide-expand" class="size-3" />
+            Mais opções
+          </button>
+
+          <UButton
+            label="Salvar"
+            size="xs"
+            :disabled="!title.trim()"
+            @click="onQuickCreate"
+          />
         </div>
       </div>
     </Transition>
