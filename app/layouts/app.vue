@@ -57,22 +57,14 @@ const links = [
         open.value = false
       }
     },
-    // {
-    //  label: 'Finanças',
-    //  icon: 'i-lucide-wallet',
-    //  to: '/app/financial',
-    //  onSelect: () => {
-    //    open.value = false
-    //  }
-    // },
-    // {
-    //  label: 'Conhecimento',
-    //  icon: 'i-lucide-brain',
-    //  to: '/app/knowledge',
-    //  onSelect: () => {
-    //    open.value = false
-    //  }
-    // },
+    {
+      label: 'Conhecimento',
+      icon: 'i-lucide-brain',
+      to: '/app/knowledge',
+      onSelect: () => {
+        open.value = false
+      }
+    },
     // {
     //  label: 'Ideias',
     //  icon: 'i-lucide-lightbulb',
