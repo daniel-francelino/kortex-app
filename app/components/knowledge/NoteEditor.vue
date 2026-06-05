@@ -8,6 +8,7 @@ import TaskItem from '@tiptap/extension-task-item'
 import Link from '@tiptap/extension-link'
 import { Extension, Node, mergeAttributes } from '@tiptap/core'
 import Suggestion from '@tiptap/suggestion'
+import { PluginKey } from '@tiptap/pm/state'
 import type { Editor, Range } from '@tiptap/core'
 import type { KnowledgeNote, KnowledgeTag, NoteDetail } from '~/types/knowledge'
 
@@ -277,6 +278,7 @@ const WikilinkSuggestion = Extension.create({
     return [
       Suggestion({
         editor: this.editor,
+        pluginKey: new PluginKey('wikilinkSuggestion'),
         char: '[[',
         allowSpaces: true,
         items: ({ query }: { query: string }) => {
@@ -333,6 +335,7 @@ const SlashCommandExtension = Extension.create({
     return [
       Suggestion({
         editor: this.editor,
+        pluginKey: new PluginKey('slashCommand'),
         char: '/',
         items: ({ query }: { query: string }) => {
           const q = query.toLowerCase()
