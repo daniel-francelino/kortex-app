@@ -37,31 +37,35 @@ const savedAtText = computed(() =>
 )
 
 // ── Sync entry from props ──────────────────────────────────────────────────────
-watch(() => props.todayEntry, (entry) => {
-  if (entry) {
-    const c = entry.content ?? ''
-    if (c !== content.value) {
-      content.value = c
-    }
-    savedContent.value = c
+watch(
+  [() => props.todayEntry, () => props.loading],
+  ([entry]) => {
+    if (entry) {
+      const c = entry.content ?? ''
+      if (c !== content.value) {
+        content.value = c
+      }
+      savedContent.value = c
 
-    const m = entry.mood ?? null
-    if (m !== mood.value) {
-      mood.value = m
+      const m = entry.mood ?? null
+      if (m !== mood.value) {
+        mood.value = m
+      }
+      savedMood.value = m
+      initialized.value = true
+    } else if (!props.loading) {
+      // Only reset when truly no entry and not mid-fetch
+      content.value = ''
+      savedContent.value = ''
+      mood.value = null
+      savedMood.value = null
+      lastChangeAt.value = 0
+      saveStatus.value = 'idle'
+      initialized.value = true
     }
-    savedMood.value = m
-    initialized.value = true
-  } else if (!props.loading) {
-    // Only reset when truly no entry and not mid-fetch
-    content.value = ''
-    savedContent.value = ''
-    mood.value = null
-    savedMood.value = null
-    lastChangeAt.value = 0
-    saveStatus.value = 'idle'
-    initialized.value = true
-  }
-}, { immediate: true })
+  },
+  { immediate: true }
+)
 
 // ── Empty content check ────────────────────────────────────────────────────────
 const isContentEmpty = computed(() => {
