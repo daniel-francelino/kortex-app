@@ -233,6 +233,32 @@ function formatDate(d: string) {
   return new Date(d).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
 }
 
+// ─── Drag & drop linking ───────────────────────────────────────────────────────
+
+const isDragOver = ref(false)
+
+function onDragOver(e: DragEvent) {
+  if (e.dataTransfer?.types.includes('application/x-knowledge-note-id')) {
+    isDragOver.value = true
+    if (e.dataTransfer) e.dataTransfer.dropEffect = 'link'
+  }
+}
+
+function onDragLeave(e: DragEvent) {
+  const target = e.currentTarget as Element
+  if (!e.relatedTarget || !target.contains(e.relatedTarget as Node)) {
+    isDragOver.value = false
+  }
+}
+
+function onDrop(e: DragEvent) {
+  isDragOver.value = false
+  const noteId = e.dataTransfer?.getData('application/x-knowledge-note-id')
+  if (noteId && noteId !== noteDetail.value?.id) {
+    void addLink(noteId)
+  }
+}
+
 // ─── Table bar ref ─────────────────────────────────────────────────────────────
 
 const tableBarRef = ref<{ update: () => void } | null>(null)
@@ -526,7 +552,18 @@ defineExpose({ isUnsaved: () => saveStatus.value === 'unsaved', doSave: saveNote
       </div>
 
       <!-- Links / Backlinks panel -->
-      <div class="border-t border-default shrink-0">
+      <div
+        class="border-t border-default shrink-0 transition-colors duration-150"
+        :class="isDragOver ? 'bg-primary/5 border-primary/50' : ''"
+        @dragover.prevent="onDragOver"
+        @dragleave="onDragLeave"
+        @drop.prevent="onDrop"
+      >
+        <!-- Drop indicator -->
+        <div v-if="isDragOver" class="flex items-center justify-center gap-2 py-2 text-xs text-primary font-medium">
+          <UIcon name="i-lucide-link" class="size-3.5" />
+          Soltar para vincular nota
+        </div>
         <div class="px-10 py-3">
           <div class="grid grid-cols-2 gap-6">
             <!-- Outgoing links -->

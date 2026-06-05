@@ -19,6 +19,12 @@ const emit = defineEmits<{
   'delete': [note: KnowledgeNote]
 }>()
 
+function onDragStart(note: KnowledgeNote, e: DragEvent) {
+  e.dataTransfer?.setData('application/x-knowledge-note-id', note.id)
+  e.dataTransfer?.setData('text/plain', note.title)
+  if (e.dataTransfer) e.dataTransfer.effectAllowed = 'link'
+}
+
 const totalPages = computed(() => Math.max(1, Math.ceil(props.total / props.pageSize)))
 
 function getTypeMeta(type: string) {
@@ -57,9 +63,11 @@ function formatDate(dateStr: string): string {
         <button
           v-for="note in notes"
           :key="note.id"
-          class="w-full text-left rounded-lg px-3 py-2.5 transition-colors hover:bg-elevated/80 group"
+          draggable="true"
+          class="w-full text-left rounded-lg px-3 py-2.5 transition-colors hover:bg-elevated/80 group cursor-grab active:cursor-grabbing"
           :class="{ 'bg-elevated ring-1 ring-primary/30': selectedId === note.id }"
           @click="emit('select', note)"
+          @dragstart="onDragStart(note, $event)"
         >
           <div class="flex items-start gap-2">
             <UIcon
