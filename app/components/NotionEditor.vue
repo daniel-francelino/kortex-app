@@ -9,6 +9,10 @@ import Link from '@tiptap/extension-link'
 import { Extension } from '@tiptap/core'
 import Suggestion from '@tiptap/suggestion'
 import type { Editor, Range } from '@tiptap/core'
+import Table from '@tiptap/extension-table'
+import TableRow from '@tiptap/extension-table-row'
+import TableCell from '@tiptap/extension-table-cell'
+import TableHeader from '@tiptap/extension-table-header'
 
 interface CommandItem {
   title: string
@@ -78,6 +82,12 @@ const ALL_COMMANDS: CommandItem[] = [
     icon: 'i-lucide-minus',
     command: ({ editor, range }) => editor.chain().focus().deleteRange(range).setHorizontalRule().run(),
   },
+  {
+    title: 'Tabela',
+    description: 'Tabela com linhas e colunas',
+    icon: 'i-lucide-table-2',
+    command: ({ editor, range }) => editor.chain().focus().deleteRange(range).insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run(),
+  }
 ]
 
 const props = withDefaults(defineProps<{
@@ -95,6 +105,9 @@ const props = withDefaults(defineProps<{
 const emit = defineEmits<{
   'update:modelValue': [value: string]
 }>()
+
+// ── Table bar ref ──────────────────────────────────────────────────────────────
+const tableBarRef = ref<{ update: () => void } | null>(null)
 
 // ── Bubble menu state ──────────────────────────────────────────────────────────
 const bubbleVisible = ref(false)
@@ -237,10 +250,17 @@ const editor = useEditor({
     TaskItem.configure({ nested: true }),
     Link.configure({ openOnClick: false, autolink: true }),
     SlashCommandExtension,
+    Table.configure({ resizable: true }),
+    TableRow,
+    TableHeader,
+    TableCell
   ],
   editable: props.editable,
   onUpdate: ({ editor: ed }) => emit('update:modelValue', JSON.stringify(ed.getJSON())),
-  onSelectionUpdate: () => nextTick(updateBubble),
+  onSelectionUpdate: () => {
+    nextTick(updateBubble)
+    nextTick(() => tableBarRef.value?.update())
+  },
   onBlur: () => {
     // Delay to allow bubble menu clicks to fire before hiding
     setTimeout(() => {
