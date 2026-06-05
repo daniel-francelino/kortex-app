@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { KnowledgeNote, NoteDetail } from '~/types/knowledge'
 
-definePageMeta({ layout: 'app' })
+definePageMeta({ layout: 'app', ssr: false })
 useSeoMeta({ title: 'Conhecimento' })
 
 const {

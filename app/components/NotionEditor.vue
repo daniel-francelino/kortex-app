@@ -354,6 +354,9 @@ watch(() => props.editable, val => editor.value?.setEditable(val))
       </div>
     </Teleport>
 
+    <!-- Table management bar -->
+    <TiptapTableBar ref="tableBarRef" :editor="editor" />
+
     <!-- Slash command menu -->
     <Teleport to="body">
       <div
@@ -754,4 +757,39 @@ watch(() => props.editable, val => editor.value?.setEditable(val))
   cursor: default;
   user-select: text;
 }
+
+/* Tables */
+.notion-content .tiptap .tableWrapper { overflow-x: auto; }
+.notion-content .tiptap table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 0.75rem 0;
+  table-layout: fixed;
+}
+.notion-content .tiptap table td,
+.notion-content .tiptap table th {
+  border: 1px solid var(--ui-border);
+  padding: 0.4rem 0.65rem;
+  min-width: 60px;
+  vertical-align: top;
+  position: relative;
+  color: var(--ui-text-highlighted) !important;
+}
+.notion-content .tiptap table th {
+  font-weight: 600;
+  background: var(--ui-bg-muted);
+}
+.notion-content .tiptap table .selectedCell {
+  background: color-mix(in srgb, var(--ui-color-primary, #18b981) 10%, transparent) !important;
+}
+.notion-content .tiptap table .column-resize-handle {
+  position: absolute;
+  right: -2px;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background: var(--ui-color-primary, #18b981);
+  pointer-events: none;
+}
+.notion-content .tiptap .resize-cursor { cursor: col-resize; }
 </style>

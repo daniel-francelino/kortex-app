@@ -10,6 +10,10 @@ import { Extension, Node, mergeAttributes } from '@tiptap/core'
 import Suggestion from '@tiptap/suggestion'
 import { PluginKey } from '@tiptap/pm/state'
 import type { Editor, Range } from '@tiptap/core'
+import Table from '@tiptap/extension-table'
+import TableRow from '@tiptap/extension-table-row'
+import TableCell from '@tiptap/extension-table-cell'
+import TableHeader from '@tiptap/extension-table-header'
 import type { KnowledgeNote, KnowledgeTag, NoteDetail } from '~/types/knowledge'
 
 // ─── Slash command data ────────────────────────────────────────────────────────
@@ -32,6 +36,7 @@ const ALL_COMMANDS: CommandItem[] = [
   { title: 'Citação', description: 'Bloco de citação', icon: 'i-lucide-quote', command: ({ editor, range }) => editor.chain().focus().deleteRange(range).toggleBlockquote().run() },
   { title: 'Bloco de código', description: 'Código com destaque', icon: 'i-lucide-code-2', command: ({ editor, range }) => editor.chain().focus().deleteRange(range).toggleCodeBlock().run() },
   { title: 'Divisor', description: 'Linha separadora', icon: 'i-lucide-minus', command: ({ editor, range }) => editor.chain().focus().deleteRange(range).setHorizontalRule().run() },
+  { title: 'Tabela', description: 'Tabela com linhas e colunas', icon: 'i-lucide-table-2', command: ({ editor, range }) => editor.chain().focus().deleteRange(range).insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run() }
 ]
 
 // ─── Props / Emits ─────────────────────────────────────────────────────────────
@@ -228,6 +233,10 @@ function formatDate(d: string) {
   return new Date(d).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
 }
 
+// ─── Table bar ref ─────────────────────────────────────────────────────────────
+
+const tableBarRef = ref<{ update: () => void } | null>(null)
+
 // ─── Bubble menu ───────────────────────────────────────────────────────────────
 
 const bubbleVisible = ref(false)
@@ -421,6 +430,10 @@ const editor = useEditor({
     WikilinkNode,
     WikilinkSuggestion,
     SlashCommandExtension,
+    Table.configure({ resizable: true }),
+    TableRow,
+    TableHeader,
+    TableCell
   ],
   onCreate({ editor: ed }) {
     if (noteDetail.value) syncToEditor(noteDetail.value)
@@ -430,7 +443,10 @@ const editor = useEditor({
     emit('content-change', content)
     markDirty()
   },
-  onSelectionUpdate: () => nextTick(updateBubble),
+  onSelectionUpdate: () => {
+    nextTick(updateBubble)
+    nextTick(() => tableBarRef.value?.update())
+  },
   onBlur() {
     setTimeout(() => { if (!bubbleRef.value?.matches(':hover')) bubbleVisible.value = false }, 150)
   },
@@ -627,6 +643,9 @@ defineExpose({ isUnsaved: () => saveStatus.value === 'unsaved', doSave: saveNote
       </div>
     </Teleport>
 
+    <!-- Table management bar -->
+    <TiptapTableBar ref="tableBarRef" :editor="editor" />
+
     <!-- Wikilink suggestion menu -->
     <Teleport to="body">
       <div
@@ -803,4 +822,39 @@ defineExpose({ isUnsaved: () => saveStatus.value === 'unsaved', doSave: saveNote
 .knowledge-content .tiptap em { font-style: italic; }
 .knowledge-content .tiptap u { text-decoration: underline; text-underline-offset: 2px; }
 .knowledge-content .tiptap s { text-decoration: line-through; opacity: 0.7; }
+
+/* Tables */
+.knowledge-content .tiptap .tableWrapper { overflow-x: auto; }
+.knowledge-content .tiptap table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 0.75rem 0;
+  table-layout: fixed;
+}
+.knowledge-content .tiptap table td,
+.knowledge-content .tiptap table th {
+  border: 1px solid var(--ui-border);
+  padding: 0.4rem 0.65rem;
+  min-width: 60px;
+  vertical-align: top;
+  position: relative;
+  color: var(--ui-text-highlighted) !important;
+}
+.knowledge-content .tiptap table th {
+  font-weight: 600;
+  background: var(--ui-bg-muted);
+}
+.knowledge-content .tiptap table .selectedCell {
+  background: color-mix(in srgb, var(--ui-color-primary, #18b981) 10%, transparent) !important;
+}
+.knowledge-content .tiptap table .column-resize-handle {
+  position: absolute;
+  right: -2px;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background: var(--ui-color-primary, #18b981);
+  pointer-events: none;
+}
+.knowledge-content .tiptap .resize-cursor { cursor: col-resize; }
 </style>
