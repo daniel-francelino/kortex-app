@@ -32,6 +32,16 @@ const sidebarTab = ref<'notes' | 'tags'>('notes')
 const zenMode = ref(false)
 const rightTab = ref<'properties' | 'outline'>('properties')
 
+const ALL_TYPE_VALUE = '__all__'
+const typeFilterModel = computed({
+  get: () => filters.type || ALL_TYPE_VALUE,
+  set: (v: string) => { filters.type = v === ALL_TYPE_VALUE ? '' : v }
+})
+const typeFilterOptions = computed(() => [
+  { label: 'Todos tipos', value: ALL_TYPE_VALUE },
+  ...noteTypeOptions
+])
+
 // ─── Note detail (shared between editor + right panel) ────────────────────────
 
 const currentNoteDetail = ref<NoteDetail | null>(null)
@@ -257,8 +267,8 @@ function onPropertiesUpdated(): void {
       <div v-if="sidebarTab === 'notes' && !searchQuery" class="border-t border-default px-3 py-2 shrink-0">
         <div class="flex items-center gap-2">
           <USelect
-            v-model="filters.type"
-            :items="[{ label: 'Todos tipos', value: '' }, ...noteTypeOptions]"
+            v-model="typeFilterModel"
+            :items="typeFilterOptions"
             value-key="value"
             size="xs"
             class="flex-1"
