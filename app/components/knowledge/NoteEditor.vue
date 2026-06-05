@@ -122,11 +122,13 @@ async function loadNote(id: string | null) {
     if (detail) {
       editTitle.value = detail.title
       lastSavedTitle.value = detail.title
-      syncToEditor(detail)
     }
   } finally {
     loading.value = false
   }
+  // Wait for Vue to re-render (loading→false, EditorContent mounts) before setting content
+  await nextTick()
+  if (noteDetail.value) syncToEditor(noteDetail.value)
 }
 
 watch(() => props.noteId, loadNote)
