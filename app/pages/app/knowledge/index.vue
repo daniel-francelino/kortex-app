@@ -28,6 +28,13 @@ const {
 const selectedNoteId = ref<string | null>(null)
 const activeView = ref<'editor' | 'graph'>('editor')
 const createModalOpen = ref(false)
+const noteEditorRef = ref<{ isUnsaved: () => boolean, doSave: () => Promise<void> } | null>(null)
+
+onBeforeRouteLeave(async () => {
+  if (noteEditorRef.value?.isUnsaved()) {
+    await noteEditorRef.value.doSave()
+  }
+})
 const sidebarTab = ref<'notes' | 'tags'>('notes')
 const zenMode = ref(false)
 const rightTab = ref<'properties' | 'outline'>('properties')
@@ -354,6 +361,7 @@ function onPropertiesUpdated(): void {
 
           <KnowledgeNoteEditor
             v-else
+            ref="noteEditorRef"
             :note-id="selectedNoteId"
             :tags="tags ?? []"
             @updated="onNoteUpdated"

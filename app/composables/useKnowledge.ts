@@ -138,17 +138,21 @@ export function useKnowledge() {
     }
   }
 
-  async function updateNote(id: string, payload: UpdateNotePayload): Promise<KnowledgeNote | null> {
+  async function updateNote(id: string, payload: UpdateNotePayload, options?: { silent?: boolean }): Promise<KnowledgeNote | null> {
     try {
       const note = await $fetch<KnowledgeNote>(`/api/knowledge/notes/${id}`, {
         method: 'PUT',
         body: payload
       })
-      toast.add({ title: 'Nota atualizada', description: 'Alterações salvas.', color: 'success' })
-      await refreshNotes()
+      if (!options?.silent) {
+        toast.add({ title: 'Nota atualizada', description: 'Alterações salvas.', color: 'success' })
+        await refreshNotes()
+      }
       return note
     } catch {
-      toast.add({ title: 'Erro', description: 'Falha ao atualizar nota.', color: 'error' })
+      if (!options?.silent) {
+        toast.add({ title: 'Erro', description: 'Falha ao atualizar nota.', color: 'error' })
+      }
       return null
     }
   }

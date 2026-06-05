@@ -57,7 +57,6 @@ const { fetchNoteDetail, updateNote, deleteNote, linkNotes, unlinkNotes, notesDa
 
 const noteDetail = ref<NoteDetail | null>(null)
 const loading = ref(false)
-const saving = ref(false)
 const editTitle = ref('')
 const lastSavedTitle = ref('')
 const lastSavedContent = ref('')
@@ -67,6 +66,17 @@ const dirty = computed(() => {
   const content = editor.value ? JSON.stringify(editor.value.getJSON()) : ''
   return editTitle.value !== lastSavedTitle.value || content !== lastSavedContent.value
 })
+
+// ─── Save status ───────────────────────────────────────────────────────────────
+
+type SaveStatus = 'idle' | 'unsaved' | 'saved' | 'error'
+const saveStatus = ref<SaveStatus>('idle')
+const savedAt = ref<Date | null>(null)
+const lastChangeAt = ref(0)
+
+const savedAtText = computed(() =>
+  savedAt.value?.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) ?? ''
+)
 
 // ─── Link state ────────────────────────────────────────────────────────────────
 
@@ -105,12 +115,18 @@ function syncToEditor(detail: NoteDetail) {
 // ─── Load note ─────────────────────────────────────────────────────────────────
 
 async function loadNote(id: string | null) {
+  // Best-effort save before switching notes
+  if (noteDetail.value && saveStatus.value === 'unsaved') {
+    await saveNote()
+  }
   if (!id) {
     noteDetail.value = null
     emit('note-loaded', null)
     editTitle.value = ''
     lastSavedTitle.value = ''
     lastSavedContent.value = ''
+    lastChangeAt.value = 0
+    saveStatus.value = 'idle'
     editor.value?.commands.clearContent()
     return
   }
@@ -126,6 +142,8 @@ async function loadNote(id: string | null) {
   } finally {
     loading.value = false
   }
+  lastChangeAt.value = 0
+  saveStatus.value = 'idle'
   // Wait for Vue to re-render (loading→false, EditorContent mounts) before setting content
   await nextTick()
   if (noteDetail.value) syncToEditor(noteDetail.value)
@@ -134,30 +152,47 @@ async function loadNote(id: string | null) {
 watch(() => props.noteId, loadNote)
 onMounted(() => { void loadNote(props.noteId) })
 
-// ─── Auto-save ─────────────────────────────────────────────────────────────────
+// ─── Auto-save (polling-based, same pattern as Journal) ────────────────────────
 
-let saveTimer: ReturnType<typeof setTimeout> | null = null
+const SAVE_AFTER_MS = 60_000
+const POLL_INTERVAL_MS = 10_000
+let pollTimer: ReturnType<typeof setInterval> | null = null
 
-function scheduleSave() {
-  if (saveTimer) clearTimeout(saveTimer)
-  saveTimer = setTimeout(() => saveNote(), 2000)
+function markDirty() {
+  if (!noteDetail.value) return
+  lastChangeAt.value = Date.now()
+  saveStatus.value = 'unsaved'
 }
 
 async function saveNote() {
   if (!noteDetail.value || !dirty.value) return
-  saving.value = true
   try {
     const content = editor.value ? JSON.stringify(editor.value.getJSON()) : undefined
-    await updateNote(noteDetail.value.id, { title: editTitle.value, content })
-    lastSavedTitle.value = editTitle.value
-    if (content !== undefined) lastSavedContent.value = content
-    emit('updated')
-  } finally {
-    saving.value = false
+    const result = await updateNote(noteDetail.value.id, { title: editTitle.value, content }, { silent: true })
+    if (result) {
+      lastSavedTitle.value = editTitle.value
+      if (content !== undefined) lastSavedContent.value = content
+      lastChangeAt.value = 0
+      saveStatus.value = 'saved'
+      savedAt.value = new Date()
+      emit('updated')
+    } else {
+      saveStatus.value = 'error'
+    }
+  } catch {
+    saveStatus.value = 'error'
   }
 }
 
-watch(editTitle, () => { if (noteDetail.value) scheduleSave() })
+onMounted(() => {
+  pollTimer = setInterval(() => {
+    if (!dirty.value || lastChangeAt.value === 0) return
+    if (Date.now() - lastChangeAt.value < SAVE_AFTER_MS) return
+    void saveNote()
+  }, POLL_INTERVAL_MS)
+})
+
+watch(editTitle, (val) => { if (noteDetail.value && val !== lastSavedTitle.value) markDirty() })
 
 // ─── Actions ──────────────────────────────────────────────────────────────────
 
@@ -393,7 +428,7 @@ const editor = useEditor({
   onUpdate({ editor: ed }) {
     const content = JSON.stringify(ed.getJSON())
     emit('content-change', content)
-    if (noteDetail.value) scheduleSave()
+    markDirty()
   },
   onSelectionUpdate: () => nextTick(updateBubble),
   onBlur() {
@@ -409,9 +444,12 @@ const editor = useEditor({
 })
 
 onBeforeUnmount(() => {
-  if (saveTimer) clearTimeout(saveTimer)
+  if (pollTimer) { clearInterval(pollTimer); pollTimer = null }
+  if (saveStatus.value === 'unsaved') void saveNote()
   editor.value?.destroy()
 })
+
+defineExpose({ isUnsaved: () => saveStatus.value === 'unsaved', doSave: saveNote })
 </script>
 
 <template>
@@ -446,14 +484,20 @@ onBeforeUnmount(() => {
         />
         <div class="flex items-center gap-3 mt-1.5">
           <span class="text-xs text-muted">Editado {{ formatDate(noteDetail.updatedAt) }}</span>
-          <span v-if="saving" class="flex items-center gap-1 text-xs text-muted">
-            <UIcon name="i-lucide-loader-2" class="size-3 animate-spin" />
-            Salvando...
-          </span>
-          <span v-else-if="dirty" class="flex items-center gap-1.5 text-xs text-amber-500">
-            <span class="size-1.5 rounded-full bg-amber-400 animate-pulse" />
-            Não salvo
-          </span>
+          <div class="flex items-center gap-1 text-xs shrink-0">
+            <template v-if="saveStatus === 'unsaved'">
+              <span class="size-1.5 rounded-full bg-amber-400 dark:bg-amber-500 animate-pulse" />
+              <span class="text-muted">Não salvo</span>
+            </template>
+            <template v-else-if="saveStatus === 'saved'">
+              <UIcon name="i-lucide-check-circle" class="size-3 text-success" />
+              <span class="text-muted">Salvo às {{ savedAtText }}</span>
+            </template>
+            <template v-else-if="saveStatus === 'error'">
+              <UIcon name="i-lucide-alert-circle" class="size-3 text-error" />
+              <button type="button" class="text-primary underline underline-offset-2 cursor-pointer" @click="saveNote">Tentar novamente</button>
+            </template>
+          </div>
         </div>
       </div>
 
