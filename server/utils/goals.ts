@@ -42,6 +42,7 @@ export function mapGoal(row: Record<string, unknown>): Record<string, unknown> {
     userId: row.userId ?? row.user_id,
     title: row.title,
     description: row.description ?? null,
+    emoji: row.emoji ?? null,
     timeCategory: row.timeCategory ?? row.time_category,
     lifeCategory: row.lifeCategory ?? row.life_category,
     status: row.status,

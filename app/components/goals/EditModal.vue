@@ -31,12 +31,15 @@ const state = reactive<Partial<Schema>>({
   lifeCategory: GoalLifeCategory.Personal
 })
 
+const selectedEmoji = ref<string | null>(null)
+
 watch(() => props.goal, (goal) => {
   if (goal) {
     state.title = goal.title
     state.description = goal.description ?? ''
     state.timeCategory = goal.timeCategory as GoalTimeCategory
     state.lifeCategory = goal.lifeCategory as GoalLifeCategory
+    selectedEmoji.value = goal.emoji ?? null
   }
 }, { immediate: true })
 
@@ -47,7 +50,7 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
   if (!props.goal) return
   loading.value = true
   try {
-    const result = await updateGoal(props.goal.id, event.data)
+    const result = await updateGoal(props.goal.id, { ...event.data, emoji: selectedEmoji.value })
     if (result) {
       emit('update:open', false)
     }
@@ -69,6 +72,12 @@ function onClose() {
     @update:open="onClose"
   >
     <template #body>
+      <!-- Emoji picker -->
+      <div class="flex flex-col items-center gap-1.5 pb-4">
+        <GoalsEmojiPicker v-model="selectedEmoji" />
+        <span class="text-xs text-muted">Ícone (opcional)</span>
+      </div>
+
       <UForm
         :schema="schema"
         :state="state"

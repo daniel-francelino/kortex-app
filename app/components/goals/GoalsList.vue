@@ -109,6 +109,7 @@ function getRowItems(goal: Goal) {
     <template v-if="loading">
       <UCard v-for="i in 6" :key="i">
         <div class="flex items-center gap-3">
+          <USkeleton class="size-9 rounded-xl shrink-0" />
           <div class="flex-1 space-y-2">
             <USkeleton class="h-4 w-2/3" />
             <USkeleton class="h-3 w-1/3" />
@@ -128,6 +129,12 @@ function getRowItems(goal: Goal) {
         @click="emit('select', goal.id)"
       >
         <div class="flex items-center gap-3">
+          <!-- Emoji avatar -->
+          <div class="size-9 rounded-xl flex items-center justify-center shrink-0 bg-elevated border border-default">
+            <span v-if="goal.emoji" class="text-xl leading-none select-none">{{ goal.emoji }}</span>
+            <UIcon v-else name="i-lucide-target" class="size-4 text-muted" />
+          </div>
+
           <div class="flex-1 min-w-0">
             <p class="font-medium text-highlighted truncate">
               {{ goal.title }}
@@ -151,7 +158,7 @@ function getRowItems(goal: Goal) {
             />
 
             <!-- Progress bar -->
-            <div class="flex items-center gap-2 min-w-[6rem]">
+            <div class="flex items-center gap-2 min-w-24">
               <UProgress
                 :model-value="Number(goal.progress)"
                 :max="100"

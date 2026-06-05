@@ -6,6 +6,7 @@ import { mapGoal } from '../../utils/goals'
 const bodySchema = z.object({
   title: z.string().min(1, 'Título é obrigatório').max(200),
   description: z.string().max(2000).optional(),
+  emoji: z.string().max(10).nullable().optional(),
   timeCategory: z.enum(['daily', 'weekly', 'monthly', 'quarterly', 'yearly', 'long_term']).default('monthly'),
   lifeCategory: z.enum(['personal', 'career', 'health', 'finance', 'spiritual', 'learning', 'relationships', 'lifestyle']).default('personal')
 })
@@ -23,6 +24,7 @@ export default eventHandler(async (event) => {
       user_id: user.id,
       title: parsed.title,
       description: parsed.description ?? null,
+      emoji: parsed.emoji ?? null,
       time_category: parsed.timeCategory,
       life_category: parsed.lifeCategory,
       status: 'active',

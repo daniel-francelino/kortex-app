@@ -33,6 +33,7 @@ export interface Goal {
   userId: string
   title: string
   description: string | null
+  emoji: string | null
   timeCategory: GoalTimeCategory
   lifeCategory: GoalLifeCategory
   status: GoalStatus
@@ -70,6 +71,7 @@ export interface GoalHabitLink {
 export interface CreateGoalPayload {
   title: string
   description?: string
+  emoji?: string | null
   timeCategory: GoalTimeCategory
   lifeCategory: GoalLifeCategory
 }
@@ -77,6 +79,7 @@ export interface CreateGoalPayload {
 export interface UpdateGoalPayload {
   title?: string
   description?: string | null
+  emoji?: string | null
   timeCategory?: GoalTimeCategory
   lifeCategory?: GoalLifeCategory
   status?: GoalStatus
