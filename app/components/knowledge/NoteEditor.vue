@@ -128,7 +128,8 @@ async function loadNote(id: string | null) {
   }
 }
 
-watch(() => props.noteId, loadNote, { immediate: true })
+watch(() => props.noteId, loadNote)
+onMounted(() => { void loadNote(props.noteId) })
 
 // ─── Auto-save ─────────────────────────────────────────────────────────────────
 
