@@ -28,6 +28,25 @@ export interface KnowledgeTag {
   createdAt: string
 }
 
+export interface KnowledgeFolder {
+  id: string
+  userId: string
+  name: string
+  parentId: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export interface CreateFolderPayload {
+  name: string
+  parentId?: string | null
+}
+
+export interface UpdateFolderPayload {
+  name?: string
+  parentId?: string | null
+}
+
 export interface KnowledgeNote {
   id: string
   userId: string
@@ -37,6 +56,7 @@ export interface KnowledgeNote {
   pinned: boolean
   createdAt: string
   updatedAt: string
+  folderId: string | null
   // Populated via joins
   tags?: KnowledgeTag[]
   linkCount?: number
@@ -95,6 +115,7 @@ export interface UpdateNotePayload {
   type?: NoteType
   pinned?: boolean
   tagIds?: string[]
+  folderId?: string | null
 }
 
 export interface CreateTagPayload {

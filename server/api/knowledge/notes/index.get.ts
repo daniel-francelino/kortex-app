@@ -4,7 +4,7 @@ import { requireAuthUser } from '../../../utils/require-auth'
 
 const querySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
-  pageSize: z.coerce.number().int().min(1).max(100).default(20),
+  pageSize: z.coerce.number().int().min(1).max(500).default(20),
   search: z.string().max(200).optional(),
   type: z.enum(['note', 'idea', 'concept', 'research', 'book_note']).optional(),
   tagId: z.string().uuid().optional(),
@@ -63,6 +63,7 @@ export default eventHandler(async (event) => {
     pinned: row.pinned as boolean,
     createdAt: row.created_at as string,
     updatedAt: row.updated_at as string,
+    folderId: (row.folder_id as string) ?? null,
     tags: [] as Array<{ id: string, name: string, color: string | null }>,
     linkCount: 0,
     backlinkCount: 0

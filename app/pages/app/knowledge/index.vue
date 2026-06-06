@@ -21,6 +21,15 @@ const {
   noteTypeOptions,
   togglePin,
   deleteNote,
+  folders,
+  refreshFolders,
+  allNotes,
+  allNotesStatus,
+  refreshAllNotes,
+  createFolder,
+  updateFolder,
+  deleteFolder,
+  moveNoteToFolder,
 } = useKnowledge()
 
 // ─── State ────────────────────────────────────────────────────────────────────
@@ -153,6 +162,22 @@ async function onDeleteNote(note: KnowledgeNote): Promise<void> {
   }
 }
 
+async function onMoveToFolder(noteId: string, folderId: string | null): Promise<void> {
+  await moveNoteToFolder(noteId, folderId)
+}
+
+async function onCreateFolder(name: string): Promise<void> {
+  await createFolder({ name })
+}
+
+async function onRenameFolder(folderId: string, name: string): Promise<void> {
+  await updateFolder(folderId, { name })
+}
+
+async function onDeleteFolder(folderId: string): Promise<void> {
+  await deleteFolder(folderId)
+}
+
 async function onPinNote(note: KnowledgeNote): Promise<void> {
   await togglePin(note)
 }
@@ -250,17 +275,22 @@ function onPropertiesUpdated(): void {
         <!-- Notes list -->
         <div v-else-if="sidebarTab === 'notes'">
           <KnowledgeNotesList
-            :notes="notesData?.data ?? []"
+            :notes="(folders ?? []).length > 0 ? (allNotes ?? []) : (notesData?.data ?? [])"
+            :folders="folders ?? []"
             :total="notesData?.total ?? 0"
             :page="page"
             :page-size="pageSize"
-            :loading="notesStatus === 'pending'"
+            :loading="notesStatus === 'pending' || allNotesStatus === 'pending'"
             :selected-id="selectedNoteId"
             @select="onSelectNote"
             @new-note="createModalOpen = true"
             @update:page="page = $event"
             @pin="onPinNote"
             @delete="onDeleteNote"
+            @move-to-folder="onMoveToFolder"
+            @create-folder="onCreateFolder"
+            @rename-folder="onRenameFolder"
+            @delete-folder="onDeleteFolder"
           />
         </div>
 

@@ -5,6 +5,9 @@ import type {
   GraphData,
   KnowledgeNote,
   KnowledgeTag,
+  KnowledgeFolder,
+  CreateFolderPayload,
+  UpdateFolderPayload,
   LinkNotesPayload,
   NoteDetail,
   NoteListResponse,
@@ -92,6 +95,26 @@ export function useKnowledge() {
   } = useFetch<GraphData>('/api/knowledge/graph', {
     lazy: true,
     key: 'knowledge-graph'
+  })
+
+  const {
+    data: folders,
+    status: foldersStatus,
+    refresh: refreshFolders
+  } = useFetch<KnowledgeFolder[]>('/api/knowledge/folders', {
+    lazy: true,
+    key: 'knowledge-folders'
+  })
+
+  const {
+    data: allNotes,
+    status: allNotesStatus,
+    refresh: refreshAllNotes
+  } = useFetch<KnowledgeNote[]>('/api/knowledge/notes', {
+    query: computed(() => ({ page: 1, pageSize: 500 })),
+    transform: (res: { data: KnowledgeNote[] }) => res.data,
+    lazy: true,
+    key: 'knowledge-all-notes'
   })
 
   // ─── Search ─────────────────────────────────────────────────────────────────
@@ -271,6 +294,52 @@ export function useKnowledge() {
     }
   }
 
+  async function createFolder(payload: CreateFolderPayload): Promise<KnowledgeFolder | null> {
+    try {
+      const folder = await $fetch<KnowledgeFolder>('/api/knowledge/folders', { method: 'POST', body: payload })
+      toast.add({ title: 'Pasta criada', description: `"${folder.name}" criada.`, color: 'success' })
+      await refreshFolders()
+      return folder
+    } catch {
+      toast.add({ title: 'Erro', description: 'Falha ao criar pasta.', color: 'error' })
+      return null
+    }
+  }
+
+  async function updateFolder(id: string, payload: UpdateFolderPayload): Promise<KnowledgeFolder | null> {
+    try {
+      const folder = await $fetch<KnowledgeFolder>(`/api/knowledge/folders/${id}`, { method: 'PUT', body: payload })
+      await refreshFolders()
+      return folder
+    } catch {
+      toast.add({ title: 'Erro', description: 'Falha ao renomear pasta.', color: 'error' })
+      return null
+    }
+  }
+
+  async function deleteFolder(id: string): Promise<boolean> {
+    try {
+      await $fetch(`/api/knowledge/folders/${id}`, { method: 'DELETE' })
+      toast.add({ title: 'Pasta excluída', color: 'success' })
+      await Promise.all([refreshFolders(), refreshAllNotes(), refreshNotes()])
+      return true
+    } catch {
+      toast.add({ title: 'Erro', description: 'Falha ao excluir pasta.', color: 'error' })
+      return false
+    }
+  }
+
+  async function moveNoteToFolder(noteId: string, folderId: string | null): Promise<boolean> {
+    try {
+      await $fetch(`/api/knowledge/notes/${noteId}`, { method: 'PUT', body: { folderId } })
+      await refreshAllNotes()
+      return true
+    } catch {
+      toast.add({ title: 'Erro', description: 'Falha ao mover nota.', color: 'error' })
+      return false
+    }
+  }
+
   // ─── Helpers ────────────────────────────────────────────────────────────────
 
   const noteTypeOptions = Object.entries(NOTE_TYPE_META).map(([value, meta]) => ({
@@ -308,6 +377,18 @@ export function useKnowledge() {
     graphData,
     graphStatus,
     refreshGraph,
+
+    // Folders
+    folders,
+    foldersStatus,
+    refreshFolders,
+    allNotes,
+    allNotesStatus,
+    refreshAllNotes,
+    createFolder,
+    updateFolder,
+    deleteFolder,
+    moveNoteToFolder,
 
     // Search
     searchQuery,
