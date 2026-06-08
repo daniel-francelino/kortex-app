@@ -1,4 +1,4 @@
-import { z } from 'zod'
+﻿import { z } from 'zod'
 import { getSupabaseAdminClient } from '../../utils/supabase'
 import { requireAuthUser } from '../../utils/require-auth'
 
@@ -13,7 +13,7 @@ export default eventHandler(async (event) => {
   const supabase = getSupabaseAdminClient()
 
   const { data, error } = await supabase
-    .from('knowledge_notes')
+    .from('notes')
     .select('id, title, type, content, updated_at')
     .eq('user_id', user.id)
     .or(`title.ilike.%${params.q}%,content.ilike.%${params.q}%`)

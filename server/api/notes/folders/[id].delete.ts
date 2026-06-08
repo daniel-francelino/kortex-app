@@ -8,7 +8,7 @@ export default eventHandler(async (event) => {
   const supabase = getSupabaseAdminClient()
 
   const { error } = await supabase
-    .from('knowledge_folders')
+    .from('note_folders')
     .delete()
     .eq('id', id)
     .eq('user_id', user.id)

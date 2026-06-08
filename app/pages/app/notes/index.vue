@@ -29,7 +29,7 @@ const {
   createFolder,
   updateFolder,
   deleteFolder,
-  moveNoteToFolder,
+  moveNoteToFolder
 } = useNotes()
 
 // ─── State ────────────────────────────────────────────────────────────────────

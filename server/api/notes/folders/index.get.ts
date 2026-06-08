@@ -1,4 +1,4 @@
-import { getSupabaseAdminClient } from '../../../utils/supabase'
+﻿import { getSupabaseAdminClient } from '../../../utils/supabase'
 import { requireAuthUser } from '../../../utils/require-auth'
 
 export default eventHandler(async (event) => {
@@ -6,7 +6,7 @@ export default eventHandler(async (event) => {
   const supabase = getSupabaseAdminClient()
 
   const { data, error } = await supabase
-    .from('knowledge_folders')
+    .from('note_folders')
     .select('id, user_id, name, parent_id, created_at, updated_at')
     .eq('user_id', user.id)
     .order('name')

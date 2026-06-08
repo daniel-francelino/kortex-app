@@ -15,7 +15,7 @@ export default eventHandler(async (event) => {
 
   // Verify source note ownership
   const { data: sourceNote } = await supabase
-    .from('knowledge_notes')
+    .from('notes')
     .select('id')
     .eq('id', sourceId)
     .eq('user_id', user.id)
@@ -27,7 +27,7 @@ export default eventHandler(async (event) => {
 
   // Verify target note ownership
   const { data: targetNote } = await supabase
-    .from('knowledge_notes')
+    .from('notes')
     .select('id')
     .eq('id', payload.targetNoteId)
     .eq('user_id', user.id)

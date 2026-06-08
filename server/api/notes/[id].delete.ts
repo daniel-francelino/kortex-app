@@ -9,7 +9,7 @@ export default eventHandler(async (event) => {
 
   // Tags and links are deleted via CASCADE
   const { error } = await supabase
-    .from('knowledge_notes')
+    .from('notes')
     .delete()
     .eq('id', id)
     .eq('user_id', user.id)

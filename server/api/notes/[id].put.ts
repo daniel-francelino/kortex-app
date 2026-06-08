@@ -27,7 +27,7 @@ export default eventHandler(async (event) => {
   if (payload.folderId !== undefined) updateData.folder_id = payload.folderId
 
   const { data, error } = await supabase
-    .from('knowledge_notes')
+    .from('notes')
     .update(updateData)
     .eq('id', id)
     .eq('user_id', user.id)

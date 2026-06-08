@@ -19,7 +19,7 @@ export default eventHandler(async (event) => {
   if (payload.color !== undefined) updateData.color = payload.color
 
   const { data, error } = await supabase
-    .from('knowledge_tags')
+    .from('note_tags')
     .update(updateData)
     .eq('id', id)
     .eq('user_id', user.id)

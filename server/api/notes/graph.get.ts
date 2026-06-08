@@ -1,4 +1,4 @@
-import { getSupabaseAdminClient } from '../../utils/supabase'
+﻿import { getSupabaseAdminClient } from '../../utils/supabase'
 import { requireAuthUser } from '../../utils/require-auth'
 
 export default eventHandler(async (event) => {
@@ -7,7 +7,7 @@ export default eventHandler(async (event) => {
 
   // Fetch all user's notes (as graph nodes)
   const { data: notes, error: notesError } = await supabase
-    .from('knowledge_notes')
+    .from('notes')
     .select('id, title, type')
     .eq('user_id', user.id)
 

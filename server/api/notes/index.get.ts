@@ -1,4 +1,4 @@
-import { z } from 'zod'
+﻿import { z } from 'zod'
 import { getSupabaseAdminClient } from '../../utils/supabase'
 import { requireAuthUser } from '../../utils/require-auth'
 
@@ -29,7 +29,7 @@ export default eventHandler(async (event) => {
   const to = from + params.pageSize - 1
 
   let qb = supabase
-    .from('knowledge_notes')
+    .from('notes')
     .select('*', { count: 'exact' })
     .eq('user_id', user.id)
     .order('pinned', { ascending: false })
@@ -75,7 +75,7 @@ export default eventHandler(async (event) => {
     // Fetch tags for notes
     const { data: tagLinks } = await supabase
       .from('note_tag_links')
-      .select('note_id, tag:knowledge_tags(*)')
+      .select('note_id, tag:note_tags(*)')
       .in('note_id', noteIds)
 
     if (tagLinks) {

@@ -9,7 +9,7 @@ export default eventHandler(async (event) => {
 
   // Fetch note
   const { data: note, error } = await supabase
-    .from('knowledge_notes')
+    .from('notes')
     .select('*')
     .eq('id', id)
     .eq('user_id', user.id)
@@ -22,7 +22,7 @@ export default eventHandler(async (event) => {
   // Fetch tags
   const { data: tagLinks } = await supabase
     .from('note_tag_links')
-    .select('tag:knowledge_tags(*)')
+    .select('tag:note_tags(*)')
     .eq('note_id', id)
 
   const tags = (tagLinks ?? []).map((link: Record<string, unknown>) => {
@@ -39,7 +39,7 @@ export default eventHandler(async (event) => {
   // Fetch links (outgoing)
   const { data: linksRaw } = await supabase
     .from('note_links')
-    .select('id, source_note_id, target_note_id, created_at, target:knowledge_notes!note_links_target_note_id_fkey(id, title, type)')
+    .select('id, source_note_id, target_note_id, created_at, target:notes!note_links_target_note_id_fkey(id, title, type)')
     .eq('source_note_id', id)
 
   const links = (linksRaw ?? []).map((row: Record<string, unknown>) => {
@@ -58,7 +58,7 @@ export default eventHandler(async (event) => {
   // Fetch backlinks (incoming)
   const { data: backlinksRaw } = await supabase
     .from('note_links')
-    .select('id, source_note_id, target_note_id, created_at, source:knowledge_notes!note_links_source_note_id_fkey(id, title, type)')
+    .select('id, source_note_id, target_note_id, created_at, source:notes!note_links_source_note_id_fkey(id, title, type)')
     .eq('target_note_id', id)
 
   const backlinks = (backlinksRaw ?? []).map((row: Record<string, unknown>) => {

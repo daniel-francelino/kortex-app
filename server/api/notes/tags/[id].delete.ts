@@ -8,7 +8,7 @@ export default eventHandler(async (event) => {
   const supabase = getSupabaseAdminClient()
 
   const { error } = await supabase
-    .from('knowledge_tags')
+    .from('note_tags')
     .delete()
     .eq('id', id)
     .eq('user_id', user.id)

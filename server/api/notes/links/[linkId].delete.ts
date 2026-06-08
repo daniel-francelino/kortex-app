@@ -19,7 +19,7 @@ export default eventHandler(async (event) => {
   }
 
   const { data: note } = await supabase
-    .from('knowledge_notes')
+    .from('notes')
     .select('id')
     .eq('id', link.source_note_id)
     .eq('user_id', user.id)
