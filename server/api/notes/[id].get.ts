@@ -1,6 +1,6 @@
 import { z } from 'zod'
-import { getSupabaseAdminClient } from '../../../utils/supabase'
-import { requireAuthUser } from '../../../utils/require-auth'
+import { getSupabaseAdminClient } from '../../utils/supabase'
+import { requireAuthUser } from '../../utils/require-auth'
 
 export default eventHandler(async (event) => {
   const user = await requireAuthUser(event)

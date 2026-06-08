@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import type { GraphData, GraphNode } from '~/types/knowledge'
-import { NOTE_TYPE_META, NoteType } from '~/types/knowledge'
+import type { GraphData, GraphNode } from '~/types/notes'
+import { NOTE_TYPE_META, NoteType } from '~/types/notes'
 
 const props = defineProps<{
   graphData: GraphData | null

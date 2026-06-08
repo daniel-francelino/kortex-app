@@ -1,11 +1,11 @@
 <script setup lang="ts">
-import type { KnowledgeTag } from '~/types/knowledge'
+import type { NoteTag } from '~/types/notes'
 import { z } from 'zod'
 
-const { tags, createTag, updateTag, deleteTag } = useKnowledge()
+const { tags, createTag, updateTag, deleteTag } = useNotes()
 
 const modalOpen = ref(false)
-const editingTag = ref<KnowledgeTag | null>(null)
+const editingTag = ref<NoteTag | null>(null)
 const deleting = ref<string | null>(null)
 
 const TAG_COLORS = [
@@ -33,7 +33,7 @@ function openCreate(): void {
   modalOpen.value = true
 }
 
-function openEdit(tag: KnowledgeTag): void {
+function openEdit(tag: NoteTag): void {
   editingTag.value = tag
   formState.name = tag.name
   formState.color = tag.color ?? ''
@@ -52,7 +52,7 @@ async function onSubmit(): Promise<void> {
   }
 }
 
-async function onDelete(tag: KnowledgeTag): Promise<void> {
+async function onDelete(tag: NoteTag): Promise<void> {
   deleting.value = tag.id
   await deleteTag(tag.id)
   deleting.value = null

@@ -58,9 +58,9 @@ const links = [
       }
     },
     {
-      label: 'Conhecimento',
+      label: 'Notas',
       icon: 'i-lucide-brain',
-      to: '/app/knowledge',
+      to: '/app/notes',
       onSelect: () => {
         open.value = false
       }

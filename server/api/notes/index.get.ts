@@ -1,6 +1,6 @@
 import { z } from 'zod'
-import { getSupabaseAdminClient } from '../../../utils/supabase'
-import { requireAuthUser } from '../../../utils/require-auth'
+import { getSupabaseAdminClient } from '../../utils/supabase'
+import { requireAuthUser } from '../../utils/require-auth'
 
 const querySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),

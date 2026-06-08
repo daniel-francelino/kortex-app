@@ -16,7 +16,7 @@ const moreItems = [
   { label: 'Agenda', icon: 'i-lucide-calendar-days', to: '/app/appointments' },
   { label: 'Metas', icon: 'i-lucide-target', to: '/app/goals' },
   { label: 'Finanças', icon: 'i-lucide-wallet', to: '/app/financial' },
-  { label: 'Conhecimento', icon: 'i-lucide-brain', to: '/app/knowledge' },
+  { label: 'Notas', icon: 'i-lucide-brain', to: '/app/notes' },
   { label: 'Ideias', icon: 'i-lucide-lightbulb', to: '/app/ideas' },
   { label: 'Configurações', icon: 'i-lucide-settings', to: '/app/settings' }
 ]

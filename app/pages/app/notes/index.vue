@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import type { KnowledgeNote, NoteDetail } from '~/types/knowledge'
+import type { Note, NoteDetail } from '~/types/notes'
 
 definePageMeta({ layout: 'app', ssr: false })
-useSeoMeta({ title: 'Conhecimento' })
+useSeoMeta({ title: 'Notas' })
 
 const {
   notesData,
@@ -30,7 +30,7 @@ const {
   updateFolder,
   deleteFolder,
   moveNoteToFolder,
-} = useKnowledge()
+} = useNotes()
 
 // ─── State ────────────────────────────────────────────────────────────────────
 
@@ -129,7 +129,7 @@ function goForward() {
 
 // ─── Handlers ─────────────────────────────────────────────────────────────────
 
-function onSelectNote(note: string | KnowledgeNote): void {
+function onSelectNote(note: string | Note): void {
   const id = typeof note === 'string' ? note : note.id
   navigateTo(id)
 }
@@ -155,7 +155,7 @@ function onNoteDeleted(): void {
   refreshNotes()
 }
 
-async function onDeleteNote(note: KnowledgeNote): Promise<void> {
+async function onDeleteNote(note: Note): Promise<void> {
   const ok = await deleteNote(note.id)
   if (ok && selectedNoteId.value === note.id) {
     onNoteDeleted()
@@ -178,7 +178,7 @@ async function onDeleteFolder(folderId: string): Promise<void> {
   await deleteFolder(folderId)
 }
 
-async function onPinNote(note: KnowledgeNote): Promise<void> {
+async function onPinNote(note: Note): Promise<void> {
   await togglePin(note)
 }
 
@@ -201,7 +201,7 @@ function onPropertiesUpdated(): void {
 </script>
 
 <template>
-  <UDashboardPanel id="knowledge" class="flex-row!">
+  <UDashboardPanel id="notes" class="flex-row!">
     <!-- ── Left sidebar (notes list + tags) ──────────────────────────────────── -->
     <div
       v-show="!zenMode"
@@ -210,7 +210,7 @@ function onPropertiesUpdated(): void {
       <!-- Sidebar header -->
       <div class="px-3 py-2 border-b border-default">
         <div class="flex items-center justify-between mb-2">
-          <h2 class="text-sm font-semibold text-highlighted">Conhecimento</h2>
+          <h2 class="text-sm font-semibold text-highlighted">Notas</h2>
           <div class="flex items-center gap-1">
             <UButton icon="i-lucide-plus" size="xs" @click="createModalOpen = true" />
             <UButton
@@ -274,7 +274,7 @@ function onPropertiesUpdated(): void {
 
         <!-- Notes list -->
         <div v-else-if="sidebarTab === 'notes'">
-          <KnowledgeNotesList
+          <NotesNotesList
             :notes="(folders ?? []).length > 0 ? (allNotes ?? []) : (notesData?.data ?? [])"
             :folders="folders ?? []"
             :total="notesData?.total ?? 0"
@@ -296,7 +296,7 @@ function onPropertiesUpdated(): void {
 
         <!-- Tags -->
         <div v-else class="p-3">
-          <KnowledgeTagManager />
+          <NotesTagManager />
         </div>
       </div>
 
@@ -369,7 +369,7 @@ function onPropertiesUpdated(): void {
             {{ currentNoteDetail.title || 'Sem título' }}
           </span>
           <span v-else class="ml-2 text-sm font-medium text-muted">
-            {{ activeView === 'graph' ? 'Grafo de Conhecimento' : 'Editor' }}
+            {{ activeView === 'graph' ? 'Grafo de Notas' : 'Editor' }}
           </span>
         </template>
 
@@ -382,14 +382,14 @@ function onPropertiesUpdated(): void {
       <div class="flex-1 flex overflow-hidden">
         <!-- Graph or Editor -->
         <div class="flex-1 overflow-hidden">
-          <KnowledgeGraphView
+          <NotesGraphView
             v-if="activeView === 'graph'"
             :graph-data="graphData ?? null"
             :loading="graphStatus === 'pending'"
             @select-note="onGraphSelectNote"
           />
 
-          <KnowledgeNoteEditor
+          <NotesNoteEditor
             v-else
             ref="noteEditorRef"
             :note-id="selectedNoteId"
@@ -427,7 +427,7 @@ function onPropertiesUpdated(): void {
 
           <!-- Properties -->
           <div v-show="rightTab === 'properties'" class="flex-1 overflow-y-auto">
-            <KnowledgeNotePropertiesPanel
+            <NotesNotePropertiesPanel
               :note="currentNoteDetail"
               :tags="tags ?? []"
               @updated="onPropertiesUpdated"
@@ -462,7 +462,7 @@ function onPropertiesUpdated(): void {
     </div>
 
     <!-- Create Modal -->
-    <KnowledgeNoteCreateModal
+    <NotesNoteCreateModal
       :open="createModalOpen"
       @update:open="createModalOpen = $event"
       @saved="onNoteSaved"

@@ -20,7 +20,7 @@ export const NOTE_TYPE_META: Record<NoteType, { label: string, icon: string, col
 
 // ─── Entities ─────────────────────────────────────────────────────────────────
 
-export interface KnowledgeTag {
+export interface NoteTag {
   id: string
   userId: string
   name: string
@@ -28,7 +28,7 @@ export interface KnowledgeTag {
   createdAt: string
 }
 
-export interface KnowledgeFolder {
+export interface NoteFolder {
   id: string
   userId: string
   name: string
@@ -47,7 +47,7 @@ export interface UpdateFolderPayload {
   parentId?: string | null
 }
 
-export interface KnowledgeNote {
+export interface Note {
   id: string
   userId: string
   title: string
@@ -58,7 +58,7 @@ export interface KnowledgeNote {
   updatedAt: string
   folderId: string | null
   // Populated via joins
-  tags?: KnowledgeTag[]
+  tags?: NoteTag[]
   linkCount?: number
   backlinkCount?: number
 }
@@ -69,8 +69,8 @@ export interface NoteLink {
   targetNoteId: string
   createdAt: string
   // Populated
-  sourceNote?: Pick<KnowledgeNote, 'id' | 'title' | 'type'>
-  targetNote?: Pick<KnowledgeNote, 'id' | 'title' | 'type'>
+  sourceNote?: Pick<Note, 'id' | 'title' | 'type'>
+  targetNote?: Pick<Note, 'id' | 'title' | 'type'>
 }
 
 export interface NoteTagLink {
@@ -135,14 +135,14 @@ export interface LinkNotesPayload {
 // ─── Response Types ───────────────────────────────────────────────────────────
 
 export interface NoteListResponse {
-  data: KnowledgeNote[]
+  data: Note[]
   total: number
   page: number
   pageSize: number
 }
 
-export interface NoteDetail extends KnowledgeNote {
-  tags: KnowledgeTag[]
+export interface NoteDetail extends Note {
+  tags: NoteTag[]
   links: NoteLink[]
   backlinks: NoteLink[]
 }

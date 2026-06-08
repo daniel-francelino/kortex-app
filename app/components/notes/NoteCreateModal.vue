@@ -1,19 +1,19 @@
 <script setup lang="ts">
 import { z } from 'zod'
-import type { KnowledgeNote } from '~/types/knowledge'
-import { NoteType } from '~/types/knowledge'
+import type { Note } from '~/types/notes'
+import { NoteType } from '~/types/notes'
 
 const props = defineProps<{
   open: boolean
-  note?: KnowledgeNote | null
+  note?: Note | null
 }>()
 
 const emit = defineEmits<{
   'update:open': [value: boolean]
-  'saved': [note: KnowledgeNote]
+  'saved': [note: Note]
 }>()
 
-const { createNote, noteTypeOptions } = useKnowledge()
+const { createNote, noteTypeOptions } = useNotes()
 
 const schema = z.object({
   title: z.string().min(1, 'Título é obrigatório'),
@@ -49,7 +49,7 @@ async function onSubmit(): Promise<void> {
     })
     if (note) {
       emit('update:open', false)
-      emit('saved', note as KnowledgeNote)
+      emit('saved', note as Note)
     }
   } finally {
     submitting.value = false

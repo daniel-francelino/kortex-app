@@ -1,6 +1,6 @@
 import { z } from 'zod'
-import { getSupabaseAdminClient } from '../../../utils/supabase'
-import { requireAuthUser } from '../../../utils/require-auth'
+import { getSupabaseAdminClient } from '../../utils/supabase'
+import { requireAuthUser } from '../../utils/require-auth'
 
 const querySchema = z.object({
   q: z.string().min(1).max(200)

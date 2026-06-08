@@ -11,7 +11,7 @@ import Suggestion from '@tiptap/suggestion'
 import { PluginKey } from '@tiptap/pm/state'
 import type { Editor, Range } from '@tiptap/core'
 import { Table, TableRow, TableCell, TableHeader } from '@tiptap/extension-table'
-import type { KnowledgeNote, KnowledgeTag, NoteDetail } from '~/types/knowledge'
+import type { Note, NoteTag, NoteDetail } from '~/types/notes'
 
 // ─── Slash command data ────────────────────────────────────────────────────────
 
@@ -40,7 +40,7 @@ const ALL_COMMANDS: CommandItem[] = [
 
 const props = defineProps<{
   noteId: string | null
-  tags: KnowledgeTag[]
+  tags: NoteTag[]
 }>()
 
 const emit = defineEmits<{
@@ -53,7 +53,7 @@ const emit = defineEmits<{
 
 // ─── Composable ────────────────────────────────────────────────────────────────
 
-const { fetchNoteDetail, updateNote, deleteNote, linkNotes, unlinkNotes, notesData } = useKnowledge()
+const { fetchNoteDetail, updateNote, deleteNote, linkNotes, unlinkNotes, notesData } = useNotes()
 
 // ─── Note state ────────────────────────────────────────────────────────────────
 
@@ -92,8 +92,8 @@ const availableNotesForLink = computed(() => {
     noteDetail.value.id,
   ])
   return notesData.value.data
-    .filter((n: KnowledgeNote) => !linked.has(n.id))
-    .filter((n: KnowledgeNote) => !linkSearchQuery.value || n.title.toLowerCase().includes(linkSearchQuery.value.toLowerCase()))
+    .filter((n: Note) => !linked.has(n.id))
+    .filter((n: Note) => !linkSearchQuery.value || n.title.toLowerCase().includes(linkSearchQuery.value.toLowerCase()))
 })
 
 // ─── Content helpers ───────────────────────────────────────────────────────────
@@ -235,7 +235,7 @@ function formatDate(d: string) {
 const isDragOver = ref(false)
 
 function onDragOver(e: DragEvent) {
-  if (e.dataTransfer?.types.includes('application/x-knowledge-note-id')) {
+  if (e.dataTransfer?.types.includes('application/x-notes-note-id')) {
     isDragOver.value = true
     if (e.dataTransfer) e.dataTransfer.dropEffect = 'link'
   }
@@ -250,7 +250,7 @@ function onDragLeave(e: DragEvent) {
 
 function onDrop(e: DragEvent) {
   isDragOver.value = false
-  const noteId = e.dataTransfer?.getData('application/x-knowledge-note-id')
+  const noteId = e.dataTransfer?.getData('application/x-notes-note-id')
   if (noteId && noteId !== noteDetail.value?.id) {
     void addLink(noteId)
   }
@@ -353,10 +353,10 @@ const WikilinkSuggestion = Extension.create({
         items: ({ query }: { query: string }) => {
           const q = query.toLowerCase()
           return (notesData.value?.data ?? [])
-            .filter((n: KnowledgeNote) => n.id !== props.noteId)
-            .filter((n: KnowledgeNote) => !q || n.title.toLowerCase().includes(q))
+            .filter((n: Note) => n.id !== props.noteId)
+            .filter((n: Note) => !q || n.title.toLowerCase().includes(q))
             .slice(0, 8)
-            .map((n: KnowledgeNote) => ({ id: n.id, title: n.title }))
+            .map((n: Note) => ({ id: n.id, title: n.title }))
         },
         command: ({ editor: ed, range, props: item }: { editor: Editor; range: Range; props: WikiItem }) => {
           ed.chain().focus().deleteRange(range)
@@ -492,7 +492,7 @@ defineExpose({ isUnsaved: () => saveStatus.value === 'unsaved', doSave: saveNote
 </script>
 
 <template>
-  <div class="knowledge-editor flex flex-col h-full">
+  <div class="notes-editor flex flex-col h-full">
     <!-- Empty state -->
     <div v-if="!noteId" class="flex flex-col items-center justify-center h-full gap-3 text-center">
       <UIcon name="i-lucide-file-text" class="size-14 text-dimmed" />
@@ -545,7 +545,7 @@ defineExpose({ isUnsaved: () => saveStatus.value === 'unsaved', doSave: saveNote
         class="flex-1 overflow-y-auto px-10 pb-10 cursor-text"
         @click.self="editor?.commands.focus()"
       >
-        <EditorContent :editor="editor" class="knowledge-content" />
+        <EditorContent :editor="editor" class="notes-content" />
       </div>
 
       <!-- Links / Backlinks panel -->
@@ -782,8 +782,8 @@ defineExpose({ isUnsaved: () => saveStatus.value === 'unsaved', doSave: saveNote
 </style>
 
 <style>
-/* ─── Knowledge editor Tiptap content (global) ─────────────────────────────── */
-.knowledge-content .tiptap {
+/* ─── Notes editor Tiptap content (global) ─────────────────────────────── */
+.notes-content .tiptap {
   outline: none;
   min-height: 300px;
   font-family: inherit;
@@ -793,49 +793,49 @@ defineExpose({ isUnsaved: () => saveStatus.value === 'unsaved', doSave: saveNote
   background: transparent !important;
   caret-color: var(--ui-color-primary, #18b981);
 }
-.knowledge-content .tiptap p { margin: 0 0 0.2rem; color: var(--ui-text-highlighted) !important; }
-.knowledge-content .tiptap > * + * { margin-top: 0.2rem; }
+.notes-content .tiptap p { margin: 0 0 0.2rem; color: var(--ui-text-highlighted) !important; }
+.notes-content .tiptap > * + * { margin-top: 0.2rem; }
 
 /* Headings */
-.knowledge-content .tiptap h1, .knowledge-content .tiptap h2, .knowledge-content .tiptap h3 { color: var(--ui-text-highlighted) !important; }
-.knowledge-content .tiptap h1 { font-size: 1.875rem; font-weight: 700; line-height: 1.25; margin: 1.25rem 0 0.25rem; letter-spacing: -0.02em; }
-.knowledge-content .tiptap h2 { font-size: 1.375rem; font-weight: 600; line-height: 1.3; margin: 1rem 0 0.2rem; letter-spacing: -0.01em; }
-.knowledge-content .tiptap h3 { font-size: 1.125rem; font-weight: 600; line-height: 1.4; margin: 0.75rem 0 0.15rem; }
+.notes-content .tiptap h1, .notes-content .tiptap h2, .notes-content .tiptap h3 { color: var(--ui-text-highlighted) !important; }
+.notes-content .tiptap h1 { font-size: 1.875rem; font-weight: 700; line-height: 1.25; margin: 1.25rem 0 0.25rem; letter-spacing: -0.02em; }
+.notes-content .tiptap h2 { font-size: 1.375rem; font-weight: 600; line-height: 1.3; margin: 1rem 0 0.2rem; letter-spacing: -0.01em; }
+.notes-content .tiptap h3 { font-size: 1.125rem; font-weight: 600; line-height: 1.4; margin: 0.75rem 0 0.15rem; }
 
 /* Lists */
-.knowledge-content .tiptap ul { list-style-type: disc; padding-left: 1.5rem; margin: 0.2rem 0; color: var(--ui-text-highlighted) !important; }
-.knowledge-content .tiptap ol { list-style-type: decimal; padding-left: 1.5rem; margin: 0.2rem 0; color: var(--ui-text-highlighted) !important; }
-.knowledge-content .tiptap ul ul { list-style-type: circle; }
-.knowledge-content .tiptap ul ul ul { list-style-type: square; }
-.knowledge-content .tiptap li { margin: 0.1rem 0; display: list-item; color: var(--ui-text-highlighted) !important; }
-.knowledge-content .tiptap li p { margin: 0; }
+.notes-content .tiptap ul { list-style-type: disc; padding-left: 1.5rem; margin: 0.2rem 0; color: var(--ui-text-highlighted) !important; }
+.notes-content .tiptap ol { list-style-type: decimal; padding-left: 1.5rem; margin: 0.2rem 0; color: var(--ui-text-highlighted) !important; }
+.notes-content .tiptap ul ul { list-style-type: circle; }
+.notes-content .tiptap ul ul ul { list-style-type: square; }
+.notes-content .tiptap li { margin: 0.1rem 0; display: list-item; color: var(--ui-text-highlighted) !important; }
+.notes-content .tiptap li p { margin: 0; }
 
 /* Task list */
-.knowledge-content .tiptap ul[data-type="taskList"] { padding-left: 0.25rem; list-style: none; }
-.knowledge-content .tiptap ul[data-type="taskList"] li { display: flex; align-items: flex-start; gap: 0.5rem; }
-.knowledge-content .tiptap ul[data-type="taskList"] li > label { flex-shrink: 0; user-select: none; padding-top: 0.3rem; }
-.knowledge-content .tiptap ul[data-type="taskList"] li > label input[type="checkbox"] { cursor: pointer; accent-color: var(--ui-color-primary, #18b981); width: 15px; height: 15px; }
-.knowledge-content .tiptap ul[data-type="taskList"] li > div { flex: 1; }
-.knowledge-content .tiptap ul[data-type="taskList"] li[data-checked="true"] > div { text-decoration: line-through; opacity: 0.5; }
+.notes-content .tiptap ul[data-type="taskList"] { padding-left: 0.25rem; list-style: none; }
+.notes-content .tiptap ul[data-type="taskList"] li { display: flex; align-items: flex-start; gap: 0.5rem; }
+.notes-content .tiptap ul[data-type="taskList"] li > label { flex-shrink: 0; user-select: none; padding-top: 0.3rem; }
+.notes-content .tiptap ul[data-type="taskList"] li > label input[type="checkbox"] { cursor: pointer; accent-color: var(--ui-color-primary, #18b981); width: 15px; height: 15px; }
+.notes-content .tiptap ul[data-type="taskList"] li > div { flex: 1; }
+.notes-content .tiptap ul[data-type="taskList"] li[data-checked="true"] > div { text-decoration: line-through; opacity: 0.5; }
 
 /* Blockquote */
-.knowledge-content .tiptap blockquote { border-left: 3px solid var(--ui-color-primary, #18b981); padding: 0.25rem 0 0.25rem 0.875rem; margin: 0.5rem 0; color: var(--ui-text-muted) !important; font-style: italic; background: color-mix(in srgb, var(--ui-color-primary, #18b981) 5%, transparent); border-radius: 0 4px 4px 0; }
-.knowledge-content .tiptap blockquote p { margin: 0; color: var(--ui-text-muted) !important; }
+.notes-content .tiptap blockquote { border-left: 3px solid var(--ui-color-primary, #18b981); padding: 0.25rem 0 0.25rem 0.875rem; margin: 0.5rem 0; color: var(--ui-text-muted) !important; font-style: italic; background: color-mix(in srgb, var(--ui-color-primary, #18b981) 5%, transparent); border-radius: 0 4px 4px 0; }
+.notes-content .tiptap blockquote p { margin: 0; color: var(--ui-text-muted) !important; }
 
 /* Code */
-.knowledge-content .tiptap code { font-family: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace; background: color-mix(in srgb, var(--ui-color-primary, #18b981) 10%, var(--ui-bg-muted)); border: 1px solid color-mix(in srgb, var(--ui-color-primary, #18b981) 20%, var(--ui-border)); border-radius: 4px; padding: 0.1em 0.35em; font-size: 0.85em; color: var(--ui-color-primary, #18b981) !important; }
-.knowledge-content .tiptap pre { background: var(--ui-bg-muted); border: 1px solid var(--ui-border); border-radius: 8px; padding: 1rem 1.25rem; margin: 0.5rem 0; overflow-x: auto; }
-.knowledge-content .tiptap pre code { background: transparent !important; border: none !important; padding: 0; font-size: 0.875rem; line-height: 1.6; color: var(--ui-text-highlighted) !important; }
+.notes-content .tiptap code { font-family: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace; background: color-mix(in srgb, var(--ui-color-primary, #18b981) 10%, var(--ui-bg-muted)); border: 1px solid color-mix(in srgb, var(--ui-color-primary, #18b981) 20%, var(--ui-border)); border-radius: 4px; padding: 0.1em 0.35em; font-size: 0.85em; color: var(--ui-color-primary, #18b981) !important; }
+.notes-content .tiptap pre { background: var(--ui-bg-muted); border: 1px solid var(--ui-border); border-radius: 8px; padding: 1rem 1.25rem; margin: 0.5rem 0; overflow-x: auto; }
+.notes-content .tiptap pre code { background: transparent !important; border: none !important; padding: 0; font-size: 0.875rem; line-height: 1.6; color: var(--ui-text-highlighted) !important; }
 
 /* HR */
-.knowledge-content .tiptap hr { border: none; border-top: 1px solid var(--ui-border); margin: 0.75rem 0; }
+.notes-content .tiptap hr { border: none; border-top: 1px solid var(--ui-border); margin: 0.75rem 0; }
 
 /* Links */
-.knowledge-content .tiptap a { color: var(--ui-color-primary, #18b981) !important; text-decoration: underline; text-underline-offset: 2px; text-decoration-thickness: 1px; cursor: pointer; }
-.knowledge-content .tiptap a:hover { opacity: 0.8; }
+.notes-content .tiptap a { color: var(--ui-color-primary, #18b981) !important; text-decoration: underline; text-underline-offset: 2px; text-decoration-thickness: 1px; cursor: pointer; }
+.notes-content .tiptap a:hover { opacity: 0.8; }
 
 /* Wikilinks */
-.knowledge-content .tiptap .wikilink-node {
+.notes-content .tiptap .wikilink-node {
   color: var(--ui-color-primary, #18b981);
   background: color-mix(in srgb, var(--ui-color-primary, #18b981) 10%, transparent);
   border-radius: 3px;
@@ -846,27 +846,27 @@ defineExpose({ isUnsaved: () => saveStatus.value === 'unsaved', doSave: saveNote
   transition: background 0.1s;
   font-size: 0.9375em;
 }
-.knowledge-content .tiptap .wikilink-node:hover { background: color-mix(in srgb, var(--ui-color-primary, #18b981) 20%, transparent); text-decoration: underline; text-underline-offset: 2px; }
+.notes-content .tiptap .wikilink-node:hover { background: color-mix(in srgb, var(--ui-color-primary, #18b981) 20%, transparent); text-decoration: underline; text-underline-offset: 2px; }
 
 /* Placeholder */
-.knowledge-content .tiptap p.is-editor-empty:first-child::before { content: attr(data-placeholder); color: var(--ui-text-dimmed) !important; pointer-events: none; float: left; height: 0; }
+.notes-content .tiptap p.is-editor-empty:first-child::before { content: attr(data-placeholder); color: var(--ui-text-dimmed) !important; pointer-events: none; float: left; height: 0; }
 
 /* Text styles */
-.knowledge-content .tiptap strong { font-weight: 700; color: var(--ui-text-highlighted) !important; }
-.knowledge-content .tiptap em { font-style: italic; }
-.knowledge-content .tiptap u { text-decoration: underline; text-underline-offset: 2px; }
-.knowledge-content .tiptap s { text-decoration: line-through; opacity: 0.7; }
+.notes-content .tiptap strong { font-weight: 700; color: var(--ui-text-highlighted) !important; }
+.notes-content .tiptap em { font-style: italic; }
+.notes-content .tiptap u { text-decoration: underline; text-underline-offset: 2px; }
+.notes-content .tiptap s { text-decoration: line-through; opacity: 0.7; }
 
 /* Tables */
-.knowledge-content .tiptap .tableWrapper { overflow-x: auto; }
-.knowledge-content .tiptap table {
+.notes-content .tiptap .tableWrapper { overflow-x: auto; }
+.notes-content .tiptap table {
   border-collapse: collapse;
   width: 100%;
   margin: 0.75rem 0;
   table-layout: fixed;
 }
-.knowledge-content .tiptap table td,
-.knowledge-content .tiptap table th {
+.notes-content .tiptap table td,
+.notes-content .tiptap table th {
   border: 1px solid var(--ui-border);
   padding: 0.4rem 0.65rem;
   min-width: 60px;
@@ -874,14 +874,14 @@ defineExpose({ isUnsaved: () => saveStatus.value === 'unsaved', doSave: saveNote
   position: relative;
   color: var(--ui-text-highlighted) !important;
 }
-.knowledge-content .tiptap table th {
+.notes-content .tiptap table th {
   font-weight: 600;
   background: var(--ui-bg-muted);
 }
-.knowledge-content .tiptap table .selectedCell {
+.notes-content .tiptap table .selectedCell {
   background: color-mix(in srgb, var(--ui-color-primary, #18b981) 10%, transparent) !important;
 }
-.knowledge-content .tiptap table .column-resize-handle {
+.notes-content .tiptap table .column-resize-handle {
   position: absolute;
   right: -2px;
   top: 0;
@@ -890,5 +890,5 @@ defineExpose({ isUnsaved: () => saveStatus.value === 'unsaved', doSave: saveNote
   background: var(--ui-color-primary, #18b981);
   pointer-events: none;
 }
-.knowledge-content .tiptap .resize-cursor { cursor: col-resize; }
+.notes-content .tiptap .resize-cursor { cursor: col-resize; }
 </style>

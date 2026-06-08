@@ -3,9 +3,9 @@ import type {
   CreateNotePayload,
   CreateTagPayload,
   GraphData,
-  KnowledgeNote,
-  KnowledgeTag,
-  KnowledgeFolder,
+  Note,
+  NoteTag,
+  NoteFolder,
   CreateFolderPayload,
   UpdateFolderPayload,
   LinkNotesPayload,
@@ -14,10 +14,10 @@ import type {
   NoteSearchResult,
   UpdateNotePayload,
   UpdateTagPayload
-} from '~/types/knowledge'
-import { NoteType, NOTE_TYPE_META } from '~/types/knowledge'
+} from '~/types/notes'
+import { NoteType, NOTE_TYPE_META } from '~/types/notes'
 
-export function useKnowledge() {
+export function useNotes() {
   const toast = useToast()
 
   // ─── Notes list (paginated) ─────────────────────────────────────────────────
@@ -39,7 +39,7 @@ export function useKnowledge() {
     data: notesData,
     status: notesStatus,
     refresh: refreshNotes
-  } = useFetch<NoteListResponse>('/api/knowledge/notes', {
+  } = useFetch<NoteListResponse>('/api/notes', {
     query: computed(() => ({
       page: notesPage.value,
       pageSize: notesPageSize.value,
@@ -49,7 +49,7 @@ export function useKnowledge() {
       pinned: notesPinned.value || undefined
     })),
     lazy: true,
-    key: 'knowledge-notes',
+    key: 'notes',
     watch: [notesPage, notesPageSize, notesType, notesTagId, notesPinned]
   })
 
@@ -82,9 +82,9 @@ export function useKnowledge() {
     data: tags,
     status: tagsStatus,
     refresh: refreshTags
-  } = useFetch<KnowledgeTag[]>('/api/knowledge/tags', {
+  } = useFetch<NoteTag[]>('/api/notes/tags', {
     lazy: true,
-    key: 'knowledge-tags'
+    key: 'notes-tags'
   })
 
   // ─── Graph ──────────────────────────────────────────────────────────────────
@@ -92,29 +92,29 @@ export function useKnowledge() {
     data: graphData,
     status: graphStatus,
     refresh: refreshGraph
-  } = useFetch<GraphData>('/api/knowledge/graph', {
+  } = useFetch<GraphData>('/api/notes/graph', {
     lazy: true,
-    key: 'knowledge-graph'
+    key: 'notes-graph'
   })
 
   const {
     data: folders,
     status: foldersStatus,
     refresh: refreshFolders
-  } = useFetch<KnowledgeFolder[]>('/api/knowledge/folders', {
+  } = useFetch<NoteFolder[]>('/api/notes/folders', {
     lazy: true,
-    key: 'knowledge-folders'
+    key: 'notes-folders'
   })
 
   const {
     data: allNotes,
     status: allNotesStatus,
     refresh: refreshAllNotes
-  } = useFetch<KnowledgeNote[]>('/api/knowledge/notes', {
+  } = useFetch<Note[]>('/api/notes', {
     query: computed(() => ({ page: 1, pageSize: 500 })),
-    transform: (res: { data: KnowledgeNote[] }) => res.data,
+    transform: (res: { data: Note[] }) => res.data,
     lazy: true,
-    key: 'knowledge-all-notes'
+    key: 'notes-all'
   })
 
   // ─── Search ─────────────────────────────────────────────────────────────────
@@ -129,7 +129,7 @@ export function useKnowledge() {
     }
     searching.value = true
     try {
-      searchResults.value = await $fetch<NoteSearchResult[]>('/api/knowledge/notes/search', {
+      searchResults.value = await $fetch<NoteSearchResult[]>('/api/notes/search', {
         query: { q: searchQuery.value }
       })
     } catch {
@@ -145,9 +145,9 @@ export function useKnowledge() {
 
   // ─── Note CRUD ──────────────────────────────────────────────────────────────
 
-  async function createNote(payload: CreateNotePayload): Promise<KnowledgeNote | null> {
+  async function createNote(payload: CreateNotePayload): Promise<Note | null> {
     try {
-      const note = await $fetch<KnowledgeNote>('/api/knowledge/notes', {
+      const note = await $fetch<Note>('/api/notes', {
         method: 'POST',
         body: payload
       })
@@ -161,9 +161,9 @@ export function useKnowledge() {
     }
   }
 
-  async function updateNote(id: string, payload: UpdateNotePayload, options?: { silent?: boolean }): Promise<KnowledgeNote | null> {
+  async function updateNote(id: string, payload: UpdateNotePayload, options?: { silent?: boolean }): Promise<Note | null> {
     try {
-      const note = await $fetch<KnowledgeNote>(`/api/knowledge/notes/${id}`, {
+      const note = await $fetch<Note>(`/api/notes/${id}`, {
         method: 'PUT',
         body: payload
       })
@@ -182,7 +182,7 @@ export function useKnowledge() {
 
   async function deleteNote(id: string): Promise<boolean> {
     try {
-      await $fetch(`/api/knowledge/notes/${id}`, { method: 'DELETE' })
+      await $fetch(`/api/notes/${id}`, { method: 'DELETE' })
       toast.add({ title: 'Nota excluída', description: 'A nota foi removida.', color: 'success' })
       await refreshNotes()
       await refreshGraph()
@@ -195,16 +195,16 @@ export function useKnowledge() {
 
   async function fetchNoteDetail(id: string): Promise<NoteDetail | null> {
     try {
-      return await $fetch<NoteDetail>(`/api/knowledge/notes/${id}`)
+      return await $fetch<NoteDetail>(`/api/notes/${id}`)
     } catch {
       toast.add({ title: 'Erro', description: 'Falha ao carregar nota.', color: 'error' })
       return null
     }
   }
 
-  async function togglePin(note: KnowledgeNote): Promise<boolean> {
+  async function togglePin(note: Note): Promise<boolean> {
     try {
-      await $fetch(`/api/knowledge/notes/${note.id}`, {
+      await $fetch(`/api/notes/${note.id}`, {
         method: 'PUT',
         body: { pinned: !note.pinned }
       })
@@ -224,7 +224,7 @@ export function useKnowledge() {
 
   async function linkNotes(sourceId: string, payload: LinkNotesPayload): Promise<boolean> {
     try {
-      await $fetch(`/api/knowledge/notes/${sourceId}/link`, {
+      await $fetch(`/api/notes/${sourceId}/link`, {
         method: 'POST',
         body: payload
       })
@@ -240,7 +240,7 @@ export function useKnowledge() {
 
   async function unlinkNotes(linkId: string): Promise<boolean> {
     try {
-      await $fetch(`/api/knowledge/links/${linkId}`, { method: 'DELETE' })
+      await $fetch(`/api/notes/links/${linkId}`, { method: 'DELETE' })
       toast.add({ title: 'Vínculo removido', color: 'success' })
       await refreshGraph()
       return true
@@ -252,9 +252,9 @@ export function useKnowledge() {
 
   // ─── Tags CRUD ──────────────────────────────────────────────────────────────
 
-  async function createTag(payload: CreateTagPayload): Promise<KnowledgeTag | null> {
+  async function createTag(payload: CreateTagPayload): Promise<NoteTag | null> {
     try {
-      const tag = await $fetch<KnowledgeTag>('/api/knowledge/tags', {
+      const tag = await $fetch<NoteTag>('/api/notes/tags', {
         method: 'POST',
         body: payload
       })
@@ -267,9 +267,9 @@ export function useKnowledge() {
     }
   }
 
-  async function updateTag(id: string, payload: UpdateTagPayload): Promise<KnowledgeTag | null> {
+  async function updateTag(id: string, payload: UpdateTagPayload): Promise<NoteTag | null> {
     try {
-      const tag = await $fetch<KnowledgeTag>(`/api/knowledge/tags/${id}`, {
+      const tag = await $fetch<NoteTag>(`/api/notes/tags/${id}`, {
         method: 'PUT',
         body: payload
       })
@@ -284,7 +284,7 @@ export function useKnowledge() {
 
   async function deleteTag(id: string): Promise<boolean> {
     try {
-      await $fetch(`/api/knowledge/tags/${id}`, { method: 'DELETE' })
+      await $fetch(`/api/notes/tags/${id}`, { method: 'DELETE' })
       toast.add({ title: 'Tag excluída', color: 'success' })
       await refreshTags()
       return true
@@ -294,9 +294,9 @@ export function useKnowledge() {
     }
   }
 
-  async function createFolder(payload: CreateFolderPayload): Promise<KnowledgeFolder | null> {
+  async function createFolder(payload: CreateFolderPayload): Promise<NoteFolder | null> {
     try {
-      const folder = await $fetch<KnowledgeFolder>('/api/knowledge/folders', { method: 'POST', body: payload })
+      const folder = await $fetch<NoteFolder>('/api/notes/folders', { method: 'POST', body: payload })
       toast.add({ title: 'Pasta criada', description: `"${folder.name}" criada.`, color: 'success' })
       await refreshFolders()
       return folder
@@ -306,9 +306,9 @@ export function useKnowledge() {
     }
   }
 
-  async function updateFolder(id: string, payload: UpdateFolderPayload): Promise<KnowledgeFolder | null> {
+  async function updateFolder(id: string, payload: UpdateFolderPayload): Promise<NoteFolder | null> {
     try {
-      const folder = await $fetch<KnowledgeFolder>(`/api/knowledge/folders/${id}`, { method: 'PUT', body: payload })
+      const folder = await $fetch<NoteFolder>(`/api/notes/folders/${id}`, { method: 'PUT', body: payload })
       await refreshFolders()
       return folder
     } catch {
@@ -319,7 +319,7 @@ export function useKnowledge() {
 
   async function deleteFolder(id: string): Promise<boolean> {
     try {
-      await $fetch(`/api/knowledge/folders/${id}`, { method: 'DELETE' })
+      await $fetch(`/api/notes/folders/${id}`, { method: 'DELETE' })
       toast.add({ title: 'Pasta excluída', color: 'success' })
       await Promise.all([refreshFolders(), refreshAllNotes(), refreshNotes()])
       return true
@@ -331,7 +331,7 @@ export function useKnowledge() {
 
   async function moveNoteToFolder(noteId: string, folderId: string | null): Promise<boolean> {
     try {
-      await $fetch(`/api/knowledge/notes/${noteId}`, { method: 'PUT', body: { folderId } })
+      await $fetch(`/api/notes/${noteId}`, { method: 'PUT', body: { folderId } })
       await refreshAllNotes()
       return true
     } catch {

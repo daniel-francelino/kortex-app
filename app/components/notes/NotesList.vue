@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import type { KnowledgeNote, KnowledgeFolder } from '~/types/knowledge'
-import { NOTE_TYPE_META, NoteType } from '~/types/knowledge'
+import type { Note, NoteFolder } from '~/types/notes'
+import { NOTE_TYPE_META, NoteType } from '~/types/notes'
 
 const props = defineProps<{
-  notes: KnowledgeNote[]
-  folders: KnowledgeFolder[]
+  notes: Note[]
+  folders: NoteFolder[]
   total: number
   page: number
   pageSize: number
@@ -14,10 +14,10 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   'update:page': [page: number]
-  select: [note: KnowledgeNote]
+  select: [note: Note]
   'new-note': []
-  pin: [note: KnowledgeNote]
-  delete: [note: KnowledgeNote]
+  pin: [note: Note]
+  delete: [note: Note]
   'move-to-folder': [noteId: string, folderId: string | null]
   'create-folder': [name: string]
   'rename-folder': [folderId: string, name: string]
@@ -45,7 +45,7 @@ function toggleFolder(id: string) {
   else expandedFolders.value.add(id)
 }
 
-function startEdit(folder: KnowledgeFolder) {
+function startEdit(folder: NoteFolder) {
   editingFolderId.value = folder.id
   editingName.value = folder.name
   nextTick(() => editInput.value?.select())
@@ -75,14 +75,14 @@ function commitCreate() {
 const dragOverFolderId = ref<string | null>(null)
 const dragOverRoot = ref(false)
 
-function onNoteDragStart(note: KnowledgeNote, e: DragEvent) {
-  e.dataTransfer?.setData('application/x-knowledge-note-id', note.id)
+function onNoteDragStart(note: Note, e: DragEvent) {
+  e.dataTransfer?.setData('application/x-notes-note-id', note.id)
   e.dataTransfer?.setData('text/plain', note.title)
   if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move'
 }
 
 function onFolderDragOver(folderId: string, e: DragEvent) {
-  if (e.dataTransfer?.types.includes('application/x-knowledge-note-id')) {
+  if (e.dataTransfer?.types.includes('application/x-notes-note-id')) {
     dragOverFolderId.value = folderId
     if (e.dataTransfer) e.dataTransfer.dropEffect = 'move'
   }
@@ -97,12 +97,12 @@ function onFolderDragLeave(folderId: string, e: DragEvent) {
 
 function onFolderDrop(folderId: string, e: DragEvent) {
   dragOverFolderId.value = null
-  const noteId = e.dataTransfer?.getData('application/x-knowledge-note-id')
+  const noteId = e.dataTransfer?.getData('application/x-notes-note-id')
   if (noteId) emit('move-to-folder', noteId, folderId)
 }
 
 function onRootDragOver(e: DragEvent) {
-  if (e.dataTransfer?.types.includes('application/x-knowledge-note-id')) {
+  if (e.dataTransfer?.types.includes('application/x-notes-note-id')) {
     dragOverRoot.value = true
     if (e.dataTransfer) e.dataTransfer.dropEffect = 'move'
   }
@@ -117,14 +117,14 @@ function onRootDragLeave(e: DragEvent) {
 
 function onRootDrop(e: DragEvent) {
   dragOverRoot.value = false
-  const noteId = e.dataTransfer?.getData('application/x-knowledge-note-id')
+  const noteId = e.dataTransfer?.getData('application/x-notes-note-id')
   if (noteId) emit('move-to-folder', noteId, null)
 }
 
 // ─── Grouped notes ─────────────────────────────────────────────────────────────
 
 const notesByFolder = computed(() => {
-  const map = new Map<string | null, KnowledgeNote[]>()
+  const map = new Map<string | null, Note[]>()
   for (const note of props.notes) {
     const key = note.folderId ?? null
     if (!map.has(key)) map.set(key, [])

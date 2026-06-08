@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import type { KnowledgeTag, NoteDetail } from '~/types/knowledge'
-import { NOTE_TYPE_META, NoteType } from '~/types/knowledge'
+import type { NoteTag, NoteDetail } from '~/types/notes'
+import { NOTE_TYPE_META, NoteType } from '~/types/notes'
 
 const props = defineProps<{
   note: NoteDetail | null
-  tags: KnowledgeTag[]
+  tags: NoteTag[]
 }>()
 
 const emit = defineEmits<{
@@ -12,7 +12,7 @@ const emit = defineEmits<{
   'navigate-note': [noteId: string]
 }>()
 
-const { updateNote, noteTypeOptions } = useKnowledge()
+const { updateNote, noteTypeOptions } = useNotes()
 
 const editType = ref<NoteType>(NoteType.Note)
 const editTagIds = ref<string[]>([])
