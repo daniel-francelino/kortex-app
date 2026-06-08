@@ -445,7 +445,11 @@ const SlashCommandExtension = Extension.create({
 
 const editor = useEditor({
   extensions: [
-    StarterKit.configure({ heading: { levels: [1, 2, 3] } }),
+    StarterKit.configure({
+      heading: { levels: [1, 2, 3] },
+      link: false,
+      underline: false
+    }),
     Placeholder.configure({ placeholder: 'Escreva algo... use / para blocos, [[ para vincular notas.' }),
     Underline,
     TaskList,

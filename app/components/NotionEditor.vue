@@ -240,7 +240,11 @@ const SlashCommandExtension = Extension.create({
 const editor = useEditor({
   content: parseContent(props.modelValue),
   extensions: [
-    StarterKit.configure({ heading: { levels: [1, 2, 3] } }),
+    StarterKit.configure({
+      heading: { levels: [1, 2, 3] },
+      link: false,
+      underline: false
+    }),
     Placeholder.configure({ placeholder: props.placeholder }),
     Underline,
     TaskList,
