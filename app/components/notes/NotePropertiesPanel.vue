@@ -1,18 +1,18 @@
 <script setup lang="ts">
-import type { NoteTag, NoteDetail } from '~/types/notes'
+import type { Note, NoteTag, NoteDetail, UpdateNotePayload } from '~/types/notes'
 import { NOTE_TYPE_META, NoteType } from '~/types/notes'
 
 const props = defineProps<{
   note: NoteDetail | null
   tags: NoteTag[]
+  noteTypeOptions: { label: string, value: string }[]
+  updateNote: (id: string, payload: UpdateNotePayload, options?: { silent?: boolean }) => Promise<Note | null>
 }>()
 
 const emit = defineEmits<{
   updated: []
   'navigate-note': [noteId: string]
 }>()
-
-const { updateNote, noteTypeOptions } = useNotes()
 
 const editType = ref<NoteType>(NoteType.Note)
 const editTagIds = ref<string[]>([])
@@ -43,7 +43,7 @@ async function scheduleSave() {
     if (!props.note) return
     saving.value = true
     try {
-      await updateNote(props.note.id, { type: editType.value, tagIds: editTagIds.value })
+      await props.updateNote(props.note.id, { type: editType.value, tagIds: editTagIds.value })
       emit('updated')
     } finally {
       saving.value = false

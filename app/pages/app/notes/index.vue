@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { Note, NoteDetail } from '~/types/notes'
+import type { CreateNotePayload, Note, NoteDetail, UpdateNotePayload } from '~/types/notes'
 
 definePageMeta({ layout: 'app', ssr: false })
 useSeoMeta({ title: 'Notas' })
@@ -19,8 +19,16 @@ const {
   refreshNotes,
   refreshGraph,
   noteTypeOptions,
+  createNote,
+  updateNote,
+  fetchNoteDetail,
   togglePin,
   deleteNote,
+  linkNotes,
+  unlinkNotes,
+  createTag,
+  updateTag,
+  deleteTag,
   folders,
   refreshFolders,
   allNotes,
@@ -61,7 +69,38 @@ const typeFilterOptions = computed(() => [
 // ─── Note detail (shared between editor + right panel) ────────────────────────
 
 const currentNoteDetail = ref<NoteDetail | null>(null)
+const currentNoteLoading = ref(false)
 const currentContent = ref('')
+let currentNoteRequestId = 0
+
+async function loadCurrentNoteDetail(noteId: string | null): Promise<NoteDetail | null> {
+  const requestId = ++currentNoteRequestId
+
+  if (!noteId) {
+    currentNoteDetail.value = null
+    currentContent.value = ''
+    currentNoteLoading.value = false
+    return null
+  }
+
+  currentNoteLoading.value = true
+  currentNoteDetail.value = null
+
+  try {
+    const detail = await fetchNoteDetail(noteId)
+    if (requestId !== currentNoteRequestId) return null
+
+    currentNoteDetail.value = detail
+    currentContent.value = detail?.content ?? ''
+    return detail
+  } finally {
+    if (requestId === currentNoteRequestId) {
+      currentNoteLoading.value = false
+    }
+  }
+}
+
+watch(selectedNoteId, noteId => { void loadCurrentNoteDetail(noteId) })
 
 function onNoteLoaded(note: NoteDetail | null) {
   currentNoteDetail.value = note
@@ -105,8 +144,15 @@ const historyIndex = ref(-1)
 const canGoBack = computed(() => historyIndex.value > 0)
 const canGoForward = computed(() => historyIndex.value < noteHistory.value.length - 1)
 
-function navigateTo(noteId: string) {
+async function saveCurrentNoteIfNeeded(): Promise<void> {
+  if (noteEditorRef.value?.isUnsaved()) {
+    await noteEditorRef.value.doSave()
+  }
+}
+
+async function navigateTo(noteId: string) {
   if (selectedNoteId.value === noteId) return
+  await saveCurrentNoteIfNeeded()
   // Truncate forward history
   noteHistory.value = noteHistory.value.slice(0, historyIndex.value + 1)
   noteHistory.value.push(noteId)
@@ -115,14 +161,16 @@ function navigateTo(noteId: string) {
   activeView.value = 'editor'
 }
 
-function goBack() {
+async function goBack() {
   if (!canGoBack.value) return
+  await saveCurrentNoteIfNeeded()
   historyIndex.value--
   selectedNoteId.value = noteHistory.value[historyIndex.value] ?? null
 }
 
-function goForward() {
+async function goForward() {
   if (!canGoForward.value) return
+  await saveCurrentNoteIfNeeded()
   historyIndex.value++
   selectedNoteId.value = noteHistory.value[historyIndex.value] ?? null
 }
@@ -131,16 +179,17 @@ function goForward() {
 
 function onSelectNote(note: string | Note): void {
   const id = typeof note === 'string' ? note : note.id
-  navigateTo(id)
+  void navigateTo(id)
 }
 
 function onNoteSaved(note: { id: string }): void {
   createModalOpen.value = false
-  navigateTo(note.id)
+  void navigateTo(note.id)
 }
 
 function onNoteUpdated(): void {
   refreshNotes()
+  refreshAllNotes()
 }
 
 function onNoteDeleted(): void {
@@ -152,11 +201,18 @@ function onNoteDeleted(): void {
   }
   selectedNoteId.value = noteHistory.value[historyIndex.value] ?? null
   currentNoteDetail.value = null
-  refreshNotes()
+}
+
+async function onDeleteNoteById(noteId: string): Promise<boolean> {
+  const ok = await deleteNote(noteId)
+  if (ok) {
+    await refreshAllNotes()
+  }
+  return ok
 }
 
 async function onDeleteNote(note: Note): Promise<void> {
-  const ok = await deleteNote(note.id)
+  const ok = await onDeleteNoteById(note.id)
   if (ok && selectedNoteId.value === note.id) {
     onNoteDeleted()
   }
@@ -183,11 +239,11 @@ async function onPinNote(note: Note): Promise<void> {
 }
 
 function onNavigateNote(noteId: string): void {
-  navigateTo(noteId)
+  void navigateTo(noteId)
 }
 
 function onGraphSelectNote(noteId: string): void {
-  navigateTo(noteId)
+  void navigateTo(noteId)
 }
 
 function switchToGraph(): void {
@@ -197,6 +253,54 @@ function switchToGraph(): void {
 
 function onPropertiesUpdated(): void {
   refreshNotes()
+}
+
+const editorAvailableNotes = computed<Note[]>(() => {
+  if (Array.isArray(allNotes.value)) return allNotes.value
+  return notesData.value?.data ?? []
+})
+
+async function onCreateNote(payload: CreateNotePayload): Promise<Note | null> {
+  const note = await createNote(payload)
+  if (note) {
+    await refreshAllNotes()
+  }
+  return note
+}
+
+async function onUpdateNote(
+  noteId: string,
+  payload: UpdateNotePayload,
+  options?: { silent?: boolean }
+): Promise<Note | null> {
+  const note = await updateNote(noteId, payload, options)
+
+  if (note && currentNoteDetail.value?.id === noteId) {
+    currentNoteDetail.value = { ...currentNoteDetail.value, ...note }
+  }
+
+  return note
+}
+
+async function reloadNoteDetail(noteId: string): Promise<NoteDetail | null> {
+  const detail = await fetchNoteDetail(noteId)
+  if (selectedNoteId.value === noteId) {
+    currentNoteDetail.value = detail
+    currentContent.value = detail?.content ?? ''
+  }
+  return detail
+}
+
+async function onLinkNotes(sourceId: string, targetId: string): Promise<NoteDetail | null> {
+  const ok = await linkNotes(sourceId, { targetNoteId: targetId })
+  if (!ok) return null
+  return await reloadNoteDetail(sourceId)
+}
+
+async function onUnlinkNotes(sourceId: string, linkId: string): Promise<NoteDetail | null> {
+  const ok = await unlinkNotes(linkId)
+  if (!ok) return null
+  return await reloadNoteDetail(sourceId)
 }
 </script>
 
@@ -296,7 +400,12 @@ function onPropertiesUpdated(): void {
 
         <!-- Tags -->
         <div v-else class="p-3">
-          <NotesTagManager />
+          <NotesTagManager
+            :tags="tags ?? []"
+            :create-tag="createTag"
+            :update-tag="updateTag"
+            :delete-tag="deleteTag"
+          />
         </div>
       </div>
 
@@ -393,7 +502,13 @@ function onPropertiesUpdated(): void {
             v-else
             ref="noteEditorRef"
             :note-id="selectedNoteId"
-            :tags="tags ?? []"
+            :note="currentNoteDetail"
+            :loading="currentNoteLoading"
+            :available-notes="editorAvailableNotes"
+            :update-note="onUpdateNote"
+            :delete-note="onDeleteNoteById"
+            :link-notes="onLinkNotes"
+            :unlink-notes="onUnlinkNotes"
             @updated="onNoteUpdated"
             @deleted="onNoteDeleted"
             @navigate-note="onNavigateNote"
@@ -430,6 +545,8 @@ function onPropertiesUpdated(): void {
             <NotesNotePropertiesPanel
               :note="currentNoteDetail"
               :tags="tags ?? []"
+              :note-type-options="noteTypeOptions"
+              :update-note="onUpdateNote"
               @updated="onPropertiesUpdated"
               @navigate-note="onNavigateNote"
             />
@@ -464,6 +581,8 @@ function onPropertiesUpdated(): void {
     <!-- Create Modal -->
     <NotesNoteCreateModal
       :open="createModalOpen"
+      :note-type-options="noteTypeOptions"
+      :create-note="onCreateNote"
       @update:open="createModalOpen = $event"
       @saved="onNoteSaved"
     />

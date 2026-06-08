@@ -1,19 +1,18 @@
 <script setup lang="ts">
 import { z } from 'zod'
-import type { Note } from '~/types/notes'
+import type { CreateNotePayload, Note } from '~/types/notes'
 import { NoteType } from '~/types/notes'
 
 const props = defineProps<{
   open: boolean
-  note?: Note | null
+  noteTypeOptions: { label: string, value: string }[]
+  createNote: (payload: CreateNotePayload) => Promise<Note | null>
 }>()
 
 const emit = defineEmits<{
   'update:open': [value: boolean]
   'saved': [note: Note]
 }>()
-
-const { createNote, noteTypeOptions } = useNotes()
 
 const schema = z.object({
   title: z.string().min(1, 'Título é obrigatório'),
@@ -42,7 +41,7 @@ watch(() => props.open, (isOpen) => {
 async function onSubmit(): Promise<void> {
   submitting.value = true
   try {
-    const note = await createNote({
+    const note = await props.createNote({
       title: state.title,
       content: state.content || undefined,
       type: state.type

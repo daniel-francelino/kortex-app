@@ -1,8 +1,13 @@
 <script setup lang="ts">
-import type { NoteTag } from '~/types/notes'
+import type { CreateTagPayload, NoteTag, UpdateTagPayload } from '~/types/notes'
 import { z } from 'zod'
 
-const { tags, createTag, updateTag, deleteTag } = useNotes()
+const props = defineProps<{
+  tags: NoteTag[]
+  createTag: (payload: CreateTagPayload) => Promise<NoteTag | null>
+  updateTag: (id: string, payload: UpdateTagPayload) => Promise<NoteTag | null>
+  deleteTag: (id: string) => Promise<boolean>
+}>()
 
 const modalOpen = ref(false)
 const editingTag = ref<NoteTag | null>(null)
@@ -44,17 +49,17 @@ async function onSubmit(): Promise<void> {
   const payload = { name: formState.name, color: formState.color || undefined }
 
   if (editingTag.value) {
-    const success = await updateTag(editingTag.value.id, payload)
+    const success = await props.updateTag(editingTag.value.id, payload)
     if (success) modalOpen.value = false
   } else {
-    const result = await createTag(payload)
+    const result = await props.createTag(payload)
     if (result) modalOpen.value = false
   }
 }
 
 async function onDelete(tag: NoteTag): Promise<void> {
   deleting.value = tag.id
-  await deleteTag(tag.id)
+  await props.deleteTag(tag.id)
   deleting.value = null
 }
 

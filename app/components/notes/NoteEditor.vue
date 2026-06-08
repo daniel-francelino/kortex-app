@@ -6,12 +6,12 @@ import Underline from '@tiptap/extension-underline'
 import TaskList from '@tiptap/extension-task-list'
 import TaskItem from '@tiptap/extension-task-item'
 import Link from '@tiptap/extension-link'
-import { Extension, Node, mergeAttributes } from '@tiptap/core'
+import { Extension, Node as TiptapNode, mergeAttributes } from '@tiptap/core'
 import Suggestion from '@tiptap/suggestion'
 import { PluginKey } from '@tiptap/pm/state'
 import type { Editor, Range } from '@tiptap/core'
 import { Table, TableRow, TableCell, TableHeader } from '@tiptap/extension-table'
-import type { Note, NoteTag, NoteDetail } from '~/types/notes'
+import type { Note, NoteDetail, UpdateNotePayload } from '~/types/notes'
 
 // ─── Slash command data ────────────────────────────────────────────────────────
 
@@ -40,7 +40,13 @@ const ALL_COMMANDS: CommandItem[] = [
 
 const props = defineProps<{
   noteId: string | null
-  tags: NoteTag[]
+  note: NoteDetail | null
+  loading: boolean
+  availableNotes: Note[]
+  updateNote: (id: string, payload: UpdateNotePayload, options?: { silent?: boolean }) => Promise<Note | null>
+  deleteNote: (id: string) => Promise<boolean>
+  linkNotes: (sourceId: string, targetId: string) => Promise<NoteDetail | null>
+  unlinkNotes: (sourceId: string, linkId: string) => Promise<NoteDetail | null>
 }>()
 
 const emit = defineEmits<{
@@ -53,12 +59,10 @@ const emit = defineEmits<{
 
 // ─── Composable ────────────────────────────────────────────────────────────────
 
-const { fetchNoteDetail, updateNote, deleteNote, linkNotes, unlinkNotes, notesData } = useNotes()
-
 // ─── Note state ────────────────────────────────────────────────────────────────
 
-const noteDetail = ref<NoteDetail | null>(null)
-const loading = ref(false)
+const noteDetail = ref<NoteDetail | null>(props.note)
+const loading = computed(() => props.loading)
 const editTitle = ref('')
 const lastSavedTitle = ref('')
 const lastSavedContent = ref('')
@@ -86,12 +90,12 @@ const linkSearchOpen = ref(false)
 const linkSearchQuery = ref('')
 
 const availableNotesForLink = computed(() => {
-  if (!notesData.value?.data || !noteDetail.value) return []
+  if (!noteDetail.value) return []
   const linked = new Set([
     ...(noteDetail.value.links ?? []).map(l => l.targetNoteId),
     noteDetail.value.id,
   ])
-  return notesData.value.data
+  return props.availableNotes
     .filter((n: Note) => !linked.has(n.id))
     .filter((n: Note) => !linkSearchQuery.value || n.title.toLowerCase().includes(linkSearchQuery.value.toLowerCase()))
 })
@@ -110,50 +114,45 @@ function parseContent(value: string): object | undefined {
 function syncToEditor(detail: NoteDetail) {
   if (!editor.value) return
   const json = parseContent(detail.content ?? '')
-  editor.value.commands.setContent(json ?? { type: 'doc', content: [{ type: 'paragraph' }] }, false)
+  editor.value.commands.setContent(json ?? { type: 'doc', content: [{ type: 'paragraph' }] }, { emitUpdate: false })
   lastSavedContent.value = detail.content ?? ''
 }
 
 // ─── Load note ─────────────────────────────────────────────────────────────────
 
-async function loadNote(id: string | null) {
-  // Best-effort save before switching notes
-  if (noteDetail.value && saveStatus.value === 'unsaved') {
-    await saveNote()
-  }
-  if (!id) {
-    noteDetail.value = null
-    emit('note-loaded', null)
-    editTitle.value = ''
-    lastSavedTitle.value = ''
-    lastSavedContent.value = ''
-    lastChangeAt.value = 0
-    saveStatus.value = 'idle'
-    editor.value?.commands.clearContent()
-    return
-  }
-  loading.value = true
-  try {
-    const detail = await fetchNoteDetail(id)
-    noteDetail.value = detail
-    emit('note-loaded', detail)
-    if (detail) {
-      editTitle.value = detail.title
-      lastSavedTitle.value = detail.title
-    }
-  } finally {
-    loading.value = false
-  }
+function resetNoteState() {
+  noteDetail.value = null
+  emit('note-loaded', null)
+  editTitle.value = ''
+  lastSavedTitle.value = ''
+  lastSavedContent.value = ''
   lastChangeAt.value = 0
   saveStatus.value = 'idle'
-  // Wait for Vue to re-render (loading→false, EditorContent mounts) before setting content
-  await nextTick()
-  if (noteDetail.value) syncToEditor(noteDetail.value)
+  editor.value?.commands.clearContent()
 }
 
-watch(() => props.noteId, loadNote)
-onMounted(() => { void loadNote(props.noteId) })
+async function syncNote(detail: NoteDetail | null) {
+  if (!detail) {
+    resetNoteState()
+    return
+  }
 
+  const isSameNote = noteDetail.value?.id === detail.id
+  noteDetail.value = detail
+  emit('note-loaded', detail)
+
+  if (isSameNote) return
+
+  editTitle.value = detail.title
+  lastSavedTitle.value = detail.title
+  lastChangeAt.value = 0
+  saveStatus.value = 'idle'
+
+  await nextTick()
+  syncToEditor(detail)
+}
+
+watch(() => props.note, note => { void syncNote(note) })
 // ─── Auto-save (polling-based, same pattern as Journal) ────────────────────────
 
 const SAVE_AFTER_MS = 60_000
@@ -170,7 +169,7 @@ async function saveNote() {
   if (!noteDetail.value || !dirty.value) return
   try {
     const content = editor.value ? JSON.stringify(editor.value.getJSON()) : undefined
-    const result = await updateNote(noteDetail.value.id, { title: editTitle.value, content }, { silent: true })
+    const result = await props.updateNote(noteDetail.value.id, { title: editTitle.value, content }, { silent: true })
     if (result) {
       lastSavedTitle.value = editTitle.value
       if (content !== undefined) lastSavedContent.value = content
@@ -200,15 +199,14 @@ watch(editTitle, (val) => { if (noteDetail.value && val !== lastSavedTitle.value
 
 async function onDelete() {
   if (!noteDetail.value) return
-  const ok = await deleteNote(noteDetail.value.id)
+  const ok = await props.deleteNote(noteDetail.value.id)
   if (ok) { noteDetail.value = null; emit('deleted') }
 }
 
 async function addLink(targetId: string) {
   if (!noteDetail.value) return
-  const ok = await linkNotes(noteDetail.value.id, { targetNoteId: targetId })
-  if (ok) {
-    const detail = await fetchNoteDetail(noteDetail.value.id)
+  const detail = await props.linkNotes(noteDetail.value.id, targetId)
+  if (detail) {
     noteDetail.value = detail
     emit('note-loaded', detail)
     linkSearchOpen.value = false
@@ -218,9 +216,8 @@ async function addLink(targetId: string) {
 
 async function removeLink(linkId: string) {
   if (!noteDetail.value) return
-  const ok = await unlinkNotes(linkId)
-  if (ok) {
-    const detail = await fetchNoteDetail(noteDetail.value.id)
+  const detail = await props.unlinkNotes(noteDetail.value.id, linkId)
+  if (detail) {
     noteDetail.value = detail
     emit('note-loaded', detail)
   }
@@ -314,9 +311,13 @@ watch(wikiIndex, idx => nextTick(() => {
   (wikiMenuRef.value?.children[idx] as HTMLElement | undefined)?.scrollIntoView({ block: 'nearest' })
 }))
 
+function selectWikiItem(item: WikiItem) {
+  wikiCommandFn?.(item)
+}
+
 // ─── Tiptap: WikilinkNode ──────────────────────────────────────────────────────
 
-const WikilinkNode = Node.create({
+const WikilinkNode = TiptapNode.create({
   name: 'wikilink',
   group: 'inline',
   inline: true,
@@ -352,7 +353,7 @@ const WikilinkSuggestion = Extension.create({
         allowSpaces: true,
         items: ({ query }: { query: string }) => {
           const q = query.toLowerCase()
-          return (notesData.value?.data ?? [])
+          return props.availableNotes
             .filter((n: Note) => n.id !== props.noteId)
             .filter((n: Note) => !q || n.title.toLowerCase().includes(q))
             .slice(0, 8)
@@ -481,6 +482,8 @@ const editor = useEditor({
     },
   },
 })
+
+onMounted(() => { void syncNote(props.note) })
 
 onBeforeUnmount(() => {
   if (pollTimer) { clearInterval(pollTimer); pollTimer = null }
@@ -696,7 +699,7 @@ defineExpose({ isUnsaved: () => saveStatus.value === 'unsaved', doSave: saveNote
             type="button"
             :class="['kb-wiki-item', { selected: i === wikiIndex }]"
             @mouseenter="wikiIndex = i"
-            @click="wikiCommandFn?.(item)"
+            @click="selectWikiItem(item)"
           >
             <UIcon name="i-lucide-file-text" class="size-3.5 shrink-0 text-muted" />
             <span class="truncate">{{ item.title }}</span>
