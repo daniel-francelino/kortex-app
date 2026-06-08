@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { CreateNotePayload, Note, NoteDetail, UpdateNotePayload } from '~/types/notes'
+import type { CreateNotePayload, Note, NoteDetail, NoteFolder, UpdateNotePayload } from '~/types/notes'
 
 definePageMeta({ layout: 'app', ssr: false })
 useSeoMeta({ title: 'Notas' })
@@ -66,11 +66,44 @@ const typeFilterOptions = computed(() => [
   ...noteTypeOptions
 ])
 
+// Keep the last rendered list stable while requests refresh in the background.
+const visibleFolders = ref<NoteFolder[]>([])
+const visibleNotes = ref<Note[]>([])
+const visibleNotesTotal = ref(0)
+const hasLoadedNotesListOnce = ref(false)
+
+watch(folders, (value) => {
+  if (Array.isArray(value)) {
+    visibleFolders.value = value
+  }
+}, { immediate: true })
+
+watch([notesData, allNotes, visibleFolders], () => {
+  const paginatedNotes = notesData.value?.data
+  const nextNotes = visibleFolders.value.length > 0
+    ? (Array.isArray(allNotes.value) ? allNotes.value : paginatedNotes)
+    : paginatedNotes
+
+  if (nextNotes) {
+    visibleNotes.value = nextNotes
+    hasLoadedNotesListOnce.value = true
+  }
+
+  if (notesData.value) {
+    visibleNotesTotal.value = notesData.value.total
+  }
+}, { immediate: true })
+
+const notesListInitialLoading = computed(() =>
+  !hasLoadedNotesListOnce.value && (notesStatus.value === 'pending' || allNotesStatus.value === 'pending')
+)
+
 // ─── Note detail (shared between editor + right panel) ────────────────────────
 
 const currentNoteDetail = ref<NoteDetail | null>(null)
 const currentNoteLoading = ref(false)
 const currentContent = ref('')
+const hasLoadedNoteDetailOnce = ref(false)
 let currentNoteRequestId = 0
 
 async function loadCurrentNoteDetail(noteId: string | null): Promise<NoteDetail | null> {
@@ -83,8 +116,7 @@ async function loadCurrentNoteDetail(noteId: string | null): Promise<NoteDetail 
     return null
   }
 
-  currentNoteLoading.value = true
-  currentNoteDetail.value = null
+  currentNoteLoading.value = !hasLoadedNoteDetailOnce.value && !currentNoteDetail.value
 
   try {
     const detail = await fetchNoteDetail(noteId)
@@ -92,6 +124,9 @@ async function loadCurrentNoteDetail(noteId: string | null): Promise<NoteDetail 
 
     currentNoteDetail.value = detail
     currentContent.value = detail?.content ?? ''
+    if (detail) {
+      hasLoadedNoteDetailOnce.value = true
+    }
     return detail
   } finally {
     if (requestId === currentNoteRequestId) {
@@ -257,7 +292,7 @@ function onPropertiesUpdated(): void {
 
 const editorAvailableNotes = computed<Note[]>(() => {
   if (Array.isArray(allNotes.value)) return allNotes.value
-  return notesData.value?.data ?? []
+  return notesData.value?.data ?? visibleNotes.value
 })
 
 async function onCreateNote(payload: CreateNotePayload): Promise<Note | null> {
@@ -358,10 +393,7 @@ async function onUnlinkNotes(sourceId: string, linkId: string): Promise<NoteDeta
       <div class="flex-1 overflow-y-auto">
         <!-- Search results -->
         <div v-if="searchQuery && searchQuery.length >= 2" class="p-2">
-          <div v-if="searching" class="space-y-2 p-2">
-            <USkeleton v-for="i in 4" :key="i" class="h-10 w-full" />
-          </div>
-          <div v-else-if="searchResults.length > 0" class="space-y-1">
+          <div v-if="searchResults.length > 0" class="space-y-1">
             <button
               v-for="result in searchResults"
               :key="result.id"
@@ -373,18 +405,18 @@ async function onUnlinkNotes(sourceId: string, linkId: string): Promise<NoteDeta
               <p v-if="result.excerpt" class="text-xs text-muted truncate mt-0.5">{{ result.excerpt }}</p>
             </button>
           </div>
-          <p v-else class="text-xs text-muted text-center py-4">Nenhum resultado</p>
+          <p v-else-if="!searching" class="text-xs text-muted text-center py-4">Nenhum resultado</p>
         </div>
 
         <!-- Notes list -->
         <div v-else-if="sidebarTab === 'notes'">
-          <NotesNotesList
-            :notes="(folders ?? []).length > 0 ? (allNotes ?? []) : (notesData?.data ?? [])"
-            :folders="folders ?? []"
-            :total="notesData?.total ?? 0"
+          <NotesList
+            :notes="visibleNotes"
+            :folders="visibleFolders"
+            :total="visibleNotesTotal"
             :page="page"
             :page-size="pageSize"
-            :loading="notesStatus === 'pending' || allNotesStatus === 'pending'"
+            :loading="notesListInitialLoading"
             :selected-id="selectedNoteId"
             @select="onSelectNote"
             @new-note="createModalOpen = true"
@@ -494,7 +526,7 @@ async function onUnlinkNotes(sourceId: string, linkId: string): Promise<NoteDeta
           <NotesGraphView
             v-if="activeView === 'graph'"
             :graph-data="graphData ?? null"
-            :loading="graphStatus === 'pending'"
+            :loading="graphStatus === 'pending' && !graphData"
             @select-note="onGraphSelectNote"
           />
 
