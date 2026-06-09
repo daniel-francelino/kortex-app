@@ -39,12 +39,10 @@ async function loadEntry() {
   loading.value = true
   try {
     const data = await fetchEntryByDate(props.date)
-    if (data) {
-      entry.value = data.entry
-      entryTags.value = (data.tags ?? []).map((t: unknown) => (t as { name: string }).name)
-      content.value = data.entry?.content ?? ''
-      mood.value = data.entry?.mood ?? null
-    }
+    entry.value = data?.entry ?? null
+    entryTags.value = (data?.tags ?? []).map((t: unknown) => (t as { name: string }).name)
+    content.value = data?.entry?.content ?? ''
+    mood.value = data?.entry?.mood ?? null
   } finally {
     loading.value = false
   }
@@ -52,6 +50,12 @@ async function loadEntry() {
 
 function isContentEmpty(val: string): boolean {
   return isEditorContentEmpty(val)
+}
+
+function cancelEditing() {
+  editing.value = false
+  content.value = entry.value?.content ?? ''
+  mood.value = entry.value?.mood ?? null
 }
 
 async function onSave() {
@@ -219,7 +223,7 @@ function onOpenChange(value: boolean) {
             label="Cancelar"
             color="neutral"
             variant="outline"
-            @click="editing = false"
+            @click="cancelEditing"
           />
           <UButton
             label="Salvar"
