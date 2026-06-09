@@ -90,3 +90,95 @@ defineExpose({ focus })
     </div>
   </Teleport>
 </template>
+
+<style scoped>
+.kortex-mention-menu {
+  position: fixed;
+  z-index: 9999;
+  width: 260px;
+  max-height: 300px;
+  overflow-y: auto;
+  border-radius: 8px;
+  background: var(--ui-bg);
+  border: 1px solid var(--ui-border);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.08);
+  padding: 6px;
+}
+
+.kortex-mention-input {
+  width: 100%;
+  border: 1px solid var(--ui-border);
+  border-radius: 6px;
+  background: var(--ui-bg-muted);
+  color: var(--ui-text-highlighted);
+  font-size: 0.8125rem;
+  outline: none;
+  padding: 0.45rem 0.55rem;
+  margin-bottom: 0.35rem;
+}
+
+.kortex-mention-input:focus {
+  border-color: var(--ui-color-primary, #18b981);
+}
+
+.kortex-mention-item {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  width: 100%;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ui-text-highlighted);
+  padding: 0.4rem 0.45rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.kortex-mention-item:hover {
+  background: var(--ui-bg-muted);
+}
+
+.kortex-mention-avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.55rem;
+  height: 1.55rem;
+  border-radius: 999px;
+  background: var(--ui-bg-elevated);
+  border: 1px solid var(--ui-border);
+  color: var(--ui-text-muted);
+  font-size: 0.75rem;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.kortex-mention-copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 0.05rem;
+  font-size: 0.8125rem;
+}
+
+.kortex-mention-copy span,
+.kortex-mention-copy small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kortex-mention-copy small {
+  color: var(--ui-text-muted);
+  font-size: 0.7rem;
+}
+
+.kortex-menu-empty {
+  padding: 8px;
+  font-size: 0.8125rem;
+  color: var(--ui-text-muted);
+  text-align: center;
+  margin: 0;
+}
+</style>

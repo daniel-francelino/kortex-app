@@ -53,3 +53,87 @@ watch(() => props.selectedIndex, (index) => {
     </div>
   </Teleport>
 </template>
+
+<style scoped>
+.kortex-slash-menu {
+  position: fixed;
+  z-index: 9999;
+  width: 272px;
+  max-height: 360px;
+  overflow-y: auto;
+  border-radius: 8px;
+  background: var(--ui-bg);
+  border: 1px solid var(--ui-border);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.08);
+  padding: 6px;
+}
+
+.kortex-menu-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--ui-text-dimmed);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 4px 8px 6px;
+  margin: 0;
+}
+
+.kortex-command-item {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  gap: 10px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: var(--ui-text-highlighted);
+  cursor: pointer;
+  text-align: left;
+  padding: 5px 6px;
+  transition: background 0.08s;
+}
+
+.kortex-command-item:hover,
+.kortex-command-item.selected {
+  background: var(--ui-bg-muted);
+}
+
+.kortex-command-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 6px;
+  background: var(--ui-bg-elevated);
+  border: 1px solid var(--ui-border);
+  flex-shrink: 0;
+  color: var(--ui-text-muted);
+}
+
+.kortex-command-item.selected .kortex-command-icon,
+.kortex-command-item:hover .kortex-command-icon {
+  background: var(--ui-bg);
+  color: var(--ui-text-highlighted);
+}
+
+.kortex-command-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.kortex-command-title {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--ui-text-highlighted);
+  line-height: 1.3;
+}
+
+.kortex-command-desc {
+  font-size: 0.75rem;
+  color: var(--ui-text-muted);
+  line-height: 1.3;
+}
+</style>

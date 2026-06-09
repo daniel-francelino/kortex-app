@@ -78,3 +78,81 @@ const emit = defineEmits<{
     </div>
   </div>
 </template>
+
+<style scoped>
+.kortex-upload-panel {
+  position: absolute;
+  right: 0.75rem;
+  top: 0.625rem;
+  z-index: 2;
+  width: min(320px, calc(100% - 1.5rem));
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  pointer-events: auto;
+}
+
+.kortex-upload-task {
+  border: 1px solid var(--ui-border);
+  border-radius: 8px;
+  background: var(--ui-bg);
+  color: var(--ui-text-muted);
+  padding: 0.45rem 0.5rem;
+  font-size: 0.75rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.kortex-upload-task-row {
+  display: inline-flex;
+  align-items: center;
+  width: 100%;
+  gap: 0.4rem;
+}
+
+.kortex-upload-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kortex-upload-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.35rem;
+  height: 1.35rem;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--ui-text-muted);
+  cursor: pointer;
+}
+
+.kortex-upload-action:hover {
+  background: var(--ui-bg-muted);
+  color: var(--ui-text-highlighted);
+}
+
+.kortex-upload-progress {
+  height: 3px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--ui-bg-muted);
+  margin-top: 0.4rem;
+}
+
+.kortex-upload-progress span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--ui-color-primary, #18b981);
+}
+
+.kortex-upload-error {
+  margin: 0.35rem 0 0;
+  color: var(--ui-color-error, #ef4444);
+  line-height: 1.35;
+}
+</style>

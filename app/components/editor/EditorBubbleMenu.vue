@@ -84,3 +84,59 @@ const props = defineProps<{
     </div>
   </Teleport>
 </template>
+
+<style scoped>
+.kortex-bubble {
+  position: fixed;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  padding: 3px 4px;
+  border-radius: 8px;
+  background: var(--ui-bg);
+  border: 1px solid var(--ui-border);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12), 0 1px 4px rgba(0, 0, 0, 0.08);
+  white-space: nowrap;
+  transform: translateX(-50%) translateY(calc(-100% - 8px));
+}
+
+.kortex-menu-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  height: 28px;
+  padding: 0 4px;
+  border-radius: 5px;
+  border: none;
+  background: transparent;
+  color: var(--ui-text-muted);
+  cursor: pointer;
+  transition: background 0.1s, color 0.1s, opacity 0.1s;
+}
+
+.kortex-menu-btn--text {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0;
+}
+
+.kortex-menu-btn:hover {
+  background: var(--ui-bg-muted);
+  color: var(--ui-text-highlighted);
+}
+
+.kortex-menu-btn.active {
+  background: var(--ui-bg-elevated);
+  color: var(--ui-color-primary, #18b981);
+}
+
+.kortex-menu-sep {
+  width: 1px;
+  height: 16px;
+  background: var(--ui-border);
+  margin: 0 2px;
+  flex-shrink: 0;
+}
+</style>
