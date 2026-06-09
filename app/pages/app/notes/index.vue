@@ -405,26 +405,6 @@ async function onUnlinkNotes(sourceId: string, linkId: string): Promise<NoteDeta
             @rename-folder="onRenameFolder"
             @delete-folder="onDeleteFolder"
           />
-        </div>       
-      </div>
-
-      <!-- Filters -->
-      <div v-if="sidebarTab === 'notes' && !searchQuery" class="border-t border-default px-3 py-2 shrink-0">
-        <div class="flex items-center gap-2">
-          <USelect
-            v-model="typeFilterModel"
-            :items="typeFilterOptions"
-            value-key="value"
-            size="xs"
-            class="flex-1"
-          />
-          <UButton
-            :icon="filters.pinned ? 'i-lucide-pin' : 'i-lucide-pin-off'"
-            size="xs"
-            :variant="filters.pinned ? 'solid' : 'ghost'"
-            :color="filters.pinned ? 'primary' : 'neutral'"
-            @click="filters.pinned = filters.pinned ? '' : 'true'"
-          />
         </div>
       </div>
     </div>
