@@ -169,7 +169,7 @@ function normalizeSearchResult(result: NoteSearchResult): SearchDialogItem {
     id: result.id,
     title: result.title || 'Sem título',
     type: result.type,
-    excerpt: result.excerpt,
+    excerpt: getReadableExcerpt(result.excerpt, note?.content ?? null),
     updatedAt: result.updatedAt,
     folderId: note?.folderId ?? null,
     folderName: folder?.name ?? null
@@ -204,6 +204,92 @@ function daysBetweenToday(dateStr: string): number {
   return Math.max(0, Math.floor((startOfToday - startOfDate) / 86_400_000))
 }
 
+function getReadableExcerpt(excerpt: string | null, content: string | null): string | null {
+  const contentText = extractReadableText(content)
+  const excerptText = extractReadableText(excerpt)
+  const source = contentText || excerptText
+
+  if (!source) return null
+
+  return cropExcerpt(source, searchTerm.value)
+}
+
+function extractReadableText(value: string | null): string | null {
+  if (!value) return null
+
+  const trimmed = value.trim()
+  if (!trimmed) return null
+
+  const parsedText = extractJsonText(trimmed)
+  if (parsedText) return parsedText
+
+  if (looksLikeJsonSnippet(trimmed)) return null
+
+  return normalizeExcerptText(trimmed.replace(/<[^>]*>/g, ' '))
+}
+
+function extractJsonText(value: string): string | null {
+  if (!value.startsWith('{') && !value.startsWith('[')) return null
+
+  try {
+    const parsed: unknown = JSON.parse(value)
+    const chunks: string[] = []
+
+    collectTextChunks(parsed, chunks)
+
+    return normalizeExcerptText(chunks.join(' '))
+  } catch {
+    return null
+  }
+}
+
+function collectTextChunks(node: unknown, chunks: string[]): void {
+  if (!node || typeof node !== 'object') return
+
+  const record = node as {
+    text?: unknown
+    type?: unknown
+    attrs?: Record<string, unknown>
+    content?: unknown
+  }
+
+  if (typeof record.text === 'string') {
+    chunks.push(record.text)
+  } else if (record.type === 'emoji') {
+    const emoji = record.attrs?.native ?? record.attrs?.emoji ?? record.attrs?.name
+    if (typeof emoji === 'string') chunks.push(emoji)
+  }
+
+  if (Array.isArray(record.content)) {
+    for (const child of record.content) {
+      collectTextChunks(child, chunks)
+    }
+  }
+}
+
+function looksLikeJsonSnippet(value: string): boolean {
+  return value.includes('"type"') || value.includes('"content"') || value.includes('"attrs"')
+}
+
+function normalizeExcerptText(value: string): string | null {
+  const text = value.replace(/\s+/g, ' ').trim()
+  return text || null
+}
+
+function cropExcerpt(value: string, query: string): string {
+  const maxLength = 120
+  const normalizedValue = value.toLocaleLowerCase('pt-BR')
+  const normalizedQuery = query.toLocaleLowerCase('pt-BR')
+  const index = normalizedQuery ? normalizedValue.indexOf(normalizedQuery) : -1
+
+  if (value.length <= maxLength) return value
+
+  const start = index > 40 ? index - 40 : 0
+  const end = Math.min(value.length, start + maxLength)
+
+  return `${start > 0 ? '...' : ''}${value.slice(start, end)}${end < value.length ? '...' : ''}`
+}
+
 function close(): void {
   emit('update:open', false)
   emit('update:query', '')
@@ -231,6 +317,7 @@ function selectItem(item: SearchDialogItem): void {
 <template>
   <UModal
     :open="open"
+    :close="false"
     :ui="{
       overlay: 'bg-default/60 backdrop-blur-sm',
       content: 'w-[min(94vw,38rem)] max-w-[38rem] overflow-hidden rounded-2xl',
