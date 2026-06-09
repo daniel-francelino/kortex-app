@@ -14,12 +14,11 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   'update:page': [page: number]
-  select: [note: Note]
+  'select': [note: Note]
   'new-note': []
-  pin: [note: Note]
-  delete: [note: Note]
+  'pin': [note: Note]
+  'delete': [note: Note]
   'move-to-folder': [noteId: string, folderId: string | null]
-  'create-folder': [name: string]
   'rename-folder': [folderId: string, name: string]
   'delete-folder': [folderId: string]
 }>()
@@ -29,10 +28,7 @@ const emit = defineEmits<{
 const expandedFolders = ref<Set<string>>(new Set(props.folders.map(f => f.id)))
 const editingFolderId = ref<string | null>(null)
 const editingName = ref('')
-const creatingFolder = ref(false)
-const newFolderName = ref('')
 const editInput = ref<HTMLInputElement | null>(null)
-const newFolderInput = ref<HTMLInputElement | null>(null)
 
 watch(() => props.folders, (folders) => {
   for (const f of folders) {
@@ -55,19 +51,6 @@ function commitEdit(folderId: string) {
   const name = editingName.value.trim()
   if (name) emit('rename-folder', folderId, name)
   editingFolderId.value = null
-}
-
-function startCreate() {
-  creatingFolder.value = true
-  newFolderName.value = ''
-  nextTick(() => newFolderInput.value?.focus())
-}
-
-function commitCreate() {
-  const name = newFolderName.value.trim()
-  if (name) emit('create-folder', name)
-  creatingFolder.value = false
-  newFolderName.value = ''
 }
 
 // ─── Drag & drop ───────────────────────────────────────────────────────────────
@@ -354,29 +337,6 @@ const hasFolders = computed(() => props.folders.length > 0)
         </div>
       </div>
 
-      <!-- New folder row (create inline) -->
-      <div class="border-t border-default px-2 py-1.5 shrink-0">
-        <div v-if="creatingFolder" class="flex items-center gap-2 px-2 py-1">
-          <UIcon name="i-lucide-folder-plus" class="size-3.5 text-amber-500 shrink-0" />
-          <input
-            ref="newFolderInput"
-            v-model="newFolderName"
-            placeholder="Nome da pasta..."
-            class="flex-1 text-xs bg-transparent outline-none border-b border-primary"
-            @blur="commitCreate"
-            @keydown.enter.prevent="commitCreate"
-            @keydown.escape.prevent="creatingFolder = false"
-          />
-        </div>
-        <button
-          v-else
-          class="flex items-center gap-1.5 w-full px-2 py-1 rounded text-xs text-muted hover:text-highlighted hover:bg-elevated transition-colors"
-          @click="startCreate"
-        >
-          <UIcon name="i-lucide-folder-plus" class="size-3.5" />
-          Nova pasta
-        </button>
-      </div>
     </template>
   </div>
 </template>

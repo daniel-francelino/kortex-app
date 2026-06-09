@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { CreateNotePayload, Note, NoteDetail, NoteFolder, UpdateNotePayload } from '~/types/notes'
+import { NoteType } from '~/types/notes'
 
 definePageMeta({ layout: 'app', ssr: false })
 useSeoMeta({ title: 'Notas' })
@@ -28,6 +29,7 @@ const {
   unlinkNotes,
   folders,
   allNotes,
+  allNotesStatus,
   refreshAllNotes,
   createFolder,
   updateFolder,
@@ -50,6 +52,29 @@ onBeforeRouteLeave(async () => {
 const sidebarTab = ref<'notes' | 'tags'>('notes')
 const zenMode = ref(false)
 const rightTab = ref<'properties' | 'outline'>('properties')
+const creatingQuickNote = ref(false)
+const creatingQuickFolder = ref(false)
+
+const noteSortMode = ref<'updated-desc' | 'updated-asc' | 'title-asc'>('updated-desc')
+const noteSortOptions = [
+  { label: 'Mais recentes', value: 'updated-desc' as const, icon: 'i-lucide-arrow-down-wide-narrow' },
+  { label: 'Mais antigas', value: 'updated-asc' as const, icon: 'i-lucide-arrow-up-wide-narrow' },
+  { label: 'A-Z', value: 'title-asc' as const, icon: 'i-lucide-arrow-down-a-z' }
+]
+const activeSortOption = computed(() =>
+  noteSortOptions.find(option => option.value === noteSortMode.value) ?? noteSortOptions[0]
+)
+const sortMenuItems = computed(() => [
+  noteSortOptions.map(option => ({
+    label: option.label,
+    icon: option.icon,
+    type: 'checkbox' as const,
+    checked: noteSortMode.value === option.value,
+    onUpdateChecked: () => {
+      noteSortMode.value = option.value
+    }
+  }))
+])
 
 const ALL_TYPE_VALUE = '__all__'
 const typeFilterModel = computed({
@@ -92,6 +117,26 @@ watch([notesData, allNotes, visibleFolders], () => {
 const notesListInitialLoading = computed(() =>
   !hasLoadedNotesListOnce.value && (notesStatus.value === 'pending' || allNotesStatus.value === 'pending')
 )
+
+const sortedVisibleFolders = computed(() =>
+  [...visibleFolders.value].sort((a, b) => a.name.localeCompare(b.name, 'pt-BR', { sensitivity: 'base' }))
+)
+
+const sortedVisibleNotes = computed(() => {
+  const notes = [...visibleNotes.value]
+
+  return notes.sort((a, b) => {
+    if (a.pinned !== b.pinned) return a.pinned ? -1 : 1
+
+    if (noteSortMode.value === 'title-asc') {
+      return (a.title || 'Sem título').localeCompare(b.title || 'Sem título', 'pt-BR', { sensitivity: 'base' })
+    }
+
+    const left = new Date(a.updatedAt).getTime()
+    const right = new Date(b.updatedAt).getTime()
+    return noteSortMode.value === 'updated-asc' ? left - right : right - left
+  })
+})
 
 // ─── Note detail (shared between editor + right panel) ────────────────────────
 
@@ -252,8 +297,49 @@ async function onMoveToFolder(noteId: string, folderId: string | null): Promise<
   await moveNoteToFolder(noteId, folderId)
 }
 
-async function onCreateFolder(name: string): Promise<void> {
-  await createFolder({ name })
+function getAvailableName(baseName: string, existingNames: string[]): string {
+  const names = new Set(existingNames.map(name => name.trim().toLocaleLowerCase('pt-BR')))
+  if (!names.has(baseName.toLocaleLowerCase('pt-BR'))) return baseName
+
+  let index = 1
+  let nextName = `${baseName} ${index}`
+  while (names.has(nextName.toLocaleLowerCase('pt-BR'))) {
+    index++
+    nextName = `${baseName} ${index}`
+  }
+  return nextName
+}
+
+async function onQuickCreateNote(): Promise<void> {
+  if (creatingQuickNote.value) return
+
+  creatingQuickNote.value = true
+  try {
+    const title = getAvailableName('Untitled', visibleNotes.value.map(note => note.title))
+    const note = await createNote({
+      title,
+      type: NoteType.Note
+    })
+
+    if (note) {
+      await refreshAllNotes()
+      await navigateTo(note.id)
+    }
+  } finally {
+    creatingQuickNote.value = false
+  }
+}
+
+async function onQuickCreateFolder(): Promise<void> {
+  if (creatingQuickFolder.value) return
+
+  creatingQuickFolder.value = true
+  try {
+    const name = getAvailableName('Nova pasta', visibleFolders.value.map(folder => folder.name))
+    await createFolder({ name })
+  } finally {
+    creatingQuickFolder.value = false
+  }
 }
 
 async function onRenameFolder(folderId: string, name: string): Promise<void> {
@@ -343,10 +429,41 @@ async function onUnlinkNotes(sourceId: string, linkId: string): Promise<NoteDeta
     >
       <!-- Sidebar header -->
       <div class="px-3 py-2 border-b border-default">
-        <div class="flex items-center justify-between mb-2">
-          <h2 class="text-sm font-semibold text-highlighted">Notas</h2>
-          <div class="flex items-center gap-1">
-            <UButton icon="i-lucide-plus" size="xs" @click="createModalOpen = true" />
+        <div class="flex items-center justify-center gap-1 mb-2">
+          <UTooltip text="Nova nota">
+            <UButton
+              icon="i-lucide-square-pen"
+              size="xs"
+              variant="ghost"
+              color="neutral"
+              :loading="creatingQuickNote"
+              @click="onQuickCreateNote"
+            />
+          </UTooltip>
+
+          <UTooltip text="Nova pasta">
+            <UButton
+              icon="i-lucide-folder-plus"
+              size="xs"
+              variant="ghost"
+              color="neutral"
+              :loading="creatingQuickFolder"
+              @click="onQuickCreateFolder"
+            />
+          </UTooltip>
+
+          <UDropdownMenu :items="sortMenuItems">
+            <UTooltip :text="`Ordenar: ${activeSortOption.label}`">
+              <UButton
+                :icon="activeSortOption.icon"
+                size="xs"
+                variant="ghost"
+                color="neutral"
+              />
+            </UTooltip>
+          </UDropdownMenu>
+
+          <UTooltip :text="activeView === 'graph' ? 'Abrir editor' : 'Abrir grafo'">
             <UButton
               :icon="activeView === 'graph' ? 'i-lucide-file-text' : 'i-lucide-network'"
               size="xs"
@@ -354,7 +471,7 @@ async function onUnlinkNotes(sourceId: string, linkId: string): Promise<NoteDeta
               :color="activeView === 'graph' ? 'primary' : 'neutral'"
               @click="activeView === 'graph' ? activeView = 'editor' : switchToGraph()"
             />
-          </div>
+          </UTooltip>
         </div>
 
         <UInput
@@ -388,20 +505,19 @@ async function onUnlinkNotes(sourceId: string, linkId: string): Promise<NoteDeta
         <!-- Notes list -->
         <div v-else>
           <NotesList
-            :notes="visibleNotes"
-            :folders="visibleFolders"
+            :notes="sortedVisibleNotes"
+            :folders="sortedVisibleFolders"
             :total="visibleNotesTotal"
             :page="page"
             :page-size="pageSize"
             :loading="notesListInitialLoading"
             :selected-id="selectedNoteId"
             @select="onSelectNote"
-            @new-note="createModalOpen = true"
+            @new-note="onQuickCreateNote"
             @update:page="page = $event"
             @pin="onPinNote"
             @delete="onDeleteNote"
             @move-to-folder="onMoveToFolder"
-            @create-folder="onCreateFolder"
             @rename-folder="onRenameFolder"
             @delete-folder="onDeleteFolder"
           />
@@ -494,42 +610,6 @@ async function onUnlinkNotes(sourceId: string, linkId: string): Promise<NoteDeta
             @note-loaded="onNoteLoaded"
             @content-change="onContentChange"
           />
-        </div>
-
-        <!-- Right panel: Properties / Outline -->
-        <div
-          v-show="!zenMode && !!selectedNoteId && activeView === 'editor'"
-          class="w-60 shrink-0 border-l border-default flex flex-col overflow-hidden"
-        >
-          <!-- Tab bar -->
-          <div class="flex border-b border-default shrink-0">
-            <button
-              class="flex-1 px-3 py-2 text-xs font-medium transition-colors"
-              :class="rightTab === 'properties' ? 'text-primary border-b-2 border-primary' : 'text-muted hover:text-default'"
-              @click="rightTab = 'properties'"
-            >
-              Propriedades
-            </button>
-            <button
-              class="flex-1 px-3 py-2 text-xs font-medium transition-colors"
-              :class="rightTab === 'outline' ? 'text-primary border-b-2 border-primary' : 'text-muted hover:text-default'"
-              @click="rightTab = 'outline'"
-            >
-              Esboço
-            </button>
-          </div>
-
-          <!-- Properties -->
-          <div v-show="rightTab === 'properties'" class="flex-1 overflow-y-auto">
-            <NotesNotePropertiesPanel
-              :note="currentNoteDetail"
-              :tags="tags ?? []"
-              :note-type-options="noteTypeOptions"
-              :update-note="onUpdateNote"
-              @updated="onPropertiesUpdated"
-              @navigate-note="onNavigateNote"
-            />
-          </div>
         </div>
       </div>
     </div>
