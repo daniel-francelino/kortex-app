@@ -63,6 +63,7 @@ const zenMode = ref(false);
 const rightTab = ref<"properties" | "outline">("properties");
 const creatingQuickNote = ref(false);
 const creatingQuickFolder = ref(false);
+const searchDialogOpen = ref(false);
 
 const noteSortMode = ref<"updated-desc" | "updated-asc" | "title-asc">(
   "updated-desc",
@@ -87,7 +88,7 @@ const noteSortOptions = [
 const activeSortOption = computed(
   () =>
     noteSortOptions.find((option) => option.value === noteSortMode.value) ??
-    noteSortOptions[0],
+    noteSortOptions[0]!,
 );
 const sortMenuItems = computed(() => [
   noteSortOptions.map((option) => ({
@@ -315,6 +316,15 @@ async function goForward() {
 function onSelectNote(note: string | Note): void {
   const id = typeof note === "string" ? note : note.id;
   void navigateTo(id);
+}
+
+function openNotesSearch(): void {
+  searchQuery.value = "";
+  searchDialogOpen.value = true;
+}
+
+function onSearchNoteSelected(noteId: string): void {
+  void navigateTo(noteId);
 }
 
 function onNoteSaved(note: { id: string }): void {
@@ -601,6 +611,16 @@ async function onUnlinkNotes(
                 </UTooltip>
               </UDropdownMenu>
 
+              <UTooltip text="Buscar">
+                <UButton
+                  icon="i-lucide-search"
+                  size="xs"
+                  variant="ghost"
+                  color="neutral"
+                  @click="openNotesSearch"
+                />
+              </UTooltip>
+
               <UTooltip
                 :text="activeView === 'graph' ? 'Abrir editor' : 'Abrir grafo'"
               >
@@ -621,71 +641,27 @@ async function onUnlinkNotes(
                 />
               </UTooltip>
             </div>
-
-            <UInput
-              v-model="searchQuery"
-              icon="i-lucide-search"
-              placeholder="Buscar notas..."
-              size="xs"
-              class="w-full"
-            />
           </div>
 
           <!-- Sidebar content -->
           <div class="flex-1 overflow-y-auto">
-            <!-- Search results -->
-            <div v-if="searchQuery && searchQuery.length >= 2" class="p-2">
-              <div v-if="searchResults.length > 0" class="space-y-1">
-                <button
-                  v-for="result in searchResults"
-                  :key="result.id"
-                  class="w-full text-left rounded px-2 py-2 hover:bg-elevated transition-colors"
-                  :class="
-                    selectedNoteId === result.id
-                      ? 'bg-elevated ring-1 ring-primary'
-                      : ''
-                  "
-                  @click="onSelectNote(result.id)"
-                >
-                  <p class="text-sm font-medium text-highlighted truncate">
-                    {{ result.title }}
-                  </p>
-                  <p
-                    v-if="result.excerpt"
-                    class="text-xs text-muted truncate mt-0.5"
-                  >
-                    {{ result.excerpt }}
-                  </p>
-                </button>
-              </div>
-              <p
-                v-else-if="!searching"
-                class="text-xs text-muted text-center py-4"
-              >
-                Nenhum resultado
-              </p>
-            </div>
-
-            <!-- Notes list -->
-            <div v-else>
-              <NotesList
-                :notes="sortedVisibleNotes"
-                :folders="sortedVisibleFolders"
-                :total="visibleNotesTotal"
-                :page="page"
-                :page-size="pageSize"
-                :loading="notesListInitialLoading"
-                :selected-id="selectedNoteId"
-                @select="onSelectNote"
-                @new-note="onQuickCreateNote"
-                @update:page="page = $event"
-                @pin="onPinNote"
-                @delete="onDeleteNote"
-                @move-to-folder="onMoveToFolder"
-                @rename-folder="onRenameFolder"
-                @delete-folder="onDeleteFolder"
-              />
-            </div>
+            <NotesList
+              :notes="sortedVisibleNotes"
+              :folders="sortedVisibleFolders"
+              :total="visibleNotesTotal"
+              :page="page"
+              :page-size="pageSize"
+              :loading="notesListInitialLoading"
+              :selected-id="selectedNoteId"
+              @select="onSelectNote"
+              @new-note="onQuickCreateNote"
+              @update:page="page = $event"
+              @pin="onPinNote"
+              @delete="onDeleteNote"
+              @move-to-folder="onMoveToFolder"
+              @rename-folder="onRenameFolder"
+              @delete-folder="onDeleteFolder"
+            />
           </div>
         </div>
 
@@ -733,5 +709,18 @@ async function onUnlinkNotes(
     :create-note="onCreateNote"
     @update:open="createModalOpen = $event"
     @saved="onNoteSaved"
+  />
+
+  <NotesSearchDialog
+    :open="searchDialogOpen"
+    :query="searchQuery"
+    :notes="editorAvailableNotes"
+    :folders="sortedVisibleFolders"
+    :results="searchResults"
+    :searching="searching"
+    :selected-id="selectedNoteId"
+    @update:open="searchDialogOpen = $event"
+    @update:query="searchQuery = $event"
+    @select="onSearchNoteSelected"
   />
 </template>
