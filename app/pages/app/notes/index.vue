@@ -536,30 +536,6 @@ async function onUnlinkNotes(
               @click="zenMode = !zenMode"
             />
           </UTooltip>
-
-          <!-- History back / forward -->
-          <div class="flex items-center gap-0.5 ml-1">
-            <UTooltip text="Voltar">
-              <UButton
-                icon="i-lucide-arrow-left"
-                size="xs"
-                variant="ghost"
-                color="neutral"
-                :disabled="!canGoBack"
-                @click="goBack"
-              />
-            </UTooltip>
-            <UTooltip text="Avançar">
-              <UButton
-                icon="i-lucide-arrow-right"
-                size="xs"
-                variant="ghost"
-                color="neutral"
-                :disabled="!canGoForward"
-                @click="goForward"
-              />
-            </UTooltip>
-          </div>
         </template>
 
         <template #right>
@@ -690,8 +666,12 @@ async function onUnlinkNotes(
                 :delete-note="onDeleteNoteById"
                 :link-notes="onLinkNotes"
                 :unlink-notes="onUnlinkNotes"
+                :can-go-back="canGoBack"
+                :can-go-forward="canGoForward"
                 @updated="onNoteUpdated"
                 @deleted="onNoteDeleted"
+                @go-back="goBack"
+                @go-forward="goForward"
                 @navigate-note="onNavigateNote"
                 @note-loaded="onNoteLoaded"
                 @content-change="onContentChange"

@@ -19,11 +19,15 @@ const props = defineProps<{
   deleteNote: (id: string) => Promise<boolean>
   linkNotes: (sourceId: string, targetId: string) => Promise<NoteDetail | null>
   unlinkNotes: (sourceId: string, linkId: string) => Promise<NoteDetail | null>
+  canGoBack: boolean
+  canGoForward: boolean
 }>()
 
 const emit = defineEmits<{
   'updated': []
   'deleted': []
+  'go-back': []
+  'go-forward': []
   'navigate-note': [noteId: string]
   'note-loaded': [note: NoteDetail | null]
   'content-change': [content: string]
@@ -293,7 +297,30 @@ defineExpose({
     </div>
 
     <template v-else-if="noteDetail">
-      <div class="px-10 pt-8 pb-2 shrink-0">
+      <div class="relative px-10 pt-10 pb-2 shrink-0">
+        <div class="absolute left-4 top-2 flex items-center gap-0.5">
+          <UTooltip text="Voltar">
+            <UButton
+              icon="i-lucide-arrow-left"
+              size="xs"
+              variant="ghost"
+              color="neutral"
+              :disabled="!canGoBack"
+              @click="emit('go-back')"
+            />
+          </UTooltip>
+          <UTooltip text="Avançar">
+            <UButton
+              icon="i-lucide-arrow-right"
+              size="xs"
+              variant="ghost"
+              color="neutral"
+              :disabled="!canGoForward"
+              @click="emit('go-forward')"
+            />
+          </UTooltip>
+        </div>
+
         <input
           v-model="editTitle"
           class="w-full text-3xl font-bold bg-transparent border-none outline-none placeholder:text-muted/30 text-highlighted leading-tight"
