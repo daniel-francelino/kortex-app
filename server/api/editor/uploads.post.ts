@@ -60,7 +60,12 @@ export default eventHandler(async (event) => {
   const extension = extname(filePart.filename).toLowerCase()
   const kind = resolveKind(mimeType, requestedKind)
 
-  validateUpload({ kind, mimeType, extension })
+  validateUpload({
+    kind,
+    mimeType,
+    extension,
+    size: filePart.data.length
+  })
 
   const supabase = getSupabaseAdminClient()
   const safeName = sanitizeFileName(filePart.filename)
@@ -113,6 +118,7 @@ function validateUpload(input: {
   kind: EditorUploadKind
   mimeType: string
   extension: string
+  size: number
 }) {
   if (BLOCKED_EXTENSIONS.has(input.extension) || BLOCKED_MIME_TYPES.has(input.mimeType)) {
     throw createError({
@@ -127,6 +133,24 @@ function validateUpload(input: {
       statusMessage: 'Imagem nao permitida'
     })
   }
+
+  const limit = getUploadLimit(input.kind)
+  if (limit > 0 && input.size > limit) {
+    throw createError({
+      statusCode: 413,
+      statusMessage: 'Arquivo maior que o limite permitido'
+    })
+  }
+}
+
+function getUploadLimit(kind: EditorUploadKind) {
+  const config = useRuntimeConfig()
+  const raw = kind === 'image'
+    ? config.editorImageMaxBytes
+    : config.editorFileMaxBytes
+
+  const value = Number(raw)
+  return Number.isFinite(value) && value > 0 ? value : 0
 }
 
 function sanitizeFileName(filename: string) {

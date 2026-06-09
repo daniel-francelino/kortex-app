@@ -20,6 +20,8 @@ export default defineNuxtConfig({
     supabaseUrl: process.env.SUPABASE_URL,
     supabaseAnonKey: process.env.SUPABASE_ANON_KEY,
     supabaseServiceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY,
+    editorImageMaxBytes: process.env.EDITOR_IMAGE_MAX_BYTES ?? '',
+    editorFileMaxBytes: process.env.EDITOR_FILE_MAX_BYTES ?? '',
 
     stripeSecretKey: process.env.STRIPE_SECRET_KEY,
     stripeAllowedPriceIds: process.env.STRIPE_ALLOWED_PRICE_IDS,

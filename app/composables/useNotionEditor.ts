@@ -1,5 +1,6 @@
 import { Extension, Node as TiptapNode, mergeAttributes } from '@tiptap/core'
-import type { Editor, Range } from '@tiptap/core'
+import type { Editor, NodeViewRenderer, Range } from '@tiptap/core'
+import { VueNodeViewRenderer } from '@tiptap/vue-3'
 import Link from '@tiptap/extension-link'
 import Placeholder from '@tiptap/extension-placeholder'
 import { Table, TableCell, TableHeader, TableRow } from '@tiptap/extension-table'
@@ -8,6 +9,7 @@ import TaskList from '@tiptap/extension-task-list'
 import Underline from '@tiptap/extension-underline'
 import StarterKit from '@tiptap/starter-kit'
 import Suggestion from '@tiptap/suggestion'
+import EditorImageNodeView from '~/components/editor/nodes/EditorImageNodeView.vue'
 
 export interface NotionCommandItem {
   title: string
@@ -26,6 +28,7 @@ export interface NotionCommandActions {
   uploadFile?: () => void
   openMention?: () => void
   openEmoji?: () => void
+  openLinkPreview?: () => void
 }
 
 export interface SlashCommandHandlers {
@@ -135,6 +138,15 @@ export function createNotionCommandItems(actions: NotionCommandActions = {}): No
       }
     },
     {
+      title: 'Preview de link',
+      description: 'Card visual para uma URL',
+      icon: 'i-lucide-panels-top-left',
+      command: ({ editor, range }) => {
+        clearCommandRange(editor, range)
+        actions.openLinkPreview?.()
+      }
+    },
+    {
       title: 'Mencao',
       description: 'Pessoa, nota ou entidade',
       icon: 'i-lucide-at-sign',
@@ -169,6 +181,91 @@ export function createNotionCommandItems(actions: NotionCommandActions = {}): No
 }
 
 export const notionCommandItems = createNotionCommandItems()
+
+const BLOCK_ID_TYPES = [
+  'paragraph',
+  'heading',
+  'blockquote',
+  'codeBlock',
+  'horizontalRule',
+  'bulletList',
+  'orderedList',
+  'listItem',
+  'taskList',
+  'taskItem',
+  'callout',
+  'editorImage',
+  'editorFile',
+  'linkPreview',
+  'table'
+]
+
+function createBlockId() {
+  if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID()
+  return `block-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`
+}
+
+export const BlockIdExtension = Extension.create({
+  name: 'blockId',
+
+  addGlobalAttributes() {
+    return [
+      {
+        types: BLOCK_ID_TYPES,
+        attributes: {
+          blockId: {
+            default: null,
+            parseHTML: element => element.getAttribute('data-block-id'),
+            renderHTML: attributes =>
+              attributes.blockId
+                ? {
+                    'data-block-id': attributes.blockId,
+                    'id': `block-${attributes.blockId}`
+                  }
+                : {}
+          }
+        }
+      }
+    ]
+  },
+
+  onCreate() {
+    ensureEditorBlockIds(this.editor)
+  },
+
+  onUpdate() {
+    ensureEditorBlockIds(this.editor)
+  }
+})
+
+function ensureEditorBlockIds(editor: Editor) {
+  const tr = ensureBlockIds(editor.state)
+  if (tr.docChanged) editor.view.dispatch(tr)
+}
+
+function ensureBlockIds(state: Editor['state']) {
+  const tr = state.tr
+  const seen = new Set<string>()
+
+  state.doc.descendants((node, pos) => {
+    if (!BLOCK_ID_TYPES.includes(node.type.name)) return true
+
+    const current = typeof node.attrs.blockId === 'string' ? node.attrs.blockId : ''
+    const nextId = current && !seen.has(current) ? current : createBlockId()
+    seen.add(nextId)
+
+    if (nextId !== current) {
+      tr.setNodeMarkup(pos, undefined, {
+        ...node.attrs,
+        blockId: nextId
+      }, node.marks)
+    }
+
+    return true
+  })
+
+  return tr
+}
 
 export const WikilinkNode = TiptapNode.create({
   name: 'wikilink',
@@ -230,7 +327,7 @@ export const CalloutNode = TiptapNode.create({
   }
 })
 
-export const EditorImageNode = TiptapNode.create({
+export const EditorImageNode: ReturnType<typeof TiptapNode.create> = TiptapNode.create({
   name: 'editorImage',
   group: 'block',
   atom: true,
@@ -244,6 +341,7 @@ export const EditorImageNode = TiptapNode.create({
       title: { default: '' },
       name: { default: '' },
       width: { default: null },
+      caption: { default: '' },
       size: { default: null },
       mimeType: { default: '' },
       path: { default: '' },
@@ -270,11 +368,15 @@ export const EditorImageNode = TiptapNode.create({
           alt: node.attrs.alt || node.attrs.name || '',
           title: node.attrs.title || node.attrs.name || '',
           loading: 'lazy',
-          width: node.attrs.width
+          style: node.attrs.width ? `width: ${node.attrs.width}` : null
         }
       ],
-      ['figcaption', node.attrs.name || '']
+      ['figcaption', node.attrs.caption || node.attrs.name || '']
     ]
+  },
+
+  addNodeView(): NodeViewRenderer {
+    return VueNodeViewRenderer(EditorImageNodeView)
   }
 })
 
@@ -389,6 +491,49 @@ export const EmojiNode = TiptapNode.create({
   }
 })
 
+export const LinkPreviewNode = TiptapNode.create({
+  name: 'linkPreview',
+  group: 'block',
+  atom: true,
+  draggable: true,
+  selectable: true,
+
+  addAttributes() {
+    return {
+      url: { default: '' },
+      title: { default: '' },
+      description: { default: '' },
+      image: { default: '' },
+      siteName: { default: '' }
+    }
+  },
+
+  parseHTML() {
+    return [{ tag: 'a[data-type="link-preview"]' }]
+  },
+
+  renderHTML({ node, HTMLAttributes }) {
+    return [
+      'a',
+      mergeAttributes(HTMLAttributes, {
+        'data-type': 'link-preview',
+        'href': node.attrs.url,
+        'target': '_blank',
+        'rel': 'noopener noreferrer'
+      }),
+      node.attrs.image
+        ? ['img', { src: node.attrs.image, alt: '', loading: 'lazy' }]
+        : ['span', { 'data-link-preview-icon': '' }, 'LINK'],
+      [
+        'span',
+        { 'data-link-preview-body': '' },
+        ['strong', node.attrs.title || node.attrs.url],
+        ['small', node.attrs.description || node.attrs.siteName || node.attrs.url]
+      ]
+    ]
+  }
+})
+
 export function createSlashCommandExtension(
   handlers: SlashCommandHandlers,
   getItems: () => NotionCommandItem[] = () => notionCommandItems
@@ -444,11 +589,13 @@ export function createNotionEditorExtensions(options: {
     TaskList,
     TaskItem.configure({ nested: true }),
     Link.configure({ openOnClick: false, autolink: true }),
+    BlockIdExtension,
     CalloutNode,
     EditorImageNode,
     EditorFileNode,
     MentionNode,
     EmojiNode,
+    LinkPreviewNode,
     ...(options.enableWikilinks ? [WikilinkNode] : []),
     options.slashCommand,
     Table.configure({ resizable: true }),

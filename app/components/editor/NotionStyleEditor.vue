@@ -8,10 +8,12 @@ import {
   createSlashCommandExtension
 } from '~/composables/useNotionEditor'
 import {
+  extractEditorAttachmentRefs,
   isEditorContentEmpty,
   normalizeEditorContent,
   serializeEditorContent
 } from '~/utils/editor/content'
+import type { EditorAttachmentRef } from '~/utils/editor/content'
 
 type EditorSurface = 'boxed' | 'plain'
 type EditorUploadKind = 'image' | 'file'
@@ -47,6 +49,30 @@ interface EditorUploadResponse {
   kind: EditorUploadKind
 }
 
+interface EditorUploadLimits {
+  imageMaxBytes?: number
+  fileMaxBytes?: number
+}
+
+interface EditorUploadTask {
+  id: string
+  file: File
+  kind: EditorUploadKind
+  name: string
+  progress: number
+  status: 'uploading' | 'done' | 'error' | 'canceled'
+  error?: string
+  xhr?: XMLHttpRequest
+}
+
+interface LinkPreviewResponse {
+  url: string
+  title: string
+  description: string
+  image: string
+  siteName: string
+}
+
 const props = withDefaults(defineProps<{
   modelValue?: string | null
   placeholder?: string
@@ -58,6 +84,10 @@ const props = withDefaults(defineProps<{
   availableNotes?: WikiSuggestionItem[]
   mentionItems?: MentionSuggestionItem[]
   uploadEndpoint?: string
+  uploadCleanupEndpoint?: string
+  linkPreviewEndpoint?: string
+  uploadLimits?: EditorUploadLimits
+  attachmentCleanupDelayMs?: number
 }>(), {
   modelValue: '',
   placeholder: 'Escreva algo, ou pressione "/" para inserir blocos...',
@@ -68,7 +98,14 @@ const props = withDefaults(defineProps<{
   currentNoteId: null,
   availableNotes: () => [],
   mentionItems: () => [],
-  uploadEndpoint: '/api/editor/uploads'
+  uploadEndpoint: '/api/editor/uploads',
+  uploadCleanupEndpoint: '/api/editor/uploads/delete',
+  linkPreviewEndpoint: '/api/editor/link-preview',
+  uploadLimits: () => ({
+    imageMaxBytes: 0,
+    fileMaxBytes: 0
+  }),
+  attachmentCleanupDelayMs: 30_000
 })
 
 const emit = defineEmits<{
@@ -86,17 +123,20 @@ const tableBarRef = ref<{ update: () => void } | null>(null)
 const lastEmittedValue = ref(props.modelValue ?? '')
 const imageInputRef = ref<HTMLInputElement | null>(null)
 const fileInputRef = ref<HTMLInputElement | null>(null)
-const uploading = ref(false)
+const uploadTasks = ref<EditorUploadTask[]>([])
+let lastAttachmentRefs = new Map<string, EditorAttachmentRef>()
+const pendingAttachmentCleanups = new Map<string, {
+  ref: EditorAttachmentRef
+  timer: ReturnType<typeof setTimeout>
+}>()
 
 const bubbleVisible = ref(false)
 const bubblePos = ref({ x: 0, y: 0 })
-const bubbleRef = ref<HTMLElement | null>(null)
 
 const slashVisible = ref(false)
 const slashItems = ref<NotionCommandItem[]>([])
 const slashIndex = ref(0)
 const slashPos = ref({ x: 0, y: 0 })
-const slashMenuRef = ref<HTMLElement | null>(null)
 let slashRange: Range | null = null
 let slashEditor: Editor | null = null
 
@@ -111,11 +151,19 @@ const mentionVisible = ref(false)
 const mentionQuery = ref('')
 const mentionPos = ref({ x: 0, y: 0 })
 const mentionInsertPos = ref(0)
-const mentionInputRef = ref<HTMLInputElement | null>(null)
+const mentionMenuRef = ref<{ focus: () => void } | null>(null)
 
 const emojiVisible = ref(false)
 const emojiPos = ref({ x: 0, y: 0 })
 const emojiInsertPos = ref(0)
+
+const linkPreviewVisible = ref(false)
+const linkPreviewUrl = ref('')
+const linkPreviewPos = ref({ x: 0, y: 0 })
+const linkPreviewInsertPos = ref(0)
+const linkPreviewLoading = ref(false)
+const linkPreviewError = ref('')
+const linkPreviewInputRef = ref<HTMLInputElement | null>(null)
 
 const activeBlock = ref<TopLevelBlock | null>(null)
 const blockVisible = ref(false)
@@ -162,7 +210,8 @@ const commandItems = computed(() =>
     uploadImage: () => openUploadPicker('image'),
     uploadFile: () => openUploadPicker('file'),
     openMention: openMentionMenu,
-    openEmoji: openEmojiMenu
+    openEmoji: openEmojiMenu,
+    openLinkPreview: openLinkPreviewMenu
   })
 )
 
@@ -263,6 +312,7 @@ const editor = useEditor({
     }
   },
   onCreate({ editor: instance }) {
+    lastAttachmentRefs = attachmentRefsToMap(extractEditorAttachmentRefs(instance.getJSON()))
     emit('ready', instance)
     nextTick(() => {
       updateBlockTools()
@@ -271,6 +321,7 @@ const editor = useEditor({
   },
   onUpdate({ editor: instance }) {
     const value = serializeEditorContent(instance.getJSON())
+    reconcileAttachmentRefs(extractEditorAttachmentRefs(instance.getJSON()))
     lastEmittedValue.value = value
     emit('update:modelValue', value)
     emit('change', value)
@@ -290,7 +341,7 @@ const editor = useEditor({
   onBlur() {
     emit('blur')
     setTimeout(() => {
-      if (!bubbleRef.value?.matches(':hover')) bubbleVisible.value = false
+      if (!document.querySelector('.kortex-bubble:hover')) bubbleVisible.value = false
     }, 150)
   }
 })
@@ -319,15 +370,9 @@ watch(() => props.editable, (value) => {
     wikiVisible.value = false
     mentionVisible.value = false
     emojiVisible.value = false
+    linkPreviewVisible.value = false
     blockVisible.value = false
   }
-})
-
-watch(slashIndex, (index) => {
-  nextTick(() => {
-    const item = slashMenuRef.value?.children[index] as HTMLElement | undefined
-    item?.scrollIntoView({ block: 'nearest' })
-  })
 })
 
 watch(wikiIndex, (index) => {
@@ -342,6 +387,11 @@ watch(() => props.availableNotes, () => {
 })
 
 onBeforeUnmount(() => {
+  for (const cleanup of pendingAttachmentCleanups.values()) {
+    clearTimeout(cleanup.timer)
+    void cleanupAttachments([cleanup.ref])
+  }
+  uploadTasks.value.forEach(task => task.xhr?.abort())
   editor.value?.destroy()
 })
 
@@ -367,36 +417,124 @@ function onUploadInputChange(event: Event, kind: EditorUploadKind) {
 }
 
 async function uploadFiles(files: File[], forcedKind?: EditorUploadKind) {
-  if (!files.length || uploading.value) return
+  if (!files.length) return
 
-  uploading.value = true
-
-  try {
-    for (const file of files) {
-      const kind = forcedKind ?? (file.type.startsWith('image/') ? 'image' : 'file')
-      const uploaded = await uploadEditorFile(file, kind)
-      insertUploadedFile(uploaded)
-    }
-  } catch {
-    toast.add({
-      title: 'Erro',
-      description: 'Nao foi possivel enviar o arquivo.',
-      color: 'error'
-    })
-  } finally {
-    uploading.value = false
+  for (const file of files) {
+    const kind = forcedKind ?? (file.type.startsWith('image/') ? 'image' : 'file')
+    const task = createUploadTask(file, kind)
+    uploadTasks.value.unshift(task)
+    void runUploadTask(task)
   }
 }
 
-async function uploadEditorFile(file: File, kind: EditorUploadKind) {
-  const form = new FormData()
-  form.append('file', file)
-  form.append('kind', kind)
+function createUploadTask(file: File, kind: EditorUploadKind): EditorUploadTask {
+  const limit = getUploadLimit(kind)
+  const id = globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`
 
-  return await $fetch<EditorUploadResponse>(props.uploadEndpoint, {
-    method: 'POST',
-    body: form
+  return {
+    id,
+    file,
+    kind,
+    name: file.name,
+    progress: 0,
+    status: limit > 0 && file.size > limit ? 'error' : 'uploading',
+    error: limit > 0 && file.size > limit ? `Limite: ${formatBytes(limit)}` : undefined
+  }
+}
+
+async function runUploadTask(task: EditorUploadTask) {
+  if (task.status === 'error') return
+
+  try {
+    const uploaded = await uploadEditorFile(task)
+    task.status = 'done'
+    task.progress = 100
+    insertUploadedFile(uploaded)
+    setTimeout(() => dismissUploadTask(task.id), 2500)
+  } catch (error) {
+    if (task.status === 'canceled') return
+    task.status = 'error'
+    task.error = error instanceof Error ? error.message : 'Nao foi possivel enviar.'
+  }
+}
+
+function uploadEditorFile(task: EditorUploadTask) {
+  return new Promise<EditorUploadResponse>((resolve, reject) => {
+    const form = new FormData()
+    form.append('file', task.file)
+    form.append('kind', task.kind)
+
+    const xhr = new XMLHttpRequest()
+    task.xhr = xhr
+
+    xhr.open('POST', props.uploadEndpoint)
+    xhr.responseType = 'json'
+
+    xhr.upload.onprogress = (event) => {
+      if (!event.lengthComputable) return
+      task.progress = Math.max(1, Math.round((event.loaded / event.total) * 100))
+    }
+
+    xhr.onload = () => {
+      task.xhr = undefined
+      if (xhr.status >= 200 && xhr.status < 300) {
+        resolve(xhr.response as EditorUploadResponse)
+        return
+      }
+
+      reject(new Error(getUploadErrorMessage(xhr)))
+    }
+
+    xhr.onerror = () => {
+      task.xhr = undefined
+      reject(new Error('Falha de rede durante upload.'))
+    }
+
+    xhr.onabort = () => {
+      task.xhr = undefined
+      task.status = 'canceled'
+      reject(new Error('Upload cancelado.'))
+    }
+
+    xhr.send(form)
   })
+}
+
+function cancelUploadTask(id: string) {
+  const task = uploadTasks.value.find(item => item.id === id)
+  if (!task) return
+  task.status = 'canceled'
+  task.xhr?.abort()
+}
+
+function retryUploadTask(id: string) {
+  const task = uploadTasks.value.find(item => item.id === id)
+  if (!task) return
+
+  task.status = 'uploading'
+  task.progress = 0
+  task.error = undefined
+  void runUploadTask(task)
+}
+
+function dismissUploadTask(id: string) {
+  uploadTasks.value = uploadTasks.value.filter(task => task.id !== id)
+}
+
+function getUploadLimit(kind: EditorUploadKind) {
+  return kind === 'image'
+    ? props.uploadLimits.imageMaxBytes ?? 0
+    : props.uploadLimits.fileMaxBytes ?? 0
+}
+
+function formatBytes(value: number) {
+  if (value < 1024 * 1024) return `${Math.round(value / 1024)} KB`
+  return `${Math.round(value / (1024 * 1024))} MB`
+}
+
+function getUploadErrorMessage(xhr: XMLHttpRequest) {
+  const response = xhr.response as { statusMessage?: string, message?: string } | null
+  return response?.statusMessage || response?.message || 'Nao foi possivel enviar.'
 }
 
 function insertUploadedFile(uploaded: EditorUploadResponse) {
@@ -408,6 +546,8 @@ function insertUploadedFile(uploaded: EditorUploadResponse) {
     href: uploaded.url,
     name: uploaded.name,
     alt: uploaded.name,
+    caption: '',
+    width: '100%',
     size: uploaded.size,
     mimeType: uploaded.type,
     path: uploaded.path,
@@ -419,6 +559,111 @@ function insertUploadedFile(uploaded: EditorUploadResponse) {
       ? { type: 'editorImage', attrs }
       : { type: 'editorFile', attrs }
   ).run()
+}
+
+function attachmentRefsToMap(refs: EditorAttachmentRef[]) {
+  return new Map(refs.map(ref => [attachmentRefKey(ref), ref]))
+}
+
+function attachmentRefKey(ref: EditorAttachmentRef) {
+  return `${ref.bucket}:${ref.path}`
+}
+
+function reconcileAttachmentRefs(nextRefs: EditorAttachmentRef[]) {
+  const next = attachmentRefsToMap(nextRefs)
+
+  for (const [key, cleanup] of pendingAttachmentCleanups) {
+    if (!next.has(key)) continue
+    clearTimeout(cleanup.timer)
+    pendingAttachmentCleanups.delete(key)
+  }
+
+  for (const [key, ref] of lastAttachmentRefs) {
+    if (next.has(key) || pendingAttachmentCleanups.has(key)) continue
+
+    const timer = setTimeout(() => {
+      pendingAttachmentCleanups.delete(key)
+      if (lastAttachmentRefs.has(key)) return
+      void cleanupAttachments([ref])
+    }, props.attachmentCleanupDelayMs)
+
+    pendingAttachmentCleanups.set(key, { ref, timer })
+  }
+
+  lastAttachmentRefs = next
+}
+
+async function cleanupAttachments(refs: EditorAttachmentRef[]) {
+  if (!refs.length) return
+
+  try {
+    await $fetch(props.uploadCleanupEndpoint, {
+      method: 'POST',
+      body: {
+        files: refs.map(ref => ({
+          bucket: ref.bucket,
+          path: ref.path
+        }))
+      }
+    })
+  } catch {
+    toast.add({
+      title: 'Limpeza pendente',
+      description: 'Nao foi possivel remover anexos orfaos agora.',
+      color: 'warning'
+    })
+  }
+}
+
+function openLinkPreviewMenu() {
+  const instance = editor.value
+  if (!instance) return
+
+  linkPreviewUrl.value = ''
+  linkPreviewError.value = ''
+  linkPreviewInsertPos.value = instance.state.selection.from
+
+  try {
+    const rect = instance.view.coordsAtPos(linkPreviewInsertPos.value)
+    linkPreviewPos.value = { x: rect.left, y: rect.bottom + 6 }
+  } catch {
+    linkPreviewPos.value = { x: window.innerWidth / 2, y: window.innerHeight / 2 }
+  }
+
+  linkPreviewVisible.value = true
+  mentionVisible.value = false
+  emojiVisible.value = false
+  nextTick(() => linkPreviewInputRef.value?.focus())
+}
+
+async function insertLinkPreview() {
+  const instance = editor.value
+  const url = linkPreviewUrl.value.trim()
+  if (!instance || !url || linkPreviewLoading.value) return
+
+  linkPreviewLoading.value = true
+  linkPreviewError.value = ''
+
+  try {
+    const preview = await $fetch<LinkPreviewResponse>(props.linkPreviewEndpoint, {
+      query: { url }
+    })
+
+    instance
+      .chain()
+      .focus()
+      .insertContentAt(linkPreviewInsertPos.value, {
+        type: 'linkPreview',
+        attrs: preview
+      })
+      .run()
+
+    linkPreviewVisible.value = false
+  } catch {
+    linkPreviewError.value = 'Nao foi possivel gerar o preview.'
+  } finally {
+    linkPreviewLoading.value = false
+  }
 }
 
 function openMentionMenu() {
@@ -437,7 +682,8 @@ function openMentionMenu() {
 
   mentionVisible.value = true
   emojiVisible.value = false
-  nextTick(() => mentionInputRef.value?.focus())
+  linkPreviewVisible.value = false
+  nextTick(() => mentionMenuRef.value?.focus())
 }
 
 function closeMentionMenu() {
@@ -492,6 +738,7 @@ function openEmojiMenu() {
 
   emojiVisible.value = true
   mentionVisible.value = false
+  linkPreviewVisible.value = false
 }
 
 function insertEmoji(item: EmojiSuggestionItem) {
@@ -765,6 +1012,20 @@ function copyActiveBlockText() {
   void navigator.clipboard?.writeText(text)
 }
 
+function copyActiveBlockLink() {
+  const blockId = activeBlock.value?.node?.attrs.blockId
+  if (!blockId) return
+
+  const url = new URL(window.location.href)
+  url.hash = `block-${blockId}`
+  void navigator.clipboard?.writeText(url.href)
+  toast.add({
+    title: 'Link copiado',
+    description: 'Referencia direta do bloco copiada.',
+    color: 'success'
+  })
+}
+
 function turnActiveBlockInto(kind: 'paragraph' | 'heading1' | 'heading2' | 'heading3' | 'bulletList' | 'taskList') {
   const instance = editor.value
   if (!instance) return
@@ -889,268 +1150,89 @@ defineExpose({
       @dragover="onEditorDragOver"
       @drop="onEditorDrop"
     >
-      <div
-        v-if="uploading"
-        class="kortex-upload-status"
-      >
-        <UIcon
-          name="i-lucide-loader-circle"
-          class="size-3.5 animate-spin"
-        />
-        <span>Enviando...</span>
-      </div>
+      <EditorUploadPanel
+        :tasks="uploadTasks"
+        @cancel="cancelUploadTask"
+        @retry="retryUploadTask"
+        @dismiss="dismissUploadTask"
+      />
       <EditorContent
         :editor="editor"
         class="kortex-editor-content"
       />
     </div>
 
-    <Teleport to="body">
-      <div
-        v-if="bubbleVisible && editable"
-        ref="bubbleRef"
-        class="kortex-bubble"
-        :style="{ left: `${bubblePos.x}px`, top: `${bubblePos.y}px` }"
-        @mousedown.prevent
-      >
-        <button
-          type="button"
-          :class="['kortex-menu-btn', { active: editor?.isActive('bold') }]"
-          title="Negrito"
-          @click="editor?.chain().focus().toggleBold().run()"
-        >
-          <UIcon name="i-lucide-bold" class="size-3.5" />
-        </button>
-        <button
-          type="button"
-          :class="['kortex-menu-btn', { active: editor?.isActive('italic') }]"
-          title="Italico"
-          @click="editor?.chain().focus().toggleItalic().run()"
-        >
-          <UIcon name="i-lucide-italic" class="size-3.5" />
-        </button>
-        <button
-          type="button"
-          :class="['kortex-menu-btn', { active: editor?.isActive('underline') }]"
-          title="Sublinhado"
-          @click="editor?.chain().focus().toggleUnderline().run()"
-        >
-          <UIcon name="i-lucide-underline" class="size-3.5" />
-        </button>
-        <button
-          type="button"
-          :class="['kortex-menu-btn', { active: editor?.isActive('strike') }]"
-          title="Tachado"
-          @click="editor?.chain().focus().toggleStrike().run()"
-        >
-          <UIcon name="i-lucide-strikethrough" class="size-3.5" />
-        </button>
-        <button
-          type="button"
-          :class="['kortex-menu-btn', { active: editor?.isActive('code') }]"
-          title="Codigo inline"
-          @click="editor?.chain().focus().toggleCode().run()"
-        >
-          <UIcon name="i-lucide-code" class="size-3.5" />
-        </button>
-        <div class="kortex-menu-sep" />
-        <button
-          type="button"
-          :class="['kortex-menu-btn kortex-menu-btn--text', { active: editor?.isActive('heading', { level: 1 }) }]"
-          title="Titulo 1"
-          @click="editor?.chain().focus().toggleHeading({ level: 1 }).run()"
-        >
-          H1
-        </button>
-        <button
-          type="button"
-          :class="['kortex-menu-btn kortex-menu-btn--text', { active: editor?.isActive('heading', { level: 2 }) }]"
-          title="Titulo 2"
-          @click="editor?.chain().focus().toggleHeading({ level: 2 }).run()"
-        >
-          H2
-        </button>
-        <button
-          type="button"
-          :class="['kortex-menu-btn kortex-menu-btn--text', { active: editor?.isActive('heading', { level: 3 }) }]"
-          title="Titulo 3"
-          @click="editor?.chain().focus().toggleHeading({ level: 3 }).run()"
-        >
-          H3
-        </button>
-      </div>
-    </Teleport>
+    <EditorBubbleMenu
+      :editor="editor"
+      :visible="bubbleVisible && editable"
+      :pos="bubblePos"
+    />
+
+    <EditorBlockMenu
+      :visible="blockVisible && editable"
+      :pos="blockPos"
+      :active-index="activeBlock?.index ?? null"
+      :block-count="getTopLevelBlocks().length"
+      @move="moveActiveBlock"
+      @transform="turnActiveBlockInto"
+      @duplicate="duplicateActiveBlock"
+      @copy-link="copyActiveBlockLink"
+      @copy-text="copyActiveBlockText"
+      @delete="deleteActiveBlock"
+      @dragstart="onBlockDragStart"
+      @dragend="onBlockDragEnd"
+    />
+
+    <EditorMentionMenu
+      ref="mentionMenuRef"
+      :visible="mentionVisible"
+      :query="mentionQuery"
+      :items="filteredMentionItems"
+      :pos="mentionPos"
+      @update:query="mentionQuery = $event"
+      @select="insertMention"
+      @close="closeMentionMenu"
+    />
+
+    <EditorEmojiMenu
+      :visible="emojiVisible"
+      :items="emojiItems"
+      :pos="emojiPos"
+      @select="insertEmoji"
+    />
 
     <Teleport to="body">
-      <div
-        v-if="blockVisible && editable"
-        class="kortex-block-menu"
-        :style="{ left: `${blockPos.x}px`, top: `${blockPos.y}px` }"
+      <form
+        v-if="linkPreviewVisible"
+        class="kortex-link-preview-menu"
+        :style="{ top: `${linkPreviewPos.y}px`, left: `${linkPreviewPos.x}px` }"
+        @submit.prevent="insertLinkPreview"
         @mousedown.stop
       >
-        <button
-          type="button"
-          class="kortex-block-handle"
-          title="Arrastar bloco"
-          draggable="true"
-          @dragstart="onBlockDragStart"
-          @dragend="onBlockDragEnd"
-        >
-          <UIcon name="i-lucide-grip-vertical" class="size-4" />
-        </button>
-        <button
-          type="button"
-          class="kortex-menu-btn"
-          title="Mover para cima"
-          :disabled="activeBlock?.index === 0"
-          @click="moveActiveBlock(-1)"
-        >
-          <UIcon name="i-lucide-arrow-up" class="size-3.5" />
-        </button>
-        <button
-          type="button"
-          class="kortex-menu-btn"
-          title="Mover para baixo"
-          :disabled="activeBlock?.index === getTopLevelBlocks().length - 1"
-          @click="moveActiveBlock(1)"
-        >
-          <UIcon name="i-lucide-arrow-down" class="size-3.5" />
-        </button>
-        <div class="kortex-menu-sep kortex-menu-sep--vertical" />
-        <button
-          type="button"
-          class="kortex-menu-btn kortex-menu-btn--text"
-          title="Texto"
-          @click="turnActiveBlockInto('paragraph')"
-        >
-          T
-        </button>
-        <button
-          type="button"
-          class="kortex-menu-btn kortex-menu-btn--text"
-          title="Titulo 1"
-          @click="turnActiveBlockInto('heading1')"
-        >
-          H1
-        </button>
-        <button
-          type="button"
-          class="kortex-menu-btn"
-          title="Lista"
-          @click="turnActiveBlockInto('bulletList')"
-        >
-          <UIcon name="i-lucide-list" class="size-3.5" />
-        </button>
-        <button
-          type="button"
-          class="kortex-menu-btn"
-          title="Tarefa"
-          @click="turnActiveBlockInto('taskList')"
-        >
-          <UIcon name="i-lucide-list-checks" class="size-3.5" />
-        </button>
-        <div class="kortex-menu-sep kortex-menu-sep--vertical" />
-        <button
-          type="button"
-          class="kortex-menu-btn"
-          title="Duplicar bloco"
-          @click="duplicateActiveBlock"
-        >
-          <UIcon name="i-lucide-copy-plus" class="size-3.5" />
-        </button>
-        <button
-          type="button"
-          class="kortex-menu-btn"
-          title="Copiar texto do bloco"
-          @click="copyActiveBlockText"
-        >
-          <UIcon name="i-lucide-copy" class="size-3.5" />
-        </button>
-        <button
-          type="button"
-          class="kortex-menu-btn kortex-menu-btn--danger"
-          title="Apagar bloco"
-          @click="deleteActiveBlock"
-        >
-          <UIcon name="i-lucide-trash-2" class="size-3.5" />
-        </button>
-      </div>
-    </Teleport>
-
-    <Teleport to="body">
-      <div
-        v-if="mentionVisible"
-        class="kortex-mention-menu"
-        :style="{ top: `${mentionPos.y}px`, left: `${mentionPos.x}px` }"
-        @mousedown.prevent
-      >
         <input
-          ref="mentionInputRef"
-          v-model="mentionQuery"
-          class="kortex-mention-input"
-          placeholder="@mencao"
-          @keydown.escape.prevent="closeMentionMenu"
-          @keydown.enter.prevent="insertMention(filteredMentionItems[0])"
+          ref="linkPreviewInputRef"
+          v-model="linkPreviewUrl"
+          class="kortex-link-preview-input"
+          placeholder="https://..."
+          @keydown.escape.prevent="linkPreviewVisible = false"
         >
-
-        <template v-if="filteredMentionItems.length">
-          <button
-            v-for="item in filteredMentionItems"
-            :key="item.id"
-            type="button"
-            class="kortex-mention-item"
-            @click="insertMention(item)"
-          >
-            <span class="kortex-mention-avatar">
-              {{ item.label.slice(0, 1).toUpperCase() }}
-            </span>
-            <span class="kortex-mention-copy">
-              <span>{{ item.label }}</span>
-              <small v-if="item.description">{{ item.description }}</small>
-            </span>
-          </button>
-        </template>
-
         <button
-          v-else-if="mentionQuery.trim()"
-          type="button"
-          class="kortex-mention-item"
-          @click="insertMention()"
+          type="submit"
+          class="kortex-link-preview-submit"
+          :disabled="linkPreviewLoading || !linkPreviewUrl.trim()"
         >
-          <span class="kortex-mention-avatar">@</span>
-          <span class="kortex-mention-copy">
-            <span>{{ mentionQuery.trim() }}</span>
-            <small>Mencao manual</small>
-          </span>
+          <UIcon
+            :name="linkPreviewLoading ? 'i-lucide-loader-circle' : 'i-lucide-check'"
+            :class="['size-3.5', { 'animate-spin': linkPreviewLoading }]"
+          />
         </button>
-
         <p
-          v-else
-          class="kortex-menu-empty"
+          v-if="linkPreviewError"
+          class="kortex-link-preview-error"
         >
-          Digite uma mencao
+          {{ linkPreviewError }}
         </p>
-      </div>
-    </Teleport>
-
-    <Teleport to="body">
-      <div
-        v-if="emojiVisible"
-        class="kortex-emoji-menu"
-        :style="{ top: `${emojiPos.y}px`, left: `${emojiPos.x}px` }"
-        @mousedown.prevent
-      >
-        <button
-          v-for="item in emojiItems"
-          :key="item.name"
-          type="button"
-          class="kortex-emoji-item"
-          :title="item.label"
-          @click="insertEmoji(item)"
-        >
-          <span>{{ item.emoji }}</span>
-        </button>
-      </div>
+      </form>
     </Teleport>
 
     <TiptapTableBar
@@ -1158,34 +1240,14 @@ defineExpose({
       :editor="editor"
     />
 
-    <Teleport to="body">
-      <div
-        v-if="slashVisible && slashItems.length > 0"
-        ref="slashMenuRef"
-        class="kortex-slash-menu"
-        :style="{ top: `${slashPos.y}px`, left: `${slashPos.x}px` }"
-      >
-        <p class="kortex-menu-label">
-          Blocos basicos
-        </p>
-        <button
-          v-for="(item, index) in slashItems"
-          :key="item.title"
-          type="button"
-          :class="['kortex-command-item', { selected: index === slashIndex }]"
-          @mouseenter="slashIndex = index"
-          @click="selectSlashCommand(item)"
-        >
-          <span class="kortex-command-icon">
-            <UIcon :name="item.icon" class="size-4" />
-          </span>
-          <span class="kortex-command-text">
-            <span class="kortex-command-title">{{ item.title }}</span>
-            <span class="kortex-command-desc">{{ item.description }}</span>
-          </span>
-        </button>
-      </div>
-    </Teleport>
+    <EditorSlashMenu
+      :visible="slashVisible"
+      :items="slashItems"
+      :selected-index="slashIndex"
+      :pos="slashPos"
+      @hover="slashIndex = $event"
+      @select="selectSlashCommand"
+    />
 
     <Teleport to="body">
       <div
@@ -1328,7 +1390,8 @@ defineExpose({
 .kortex-slash-menu,
 .kortex-wiki-menu,
 .kortex-mention-menu,
-.kortex-emoji-menu {
+.kortex-emoji-menu,
+.kortex-link-preview-menu {
   position: fixed;
   z-index: 9999;
   overflow-y: auto;
@@ -1360,22 +1423,80 @@ defineExpose({
   gap: 4px;
 }
 
-.kortex-upload-status {
+.kortex-upload-panel {
   position: absolute;
   right: 0.75rem;
   top: 0.625rem;
   z-index: 2;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.375rem;
+  width: min(320px, calc(100% - 1.5rem));
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  pointer-events: auto;
+}
+
+.kortex-upload-task {
   border: 1px solid var(--ui-border);
-  border-radius: 999px;
+  border-radius: 8px;
   background: var(--ui-bg);
   color: var(--ui-text-muted);
-  padding: 0.25rem 0.5rem;
+  padding: 0.45rem 0.5rem;
   font-size: 0.75rem;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-  pointer-events: none;
+}
+
+.kortex-upload-task-row {
+  display: inline-flex;
+  align-items: center;
+  width: 100%;
+  gap: 0.4rem;
+}
+
+.kortex-upload-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kortex-upload-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.35rem;
+  height: 1.35rem;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--ui-text-muted);
+  cursor: pointer;
+}
+
+.kortex-upload-action:hover {
+  background: var(--ui-bg-muted);
+  color: var(--ui-text-highlighted);
+}
+
+.kortex-upload-progress {
+  height: 3px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--ui-bg-muted);
+  margin-top: 0.4rem;
+}
+
+.kortex-upload-progress span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--ui-color-primary, #18b981);
+}
+
+.kortex-upload-error {
+  margin: 0.35rem 0 0;
+  color: var(--ui-color-error, #ef4444);
+  line-height: 1.35;
 }
 
 .kortex-menu-label {
@@ -1552,6 +1673,51 @@ defineExpose({
 
 .kortex-emoji-item:hover {
   background: var(--ui-bg-muted);
+}
+
+.kortex-link-preview-menu {
+  display: grid;
+  width: 300px;
+  grid-template-columns: 1fr 2rem;
+  gap: 0.4rem;
+}
+
+.kortex-link-preview-input {
+  min-width: 0;
+  border: 1px solid var(--ui-border);
+  border-radius: 6px;
+  background: var(--ui-bg-muted);
+  color: var(--ui-text-highlighted);
+  font-size: 0.8125rem;
+  outline: none;
+  padding: 0.45rem 0.55rem;
+}
+
+.kortex-link-preview-input:focus {
+  border-color: var(--ui-color-primary, #18b981);
+}
+
+.kortex-link-preview-submit {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 6px;
+  background: var(--ui-color-primary, #18b981);
+  color: white;
+  cursor: pointer;
+}
+
+.kortex-link-preview-submit:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.kortex-link-preview-error {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: var(--ui-color-error, #ef4444);
+  font-size: 0.75rem;
 }
 </style>
 
@@ -1782,6 +1948,15 @@ defineExpose({
   margin: 0.8rem 0;
 }
 
+.kortex-editor-content .tiptap .editor-image-node {
+  width: var(--editor-image-width, 100%);
+  max-width: 100%;
+}
+
+.kortex-editor-content .tiptap .editor-image-frame {
+  position: relative;
+}
+
 .kortex-editor-content .tiptap [data-type="editor-image"] img {
   display: block;
   width: 100%;
@@ -1799,6 +1974,59 @@ defineExpose({
   text-align: center;
 }
 
+.kortex-editor-content .tiptap .editor-image-controls {
+  position: absolute;
+  right: 0.5rem;
+  top: 0.5rem;
+  display: flex;
+  gap: 0.2rem;
+  border: 1px solid var(--ui-border);
+  border-radius: 6px;
+  background: var(--ui-bg);
+  padding: 0.2rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+}
+
+.kortex-editor-content .tiptap .editor-image-controls button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.7rem;
+  height: 1.5rem;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--ui-text-muted);
+  cursor: pointer;
+  font-size: 0.65rem;
+  font-weight: 700;
+}
+
+.kortex-editor-content .tiptap .editor-image-controls button:hover,
+.kortex-editor-content .tiptap .editor-image-controls button.active {
+  background: var(--ui-bg-muted);
+  color: var(--ui-text-highlighted);
+}
+
+.kortex-editor-content .tiptap .editor-image-caption-input {
+  display: block;
+  width: 100%;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--ui-text-muted);
+  font-size: 0.78rem;
+  text-align: center;
+  padding: 0.35rem 0.25rem 0;
+}
+
+.kortex-editor-content .tiptap .editor-image-error {
+  margin: 0.35rem 0 0;
+  color: var(--ui-color-error, #ef4444);
+  font-size: 0.75rem;
+  text-align: center;
+}
+
 .kortex-editor-content .tiptap [data-type="editor-file"] {
   display: flex;
   align-items: center;
@@ -1810,6 +2038,63 @@ defineExpose({
   padding: 0.65rem 0.75rem;
   margin: 0.55rem 0;
   text-decoration: none;
+}
+
+.kortex-editor-content .tiptap [data-type="link-preview"] {
+  display: grid;
+  grid-template-columns: 92px minmax(0, 1fr);
+  gap: 0.75rem;
+  border: 1px solid var(--ui-border);
+  border-radius: 8px;
+  background: var(--ui-bg-muted);
+  color: var(--ui-text-highlighted) !important;
+  padding: 0.65rem;
+  margin: 0.65rem 0;
+  text-decoration: none;
+}
+
+.kortex-editor-content .tiptap [data-type="link-preview"]:hover {
+  background: var(--ui-bg-elevated);
+  opacity: 1;
+}
+
+.kortex-editor-content .tiptap [data-type="link-preview"] img,
+.kortex-editor-content .tiptap [data-link-preview-icon] {
+  width: 92px;
+  height: 64px;
+  border-radius: 6px;
+  object-fit: cover;
+  background: var(--ui-bg);
+  border: 1px solid var(--ui-border);
+}
+
+.kortex-editor-content .tiptap [data-link-preview-icon] {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ui-text-muted);
+  font-size: 0.65rem;
+  font-weight: 700;
+}
+
+.kortex-editor-content .tiptap [data-link-preview-body] {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.2rem;
+}
+
+.kortex-editor-content .tiptap [data-link-preview-body] strong,
+.kortex-editor-content .tiptap [data-link-preview-body] small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kortex-editor-content .tiptap [data-link-preview-body] small {
+  color: var(--ui-text-muted);
+  font-size: 0.75rem;
 }
 
 .kortex-editor-content .tiptap [data-type="editor-file"]:hover {
