@@ -655,6 +655,7 @@ async function onUnlinkNotes(
               :selected-id="selectedNoteId"
               @select="onSelectNote"
               @new-note="onQuickCreateNote"
+              @new-folder="onQuickCreateFolder"
               @update:page="page = $event"
               @pin="onPinNote"
               @delete="onDeleteNote"
