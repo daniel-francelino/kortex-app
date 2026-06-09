@@ -65,13 +65,13 @@ function onConfirmCancel() {
   resolvePendingNav = null
 }
 
-// ─── Calendar slideover ───────────────────────────────────────────────────────
-const detailSlideoverOpen = ref(false)
+// Calendar entry modal
+const detailModalOpen = ref(false)
 const selectedDate = ref('')
 
 function onSelectDate(date: string) {
   selectedDate.value = date
-  detailSlideoverOpen.value = true
+  detailModalOpen.value = true
 }
 
 function onCalendarMonthChange(from: string, to: string) {
@@ -187,11 +187,11 @@ const viewOptions: { value: JournalView, icon: string, tooltip: string }[] = [
     </template>
   </UModal>
 
-  <JournalEntryDetailSlideover
+  <JournalEntryDetailModal
     v-if="selectedDate"
-    :open="detailSlideoverOpen"
+    :open="detailModalOpen"
     :date="selectedDate"
-    @update:open="detailSlideoverOpen = $event"
+    @update:open="detailModalOpen = $event"
     @updated="refreshToday(); refreshCalendar()"
   />
 </template>

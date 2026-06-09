@@ -83,19 +83,32 @@ function formatDate(dateStr: string): string {
     year: 'numeric'
   })
 }
+
+function onOpenChange(value: boolean) {
+  emit('update:open', value)
+}
 </script>
 
 <template>
-  <USlideover
+  <UModal
     :open="props.open"
+    fullscreen
     :title="formatDate(props.date)"
-    @update:open="emit('update:open', $event)"
+    :description="editing ? 'Editando entrada do diario.' : 'Entrada do diario.'"
+    :ui="{
+      overlay: 'z-[220] bg-elevated/80',
+      content: 'z-[230]',
+      header: 'px-4 py-3 sm:px-8',
+      body: 'overflow-y-auto p-0',
+      footer: 'px-4 py-3 sm:px-8'
+    }"
+    @update:open="onOpenChange"
   >
     <template #body>
       <!-- Loading -->
       <div
         v-if="loading"
-        class="space-y-4"
+        class="mx-auto w-full max-w-4xl space-y-4 px-4 py-8 sm:px-8"
       >
         <USkeleton class="h-4 w-full" />
         <USkeleton class="h-4 w-5/6" />
@@ -105,12 +118,12 @@ function formatDate(dateStr: string): string {
 
       <div
         v-else
-        class="space-y-5"
+        class="mx-auto flex min-h-full w-full max-w-4xl flex-col gap-6 px-4 py-8 sm:px-8"
       >
         <!-- No entry yet -->
         <div
           v-if="!entry && !editing"
-          class="flex flex-col items-center justify-center py-8 gap-3"
+          class="flex flex-1 flex-col items-center justify-center gap-3 py-16"
         >
           <UIcon
             name="i-lucide-book-open"
@@ -129,7 +142,7 @@ function formatDate(dateStr: string): string {
         <!-- View mode -->
         <template v-if="entry && !editing">
           <!-- Mood display + edit action -->
-          <div class="flex items-center justify-between gap-3">
+          <div class="flex items-center justify-between gap-3 border-b border-default pb-4">
             <div
               v-if="getMoodOption(entry.mood)"
               class="flex items-center gap-2"
@@ -157,6 +170,7 @@ function formatDate(dateStr: string): string {
               :key="props.date + '-view'"
               :model-value="entry.content ?? ''"
               :editable="false"
+              min-height="60vh"
             />
             <template #fallback>
               <USkeleton class="h-32 w-full" />
@@ -188,28 +202,43 @@ function formatDate(dateStr: string): string {
               :key="props.date + '-edit'"
               v-model="content"
               placeholder="Escreva sua entrada... use '/' para inserir blocos."
+              min-height="60vh"
             />
             <template #fallback>
               <USkeleton class="h-40 w-full" />
             </template>
           </ClientOnly>
-
-          <div class="flex justify-end gap-2">
-            <UButton
-              label="Cancelar"
-              color="neutral"
-              variant="outline"
-              @click="editing = false"
-            />
-            <UButton
-              label="Salvar"
-              :loading="saving"
-              :disabled="saving || isContentEmpty(content)"
-              @click="onSave"
-            />
-          </div>
         </template>
       </div>
     </template>
-  </USlideover>
+
+    <template #footer>
+      <div class="flex w-full items-center justify-end gap-2">
+        <template v-if="editing">
+          <UButton
+            label="Cancelar"
+            color="neutral"
+            variant="outline"
+            @click="editing = false"
+          />
+          <UButton
+            label="Salvar"
+            icon="i-lucide-check"
+            :loading="saving"
+            :disabled="saving || isContentEmpty(content)"
+            @click="onSave"
+          />
+        </template>
+
+        <UButton
+          v-else
+          label="Fechar"
+          icon="i-lucide-x"
+          color="neutral"
+          variant="subtle"
+          @click="onOpenChange(false)"
+        />
+      </div>
+    </template>
+  </UModal>
 </template>
