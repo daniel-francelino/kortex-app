@@ -278,7 +278,7 @@ defineExpose({
         class="size-14 text-dimmed"
       />
       <p class="text-sm text-muted">
-        Selecione ou crie uma nota para comecar
+        Selecione ou crie uma nota para começar
       </p>
     </div>
 
@@ -321,6 +321,8 @@ defineExpose({
           </UTooltip>
         </div>
 
+        <span class="text-xs text-muted absolute right-4 top-3">Editado {{ formatDate(noteDetail.updatedAt) }}</span>
+
         <input
           v-model="editTitle"
           class="w-full text-3xl font-bold bg-transparent border-none outline-none placeholder:text-muted/30 text-highlighted leading-tight"
@@ -329,7 +331,6 @@ defineExpose({
         >
 
         <div class="flex items-center gap-3 mt-1.5">
-          <span class="text-xs text-muted">Editado {{ formatDate(noteDetail.updatedAt) }}</span>
           <div class="flex items-center gap-1 text-xs shrink-0">
             <template v-if="saveStatus === 'unsaved'">
               <span class="size-1.5 rounded-full bg-amber-400 dark:bg-amber-500 animate-pulse" />

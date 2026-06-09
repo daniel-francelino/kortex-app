@@ -23,6 +23,7 @@ const emit = defineEmits<{
   'rename-note': [noteId: string, title: string]
   'rename-folder': [folderId: string, name: string]
   'delete-folder': [folderId: string]
+  'new-note-in-folder': [folderId: string]
 }>()
 
 // ─── Folder state ──────────────────────────────────────────────────────────────
@@ -72,6 +73,7 @@ function commitNoteEdit(noteId: string) {
 
 function folderActionItems(folder: NoteFolder) {
   return [[
+    { label: 'Nova nota aqui', icon: 'i-lucide-file-plus', onSelect: () => emit('new-note-in-folder', folder.id) },
     { label: 'Renomear', icon: 'i-lucide-pencil', onSelect: () => startEdit(folder) },
     { label: 'Excluir pasta', icon: 'i-lucide-trash-2', color: 'error' as const, onSelect: () => emit('delete-folder', folder.id) }
   ]]
@@ -224,20 +226,32 @@ const hasFolders = computed(() => props.folders.length > 0)
                   {{ folder.name }}
                 </span>
 
-                <!-- Folder context menu -->
-                <UDropdownMenu
-                  :items="folderActionItems(folder)"
-                  @click.stop
-                >
-                  <UButton
-                    icon="i-lucide-ellipsis-vertical"
-                    color="neutral"
-                    variant="ghost"
-                    size="xs"
-                    class="opacity-0 group-hover/folder:opacity-100 shrink-0"
+                <!-- Folder action buttons -->
+                <div class="flex items-center opacity-0 group-hover/folder:opacity-100">
+                  <UTooltip text="Nova nota na pasta">
+                    <UButton
+                      icon="i-lucide-file-plus"
+                      color="neutral"
+                      variant="ghost"
+                      size="xs"
+                      class="shrink-0"
+                      @click.stop="emit('new-note-in-folder', folder.id)"
+                    />
+                  </UTooltip>
+                  <UDropdownMenu
+                    :items="folderActionItems(folder)"
                     @click.stop
-                  />
-                </UDropdownMenu>
+                  >
+                    <UButton
+                      icon="i-lucide-ellipsis-vertical"
+                      color="neutral"
+                      variant="ghost"
+                      size="xs"
+                      class="shrink-0"
+                      @click.stop
+                    />
+                  </UDropdownMenu>
+                </div>
               </div>
             </UContextMenu>
 

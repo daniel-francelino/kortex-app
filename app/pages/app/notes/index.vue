@@ -410,7 +410,7 @@ function getAvailableName(baseName: string, existingNames: string[]): string {
   return nextName;
 }
 
-async function onQuickCreateNote(): Promise<void> {
+async function onQuickCreateNote(folderId?: string | null): Promise<void> {
   if (creatingQuickNote.value) return;
 
   creatingQuickNote.value = true;
@@ -422,6 +422,7 @@ async function onQuickCreateNote(): Promise<void> {
     const note = await createNote({
       title,
       type: NoteType.Note,
+      folderId: folderId ?? null
     });
 
     if (note) {
@@ -646,8 +647,9 @@ async function onUnlinkNotes(
               :loading="notesListInitialLoading"
               :selected-id="selectedNoteId"
               @select="onSelectNote"
-              @new-note="onQuickCreateNote"
+              @new-note="onQuickCreateNote()"
               @new-folder="onQuickCreateFolder"
+              @new-note-in-folder="onQuickCreateNote"
               @update:page="page = $event"
               @pin="onPinNote"
               @delete="onDeleteNote"
