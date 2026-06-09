@@ -185,10 +185,6 @@ const hasFolders = computed(() => props.folders.length > 0)
               {{ folder.name }}
             </span>
 
-            <span class="text-xs text-dimmed shrink-0 tabular-nums">
-              {{ (notesByFolder.get(folder.id) ?? []).length }}
-            </span>
-
             <!-- Folder context menu -->
             <UDropdownMenu
               :items="[[
@@ -210,12 +206,6 @@ const hasFolders = computed(() => props.folders.length > 0)
 
           <!-- Notes inside folder -->
           <div v-if="expandedFolders.has(folder.id)" class="pl-5">
-            <div
-              v-if="(notesByFolder.get(folder.id) ?? []).length === 0"
-              class="px-3 py-1.5 text-xs text-dimmed italic"
-            >
-              Pasta vazia — arraste notas aqui
-            </div>
             <button
               v-for="note in notesByFolder.get(folder.id) ?? []"
               :key="note.id"

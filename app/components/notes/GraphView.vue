@@ -418,11 +418,6 @@ const typeLegend = computed(() =>
           </div>
         </div>
       </div>
-
-      <!-- Stats overlay -->
-      <div class="absolute bottom-3 right-3 text-xs text-muted bg-elevated/90 backdrop-blur-sm rounded-lg px-3 py-2">
-        {{ graphData.nodes.length }} notas · {{ graphData.edges.length }} vínculos
-      </div>
     </template>
   </div>
 </template>
