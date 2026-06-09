@@ -222,7 +222,6 @@ const hasFolders = computed(() => props.folders.length > 0)
                   :class="`text-${getTypeMeta(note.type).color}-500`"
                 />
                 <p class="text-xs font-medium truncate flex-1 text-highlighted">{{ note.title || 'Sem título' }}</p>
-                <span class="text-xs text-dimmed shrink-0">{{ formatDate(note.updatedAt) }}</span>
               </div>
             </button>
           </div>

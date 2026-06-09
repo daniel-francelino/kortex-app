@@ -1,9 +1,15 @@
 <script setup lang="ts">
-import type { CreateNotePayload, Note, NoteDetail, NoteFolder, UpdateNotePayload } from '~/types/notes'
-import { NoteType } from '~/types/notes'
+import type {
+  CreateNotePayload,
+  Note,
+  NoteDetail,
+  NoteFolder,
+  UpdateNotePayload,
+} from "~/types/notes";
+import { NoteType } from "~/types/notes";
 
-definePageMeta({ layout: 'app', ssr: false })
-useSeoMeta({ title: 'Notas' })
+definePageMeta({ layout: "app", ssr: false });
+useSeoMeta({ title: "Notas" });
 
 const {
   notesData,
@@ -34,504 +40,481 @@ const {
   createFolder,
   updateFolder,
   deleteFolder,
-  moveNoteToFolder
-} = useNotes()
+  moveNoteToFolder,
+} = useNotes();
 
 // ─── State ────────────────────────────────────────────────────────────────────
 
-const selectedNoteId = ref<string | null>(null)
-const activeView = ref<'editor' | 'graph'>('editor')
-const createModalOpen = ref(false)
-const noteEditorRef = ref<{ isUnsaved: () => boolean, doSave: () => Promise<void> } | null>(null)
+const selectedNoteId = ref<string | null>(null);
+const activeView = ref<"editor" | "graph">("editor");
+const createModalOpen = ref(false);
+const noteEditorRef = ref<{
+  isUnsaved: () => boolean;
+  doSave: () => Promise<void>;
+} | null>(null);
 
 onBeforeRouteLeave(async () => {
   if (noteEditorRef.value?.isUnsaved()) {
-    await noteEditorRef.value.doSave()
+    await noteEditorRef.value.doSave();
   }
-})
-const sidebarTab = ref<'notes' | 'tags'>('notes')
-const zenMode = ref(false)
-const rightTab = ref<'properties' | 'outline'>('properties')
-const creatingQuickNote = ref(false)
-const creatingQuickFolder = ref(false)
+});
+const sidebarTab = ref<"notes" | "tags">("notes");
+const zenMode = ref(false);
+const rightTab = ref<"properties" | "outline">("properties");
+const creatingQuickNote = ref(false);
+const creatingQuickFolder = ref(false);
 
-const noteSortMode = ref<'updated-desc' | 'updated-asc' | 'title-asc'>('updated-desc')
+const noteSortMode = ref<"updated-desc" | "updated-asc" | "title-asc">(
+  "updated-desc",
+);
 const noteSortOptions = [
-  { label: 'Mais recentes', value: 'updated-desc' as const, icon: 'i-lucide-arrow-down-wide-narrow' },
-  { label: 'Mais antigas', value: 'updated-asc' as const, icon: 'i-lucide-arrow-up-wide-narrow' },
-  { label: 'A-Z', value: 'title-asc' as const, icon: 'i-lucide-arrow-down-a-z' }
-]
-const activeSortOption = computed(() =>
-  noteSortOptions.find(option => option.value === noteSortMode.value) ?? noteSortOptions[0]
-)
+  {
+    label: "Mais recentes",
+    value: "updated-desc" as const,
+    icon: "i-lucide-arrow-down-wide-narrow",
+  },
+  {
+    label: "Mais antigas",
+    value: "updated-asc" as const,
+    icon: "i-lucide-arrow-up-wide-narrow",
+  },
+  {
+    label: "A-Z",
+    value: "title-asc" as const,
+    icon: "i-lucide-arrow-down-a-z",
+  },
+];
+const activeSortOption = computed(
+  () =>
+    noteSortOptions.find((option) => option.value === noteSortMode.value) ??
+    noteSortOptions[0],
+);
 const sortMenuItems = computed(() => [
-  noteSortOptions.map(option => ({
+  noteSortOptions.map((option) => ({
     label: option.label,
     icon: option.icon,
-    type: 'checkbox' as const,
+    type: "checkbox" as const,
     checked: noteSortMode.value === option.value,
     onUpdateChecked: () => {
-      noteSortMode.value = option.value
-    }
-  }))
-])
+      noteSortMode.value = option.value;
+    },
+  })),
+]);
 
-const ALL_TYPE_VALUE = '__all__'
+const ALL_TYPE_VALUE = "__all__";
 const typeFilterModel = computed({
   get: () => filters.type || ALL_TYPE_VALUE,
-  set: (v: string) => { filters.type = v === ALL_TYPE_VALUE ? '' : v }
-})
+  set: (v: string) => {
+    filters.type = v === ALL_TYPE_VALUE ? "" : v;
+  },
+});
 const typeFilterOptions = computed(() => [
-  { label: 'Todos tipos', value: ALL_TYPE_VALUE },
-  ...noteTypeOptions
-])
+  { label: "Todos tipos", value: ALL_TYPE_VALUE },
+  ...noteTypeOptions,
+]);
 
 // Keep the last rendered list stable while requests refresh in the background.
-const visibleFolders = ref<NoteFolder[]>([])
-const visibleNotes = ref<Note[]>([])
-const visibleNotesTotal = ref(0)
-const hasLoadedNotesListOnce = ref(false)
+const visibleFolders = ref<NoteFolder[]>([]);
+const visibleNotes = ref<Note[]>([]);
+const visibleNotesTotal = ref(0);
+const hasLoadedNotesListOnce = ref(false);
 
-watch(folders, (value) => {
-  if (Array.isArray(value)) {
-    visibleFolders.value = value
-  }
-}, { immediate: true })
+watch(
+  folders,
+  (value) => {
+    if (Array.isArray(value)) {
+      visibleFolders.value = value;
+    }
+  },
+  { immediate: true },
+);
 
-watch([notesData, allNotes, visibleFolders], () => {
-  const paginatedNotes = notesData.value?.data
-  const nextNotes = visibleFolders.value.length > 0
-    ? (Array.isArray(allNotes.value) ? allNotes.value : paginatedNotes)
-    : paginatedNotes
+watch(
+  [notesData, allNotes, visibleFolders],
+  () => {
+    const paginatedNotes = notesData.value?.data;
+    const nextNotes =
+      visibleFolders.value.length > 0
+        ? Array.isArray(allNotes.value)
+          ? allNotes.value
+          : paginatedNotes
+        : paginatedNotes;
 
-  if (nextNotes) {
-    visibleNotes.value = nextNotes
-    hasLoadedNotesListOnce.value = true
-  }
-
-  if (notesData.value) {
-    visibleNotesTotal.value = notesData.value.total
-  }
-}, { immediate: true })
-
-const notesListInitialLoading = computed(() =>
-  !hasLoadedNotesListOnce.value && (notesStatus.value === 'pending' || allNotesStatus.value === 'pending')
-)
-
-const sortedVisibleFolders = computed(() =>
-  [...visibleFolders.value].sort((a, b) => a.name.localeCompare(b.name, 'pt-BR', { sensitivity: 'base' }))
-)
-
-const sortedVisibleNotes = computed(() => {
-  const notes = [...visibleNotes.value]
-
-  return notes.sort((a, b) => {
-    if (a.pinned !== b.pinned) return a.pinned ? -1 : 1
-
-    if (noteSortMode.value === 'title-asc') {
-      return (a.title || 'Sem título').localeCompare(b.title || 'Sem título', 'pt-BR', { sensitivity: 'base' })
+    if (nextNotes) {
+      visibleNotes.value = nextNotes;
+      hasLoadedNotesListOnce.value = true;
     }
 
-    const left = new Date(a.updatedAt).getTime()
-    const right = new Date(b.updatedAt).getTime()
-    return noteSortMode.value === 'updated-asc' ? left - right : right - left
-  })
-})
+    if (notesData.value) {
+      visibleNotesTotal.value = notesData.value.total;
+    }
+  },
+  { immediate: true },
+);
+
+const notesListInitialLoading = computed(
+  () =>
+    !hasLoadedNotesListOnce.value &&
+    (notesStatus.value === "pending" || allNotesStatus.value === "pending"),
+);
+
+const sortedVisibleFolders = computed(() =>
+  [...visibleFolders.value].sort((a, b) =>
+    a.name.localeCompare(b.name, "pt-BR", { sensitivity: "base" }),
+  ),
+);
+
+const sortedVisibleNotes = computed(() => {
+  const notes = [...visibleNotes.value];
+
+  return notes.sort((a, b) => {
+    if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
+
+    if (noteSortMode.value === "title-asc") {
+      return (a.title || "Sem título").localeCompare(
+        b.title || "Sem título",
+        "pt-BR",
+        { sensitivity: "base" },
+      );
+    }
+
+    const left = new Date(a.updatedAt).getTime();
+    const right = new Date(b.updatedAt).getTime();
+    return noteSortMode.value === "updated-asc" ? left - right : right - left;
+  });
+});
 
 // ─── Note detail (shared between editor + right panel) ────────────────────────
 
-const currentNoteDetail = ref<NoteDetail | null>(null)
-const currentNoteLoading = ref(false)
-const currentContent = ref('')
-const hasLoadedNoteDetailOnce = ref(false)
-let currentNoteRequestId = 0
+const currentNoteDetail = ref<NoteDetail | null>(null);
+const currentNoteLoading = ref(false);
+const currentContent = ref("");
+const hasLoadedNoteDetailOnce = ref(false);
+let currentNoteRequestId = 0;
 
-async function loadCurrentNoteDetail(noteId: string | null): Promise<NoteDetail | null> {
-  const requestId = ++currentNoteRequestId
+async function loadCurrentNoteDetail(
+  noteId: string | null,
+): Promise<NoteDetail | null> {
+  const requestId = ++currentNoteRequestId;
 
   if (!noteId) {
-    currentNoteDetail.value = null
-    currentContent.value = ''
-    currentNoteLoading.value = false
-    return null
+    currentNoteDetail.value = null;
+    currentContent.value = "";
+    currentNoteLoading.value = false;
+    return null;
   }
 
-  currentNoteLoading.value = !hasLoadedNoteDetailOnce.value && !currentNoteDetail.value
+  currentNoteLoading.value =
+    !hasLoadedNoteDetailOnce.value && !currentNoteDetail.value;
 
   try {
-    const detail = await fetchNoteDetail(noteId)
-    if (requestId !== currentNoteRequestId) return null
+    const detail = await fetchNoteDetail(noteId);
+    if (requestId !== currentNoteRequestId) return null;
 
-    currentNoteDetail.value = detail
-    currentContent.value = detail?.content ?? ''
+    currentNoteDetail.value = detail;
+    currentContent.value = detail?.content ?? "";
     if (detail) {
-      hasLoadedNoteDetailOnce.value = true
+      hasLoadedNoteDetailOnce.value = true;
     }
-    return detail
+    return detail;
   } finally {
     if (requestId === currentNoteRequestId) {
-      currentNoteLoading.value = false
+      currentNoteLoading.value = false;
     }
   }
 }
 
-watch(selectedNoteId, noteId => { void loadCurrentNoteDetail(noteId) })
+watch(selectedNoteId, (noteId) => {
+  void loadCurrentNoteDetail(noteId);
+});
 
 function onNoteLoaded(note: NoteDetail | null) {
-  currentNoteDetail.value = note
-  currentContent.value = note?.content ?? ''
+  currentNoteDetail.value = note;
+  currentContent.value = note?.content ?? "";
 }
 
 function onContentChange(content: string) {
-  currentContent.value = content
+  currentContent.value = content;
 }
 
 // ─── Outline parsing ──────────────────────────────────────────────────────────
 
 const outline = computed(() => {
-  if (!currentContent.value) return []
+  if (!currentContent.value) return [];
   try {
-    const doc = JSON.parse(currentContent.value)
-    const result: { level: number; text: string }[] = []
-    function walk(nodes: { type: string; attrs?: Record<string, unknown>; content?: unknown[] }[]) {
+    const doc = JSON.parse(currentContent.value);
+    const result: { level: number; text: string }[] = [];
+    function walk(
+      nodes: {
+        type: string;
+        attrs?: Record<string, unknown>;
+        content?: unknown[];
+      }[],
+    ) {
       for (const node of nodes) {
-        if (node.type === 'heading') {
+        if (node.type === "heading") {
           const text = (node.content ?? [])
-            .map((c: unknown) => (c as { text?: string }).text ?? '')
-            .join('')
-          if (text) result.push({ level: (node.attrs?.level as number) ?? 1, text })
+            .map((c: unknown) => (c as { text?: string }).text ?? "")
+            .join("");
+          if (text)
+            result.push({ level: (node.attrs?.level as number) ?? 1, text });
         }
-        if (node.content) walk(node.content as typeof nodes)
+        if (node.content) walk(node.content as typeof nodes);
       }
     }
-    walk(doc.content ?? [])
-    return result
+    walk(doc.content ?? []);
+    return result;
   } catch {
-    return []
+    return [];
   }
-})
+});
 
 // ─── History (back / forward) ─────────────────────────────────────────────────
 
-const noteHistory = ref<string[]>([])
-const historyIndex = ref(-1)
+const noteHistory = ref<string[]>([]);
+const historyIndex = ref(-1);
 
-const canGoBack = computed(() => historyIndex.value > 0)
-const canGoForward = computed(() => historyIndex.value < noteHistory.value.length - 1)
+const canGoBack = computed(() => historyIndex.value > 0);
+const canGoForward = computed(
+  () => historyIndex.value < noteHistory.value.length - 1,
+);
 
 async function saveCurrentNoteIfNeeded(): Promise<void> {
   if (noteEditorRef.value?.isUnsaved()) {
-    await noteEditorRef.value.doSave()
+    await noteEditorRef.value.doSave();
   }
 }
 
 async function navigateTo(noteId: string) {
-  if (selectedNoteId.value === noteId) return
-  await saveCurrentNoteIfNeeded()
+  if (selectedNoteId.value === noteId) return;
+  await saveCurrentNoteIfNeeded();
   // Truncate forward history
-  noteHistory.value = noteHistory.value.slice(0, historyIndex.value + 1)
-  noteHistory.value.push(noteId)
-  historyIndex.value++
-  selectedNoteId.value = noteId
-  activeView.value = 'editor'
+  noteHistory.value = noteHistory.value.slice(0, historyIndex.value + 1);
+  noteHistory.value.push(noteId);
+  historyIndex.value++;
+  selectedNoteId.value = noteId;
+  activeView.value = "editor";
 }
 
 async function goBack() {
-  if (!canGoBack.value) return
-  await saveCurrentNoteIfNeeded()
-  historyIndex.value--
-  selectedNoteId.value = noteHistory.value[historyIndex.value] ?? null
+  if (!canGoBack.value) return;
+  await saveCurrentNoteIfNeeded();
+  historyIndex.value--;
+  selectedNoteId.value = noteHistory.value[historyIndex.value] ?? null;
 }
 
 async function goForward() {
-  if (!canGoForward.value) return
-  await saveCurrentNoteIfNeeded()
-  historyIndex.value++
-  selectedNoteId.value = noteHistory.value[historyIndex.value] ?? null
+  if (!canGoForward.value) return;
+  await saveCurrentNoteIfNeeded();
+  historyIndex.value++;
+  selectedNoteId.value = noteHistory.value[historyIndex.value] ?? null;
 }
 
 // ─── Handlers ─────────────────────────────────────────────────────────────────
 
 function onSelectNote(note: string | Note): void {
-  const id = typeof note === 'string' ? note : note.id
-  void navigateTo(id)
+  const id = typeof note === "string" ? note : note.id;
+  void navigateTo(id);
 }
 
 function onNoteSaved(note: { id: string }): void {
-  createModalOpen.value = false
-  void navigateTo(note.id)
+  createModalOpen.value = false;
+  void navigateTo(note.id);
 }
 
 function onNoteUpdated(): void {
-  refreshNotes()
-  refreshAllNotes()
+  refreshNotes();
+  refreshAllNotes();
 }
 
 function onNoteDeleted(): void {
   // Remove deleted note from history
-  const deletedId = selectedNoteId.value
+  const deletedId = selectedNoteId.value;
   if (deletedId) {
-    noteHistory.value = noteHistory.value.filter(id => id !== deletedId)
-    historyIndex.value = Math.min(historyIndex.value, noteHistory.value.length - 1)
+    noteHistory.value = noteHistory.value.filter((id) => id !== deletedId);
+    historyIndex.value = Math.min(
+      historyIndex.value,
+      noteHistory.value.length - 1,
+    );
   }
-  selectedNoteId.value = noteHistory.value[historyIndex.value] ?? null
-  currentNoteDetail.value = null
+  selectedNoteId.value = noteHistory.value[historyIndex.value] ?? null;
+  currentNoteDetail.value = null;
 }
 
 async function onDeleteNoteById(noteId: string): Promise<boolean> {
-  const ok = await deleteNote(noteId)
+  const ok = await deleteNote(noteId);
   if (ok) {
-    await refreshAllNotes()
+    await refreshAllNotes();
   }
-  return ok
+  return ok;
 }
 
 async function onDeleteNote(note: Note): Promise<void> {
-  const ok = await onDeleteNoteById(note.id)
+  const ok = await onDeleteNoteById(note.id);
   if (ok && selectedNoteId.value === note.id) {
-    onNoteDeleted()
+    onNoteDeleted();
   }
 }
 
-async function onMoveToFolder(noteId: string, folderId: string | null): Promise<void> {
-  await moveNoteToFolder(noteId, folderId)
+async function onMoveToFolder(
+  noteId: string,
+  folderId: string | null,
+): Promise<void> {
+  await moveNoteToFolder(noteId, folderId);
 }
 
 function getAvailableName(baseName: string, existingNames: string[]): string {
-  const names = new Set(existingNames.map(name => name.trim().toLocaleLowerCase('pt-BR')))
-  if (!names.has(baseName.toLocaleLowerCase('pt-BR'))) return baseName
+  const names = new Set(
+    existingNames.map((name) => name.trim().toLocaleLowerCase("pt-BR")),
+  );
+  if (!names.has(baseName.toLocaleLowerCase("pt-BR"))) return baseName;
 
-  let index = 1
-  let nextName = `${baseName} ${index}`
-  while (names.has(nextName.toLocaleLowerCase('pt-BR'))) {
-    index++
-    nextName = `${baseName} ${index}`
+  let index = 1;
+  let nextName = `${baseName} ${index}`;
+  while (names.has(nextName.toLocaleLowerCase("pt-BR"))) {
+    index++;
+    nextName = `${baseName} ${index}`;
   }
-  return nextName
+  return nextName;
 }
 
 async function onQuickCreateNote(): Promise<void> {
-  if (creatingQuickNote.value) return
+  if (creatingQuickNote.value) return;
 
-  creatingQuickNote.value = true
+  creatingQuickNote.value = true;
   try {
-    const title = getAvailableName('Untitled', visibleNotes.value.map(note => note.title))
+    const title = getAvailableName(
+      "Untitled",
+      visibleNotes.value.map((note) => note.title),
+    );
     const note = await createNote({
       title,
-      type: NoteType.Note
-    })
+      type: NoteType.Note,
+    });
 
     if (note) {
-      await refreshAllNotes()
-      await navigateTo(note.id)
+      await refreshAllNotes();
+      await navigateTo(note.id);
     }
   } finally {
-    creatingQuickNote.value = false
+    creatingQuickNote.value = false;
   }
 }
 
 async function onQuickCreateFolder(): Promise<void> {
-  if (creatingQuickFolder.value) return
+  if (creatingQuickFolder.value) return;
 
-  creatingQuickFolder.value = true
+  creatingQuickFolder.value = true;
   try {
-    const name = getAvailableName('Nova pasta', visibleFolders.value.map(folder => folder.name))
-    await createFolder({ name })
+    const name = getAvailableName(
+      "Nova pasta",
+      visibleFolders.value.map((folder) => folder.name),
+    );
+    await createFolder({ name });
   } finally {
-    creatingQuickFolder.value = false
+    creatingQuickFolder.value = false;
   }
 }
 
 async function onRenameFolder(folderId: string, name: string): Promise<void> {
-  await updateFolder(folderId, { name })
+  await updateFolder(folderId, { name });
 }
 
 async function onDeleteFolder(folderId: string): Promise<void> {
-  await deleteFolder(folderId)
+  await deleteFolder(folderId);
 }
 
 async function onPinNote(note: Note): Promise<void> {
-  await togglePin(note)
+  await togglePin(note);
 }
 
 function onNavigateNote(noteId: string): void {
-  void navigateTo(noteId)
+  void navigateTo(noteId);
 }
 
 function onGraphSelectNote(noteId: string): void {
-  void navigateTo(noteId)
+  void navigateTo(noteId);
 }
 
 function switchToGraph(): void {
-  activeView.value = 'graph'
-  refreshGraph()
+  activeView.value = "graph";
+  refreshGraph();
 }
 
 function onPropertiesUpdated(): void {
-  refreshNotes()
+  refreshNotes();
 }
 
 const editorAvailableNotes = computed<Note[]>(() => {
-  if (Array.isArray(allNotes.value)) return allNotes.value
-  return notesData.value?.data ?? visibleNotes.value
-})
+  if (Array.isArray(allNotes.value)) return allNotes.value;
+  return notesData.value?.data ?? visibleNotes.value;
+});
 
 async function onCreateNote(payload: CreateNotePayload): Promise<Note | null> {
-  const note = await createNote(payload)
+  const note = await createNote(payload);
   if (note) {
-    await refreshAllNotes()
+    await refreshAllNotes();
   }
-  return note
+  return note;
 }
 
 async function onUpdateNote(
   noteId: string,
   payload: UpdateNotePayload,
-  options?: { silent?: boolean }
+  options?: { silent?: boolean },
 ): Promise<Note | null> {
-  const note = await updateNote(noteId, payload, options)
+  const note = await updateNote(noteId, payload, options);
 
   if (note && currentNoteDetail.value?.id === noteId) {
-    currentNoteDetail.value = { ...currentNoteDetail.value, ...note }
+    currentNoteDetail.value = { ...currentNoteDetail.value, ...note };
   }
 
-  return note
+  return note;
 }
 
 async function reloadNoteDetail(noteId: string): Promise<NoteDetail | null> {
-  const detail = await fetchNoteDetail(noteId)
+  const detail = await fetchNoteDetail(noteId);
   if (selectedNoteId.value === noteId) {
-    currentNoteDetail.value = detail
-    currentContent.value = detail?.content ?? ''
+    currentNoteDetail.value = detail;
+    currentContent.value = detail?.content ?? "";
   }
-  return detail
+  return detail;
 }
 
-async function onLinkNotes(sourceId: string, targetId: string): Promise<NoteDetail | null> {
-  const ok = await linkNotes(sourceId, { targetNoteId: targetId })
-  if (!ok) return null
-  return await reloadNoteDetail(sourceId)
+async function onLinkNotes(
+  sourceId: string,
+  targetId: string,
+): Promise<NoteDetail | null> {
+  const ok = await linkNotes(sourceId, { targetNoteId: targetId });
+  if (!ok) return null;
+  return await reloadNoteDetail(sourceId);
 }
 
-async function onUnlinkNotes(sourceId: string, linkId: string): Promise<NoteDetail | null> {
-  const ok = await unlinkNotes(linkId)
-  if (!ok) return null
-  return await reloadNoteDetail(sourceId)
+async function onUnlinkNotes(
+  sourceId: string,
+  linkId: string,
+): Promise<NoteDetail | null> {
+  const ok = await unlinkNotes(linkId);
+  if (!ok) return null;
+  return await reloadNoteDetail(sourceId);
 }
 </script>
 
 <template>
-  <UDashboardPanel id="notes" class="flex-row!">
-    <!-- ── Left sidebar (notes list + tags) ──────────────────────────────────── -->
-    <div
-      v-show="!zenMode"
-      class="w-72 shrink-0 flex flex-col border-r border-default h-full transition-all"
-    >
-      <!-- Sidebar header -->
-      <div class="px-3 py-2 border-b border-default">
-        <div class="flex items-center justify-center gap-1 mb-2">
-          <UTooltip text="Nova nota">
-            <UButton
-              icon="i-lucide-square-pen"
-              size="xs"
-              variant="ghost"
-              color="neutral"
-              :loading="creatingQuickNote"
-              @click="onQuickCreateNote"
-            />
-          </UTooltip>
-
-          <UTooltip text="Nova pasta">
-            <UButton
-              icon="i-lucide-folder-plus"
-              size="xs"
-              variant="ghost"
-              color="neutral"
-              :loading="creatingQuickFolder"
-              @click="onQuickCreateFolder"
-            />
-          </UTooltip>
-
-          <UDropdownMenu :items="sortMenuItems">
-            <UTooltip :text="`Ordenar: ${activeSortOption.label}`">
-              <UButton
-                :icon="activeSortOption.icon"
-                size="xs"
-                variant="ghost"
-                color="neutral"
-              />
-            </UTooltip>
-          </UDropdownMenu>
-
-          <UTooltip :text="activeView === 'graph' ? 'Abrir editor' : 'Abrir grafo'">
-            <UButton
-              :icon="activeView === 'graph' ? 'i-lucide-file-text' : 'i-lucide-network'"
-              size="xs"
-              variant="ghost"
-              :color="activeView === 'graph' ? 'primary' : 'neutral'"
-              @click="activeView === 'graph' ? activeView = 'editor' : switchToGraph()"
-            />
-          </UTooltip>
-        </div>
-
-        <UInput
-          v-model="searchQuery"
-          icon="i-lucide-search"
-          placeholder="Buscar notas..."
-          size="xs"
-          class="w-full"
-        />
-      </div>
-
-      <!-- Sidebar content -->
-      <div class="flex-1 overflow-y-auto">
-        <!-- Search results -->
-        <div v-if="searchQuery && searchQuery.length >= 2" class="p-2">
-          <div v-if="searchResults.length > 0" class="space-y-1">
-            <button
-              v-for="result in searchResults"
-              :key="result.id"
-              class="w-full text-left rounded px-2 py-2 hover:bg-elevated transition-colors"
-              :class="selectedNoteId === result.id ? 'bg-elevated ring-1 ring-primary' : ''"
-              @click="onSelectNote(result.id)"
-            >
-              <p class="text-sm font-medium text-highlighted truncate">{{ result.title }}</p>
-              <p v-if="result.excerpt" class="text-xs text-muted truncate mt-0.5">{{ result.excerpt }}</p>
-            </button>
-          </div>
-          <p v-else-if="!searching" class="text-xs text-muted text-center py-4">Nenhum resultado</p>
-        </div>
-
-        <!-- Notes list -->
-        <div v-else>
-          <NotesList
-            :notes="sortedVisibleNotes"
-            :folders="sortedVisibleFolders"
-            :total="visibleNotesTotal"
-            :page="page"
-            :page-size="pageSize"
-            :loading="notesListInitialLoading"
-            :selected-id="selectedNoteId"
-            @select="onSelectNote"
-            @new-note="onQuickCreateNote"
-            @update:page="page = $event"
-            @pin="onPinNote"
-            @delete="onDeleteNote"
-            @move-to-folder="onMoveToFolder"
-            @rename-folder="onRenameFolder"
-            @delete-folder="onDeleteFolder"
-          />
-        </div>
-      </div>
-    </div>
-
-    <!-- ── Main area (navbar + editor + right panel) ──────────────────────────── -->
-    <div class="flex-1 flex flex-col h-full min-w-0">
+  <UDashboardPanel
+    id="notes"
+    :ui="{
+      body: 'p-0 sm:p-0'
+    }"
+  >
+    <template #header>
       <!-- Navbar -->
-      <UDashboardNavbar>
+      <UDashboardNavbar title="Notas">
         <template #leading>
           <AppSidebarCollapse />
+        </template>
 
+        <template #default>
           <!-- Zen mode toggle -->
           <UTooltip :text="zenMode ? 'Sair do modo foco' : 'Modo foco'">
             <UButton
@@ -567,60 +550,188 @@ async function onUnlinkNotes(sourceId: string, linkId: string): Promise<NoteDeta
               />
             </UTooltip>
           </div>
-
-          <!-- Current note title breadcrumb -->
-          <span v-if="currentNoteDetail" class="ml-2 text-sm font-medium text-highlighted truncate max-w-xs">
-            {{ currentNoteDetail.title || 'Sem título' }}
-          </span>
-          <span v-else class="ml-2 text-sm font-medium text-muted">
-            {{ activeView === 'graph' ? 'Grafo de Notas' : 'Editor' }}
-          </span>
         </template>
 
         <template #right>
           <NotificationsButton />
         </template>
       </UDashboardNavbar>
+    </template>
 
-      <!-- Content: editor + right panel -->
-      <div class="flex-1 flex overflow-hidden">
-        <!-- Graph or Editor -->
-        <div class="flex-1 overflow-hidden">
-          <NotesGraphView
-            v-if="activeView === 'graph'"
-            :graph-data="graphData ?? null"
-            :loading="graphStatus === 'pending' && !graphData"
-            @select-note="onGraphSelectNote"
-          />
+    <template #body>
+      <div class="flex h-full">
+        <!-- ── Left sidebar (notes list + tags) ──────────────────────────────────── -->
+        <div
+          v-show="!zenMode"
+          class="w-72 shrink-0 flex flex-col border-r border-default h-full transition-all"
+        >
+          <!-- Sidebar header -->
+          <div class="px-3 py-2 border-b border-default">
+            <div class="flex items-center justify-center gap-1 mb-2">
+              <UTooltip text="Nova nota">
+                <UButton
+                  icon="i-lucide-square-pen"
+                  size="xs"
+                  variant="ghost"
+                  color="neutral"
+                  :loading="creatingQuickNote"
+                  @click="onQuickCreateNote"
+                />
+              </UTooltip>
 
-          <NotesNoteEditor
-            v-else
-            ref="noteEditorRef"
-            :note-id="selectedNoteId"
-            :note="currentNoteDetail"
-            :loading="currentNoteLoading"
-            :available-notes="editorAvailableNotes"
-            :update-note="onUpdateNote"
-            :delete-note="onDeleteNoteById"
-            :link-notes="onLinkNotes"
-            :unlink-notes="onUnlinkNotes"
-            @updated="onNoteUpdated"
-            @deleted="onNoteDeleted"
-            @navigate-note="onNavigateNote"
-            @note-loaded="onNoteLoaded"
-            @content-change="onContentChange"
-          />
+              <UTooltip text="Nova pasta">
+                <UButton
+                  icon="i-lucide-folder-plus"
+                  size="xs"
+                  variant="ghost"
+                  color="neutral"
+                  :loading="creatingQuickFolder"
+                  @click="onQuickCreateFolder"
+                />
+              </UTooltip>
+
+              <UDropdownMenu :items="sortMenuItems">
+                <UTooltip :text="`Ordenar: ${activeSortOption.label}`">
+                  <UButton
+                    :icon="activeSortOption.icon"
+                    size="xs"
+                    variant="ghost"
+                    color="neutral"
+                  />
+                </UTooltip>
+              </UDropdownMenu>
+
+              <UTooltip
+                :text="activeView === 'graph' ? 'Abrir editor' : 'Abrir grafo'"
+              >
+                <UButton
+                  :icon="
+                    activeView === 'graph'
+                      ? 'i-lucide-file-text'
+                      : 'i-lucide-network'
+                  "
+                  size="xs"
+                  variant="ghost"
+                  :color="activeView === 'graph' ? 'primary' : 'neutral'"
+                  @click="
+                    activeView === 'graph'
+                      ? (activeView = 'editor')
+                      : switchToGraph()
+                  "
+                />
+              </UTooltip>
+            </div>
+
+            <UInput
+              v-model="searchQuery"
+              icon="i-lucide-search"
+              placeholder="Buscar notas..."
+              size="xs"
+              class="w-full"
+            />
+          </div>
+
+          <!-- Sidebar content -->
+          <div class="flex-1 overflow-y-auto">
+            <!-- Search results -->
+            <div v-if="searchQuery && searchQuery.length >= 2" class="p-2">
+              <div v-if="searchResults.length > 0" class="space-y-1">
+                <button
+                  v-for="result in searchResults"
+                  :key="result.id"
+                  class="w-full text-left rounded px-2 py-2 hover:bg-elevated transition-colors"
+                  :class="
+                    selectedNoteId === result.id
+                      ? 'bg-elevated ring-1 ring-primary'
+                      : ''
+                  "
+                  @click="onSelectNote(result.id)"
+                >
+                  <p class="text-sm font-medium text-highlighted truncate">
+                    {{ result.title }}
+                  </p>
+                  <p
+                    v-if="result.excerpt"
+                    class="text-xs text-muted truncate mt-0.5"
+                  >
+                    {{ result.excerpt }}
+                  </p>
+                </button>
+              </div>
+              <p
+                v-else-if="!searching"
+                class="text-xs text-muted text-center py-4"
+              >
+                Nenhum resultado
+              </p>
+            </div>
+
+            <!-- Notes list -->
+            <div v-else>
+              <NotesList
+                :notes="sortedVisibleNotes"
+                :folders="sortedVisibleFolders"
+                :total="visibleNotesTotal"
+                :page="page"
+                :page-size="pageSize"
+                :loading="notesListInitialLoading"
+                :selected-id="selectedNoteId"
+                @select="onSelectNote"
+                @new-note="onQuickCreateNote"
+                @update:page="page = $event"
+                @pin="onPinNote"
+                @delete="onDeleteNote"
+                @move-to-folder="onMoveToFolder"
+                @rename-folder="onRenameFolder"
+                @delete-folder="onDeleteFolder"
+              />
+            </div>
+          </div>
+        </div>
+
+        <!-- ── Main area (navbar + editor + right panel) ──────────────────────────── -->
+        <div class="flex-1 flex flex-col h-full min-w-0">
+          <!-- Content: editor + right panel -->
+          <div class="flex-1 flex overflow-hidden">
+            <!-- Graph or Editor -->
+            <div class="flex-1 overflow-hidden">
+              <NotesGraphView
+                v-if="activeView === 'graph'"
+                :graph-data="graphData ?? null"
+                :loading="graphStatus === 'pending' && !graphData"
+                @select-note="onGraphSelectNote"
+              />
+
+              <NotesNoteEditor
+                v-else
+                ref="noteEditorRef"
+                :note-id="selectedNoteId"
+                :note="currentNoteDetail"
+                :loading="currentNoteLoading"
+                :available-notes="editorAvailableNotes"
+                :update-note="onUpdateNote"
+                :delete-note="onDeleteNoteById"
+                :link-notes="onLinkNotes"
+                :unlink-notes="onUnlinkNotes"
+                @updated="onNoteUpdated"
+                @deleted="onNoteDeleted"
+                @navigate-note="onNavigateNote"
+                @note-loaded="onNoteLoaded"
+                @content-change="onContentChange"
+              />
+            </div>
+          </div>
         </div>
       </div>
-    </div>
-
-    <!-- Create Modal -->
-    <NotesNoteCreateModal
-      :open="createModalOpen"
-      :note-type-options="noteTypeOptions"
-      :create-note="onCreateNote"
-      @update:open="createModalOpen = $event"
-      @saved="onNoteSaved"
-    />
+    </template>
   </UDashboardPanel>
+
+  <!-- Create Modal -->
+  <NotesNoteCreateModal
+    :open="createModalOpen"
+    :note-type-options="noteTypeOptions"
+    :create-note="onCreateNote"
+    @update:open="createModalOpen = $event"
+    @saved="onNoteSaved"
+  />
 </template>
