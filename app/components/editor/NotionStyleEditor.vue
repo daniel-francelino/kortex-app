@@ -33,11 +33,6 @@ interface MentionSuggestionItem {
   kind?: string
 }
 
-interface EmojiSuggestionItem {
-  emoji: string
-  name: string
-  label: string
-}
 
 interface EditorUploadResponse {
   bucket: string
@@ -169,17 +164,6 @@ const activeBlock = ref<TopLevelBlock | null>(null)
 const blockVisible = ref(false)
 const blockPos = ref({ x: 0, y: 0 })
 const draggingBlockIndex = ref<number | null>(null)
-
-const emojiItems: EmojiSuggestionItem[] = [
-  { emoji: '\u{2728}', name: 'sparkles', label: 'Destaque' },
-  { emoji: '\u{1F4A1}', name: 'idea', label: 'Ideia' },
-  { emoji: '\u{2705}', name: 'done', label: 'Concluido' },
-  { emoji: '\u{1F525}', name: 'fire', label: 'Urgente' },
-  { emoji: '\u{1F4CC}', name: 'pin', label: 'Fixar' },
-  { emoji: '\u{1F9E0}', name: 'brain', label: 'Insight' },
-  { emoji: '\u{1F4DA}', name: 'books', label: 'Estudo' },
-  { emoji: '\u{1F680}', name: 'rocket', label: 'Acao' }
-]
 
 const resolvedMentionItems = computed<MentionSuggestionItem[]>(() => {
   if (props.mentionItems.length) return props.mentionItems
@@ -741,7 +725,7 @@ function openEmojiMenu() {
   linkPreviewVisible.value = false
 }
 
-function insertEmoji(item: EmojiSuggestionItem) {
+function insertEmoji(emoji: string, name: string) {
   const instance = editor.value
   if (!instance) return
 
@@ -751,10 +735,7 @@ function insertEmoji(item: EmojiSuggestionItem) {
     .insertContentAt(emojiInsertPos.value, [
       {
         type: 'emoji',
-        attrs: {
-          emoji: item.emoji,
-          name: item.name
-        }
+        attrs: { emoji, name }
       },
       {
         type: 'text',
@@ -1196,7 +1177,6 @@ defineExpose({
 
     <EditorEmojiMenu
       :visible="emojiVisible"
-      :items="emojiItems"
       :pos="emojiPos"
       @select="insertEmoji"
     />

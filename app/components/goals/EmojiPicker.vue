@@ -9,15 +9,6 @@ const emit = defineEmits<{
 
 const pickerOpen = ref(false)
 
-const GOAL_EMOJIS = [
-  '🎯', '⭐', '💪', '🏃', '📚', '💡', '🔥', '✨',
-  '🌟', '🎓', '💼', '🏆', '🚀', '💎', '🌱', '🏋️',
-  '🧠', '📊', '💰', '❤️', '🤝', '🏠', '🎨', '🎵',
-  '🌍', '💻', '📝', '🔑', '⚡', '🌈', '🎉', '🙏',
-  '🌺', '🦁', '🦅', '🌊', '🏄', '🧘', '🎭', '🌙',
-  '☀️', '🌸', '🦋', '🐉', '🦊', '🌲', '🍎', '🔭',
-]
-
 function select(emoji: string) {
   emit('update:modelValue', emoji)
   pickerOpen.value = false
@@ -43,23 +34,12 @@ function clear() {
     </button>
 
     <template #content>
-      <div class="p-2 w-56">
-        <div class="grid grid-cols-8 gap-0.5">
-          <button
-            v-for="emoji in GOAL_EMOJIS"
-            :key="emoji"
-            type="button"
-            class="size-6 text-sm rounded hover:bg-elevated flex items-center justify-center transition-colors leading-none"
-            :class="modelValue === emoji ? 'bg-elevated ring-1 ring-primary' : ''"
-            @click="select(emoji)"
-          >
-            {{ emoji }}
-          </button>
-        </div>
+      <div class="overflow-hidden rounded-lg">
+        <AppEmojiPicker @select="select" />
         <button
           v-if="modelValue"
           type="button"
-          class="w-full text-xs text-muted hover:text-error text-center py-1.5 border-t border-default mt-2"
+          class="w-full text-xs text-muted hover:text-error text-center py-1.5 border-t border-default"
           @click="clear"
         >
           Remover emoji

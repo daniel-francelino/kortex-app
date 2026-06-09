@@ -2,7 +2,6 @@
 import * as z from 'zod'
 import type { FormSubmitEvent } from '@nuxt/ui'
 import type { Calendar } from '~/types/appointments'
-import { HABIT_EMOJI_OPTIONS } from '~/constants/habit-emoji-options'
 import type { Habit } from '~/types/habits'
 import { HabitFrequency, HabitDifficulty, HabitType } from '~/types/habits'
 
@@ -332,42 +331,17 @@ function getHabitTypeIcon(habitType: HabitType) {
 
               <template #content>
                 <div class="overflow-hidden rounded-3xl">
-                  <div class="max-h-80 overflow-y-auto p-3">
-                    <div class="grid grid-cols-6 gap-2 sm:grid-cols-8">
-                      <button
-                        type="button"
-                        class="flex h-11 items-center justify-center rounded-xl border border-default bg-elevated text-lg transition-colors hover:bg-accented"
-                        :class="
-                          !state.avatarEmoji
-                            ? 'border-primary bg-primary/10'
-                            : ''
-                        "
-                        @click="
-                          state.avatarEmoji = undefined;
-                          avatarPopoverOpen = false;
-                        "
-                      >
-                        <UIcon name="i-lucide-x" class="size-4 text-muted" />
-                      </button>
-                      <button
-                        v-for="emoji in HABIT_EMOJI_OPTIONS"
-                        :key="emoji"
-                        type="button"
-                        class="flex h-11 items-center justify-center rounded-xl border border-default bg-elevated text-xl transition-colors hover:bg-accented"
-                        :class="
-                          state.avatarEmoji === emoji
-                            ? 'border-primary bg-primary/10'
-                            : ''
-                        "
-                        @click="
-                          state.avatarEmoji = emoji;
-                          avatarPopoverOpen = false;
-                        "
-                      >
-                        {{ emoji }}
-                      </button>
-                    </div>
-                  </div>
+                  <AppEmojiPicker
+                    @select="(emoji) => { state.avatarEmoji = emoji; avatarPopoverOpen = false }"
+                  />
+                  <button
+                    v-if="state.avatarEmoji"
+                    type="button"
+                    class="w-full text-xs text-muted hover:text-error text-center py-1.5 border-t border-default"
+                    @click="state.avatarEmoji = undefined; avatarPopoverOpen = false"
+                  >
+                    Remover emoji
+                  </button>
                 </div>
               </template>
             </UPopover>
