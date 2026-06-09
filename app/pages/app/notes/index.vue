@@ -26,13 +26,8 @@ const {
   deleteNote,
   linkNotes,
   unlinkNotes,
-  createTag,
-  updateTag,
-  deleteTag,
   folders,
-  refreshFolders,
   allNotes,
-  allNotesStatus,
   refreshAllNotes,
   createFolder,
   updateFolder,
@@ -371,24 +366,6 @@ async function onUnlinkNotes(sourceId: string, linkId: string): Promise<NoteDeta
         />
       </div>
 
-      <!-- Tabs: Notes / Tags -->
-      <div class="flex border-b border-default shrink-0">
-        <button
-          class="flex-1 px-3 py-1.5 text-xs font-medium transition-colors"
-          :class="sidebarTab === 'notes' ? 'text-primary border-b-2 border-primary' : 'text-muted hover:text-default'"
-          @click="sidebarTab = 'notes'"
-        >
-          Notas
-        </button>
-        <button
-          class="flex-1 px-3 py-1.5 text-xs font-medium transition-colors"
-          :class="sidebarTab === 'tags' ? 'text-primary border-b-2 border-primary' : 'text-muted hover:text-default'"
-          @click="sidebarTab = 'tags'"
-        >
-          Tags
-        </button>
-      </div>
-
       <!-- Sidebar content -->
       <div class="flex-1 overflow-y-auto">
         <!-- Search results -->
@@ -409,7 +386,7 @@ async function onUnlinkNotes(sourceId: string, linkId: string): Promise<NoteDeta
         </div>
 
         <!-- Notes list -->
-        <div v-else-if="sidebarTab === 'notes'">
+        <div v-else>
           <NotesList
             :notes="visibleNotes"
             :folders="visibleFolders"
@@ -428,17 +405,7 @@ async function onUnlinkNotes(sourceId: string, linkId: string): Promise<NoteDeta
             @rename-folder="onRenameFolder"
             @delete-folder="onDeleteFolder"
           />
-        </div>
-
-        <!-- Tags -->
-        <div v-else class="p-3">
-          <NotesTagManager
-            :tags="tags ?? []"
-            :create-tag="createTag"
-            :update-tag="updateTag"
-            :delete-tag="deleteTag"
-          />
-        </div>
+        </div>       
       </div>
 
       <!-- Filters -->
@@ -582,29 +549,6 @@ async function onUnlinkNotes(sourceId: string, linkId: string): Promise<NoteDeta
               @updated="onPropertiesUpdated"
               @navigate-note="onNavigateNote"
             />
-          </div>
-
-          <!-- Outline / TOC -->
-          <div v-show="rightTab === 'outline'" class="flex-1 overflow-y-auto p-3">
-            <div v-if="outline.length === 0" class="flex flex-col items-center justify-center py-8 gap-2">
-              <UIcon name="i-lucide-list" class="size-6 text-dimmed" />
-              <p class="text-xs text-muted text-center">Adicione títulos à nota para ver o esboço</p>
-            </div>
-            <nav v-else class="space-y-0.5">
-              <button
-                v-for="(heading, i) in outline"
-                :key="i"
-                class="w-full text-left text-xs text-default hover:text-primary py-1 rounded hover:bg-elevated transition-colors truncate block"
-                :style="{ paddingLeft: `${(heading.level - 1) * 10 + 8}px` }"
-                :class="{
-                  'font-semibold': heading.level === 1,
-                  'font-medium': heading.level === 2,
-                  'text-muted': heading.level === 3,
-                }"
-              >
-                {{ heading.text }}
-              </button>
-            </nav>
           </div>
         </div>
       </div>
