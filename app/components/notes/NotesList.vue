@@ -328,12 +328,6 @@ const hasFolders = computed(() => props.folders.length > 0)
             <p class="text-sm text-muted text-center">
               Nenhuma nota encontrada
             </p>
-            <UButton
-              icon="i-lucide-plus"
-              label="Criar nota"
-              size="sm"
-              @click="emit('new-note')"
-            />
           </div>
 
           <div v-else class="space-y-0.5 p-1">

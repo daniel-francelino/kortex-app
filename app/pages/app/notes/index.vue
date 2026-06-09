@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useEventListener, useStorage } from '@vueuse/core'
 import type {
   CreateNotePayload,
   Note,
@@ -59,15 +60,36 @@ onBeforeRouteLeave(async () => {
   }
 });
 const sidebarTab = ref<"notes" | "tags">("notes");
-const zenMode = ref(false);
-const rightTab = ref<"properties" | "outline">("properties");
-const creatingQuickNote = ref(false);
-const creatingQuickFolder = ref(false);
-const searchDialogOpen = ref(false);
+const rightTab = ref<'properties' | 'outline'>('properties')
+const creatingQuickNote = ref(false)
+const creatingQuickFolder = ref(false)
+const searchDialogOpen = ref(false)
 
-const noteSortMode = ref<"updated-desc" | "updated-asc" | "title-asc">(
-  "updated-desc",
-);
+const sidebarWidth = useStorage('notes-sidebar-width', 288)
+
+function startResize(e: MouseEvent) {
+  const startX = e.clientX
+  const startWidth = sidebarWidth.value
+
+  document.body.style.userSelect = 'none'
+  document.body.style.cursor = 'col-resize'
+
+  const stopMove = useEventListener(window, 'mousemove', (event: MouseEvent) => {
+    sidebarWidth.value = Math.max(180, Math.min(520, startWidth + event.clientX - startX))
+  })
+
+  const stopUp = useEventListener(window, 'mouseup', () => {
+    document.body.style.userSelect = ''
+    document.body.style.cursor = ''
+    stopMove()
+    stopUp()
+  })
+}
+
+const noteSortMode = useStorage<'updated-desc' | 'updated-asc' | 'title-asc'>(
+  'notes-sort-mode',
+  'updated-desc',
+)
 const noteSortOptions = [
   {
     label: "Mais recentes",
@@ -542,8 +564,8 @@ async function onUnlinkNotes(
       <div class="flex h-full">
         <!-- ── Left sidebar (notes list + tags) ──────────────────────────────────── -->
         <div
-          v-show="!zenMode"
-          class="w-72 shrink-0 flex flex-col border-r border-default h-full transition-all"
+          class="shrink-0 flex flex-col h-full relative"
+          :style="{ width: sidebarWidth + 'px' }"
         >
           <!-- Sidebar header -->
           <div class="px-3 py-2 border-b border-default">
@@ -635,6 +657,12 @@ async function onUnlinkNotes(
               @delete-folder="onDeleteFolder"
             />
           </div>
+
+          <!-- Resize handle -->
+          <div
+            class="absolute right-0 top-0 h-full w-1 cursor-col-resize border-r border-default hover:border-primary transition-colors z-10"
+            @mousedown.prevent="startResize"
+          />
         </div>
 
         <!-- ── Main area (navbar + editor + right panel) ──────────────────────────── -->
