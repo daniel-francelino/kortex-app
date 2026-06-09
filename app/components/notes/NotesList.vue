@@ -20,6 +20,7 @@ const emit = defineEmits<{
   'pin': [note: Note]
   'delete': [note: Note]
   'move-to-folder': [noteId: string, folderId: string | null]
+  'rename-note': [noteId: string, title: string]
   'rename-folder': [folderId: string, name: string]
   'delete-folder': [folderId: string]
 }>()
@@ -30,6 +31,9 @@ const expandedFolders = ref<Set<string>>(new Set(props.folders.map(f => f.id)))
 const editingFolderId = ref<string | null>(null)
 const editingName = ref('')
 const editInput = ref<HTMLInputElement | null>(null)
+const editingNoteId = ref<string | null>(null)
+const editingNoteTitle = ref('')
+const noteEditInput = ref<HTMLInputElement | null>(null)
 
 watch(() => props.folders, (folders) => {
   for (const f of folders) {
@@ -54,6 +58,18 @@ function commitEdit(folderId: string) {
   editingFolderId.value = null
 }
 
+function startEditNote(note: Note) {
+  editingNoteId.value = note.id
+  editingNoteTitle.value = note.title
+  nextTick(() => noteEditInput.value?.select())
+}
+
+function commitNoteEdit(noteId: string) {
+  const title = editingNoteTitle.value.trim()
+  if (title) emit('rename-note', noteId, title)
+  editingNoteId.value = null
+}
+
 function folderActionItems(folder: NoteFolder) {
   return [[
     { label: 'Renomear', icon: 'i-lucide-pencil', onSelect: () => startEdit(folder) },
@@ -63,6 +79,7 @@ function folderActionItems(folder: NoteFolder) {
 
 function noteActionItems(note: Note) {
   return [[
+    { label: 'Renomear', icon: 'i-lucide-pencil', onSelect: () => startEditNote(note) },
     { label: note.pinned ? 'Desafixar' : 'Fixar', icon: 'i-lucide-pin', onSelect: () => emit('pin', note) },
     { label: 'Excluir', icon: 'i-lucide-trash-2', color: 'error' as const, onSelect: () => emit('delete', note) }
   ]]
@@ -247,7 +264,17 @@ const hasFolders = computed(() => props.folders.length > 0)
                       class="size-3.5 shrink-0"
                       :class="`text-${getTypeMeta(note.type).color}-500`"
                     />
-                    <p class="text-xs font-medium truncate flex-1 text-highlighted">
+                    <input
+                      v-if="editingNoteId === note.id"
+                      ref="noteEditInput"
+                      v-model="editingNoteTitle"
+                      class="min-w-0 flex-1 bg-transparent text-xs font-medium text-highlighted outline-none border-b border-primary"
+                      @blur="commitNoteEdit(note.id)"
+                      @keydown.enter.prevent="commitNoteEdit(note.id)"
+                      @keydown.escape.prevent="editingNoteId = null"
+                      @click.stop
+                    >
+                    <p v-else class="text-xs font-medium truncate flex-1 text-highlighted">
                       {{ note.title || 'Sem título' }}
                     </p>
                     <UDropdownMenu
@@ -331,7 +358,17 @@ const hasFolders = computed(() => props.folders.length > 0)
                   <div class="min-w-0 flex-1">
                     <div class="flex items-center gap-1.5">
                       <UIcon v-if="note.pinned" name="i-lucide-pin" class="size-3 text-primary shrink-0" />
-                      <p class="text-sm font-medium truncate">
+                      <input
+                        v-if="editingNoteId === note.id"
+                        ref="noteEditInput"
+                        v-model="editingNoteTitle"
+                        class="min-w-0 flex-1 bg-transparent text-sm font-medium text-highlighted outline-none border-b border-primary"
+                        @blur="commitNoteEdit(note.id)"
+                        @keydown.enter.prevent="commitNoteEdit(note.id)"
+                        @keydown.escape.prevent="editingNoteId = null"
+                        @click.stop
+                      >
+                      <p v-else class="text-sm font-medium truncate">
                         {{ note.title }}
                       </p>
                     </div>

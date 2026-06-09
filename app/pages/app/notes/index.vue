@@ -430,6 +430,14 @@ async function onRenameFolder(folderId: string, name: string): Promise<void> {
   await updateFolder(folderId, { name });
 }
 
+async function onRenameNote(noteId: string, title: string): Promise<void> {
+  const note = await onUpdateNote(noteId, { title });
+  if (note) {
+    refreshNotes();
+    refreshAllNotes();
+  }
+}
+
 async function onDeleteFolder(folderId: string): Promise<void> {
   await deleteFolder(folderId);
 }
@@ -524,20 +532,6 @@ async function onUnlinkNotes(
           <AppSidebarCollapse />
         </template>
 
-        <template #default>
-          <!-- Zen mode toggle -->
-          <UTooltip :text="zenMode ? 'Sair do modo foco' : 'Modo foco'">
-            <UButton
-              :icon="zenMode ? 'i-lucide-minimize-2' : 'i-lucide-maximize-2'"
-              size="xs"
-              variant="ghost"
-              color="neutral"
-              class="ml-1"
-              @click="zenMode = !zenMode"
-            />
-          </UTooltip>
-        </template>
-
         <template #right>
           <NotificationsButton />
         </template>
@@ -553,7 +547,7 @@ async function onUnlinkNotes(
         >
           <!-- Sidebar header -->
           <div class="px-3 py-2 border-b border-default">
-            <div class="flex items-center justify-center gap-1 mb-2">
+            <div class="flex items-center justify-center gap-1">
               <UTooltip text="Nova nota">
                 <UButton
                   icon="i-lucide-square-pen"
@@ -636,6 +630,7 @@ async function onUnlinkNotes(
               @pin="onPinNote"
               @delete="onDeleteNote"
               @move-to-folder="onMoveToFolder"
+              @rename-note="onRenameNote"
               @rename-folder="onRenameFolder"
               @delete-folder="onDeleteFolder"
             />
