@@ -81,8 +81,10 @@ export default eventHandler(async (event) => {
     content: note.content ?? null,
     type: note.type,
     pinned: note.pinned,
+    icon: note.icon ?? null,
     createdAt: note.created_at,
     updatedAt: note.updated_at,
+    folderId: note.folder_id ?? null,
     tags,
     links,
     backlinks

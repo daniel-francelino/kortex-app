@@ -73,7 +73,7 @@ function commitNoteEdit(noteId: string) {
 
 function folderActionItems(folder: NoteFolder) {
   return [[
-    { label: 'Nova nota aqui', icon: 'i-lucide-file-plus', onSelect: () => emit('new-note-in-folder', folder.id) },
+    { label: 'Nova nota', icon: 'i-lucide-file-plus', onSelect: () => emit('new-note-in-folder', folder.id) },
     { label: 'Renomear', icon: 'i-lucide-pencil', onSelect: () => startEdit(folder) },
     { label: 'Excluir pasta', icon: 'i-lucide-trash-2', color: 'error' as const, onSelect: () => emit('delete-folder', folder.id) }
   ]]
@@ -273,7 +273,9 @@ const hasFolders = computed(() => props.folders.length > 0)
                   @dragstart="onNoteDragStart(note, $event)"
                 >
                   <div class="flex items-center gap-2 min-w-0">
+                    <span v-if="note.icon" class="text-sm leading-none shrink-0">{{ note.icon }}</span>
                     <UIcon
+                      v-else
                       :name="getTypeMeta(note.type).icon"
                       class="size-3.5 shrink-0"
                       :class="`text-${getTypeMeta(note.type).color}-500`"
@@ -337,13 +339,7 @@ const hasFolders = computed(() => props.folders.length > 0)
           <div
             v-if="!hasFolders && notes.length === 0"
             class="flex flex-col items-center justify-center py-12 gap-3 px-4"
-          >
-            <UIcon name="i-lucide-file-text" class="size-12 text-dimmed" />
-            <p class="text-sm text-muted text-center">
-              Nenhuma nota encontrada
-            </p>
-          </div>
-
+          /> 
           <div v-else class="space-y-0.5 p-1">
             <UContextMenu
               v-for="note in hasFolders ? rootNotes : notes"
@@ -358,7 +354,9 @@ const hasFolders = computed(() => props.folders.length > 0)
                 @dragstart="onNoteDragStart(note, $event)"
               >
                 <div class="flex items-start gap-2">
+                  <span v-if="note.icon" class="text-base leading-none shrink-0 mt-0.5">{{ note.icon }}</span>
                   <UIcon
+                    v-else
                     :name="getTypeMeta(note.type).icon"
                     class="size-4 mt-0.5 shrink-0"
                     :class="`text-${getTypeMeta(note.type).color}-500`"

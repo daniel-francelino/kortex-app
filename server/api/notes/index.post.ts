@@ -46,6 +46,7 @@ export default eventHandler(async (event) => {
     content: data.content ?? null,
     type: data.type,
     pinned: data.pinned,
+    icon: data.icon ?? null,
     createdAt: data.created_at,
     updatedAt: data.updated_at
   }

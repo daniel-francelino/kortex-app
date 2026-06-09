@@ -7,6 +7,7 @@ const bodySchema = z.object({
   content: z.string().optional(),
   type: z.enum(['note', 'idea', 'concept', 'research', 'book_note']).optional(),
   pinned: z.boolean().optional(),
+  icon: z.string().nullable().optional(),
   tagIds: z.array(z.string().uuid()).optional(),
   folderId: z.string().uuid().nullable().optional()
 })
@@ -24,6 +25,7 @@ export default eventHandler(async (event) => {
   if (payload.content !== undefined) updateData.content = payload.content
   if (payload.type !== undefined) updateData.type = payload.type
   if (payload.pinned !== undefined) updateData.pinned = payload.pinned
+  if (payload.icon !== undefined) updateData.icon = payload.icon
   if (payload.folderId !== undefined) updateData.folder_id = payload.folderId
 
   const { data, error } = await supabase
@@ -57,6 +59,7 @@ export default eventHandler(async (event) => {
     content: data.content ?? null,
     type: data.type,
     pinned: data.pinned,
+    icon: data.icon ?? null,
     createdAt: data.created_at,
     updatedAt: data.updated_at,
     folderId: data.folder_id ?? null

@@ -36,6 +36,7 @@ const emit = defineEmits<{
 const editorRef = ref<NotionStyleEditorRef | null>(null)
 const noteDetail = ref<NoteDetail | null>(null)
 const editTitle = ref('')
+const editIcon = ref<string | null>(null)
 const content = ref('')
 const lastSavedTitle = ref('')
 const lastSavedContent = ref('')
@@ -43,6 +44,7 @@ const saveStatus = ref<SaveStatus>('idle')
 const savedAt = ref<Date | null>(null)
 const lastChangeAt = ref(0)
 const syncingContent = ref(false)
+const iconPickerOpen = ref(false)
 
 const linkSearchOpen = ref(false)
 const linkSearchQuery = ref('')
@@ -117,11 +119,13 @@ function resetNoteState() {
   emit('note-loaded', null)
   syncingContent.value = true
   editTitle.value = ''
+  editIcon.value = null
   content.value = ''
   lastSavedTitle.value = ''
   lastSavedContent.value = ''
   lastChangeAt.value = 0
   saveStatus.value = 'idle'
+  iconPickerOpen.value = false
   linkSearchOpen.value = false
   linkSearchQuery.value = ''
   editorRef.value?.clearContent()
@@ -144,11 +148,13 @@ async function syncNote(detail: NoteDetail | null) {
 
   syncingContent.value = true
   editTitle.value = detail.title
+  editIcon.value = detail.icon ?? null
   content.value = detail.content ?? ''
   lastSavedTitle.value = detail.title
   lastSavedContent.value = detail.content ?? ''
   lastChangeAt.value = 0
   saveStatus.value = 'idle'
+  iconPickerOpen.value = false
   linkSearchOpen.value = false
   linkSearchQuery.value = ''
 
@@ -161,6 +167,14 @@ function markDirty() {
   if (!noteDetail.value || syncingContent.value) return
   lastChangeAt.value = Date.now()
   saveStatus.value = 'unsaved'
+}
+
+async function setIcon(icon: string | null) {
+  if (!noteDetail.value) return
+  editIcon.value = icon
+  iconPickerOpen.value = false
+  const result = await props.updateNote(noteDetail.value.id, { icon }, { silent: true })
+  if (result) emit('updated')
 }
 
 function onEditorChange(value: string) {
@@ -298,6 +312,7 @@ defineExpose({
 
     <template v-else-if="noteDetail">
       <div class="relative px-10 pt-10 pb-2 shrink-0">
+        <!-- Nav: back / forward / add-icon -->
         <div class="absolute left-4 top-2 flex items-center gap-0.5">
           <UTooltip text="Voltar">
             <UButton
@@ -319,22 +334,59 @@ defineExpose({
               @click="emit('go-forward')"
             />
           </UTooltip>
+
+          <!-- Add icon button (only when no icon selected) -->
+          <UPopover v-if="!editIcon" v-model:open="iconPickerOpen">
+            <UTooltip text="Adicionar ícone">
+              <UButton
+                icon="i-lucide-smile-plus"
+                size="xs"
+                variant="ghost"
+                color="neutral"
+              />
+            </UTooltip>
+            <template #content>
+              <AppEmojiPicker @select="(emoji) => setIcon(emoji)" />
+            </template>
+          </UPopover>
         </div>
 
         <span class="text-xs text-muted absolute right-4 top-3">Editado {{ formatDate(noteDetail.updatedAt) }}</span>
 
-        <input
-          v-model="editTitle"
-          class="w-full text-3xl font-bold bg-transparent border-none outline-none placeholder:text-muted/30 text-highlighted leading-tight"
-          placeholder="Sem titulo..."
-          @blur="saveNote"
-        >
+        <!-- Title row: emoji (when set) + title input -->
+        <div class="flex items-center gap-2.5">
+          <UPopover v-if="editIcon" v-model:open="iconPickerOpen">
+            <button
+              type="button"
+              class="text-4xl leading-none shrink-0 select-none hover:opacity-70 transition-opacity -mt-0.5"
+            >
+              {{ editIcon }}
+            </button>
+            <template #content>
+              <AppEmojiPicker @select="(emoji) => setIcon(emoji)" />
+              <button
+                type="button"
+                class="w-full text-xs text-muted hover:text-error text-center py-1.5 border-t border-default"
+                @click="setIcon(null)"
+              >
+                Remover ícone
+              </button>
+            </template>
+          </UPopover>
+
+          <input
+            v-model="editTitle"
+            class="flex-1 text-3xl font-bold bg-transparent border-none outline-none placeholder:text-muted/30 text-highlighted leading-tight"
+            placeholder="Sem titulo..."
+            @blur="saveNote"
+          >
+        </div>
 
         <div class="flex items-center gap-3 mt-1.5">
           <div class="flex items-center gap-1 text-xs shrink-0">
             <template v-if="saveStatus === 'unsaved'">
               <span class="size-1.5 rounded-full bg-amber-400 dark:bg-amber-500 animate-pulse" />
-              <span class="text-muted">Nao salvo</span>
+              <span class="text-muted">Não salvo</span>
             </template>
             <template v-else-if="saveStatus === 'saved'">
               <UIcon

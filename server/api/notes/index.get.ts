@@ -61,6 +61,7 @@ export default eventHandler(async (event) => {
     content: (row.content as string) ?? null,
     type: row.type as string,
     pinned: row.pinned as boolean,
+    icon: (row.icon as string) ?? null,
     createdAt: row.created_at as string,
     updatedAt: row.updated_at as string,
     folderId: (row.folder_id as string) ?? null,

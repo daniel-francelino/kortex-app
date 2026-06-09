@@ -54,6 +54,7 @@ export interface Note {
   content: string | null
   type: NoteType
   pinned: boolean
+  icon: string | null
   createdAt: string
   updatedAt: string
   folderId: string | null
@@ -114,6 +115,7 @@ export interface UpdateNotePayload {
   content?: string
   type?: NoteType
   pinned?: boolean
+  icon?: string | null
   tagIds?: string[]
   folderId?: string | null
 }

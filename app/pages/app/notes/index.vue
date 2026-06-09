@@ -562,7 +562,36 @@ async function onUnlinkNotes(
     </template>
 
     <template #body>
-      <div class="flex h-full">
+      <!-- ── Initial load skeleton ─────────────────────────────────────────────────── -->
+      <div v-if="notesListInitialLoading" class="flex h-full">
+        <!-- Sidebar skeleton -->
+        <div
+          class="shrink-0 flex flex-col h-full border-r border-default"
+          :style="{ width: sidebarWidth + 'px' }"
+        >
+          <div class="px-3 py-2 border-b border-default flex items-center gap-1">
+            <USkeleton v-for="i in 5" :key="i" class="size-7 rounded-md" />
+          </div>
+          <div class="flex-1 p-2 space-y-1">
+            <USkeleton v-for="i in 10" :key="i" class="h-9 w-full rounded-lg" />
+          </div>
+        </div>
+        <!-- Main area skeleton -->
+        <div class="flex-1 flex flex-col px-16 py-10 gap-3 max-w-3xl">
+          <USkeleton class="h-8 w-2/5 mb-2" />
+          <USkeleton class="h-4 w-full" />
+          <USkeleton class="h-4 w-full" />
+          <USkeleton class="h-4 w-4/6" />
+          <USkeleton class="h-4 w-full mt-4" />
+          <USkeleton class="h-4 w-5/6" />
+          <USkeleton class="h-4 w-full" />
+          <USkeleton class="h-4 w-3/6 mt-4" />
+          <USkeleton class="h-4 w-full" />
+          <USkeleton class="h-4 w-full" />
+        </div>
+      </div>
+
+      <div v-else class="flex h-full">
         <!-- ── Left sidebar (notes list + tags) ──────────────────────────────────── -->
         <div
           class="shrink-0 flex flex-col h-full relative"
