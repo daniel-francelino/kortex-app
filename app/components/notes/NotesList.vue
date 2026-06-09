@@ -24,6 +24,7 @@ const emit = defineEmits<{
   'rename-folder': [folderId: string, name: string]
   'delete-folder': [folderId: string]
   'new-note-in-folder': [folderId: string]
+  'new-subfolder': [parentFolderId: string]
 }>()
 
 // ─── Folder state ──────────────────────────────────────────────────────────────
@@ -74,6 +75,7 @@ function commitNoteEdit(noteId: string) {
 function folderActionItems(folder: NoteFolder) {
   return [[
     { label: 'Nova nota', icon: 'i-lucide-file-plus', onSelect: () => emit('new-note-in-folder', folder.id) },
+    { label: 'Nova pasta', icon: 'i-lucide-folder-plus', onSelect: () => emit('new-subfolder', folder.id) },
     { label: 'Renomear', icon: 'i-lucide-pencil', onSelect: () => startEdit(folder) },
     { label: 'Excluir pasta', icon: 'i-lucide-trash-2', color: 'error' as const, onSelect: () => emit('delete-folder', folder.id) }
   ]]
@@ -91,6 +93,33 @@ const rootActionItems = computed(() => [[
   { label: 'Nova nota', icon: 'i-lucide-square-pen', onSelect: () => emit('new-note') },
   { label: 'Nova pasta', icon: 'i-lucide-folder-plus', onSelect: () => emit('new-folder') }
 ]])
+
+// ─── Folder tree ───────────────────────────────────────────────────────────────
+
+interface FolderTreeNode {
+  folder: NoteFolder
+  depth: number
+}
+
+const flatFolderTree = computed<FolderTreeNode[]>(() => {
+  const result: FolderTreeNode[] = []
+
+  function addChildren(parentId: string | null, depth: number) {
+    const children = [...props.folders]
+      .filter(f => f.parentId === parentId)
+      .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR', { sensitivity: 'base' }))
+
+    for (const folder of children) {
+      result.push({ folder, depth })
+      if (expandedFolders.value.has(folder.id)) {
+        addChildren(folder.id, depth + 1)
+      }
+    }
+  }
+
+  addChildren(null, 0)
+  return result
+})
 
 // ─── Drag & drop ───────────────────────────────────────────────────────────────
 
@@ -181,65 +210,55 @@ const hasFolders = computed(() => props.folders.length > 0)
       </div>
 
       <template v-else>
-        <!-- Folders section -->
+        <!-- Folders section (tree) -->
         <div v-if="hasFolders" class="shrink-0">
-          <!-- Folder rows -->
           <div
-            v-for="folder in folders"
-            :key="folder.id"
+            v-for="node in flatFolderTree"
+            :key="node.folder.id"
             class="group/folder"
           >
-            <UContextMenu :items="folderActionItems(folder)">
+            <UContextMenu :items="folderActionItems(node.folder)">
               <!-- Folder header (drop target) -->
               <div
-                class="flex items-center gap-1 px-2 py-1.5 rounded-lg mx-1 transition-colors cursor-pointer select-none"
-                :class="dragOverFolderId === folder.id
+                class="flex items-center gap-1 pr-2 py-1.5 rounded-lg mx-1 transition-colors cursor-pointer select-none"
+                :style="{ paddingLeft: `${0.5 + node.depth}rem` }"
+                :class="dragOverFolderId === node.folder.id
                   ? 'bg-primary/15 ring-1 ring-primary/40'
                   : 'hover:bg-elevated/80'"
-                @click="toggleFolder(folder.id)"
-                @dragover.prevent="onFolderDragOver(folder.id, $event)"
-                @dragleave="onFolderDragLeave(folder.id, $event)"
-                @drop.prevent="onFolderDrop(folder.id, $event)"
+                @click="toggleFolder(node.folder.id)"
+                @dragover.prevent="onFolderDragOver(node.folder.id, $event)"
+                @dragleave="onFolderDragLeave(node.folder.id, $event)"
+                @drop.prevent="onFolderDrop(node.folder.id, $event)"
               >
                 <UIcon
-                  :name="expandedFolders.has(folder.id) ? 'i-lucide-chevron-down' : 'i-lucide-chevron-right'"
+                  :name="expandedFolders.has(node.folder.id) ? 'i-lucide-chevron-down' : 'i-lucide-chevron-right'"
                   class="size-3 text-muted shrink-0 transition-transform"
                 />
                 <UIcon
-                  :name="expandedFolders.has(folder.id) ? 'i-lucide-folder-open' : 'i-lucide-folder'"
+                  :name="expandedFolders.has(node.folder.id) ? 'i-lucide-folder-open' : 'i-lucide-folder'"
                   class="size-3.5 shrink-0"
-                  :class="dragOverFolderId === folder.id ? 'text-primary' : 'text-amber-500'"
+                  :class="dragOverFolderId === node.folder.id ? 'text-primary' : 'text-amber-500'"
                 />
 
                 <!-- Inline rename -->
                 <input
-                  v-if="editingFolderId === folder.id"
+                  v-if="editingFolderId === node.folder.id"
                   ref="editInput"
                   v-model="editingName"
                   class="flex-1 text-xs font-medium bg-transparent outline-none border-b border-primary"
-                  @blur="commitEdit(folder.id)"
-                  @keydown.enter.prevent="commitEdit(folder.id)"
+                  @blur="commitEdit(node.folder.id)"
+                  @keydown.enter.prevent="commitEdit(node.folder.id)"
                   @keydown.escape.prevent="editingFolderId = null"
                   @click.stop
                 >
                 <span v-else class="flex-1 text-xs font-medium text-highlighted truncate">
-                  {{ folder.name }}
+                  {{ node.folder.name }}
                 </span>
 
                 <!-- Folder action buttons -->
                 <div class="flex items-center opacity-0 group-hover/folder:opacity-100">
-                  <UTooltip text="Nova nota na pasta">
-                    <UButton
-                      icon="i-lucide-file-plus"
-                      color="neutral"
-                      variant="ghost"
-                      size="xs"
-                      class="shrink-0"
-                      @click.stop="emit('new-note-in-folder', folder.id)"
-                    />
-                  </UTooltip>
                   <UDropdownMenu
-                    :items="folderActionItems(folder)"
+                    :items="folderActionItems(node.folder)"
                     @click.stop
                   >
                     <UButton
@@ -255,19 +274,20 @@ const hasFolders = computed(() => props.folders.length > 0)
               </div>
             </UContextMenu>
 
-            <!-- Notes inside folder -->
+            <!-- Notes inside this folder (when expanded) -->
             <div
-              v-if="expandedFolders.has(folder.id)"
-              class="ml-3 border-l border-default/70 pl-3 py-0.5"
+              v-if="expandedFolders.has(node.folder.id) && (notesByFolder.get(node.folder.id) ?? []).length > 0"
+              class="border-l border-default/70 pl-3 py-0.5"
+              :style="{ marginLeft: `${1.25 + node.depth}rem` }"
             >
               <UContextMenu
-                v-for="note in notesByFolder.get(folder.id) ?? []"
+                v-for="note in notesByFolder.get(node.folder.id) ?? []"
                 :key="note.id"
                 :items="noteActionItems(note)"
               >
                 <button
                   draggable="true"
-                  class="group/note relative w-full cursor-grab rounded-lg px-2 py-1.5 text-left transition-colors before:absolute before:left-[-0.75rem] before:top-1/2 before:h-px before:w-2 before:bg-default/70 hover:bg-elevated/80 active:cursor-grabbing"
+                  class="group/note relative w-full cursor-grab rounded-lg px-2 py-1.5 text-left transition-colors before:absolute before:-left-3 before:top-1/2 before:h-px before:w-2 before:bg-default/70 hover:bg-elevated/80 active:cursor-grabbing"
                   :class="{ 'bg-elevated ring-1 ring-primary/30': selectedId === note.id }"
                   @click="emit('select', note)"
                   @dragstart="onNoteDragStart(note, $event)"
@@ -330,7 +350,6 @@ const hasFolders = computed(() => props.folders.length > 0)
         <!-- Root notes (no folder, or all notes when no folders exist) -->
         <div
           class="flex-1 overflow-y-auto"
-          :class="hasFolders ? '' : ''"
           @dragover.prevent="hasFolders ? onRootDragOver($event) : undefined"
           @dragleave="hasFolders ? onRootDragLeave($event) : undefined"
           @drop.prevent="hasFolders ? onRootDrop($event) : undefined"
@@ -339,7 +358,7 @@ const hasFolders = computed(() => props.folders.length > 0)
           <div
             v-if="!hasFolders && notes.length === 0"
             class="flex flex-col items-center justify-center py-12 gap-3 px-4"
-          /> 
+          />
           <div v-else class="space-y-0.5 p-1">
             <UContextMenu
               v-for="note in hasFolders ? rootNotes : notes"
@@ -410,9 +429,7 @@ const hasFolders = computed(() => props.folders.length > 0)
                       </UBadge>
                     </div>
                   </div>
-                  <UDropdownMenu
-                    :items="noteActionItems(note)"
-                  >
+                  <UDropdownMenu :items="noteActionItems(note)">
                     <UButton
                       icon="i-lucide-ellipsis-vertical"
                       color="neutral"

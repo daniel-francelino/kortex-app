@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import type { Note, NoteDetail, UpdateNotePayload } from '~/types/notes'
+import type { Note, NoteDetail, NoteFolder, UpdateNotePayload } from '~/types/notes'
+import { NOTE_TYPE_META, NoteType } from '~/types/notes'
 
 interface NotionStyleEditorRef {
   focus: () => void
@@ -14,6 +15,7 @@ const props = defineProps<{
   noteId: string | null
   note: NoteDetail | null
   loading: boolean
+  folders: NoteFolder[]
   availableNotes: Note[]
   updateNote: (id: string, payload: UpdateNotePayload, options?: { silent?: boolean }) => Promise<Note | null>
   deleteNote: (id: string) => Promise<boolean>
@@ -29,6 +31,7 @@ const emit = defineEmits<{
   'go-back': []
   'go-forward': []
   'navigate-note': [noteId: string]
+  'navigate-to-folder': [folderId: string]
   'note-loaded': [note: NoteDetail | null]
   'content-change': [content: string]
 }>()
@@ -243,6 +246,43 @@ async function removeLink(linkId: string) {
   emit('note-loaded', detail)
 }
 
+interface BreadcrumbItem {
+  label: string
+  folderId: string | null
+  isNote: boolean
+  icon?: string | null
+  noteType?: string
+}
+
+const breadcrumbItems = computed((): BreadcrumbItem[] => {
+  if (!noteDetail.value) return []
+
+  const folderPath: NoteFolder[] = []
+  let currentFolderId = noteDetail.value.folderId
+
+  while (currentFolderId) {
+    const folder = props.folders.find(f => f.id === currentFolderId)
+    if (!folder) break
+    folderPath.unshift(folder)
+    currentFolderId = folder.parentId
+  }
+
+  return [
+    ...folderPath.map(f => ({ label: f.name, folderId: f.id, isNote: false })),
+    {
+      label: noteDetail.value.title || 'Sem título',
+      folderId: null,
+      isNote: true,
+      icon: editIcon.value,
+      noteType: noteDetail.value.type
+    }
+  ]
+})
+
+function getTypeMeta(type: string) {
+  return NOTE_TYPE_META[type as NoteType] ?? NOTE_TYPE_META[NoteType.Note]
+}
+
 function formatDate(value: string) {
   return new Date(value).toLocaleDateString('pt-BR', {
     day: '2-digit',
@@ -311,9 +351,10 @@ defineExpose({
     </div>
 
     <template v-else-if="noteDetail">
-      <div class="relative px-10 pt-10 pb-2 shrink-0">
-        <!-- Nav: back / forward / add-icon -->
-        <div class="absolute left-4 top-2 flex items-center gap-0.5">
+      <!-- Top bar: nav | breadcrumb | timestamp -->
+      <div class="flex items-center h-9 px-3 border-b border-default/50 shrink-0 gap-2">
+        <!-- Left: nav buttons + add-icon trigger -->
+        <div class="flex items-center gap-0.5 shrink-0">
           <UTooltip text="Voltar">
             <UButton
               icon="i-lucide-arrow-left"
@@ -334,8 +375,6 @@ defineExpose({
               @click="emit('go-forward')"
             />
           </UTooltip>
-
-          <!-- Add icon button (only when no icon selected) -->
           <UPopover v-if="!editIcon" v-model:open="iconPickerOpen">
             <UTooltip text="Adicionar ícone">
               <UButton
@@ -351,11 +390,63 @@ defineExpose({
           </UPopover>
         </div>
 
-        <span class="text-xs text-muted absolute right-4 top-3">Editado {{ formatDate(noteDetail.updatedAt) }}</span>
+        <!-- Center: breadcrumb -->
+        <nav class="flex-1 flex items-center justify-center min-w-0 overflow-hidden">
+          <div class="flex items-center gap-0.5 text-xs text-muted min-w-0">
+            <template
+              v-for="(item, i) in breadcrumbItems"
+              :key="i"
+            >
+              <UIcon
+                v-if="i > 0"
+                name="i-lucide-chevron-right"
+                class="size-3 text-dimmed shrink-0"
+              />
+              <button
+                v-if="!item.isNote"
+                type="button"
+                class="flex items-center gap-1 min-w-0 max-w-28 hover:text-highlighted hover:bg-elevated rounded px-1.5 py-0.5 transition-colors"
+                @click="emit('navigate-to-folder', item.folderId!)"
+              >
+                <UIcon
+                  name="i-lucide-folder"
+                  class="size-3 text-amber-500 shrink-0"
+                />
+                <span class="truncate">{{ item.label }}</span>
+              </button>
+              <span
+                v-else
+                class="flex items-center gap-1 text-highlighted font-medium px-1 min-w-0"
+              >
+                <span
+                  v-if="item.icon"
+                  class="text-sm leading-none shrink-0"
+                >{{ item.icon }}</span>
+                <UIcon
+                  v-else
+                  :name="getTypeMeta(item.noteType ?? '').icon"
+                  class="size-3 shrink-0"
+                  :class="`text-${getTypeMeta(item.noteType ?? '').color}-500`"
+                />
+                <span class="truncate max-w-48">{{ item.label }}</span>
+              </span>
+            </template>
+          </div>
+        </nav>
 
-        <!-- Title row: emoji (when set) + title input -->
+        <!-- Right: last edited timestamp -->
+        <span class="text-xs text-muted whitespace-nowrap shrink-0">
+          Editado {{ formatDate(noteDetail.updatedAt) }}
+        </span>
+      </div>
+
+      <!-- Content: emoji icon + title + save status -->
+      <div class="px-10 pt-8 pb-2 shrink-0">
         <div class="flex items-center gap-2.5">
-          <UPopover v-if="editIcon" v-model:open="iconPickerOpen">
+          <UPopover
+            v-if="editIcon"
+            v-model:open="iconPickerOpen"
+          >
             <button
               type="button"
               class="text-4xl leading-none shrink-0 select-none hover:opacity-70 transition-opacity -mt-0.5"

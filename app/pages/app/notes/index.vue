@@ -434,16 +434,16 @@ async function onQuickCreateNote(folderId?: string | null): Promise<void> {
   }
 }
 
-async function onQuickCreateFolder(): Promise<void> {
+async function onQuickCreateFolder(parentId?: string): Promise<void> {
   if (creatingQuickFolder.value) return;
 
   creatingQuickFolder.value = true;
   try {
-    const name = getAvailableName(
-      "Nova pasta",
-      visibleFolders.value.map((folder) => folder.name),
-    );
-    await createFolder({ name });
+    const siblingNames = parentId
+      ? visibleFolders.value.filter(f => f.parentId === parentId).map(f => f.name)
+      : visibleFolders.value.filter(f => !f.parentId).map(f => f.name)
+    const name = getAvailableName('Nova pasta', siblingNames)
+    await createFolder({ name, parentId: parentId ?? null })
   } finally {
     creatingQuickFolder.value = false;
   }
@@ -471,6 +471,10 @@ async function onPinNote(note: Note): Promise<void> {
 
 function onNavigateNote(noteId: string): void {
   void navigateTo(noteId);
+}
+
+function onNavigateToFolder(_folderId: string): void {
+  // sidebar always visible — no action needed for now
 }
 
 function onGraphSelectNote(noteId: string): void {
@@ -678,6 +682,7 @@ async function onUnlinkNotes(
               @select="onSelectNote"
               @new-note="onQuickCreateNote()"
               @new-folder="onQuickCreateFolder"
+              @new-subfolder="onQuickCreateFolder"
               @new-note-in-folder="onQuickCreateNote"
               @update:page="page = $event"
               @pin="onPinNote"
@@ -715,6 +720,7 @@ async function onUnlinkNotes(
                 :note-id="selectedNoteId"
                 :note="currentNoteDetail"
                 :loading="currentNoteLoading"
+                :folders="sortedVisibleFolders"
                 :available-notes="editorAvailableNotes"
                 :update-note="onUpdateNote"
                 :delete-note="onDeleteNoteById"
@@ -727,6 +733,7 @@ async function onUnlinkNotes(
                 @go-back="goBack"
                 @go-forward="goForward"
                 @navigate-note="onNavigateNote"
+                @navigate-to-folder="onNavigateToFolder"
                 @note-loaded="onNoteLoaded"
                 @content-change="onContentChange"
               />
