@@ -1,6 +1,7 @@
 export interface EditorTextNode {
   type: string
   text?: string
+  attrs?: Record<string, unknown>
   content?: EditorTextNode[]
 }
 
@@ -55,6 +56,8 @@ export function isEditorContentEmpty(value?: string | null): boolean {
 
   function hasText(node: EditorTextNode): boolean {
     if (node.type === 'text' && Boolean(node.text?.trim())) return true
+    if (['editorImage', 'editorFile', 'mention', 'emoji'].includes(node.type)) return true
+    if (node.type === 'callout' && node.attrs?.icon) return true
     return (node.content ?? []).some(hasText)
   }
 

@@ -3,6 +3,7 @@ import type { Editor, Range } from '@tiptap/core'
 import { EditorContent, useEditor } from '@tiptap/vue-3'
 import type { NotionCommandItem, WikiSuggestionItem } from '~/composables/useNotionEditor'
 import {
+  createNotionCommandItems,
   createNotionEditorExtensions,
   createSlashCommandExtension
 } from '~/composables/useNotionEditor'
@@ -13,6 +14,7 @@ import {
 } from '~/utils/editor/content'
 
 type EditorSurface = 'boxed' | 'plain'
+type EditorUploadKind = 'image' | 'file'
 type ProseMirrorNode = Editor['state']['doc']
 
 interface TopLevelBlock {
@@ -20,6 +22,29 @@ interface TopLevelBlock {
   from: number
   to: number
   node: ProseMirrorNode
+}
+
+interface MentionSuggestionItem {
+  id: string
+  label: string
+  description?: string
+  kind?: string
+}
+
+interface EmojiSuggestionItem {
+  emoji: string
+  name: string
+  label: string
+}
+
+interface EditorUploadResponse {
+  bucket: string
+  path: string
+  url: string
+  name: string
+  size: number
+  type: string
+  kind: EditorUploadKind
 }
 
 const props = withDefaults(defineProps<{
@@ -31,6 +56,8 @@ const props = withDefaults(defineProps<{
   enableWikilinks?: boolean
   currentNoteId?: string | null
   availableNotes?: WikiSuggestionItem[]
+  mentionItems?: MentionSuggestionItem[]
+  uploadEndpoint?: string
 }>(), {
   modelValue: '',
   placeholder: 'Escreva algo, ou pressione "/" para inserir blocos...',
@@ -39,7 +66,9 @@ const props = withDefaults(defineProps<{
   surface: 'boxed',
   enableWikilinks: false,
   currentNoteId: null,
-  availableNotes: () => []
+  availableNotes: () => [],
+  mentionItems: () => [],
+  uploadEndpoint: '/api/editor/uploads'
 })
 
 const emit = defineEmits<{
@@ -51,9 +80,13 @@ const emit = defineEmits<{
   'wikilink-click': [noteId: string]
 }>()
 
+const toast = useToast()
 const editorShellRef = ref<HTMLElement | null>(null)
 const tableBarRef = ref<{ update: () => void } | null>(null)
 const lastEmittedValue = ref(props.modelValue ?? '')
+const imageInputRef = ref<HTMLInputElement | null>(null)
+const fileInputRef = ref<HTMLInputElement | null>(null)
+const uploading = ref(false)
 
 const bubbleVisible = ref(false)
 const bubblePos = ref({ x: 0, y: 0 })
@@ -74,10 +107,64 @@ const wikiPos = ref({ x: 0, y: 0 })
 const wikiMenuRef = ref<HTMLElement | null>(null)
 let wikiRange: Range | null = null
 
+const mentionVisible = ref(false)
+const mentionQuery = ref('')
+const mentionPos = ref({ x: 0, y: 0 })
+const mentionInsertPos = ref(0)
+const mentionInputRef = ref<HTMLInputElement | null>(null)
+
+const emojiVisible = ref(false)
+const emojiPos = ref({ x: 0, y: 0 })
+const emojiInsertPos = ref(0)
+
 const activeBlock = ref<TopLevelBlock | null>(null)
 const blockVisible = ref(false)
 const blockPos = ref({ x: 0, y: 0 })
 const draggingBlockIndex = ref<number | null>(null)
+
+const emojiItems: EmojiSuggestionItem[] = [
+  { emoji: '\u{2728}', name: 'sparkles', label: 'Destaque' },
+  { emoji: '\u{1F4A1}', name: 'idea', label: 'Ideia' },
+  { emoji: '\u{2705}', name: 'done', label: 'Concluido' },
+  { emoji: '\u{1F525}', name: 'fire', label: 'Urgente' },
+  { emoji: '\u{1F4CC}', name: 'pin', label: 'Fixar' },
+  { emoji: '\u{1F9E0}', name: 'brain', label: 'Insight' },
+  { emoji: '\u{1F4DA}', name: 'books', label: 'Estudo' },
+  { emoji: '\u{1F680}', name: 'rocket', label: 'Acao' }
+]
+
+const resolvedMentionItems = computed<MentionSuggestionItem[]>(() => {
+  if (props.mentionItems.length) return props.mentionItems
+
+  return props.availableNotes
+    .filter(note => note.id !== props.currentNoteId)
+    .map(note => ({
+      id: note.id,
+      label: note.title,
+      description: 'Nota',
+      kind: 'note'
+    }))
+})
+
+const filteredMentionItems = computed(() => {
+  const query = mentionQuery.value.trim().toLowerCase()
+  return resolvedMentionItems.value
+    .filter(item =>
+      !query
+      || item.label.toLowerCase().includes(query)
+      || item.description?.toLowerCase().includes(query)
+    )
+    .slice(0, 8)
+})
+
+const commandItems = computed(() =>
+  createNotionCommandItems({
+    uploadImage: () => openUploadPicker('image'),
+    uploadFile: () => openUploadPicker('file'),
+    openMention: openMentionMenu,
+    openEmoji: openEmojiMenu
+  })
+)
 
 const slashCommandExtension = createSlashCommandExtension({
   onStart(payload) {
@@ -130,7 +217,7 @@ const slashCommandExtension = createSlashCommandExtension({
     slashEditor = null
     slashRange = null
   }
-})
+}, () => commandItems.value)
 
 const editor = useEditor({
   content: normalizeEditorContent(props.modelValue),
@@ -152,6 +239,27 @@ const editor = useEditor({
     },
     handleKeyDown(_view, event) {
       return handleWikiKeyDown(event)
+    },
+    handleDrop(view, event) {
+      const hasEditorBlock = event.dataTransfer?.types.includes('application/x-kortex-editor-block')
+      if (hasEditorBlock) return false
+
+      const files = Array.from(event.dataTransfer?.files ?? [])
+      if (!files.length) return false
+
+      event.preventDefault()
+      const dropPos = view.posAtCoords({ left: event.clientX, top: event.clientY })
+      if (dropPos) editor.value?.chain().focus().setTextSelection(dropPos.pos).run()
+      void uploadFiles(files)
+      return true
+    },
+    handlePaste(_view, event) {
+      const files = Array.from(event.clipboardData?.files ?? [])
+      if (!files.length) return false
+
+      event.preventDefault()
+      void uploadFiles(files)
+      return true
     }
   },
   onCreate({ editor: instance }) {
@@ -209,6 +317,8 @@ watch(() => props.editable, (value) => {
     bubbleVisible.value = false
     slashVisible.value = false
     wikiVisible.value = false
+    mentionVisible.value = false
+    emojiVisible.value = false
     blockVisible.value = false
   }
 })
@@ -239,6 +349,174 @@ function selectSlashCommand(item: NotionCommandItem) {
   if (!slashEditor || !slashRange) return
   item.command({ editor: slashEditor, range: slashRange })
   slashVisible.value = false
+}
+
+function openUploadPicker(kind: EditorUploadKind) {
+  if (!props.editable) return
+  if (kind === 'image') imageInputRef.value?.click()
+  else fileInputRef.value?.click()
+}
+
+function onUploadInputChange(event: Event, kind: EditorUploadKind) {
+  const input = event.target as HTMLInputElement
+  const files = Array.from(input.files ?? [])
+  input.value = ''
+  if (!files.length) return
+
+  void uploadFiles(files, kind)
+}
+
+async function uploadFiles(files: File[], forcedKind?: EditorUploadKind) {
+  if (!files.length || uploading.value) return
+
+  uploading.value = true
+
+  try {
+    for (const file of files) {
+      const kind = forcedKind ?? (file.type.startsWith('image/') ? 'image' : 'file')
+      const uploaded = await uploadEditorFile(file, kind)
+      insertUploadedFile(uploaded)
+    }
+  } catch {
+    toast.add({
+      title: 'Erro',
+      description: 'Nao foi possivel enviar o arquivo.',
+      color: 'error'
+    })
+  } finally {
+    uploading.value = false
+  }
+}
+
+async function uploadEditorFile(file: File, kind: EditorUploadKind) {
+  const form = new FormData()
+  form.append('file', file)
+  form.append('kind', kind)
+
+  return await $fetch<EditorUploadResponse>(props.uploadEndpoint, {
+    method: 'POST',
+    body: form
+  })
+}
+
+function insertUploadedFile(uploaded: EditorUploadResponse) {
+  const instance = editor.value
+  if (!instance) return
+
+  const attrs = {
+    src: uploaded.url,
+    href: uploaded.url,
+    name: uploaded.name,
+    alt: uploaded.name,
+    size: uploaded.size,
+    mimeType: uploaded.type,
+    path: uploaded.path,
+    bucket: uploaded.bucket
+  }
+
+  instance.chain().focus().insertContent(
+    uploaded.kind === 'image'
+      ? { type: 'editorImage', attrs }
+      : { type: 'editorFile', attrs }
+  ).run()
+}
+
+function openMentionMenu() {
+  const instance = editor.value
+  if (!instance) return
+
+  mentionQuery.value = ''
+  mentionInsertPos.value = instance.state.selection.from
+
+  try {
+    const rect = instance.view.coordsAtPos(mentionInsertPos.value)
+    mentionPos.value = { x: rect.left, y: rect.bottom + 6 }
+  } catch {
+    mentionPos.value = { x: window.innerWidth / 2, y: window.innerHeight / 2 }
+  }
+
+  mentionVisible.value = true
+  emojiVisible.value = false
+  nextTick(() => mentionInputRef.value?.focus())
+}
+
+function closeMentionMenu() {
+  mentionVisible.value = false
+  mentionQuery.value = ''
+}
+
+function insertMention(item?: MentionSuggestionItem) {
+  const instance = editor.value
+  if (!instance) return
+
+  const label = item?.label ?? mentionQuery.value.trim()
+  if (!label) {
+    closeMentionMenu()
+    return
+  }
+
+  instance
+    .chain()
+    .focus()
+    .insertContentAt(mentionInsertPos.value, [
+      {
+        type: 'mention',
+        attrs: {
+          id: item?.id ?? label,
+          label,
+          kind: item?.kind ?? 'manual'
+        }
+      },
+      {
+        type: 'text',
+        text: ' '
+      }
+    ])
+    .run()
+
+  closeMentionMenu()
+}
+
+function openEmojiMenu() {
+  const instance = editor.value
+  if (!instance) return
+
+  emojiInsertPos.value = instance.state.selection.from
+
+  try {
+    const rect = instance.view.coordsAtPos(emojiInsertPos.value)
+    emojiPos.value = { x: rect.left, y: rect.bottom + 6 }
+  } catch {
+    emojiPos.value = { x: window.innerWidth / 2, y: window.innerHeight / 2 }
+  }
+
+  emojiVisible.value = true
+  mentionVisible.value = false
+}
+
+function insertEmoji(item: EmojiSuggestionItem) {
+  const instance = editor.value
+  if (!instance) return
+
+  instance
+    .chain()
+    .focus()
+    .insertContentAt(emojiInsertPos.value, [
+      {
+        type: 'emoji',
+        attrs: {
+          emoji: item.emoji,
+          name: item.name
+        }
+      },
+      {
+        type: 'text',
+        text: ' '
+      }
+    ])
+    .run()
+
+  emojiVisible.value = false
 }
 
 function updateBubble() {
@@ -589,12 +867,38 @@ defineExpose({
     :class="[`kortex-editor--${surface}`, { 'is-readonly': !editable }]"
     :style="{ '--kortex-editor-min-height': minHeight }"
   >
+    <input
+      ref="imageInputRef"
+      class="sr-only"
+      type="file"
+      accept="image/*"
+      multiple
+      @change="onUploadInputChange($event, 'image')"
+    >
+    <input
+      ref="fileInputRef"
+      class="sr-only"
+      type="file"
+      multiple
+      @change="onUploadInputChange($event, 'file')"
+    >
+
     <div
       ref="editorShellRef"
       class="kortex-editor-shell"
       @dragover="onEditorDragOver"
       @drop="onEditorDrop"
     >
+      <div
+        v-if="uploading"
+        class="kortex-upload-status"
+      >
+        <UIcon
+          name="i-lucide-loader-circle"
+          class="size-3.5 animate-spin"
+        />
+        <span>Enviando...</span>
+      </div>
       <EditorContent
         :editor="editor"
         class="kortex-editor-content"
@@ -773,6 +1077,82 @@ defineExpose({
       </div>
     </Teleport>
 
+    <Teleport to="body">
+      <div
+        v-if="mentionVisible"
+        class="kortex-mention-menu"
+        :style="{ top: `${mentionPos.y}px`, left: `${mentionPos.x}px` }"
+        @mousedown.prevent
+      >
+        <input
+          ref="mentionInputRef"
+          v-model="mentionQuery"
+          class="kortex-mention-input"
+          placeholder="@mencao"
+          @keydown.escape.prevent="closeMentionMenu"
+          @keydown.enter.prevent="insertMention(filteredMentionItems[0])"
+        >
+
+        <template v-if="filteredMentionItems.length">
+          <button
+            v-for="item in filteredMentionItems"
+            :key="item.id"
+            type="button"
+            class="kortex-mention-item"
+            @click="insertMention(item)"
+          >
+            <span class="kortex-mention-avatar">
+              {{ item.label.slice(0, 1).toUpperCase() }}
+            </span>
+            <span class="kortex-mention-copy">
+              <span>{{ item.label }}</span>
+              <small v-if="item.description">{{ item.description }}</small>
+            </span>
+          </button>
+        </template>
+
+        <button
+          v-else-if="mentionQuery.trim()"
+          type="button"
+          class="kortex-mention-item"
+          @click="insertMention()"
+        >
+          <span class="kortex-mention-avatar">@</span>
+          <span class="kortex-mention-copy">
+            <span>{{ mentionQuery.trim() }}</span>
+            <small>Mencao manual</small>
+          </span>
+        </button>
+
+        <p
+          v-else
+          class="kortex-menu-empty"
+        >
+          Digite uma mencao
+        </p>
+      </div>
+    </Teleport>
+
+    <Teleport to="body">
+      <div
+        v-if="emojiVisible"
+        class="kortex-emoji-menu"
+        :style="{ top: `${emojiPos.y}px`, left: `${emojiPos.x}px` }"
+        @mousedown.prevent
+      >
+        <button
+          v-for="item in emojiItems"
+          :key="item.name"
+          type="button"
+          class="kortex-emoji-item"
+          :title="item.label"
+          @click="insertEmoji(item)"
+        >
+          <span>{{ item.emoji }}</span>
+        </button>
+      </div>
+    </Teleport>
+
     <TiptapTableBar
       ref="tableBarRef"
       :editor="editor"
@@ -845,6 +1225,7 @@ defineExpose({
 }
 
 .kortex-editor-shell {
+  position: relative;
   min-height: var(--kortex-editor-min-height, 8rem);
 }
 
@@ -945,7 +1326,9 @@ defineExpose({
 }
 
 .kortex-slash-menu,
-.kortex-wiki-menu {
+.kortex-wiki-menu,
+.kortex-mention-menu,
+.kortex-emoji-menu {
   position: fixed;
   z-index: 9999;
   overflow-y: auto;
@@ -964,6 +1347,35 @@ defineExpose({
 .kortex-wiki-menu {
   width: 240px;
   max-height: 260px;
+}
+
+.kortex-mention-menu {
+  width: 260px;
+  max-height: 300px;
+}
+
+.kortex-emoji-menu {
+  display: grid;
+  grid-template-columns: repeat(4, 36px);
+  gap: 4px;
+}
+
+.kortex-upload-status {
+  position: absolute;
+  right: 0.75rem;
+  top: 0.625rem;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  border: 1px solid var(--ui-border);
+  border-radius: 999px;
+  background: var(--ui-bg);
+  color: var(--ui-text-muted);
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  pointer-events: none;
 }
 
 .kortex-menu-label {
@@ -1054,6 +1466,92 @@ defineExpose({
   color: var(--ui-text-muted);
   text-align: center;
   margin: 0;
+}
+
+.kortex-mention-input {
+  width: 100%;
+  border: 1px solid var(--ui-border);
+  border-radius: 6px;
+  background: var(--ui-bg-muted);
+  color: var(--ui-text-highlighted);
+  font-size: 0.8125rem;
+  outline: none;
+  padding: 0.45rem 0.55rem;
+  margin-bottom: 0.35rem;
+}
+
+.kortex-mention-input:focus {
+  border-color: var(--ui-color-primary, #18b981);
+}
+
+.kortex-mention-item {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  width: 100%;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ui-text-highlighted);
+  padding: 0.4rem 0.45rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.kortex-mention-item:hover {
+  background: var(--ui-bg-muted);
+}
+
+.kortex-mention-avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.55rem;
+  height: 1.55rem;
+  border-radius: 999px;
+  background: var(--ui-bg-elevated);
+  border: 1px solid var(--ui-border);
+  color: var(--ui-text-muted);
+  font-size: 0.75rem;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.kortex-mention-copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 0.05rem;
+  font-size: 0.8125rem;
+}
+
+.kortex-mention-copy span,
+.kortex-mention-copy small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kortex-mention-copy small {
+  color: var(--ui-text-muted);
+  font-size: 0.7rem;
+}
+
+.kortex-emoji-item {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  cursor: pointer;
+  font-size: 1.2rem;
+}
+
+.kortex-emoji-item:hover {
+  background: var(--ui-bg-muted);
 }
 </style>
 
@@ -1247,6 +1745,119 @@ defineExpose({
   background: color-mix(in srgb, var(--ui-color-primary, #18b981) 20%, transparent);
   text-decoration: underline;
   text-underline-offset: 2px;
+}
+
+.kortex-editor-content .tiptap [data-type="callout"] {
+  display: grid;
+  grid-template-columns: 1.6rem minmax(0, 1fr);
+  gap: 0.65rem;
+  border: 1px solid var(--ui-border);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--ui-color-primary, #18b981) 6%, var(--ui-bg));
+  padding: 0.7rem 0.8rem;
+  margin: 0.55rem 0;
+}
+
+.kortex-editor-content .tiptap [data-callout-icon] {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 0.1rem;
+  line-height: 1.4;
+}
+
+.kortex-editor-content .tiptap [data-callout-content] {
+  min-width: 0;
+}
+
+.kortex-editor-content .tiptap [data-callout-content] > *:first-child {
+  margin-top: 0;
+}
+
+.kortex-editor-content .tiptap [data-callout-content] > *:last-child {
+  margin-bottom: 0;
+}
+
+.kortex-editor-content .tiptap [data-type="editor-image"] {
+  margin: 0.8rem 0;
+}
+
+.kortex-editor-content .tiptap [data-type="editor-image"] img {
+  display: block;
+  width: 100%;
+  max-height: 520px;
+  object-fit: contain;
+  border-radius: 8px;
+  border: 1px solid var(--ui-border);
+  background: var(--ui-bg-muted);
+}
+
+.kortex-editor-content .tiptap [data-type="editor-image"] figcaption {
+  margin-top: 0.35rem;
+  color: var(--ui-text-muted);
+  font-size: 0.78rem;
+  text-align: center;
+}
+
+.kortex-editor-content .tiptap [data-type="editor-file"] {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  border: 1px solid var(--ui-border);
+  border-radius: 8px;
+  background: var(--ui-bg-muted);
+  color: var(--ui-text-highlighted) !important;
+  padding: 0.65rem 0.75rem;
+  margin: 0.55rem 0;
+  text-decoration: none;
+}
+
+.kortex-editor-content .tiptap [data-type="editor-file"]:hover {
+  background: var(--ui-bg-elevated);
+  opacity: 1;
+}
+
+.kortex-editor-content .tiptap [data-file-icon] {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 6px;
+  background: var(--ui-bg);
+  border: 1px solid var(--ui-border);
+  color: var(--ui-text-muted);
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  flex-shrink: 0;
+}
+
+.kortex-editor-content .tiptap [data-file-name] {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kortex-editor-content .tiptap .mention-node {
+  color: var(--ui-color-primary, #18b981);
+  background: color-mix(in srgb, var(--ui-color-primary, #18b981) 10%, transparent);
+  border-radius: 999px;
+  padding: 0.05em 0.4em;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.kortex-editor-content .tiptap .emoji-node {
+  display: inline-block;
+  transform: translateY(0.05em);
+}
+
+.kortex-editor-content .tiptap .ProseMirror-selectednode[data-type="editor-image"] img,
+.kortex-editor-content .tiptap .ProseMirror-selectednode[data-type="editor-file"] {
+  outline: 2px solid color-mix(in srgb, var(--ui-color-primary, #18b981) 45%, transparent);
+  outline-offset: 2px;
 }
 
 .kortex-editor-content .tiptap p.is-editor-empty:first-child::before {

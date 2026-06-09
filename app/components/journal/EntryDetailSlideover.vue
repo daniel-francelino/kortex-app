@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { JournalEntry } from '~/types/journal'
 import { getMoodOption } from '~/types/journal'
+import { isEditorContentEmpty } from '~/utils/editor/content'
 
 const props = defineProps<{
   open: boolean
@@ -50,17 +51,7 @@ async function loadEntry() {
 }
 
 function isContentEmpty(val: string): boolean {
-  if (!val) return true
-  try {
-    const doc = JSON.parse(val)
-    function nodeHasText(node: { type: string; text?: string; content?: unknown[] }): boolean {
-      if (node.type === 'text' && node.text?.trim()) return true
-      return (node.content ?? []).some(n => nodeHasText(n as typeof node))
-    }
-    return !(doc.content ?? []).some((n: { type: string; text?: string; content?: unknown[] }) => nodeHasText(n))
-  } catch {
-    return !val.trim()
-  }
+  return isEditorContentEmpty(val)
 }
 
 async function onSave() {

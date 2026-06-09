@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { JournalEntry } from '~/types/journal'
+import { isEditorContentEmpty } from '~/utils/editor/content'
 
 const props = defineProps<{
   todayEntry: JournalEntry | null
@@ -68,20 +69,7 @@ watch(
 )
 
 // ── Empty content check ────────────────────────────────────────────────────────
-const isContentEmpty = computed(() => {
-  const val = content.value
-  if (!val) return true
-  try {
-    const doc = JSON.parse(val)
-    function hasText(n: { type: string; text?: string; content?: unknown[] }): boolean {
-      if (n.type === 'text' && n.text?.trim()) return true
-      return (n.content ?? []).some(c => hasText(c as typeof n))
-    }
-    return !(doc.content ?? []).some((n: { type: string; text?: string; content?: unknown[] }) => hasText(n))
-  } catch {
-    return !val.trim()
-  }
-})
+const isContentEmpty = computed(() => isEditorContentEmpty(content.value))
 
 // True when editor has unsaved changes
 const hasChanges = computed(() =>
