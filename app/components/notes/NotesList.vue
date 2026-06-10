@@ -202,8 +202,8 @@ const hasFolders = computed(() => props.folders.length > 0)
 </script>
 
 <template>
-  <UContextMenu :items="rootActionItems">
-    <div class="flex flex-col h-full">
+  <UContextMenu :items="rootActionItems" class="flex flex-col h-full min-h-0">
+    <div class="flex flex-col h-full min-h-0">
       <!-- Loading skeleton -->
       <div v-if="loading" class="space-y-2 p-2">
         <USkeleton v-for="i in 6" :key="i" class="h-10 w-full" />
@@ -349,7 +349,7 @@ const hasFolders = computed(() => props.folders.length > 0)
 
         <!-- Root notes (no folder, or all notes when no folders exist) -->
         <div
-          class="flex-1 overflow-y-auto"
+          class="flex-1 min-h-0 overflow-y-auto"
           @dragover.prevent="hasFolders ? onRootDragOver($event) : undefined"
           @dragleave="hasFolders ? onRootDragLeave($event) : undefined"
           @drop.prevent="hasFolders ? onRootDrop($event) : undefined"
