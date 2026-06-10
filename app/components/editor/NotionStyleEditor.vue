@@ -171,6 +171,9 @@ const editorShellHovered = useElementHover(editorShellRef)
 const blockMenuDropdownOpen = computed(() => blockMenuRef.value?.dropdownOpen ?? false)
 const dropIndicatorY = ref<number | null>(null)
 const dropIndicatorRect = ref<{ left: number; width: number } | null>(null)
+const dropColumnSide = ref<'left' | 'right' | null>(null)
+const dropColumnTargetIndex = ref<number | null>(null)
+const dropColumnIndicator = ref<{ x: number; top: number; height: number } | null>(null)
 let slashFromButton = false
 
 const { copy: copyToClipboard } = useClipboard({ legacy: true })
@@ -1097,6 +1100,63 @@ function onBlockDragEnd() {
   draggingBlockIndex.value = null
   dropIndicatorY.value = null
   dropIndicatorRect.value = null
+  dropColumnSide.value = null
+  dropColumnTargetIndex.value = null
+  dropColumnIndicator.value = null
+}
+
+function getEdgeZone(event: DragEvent): 'left' | 'right' | null {
+  const shell = editorShellRef.value
+  if (!shell) return null
+  const rect = shell.getBoundingClientRect()
+  const relX = (event.clientX - rect.left) / rect.width
+  if (relX < 0.3) return 'left'
+  if (relX > 0.7) return 'right'
+  return null
+}
+
+function findBlockAtY(clientY: number): TopLevelBlock | null {
+  const instance = editor.value
+  if (!instance) return null
+  const blocks = getTopLevelBlocks(instance)
+  for (const block of blocks) {
+    try {
+      const top = instance.view.coordsAtPos(Math.min(block.from + 1, instance.state.doc.content.size)).top
+      const bottom = instance.view.coordsAtPos(Math.min(block.to - 1, instance.state.doc.content.size)).bottom
+      if (clientY >= top && clientY <= bottom) return block
+    } catch { continue }
+  }
+  return null
+}
+
+function createColumnsFromBlocks(sourceIndex: number, targetIndex: number, side: 'left' | 'right') {
+  const instance = editor.value
+  if (!instance || sourceIndex === targetIndex) return
+
+  const blocks = getTopLevelBlocks(instance)
+  const sourceBlock = blocks[sourceIndex]
+  const targetBlock = blocks[targetIndex]
+  if (!sourceBlock || !targetBlock) return
+
+  const schema = instance.state.schema
+  const leftNode = side === 'left' ? sourceBlock.node : targetBlock.node
+  const rightNode = side === 'left' ? targetBlock.node : sourceBlock.node
+
+  const columnsNode = schema.nodes.columns!.create(null, [
+    schema.nodes.column!.create({ width: 50 }, [leftNode]),
+    schema.nodes.column!.create({ width: 50 }, [rightNode])
+  ])
+
+  const newContent = blocks
+    .filter(b => b.index !== sourceIndex)
+    .map(b => b.index === targetIndex ? columnsNode : b.node)
+
+  instance.chain()
+    .command(({ tr, state }) => {
+      tr.replaceWith(0, state.doc.content.size, newContent)
+      return true
+    })
+    .run()
 }
 
 function onEditorDragOver(event: DragEvent) {
@@ -1110,9 +1170,32 @@ function onEditorDragOver(event: DragEvent) {
   const shell = editorShellRef.value
   if (!instance || !shell || draggingBlockIndex.value === null) return
 
-  const shellRect = shell.getBoundingClientRect()
   const blocks = getTopLevelBlocks(instance)
 
+  // ── Column-creation zone detection ───────────────────────────────────────
+  const edgeSide = getEdgeZone(event)
+  if (edgeSide) {
+    const hoveredBlock = findBlockAtY(event.clientY)
+    if (hoveredBlock && hoveredBlock.index !== draggingBlockIndex.value) {
+      try {
+        const top = instance.view.coordsAtPos(Math.min(hoveredBlock.from + 1, instance.state.doc.content.size)).top
+        const bottom = instance.view.coordsAtPos(Math.min(hoveredBlock.to - 1, instance.state.doc.content.size)).bottom
+        dropColumnSide.value = edgeSide
+        dropColumnTargetIndex.value = hoveredBlock.index
+        dropColumnIndicator.value = { x: event.clientX, top, height: bottom - top }
+        dropIndicatorY.value = null
+        dropIndicatorRect.value = null
+        return
+      } catch { /* fall through to normal mode */ }
+    }
+  }
+
+  // ── Normal vertical reorder indicator ────────────────────────────────────
+  dropColumnSide.value = null
+  dropColumnTargetIndex.value = null
+  dropColumnIndicator.value = null
+
+  const shellRect = shell.getBoundingClientRect()
   let contentLeft = shellRect.left + 8
   const firstBlock = blocks[0]
   if (firstBlock) {
@@ -1147,10 +1230,19 @@ function onEditorDrop(event: DragEvent) {
   if (sourceIndex === null || Number.isNaN(sourceIndex)) return
 
   event.preventDefault()
-  reorderBlock(sourceIndex, findDropTargetIndex(event.clientY))
+
+  if (dropColumnSide.value !== null && dropColumnTargetIndex.value !== null) {
+    createColumnsFromBlocks(sourceIndex, dropColumnTargetIndex.value, dropColumnSide.value)
+  } else {
+    reorderBlock(sourceIndex, findDropTargetIndex(event.clientY))
+  }
+
   draggingBlockIndex.value = null
   dropIndicatorY.value = null
   dropIndicatorRect.value = null
+  dropColumnSide.value = null
+  dropColumnTargetIndex.value = null
+  dropColumnIndicator.value = null
 }
 
 function findDropTargetIndex(clientY: number): number {
@@ -1416,6 +1508,15 @@ defineExpose({
           width: `${dropIndicatorRect.width}px`
         }"
       />
+      <div
+        v-if="dropColumnIndicator !== null"
+        class="kortex-column-drop-indicator"
+        :style="{
+          left: `${dropColumnIndicator.x}px`,
+          top: `${dropColumnIndicator.top}px`,
+          height: `${dropColumnIndicator.height}px`
+        }"
+      />
     </Teleport>
 
     <EditorMentionMenu
@@ -1628,6 +1729,17 @@ defineExpose({
   z-index: 9998;
   pointer-events: none;
   border-radius: 1px;
+}
+
+.kortex-column-drop-indicator {
+  position: fixed;
+  width: 2px;
+  background: var(--ui-color-primary, #18b981);
+  z-index: 9998;
+  pointer-events: none;
+  border-radius: 1px;
+  transform: translateX(-50%);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ui-color-primary, #18b981) 20%, transparent);
 }
 
 .kortex-slash-menu,
