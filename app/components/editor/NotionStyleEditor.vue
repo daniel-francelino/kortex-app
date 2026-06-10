@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { Editor, Range } from '@tiptap/core'
 import { EditorContent, useEditor } from '@tiptap/vue-3'
-import { useElementHover, useEventListener, useThrottleFn } from '@vueuse/core'
+import { useClipboard, useElementHover, useEventListener, useThrottleFn, useTimeoutFn } from '@vueuse/core'
 import type { NotionCommandItem, WikiSuggestionItem } from '~/composables/useNotionEditor'
 import {
   createNotionCommandItems,
@@ -167,9 +167,24 @@ const blockPos = ref({ x: 0, y: 0 })
 const draggingBlockIndex = ref<number | null>(null)
 const blockMenuRef = ref<{ containerRef: HTMLElement | null } | null>(null)
 const menuHovered = useElementHover(computed(() => blockMenuRef.value?.containerRef ?? null))
+const editorShellHovered = useElementHover(editorShellRef)
 const dropIndicatorY = ref<number | null>(null)
 const dropIndicatorRect = ref<{ left: number; width: number } | null>(null)
 let slashFromButton = false
+
+const { copy: copyToClipboard } = useClipboard({ legacy: true })
+
+const { start: hideBlockDelayed } = useTimeoutFn(
+  () => { if (!menuHovered.value) blockVisible.value = false },
+  150,
+  { immediate: false }
+)
+
+const { start: hideBlockFromMenu } = useTimeoutFn(
+  () => { if (!editorShellHovered.value) blockVisible.value = false },
+  100,
+  { immediate: false }
+)
 
 const resolvedMentionItems = computed<MentionSuggestionItem[]>(() => {
   if (props.mentionItems.length) return props.mentionItems
@@ -1045,7 +1060,7 @@ function deleteActiveBlock() {
 function copyActiveBlockText() {
   const text = activeBlock.value?.node?.textContent ?? ''
   if (!text.trim()) return
-  void navigator.clipboard?.writeText(text)
+  void copyToClipboard(text)
 }
 
 function copyActiveBlockLink() {
@@ -1054,7 +1069,7 @@ function copyActiveBlockLink() {
 
   const url = new URL(window.location.href)
   url.hash = `block-${blockId}`
-  void navigator.clipboard?.writeText(url.href)
+  void copyToClipboard(url.href)
   toast.add({
     title: 'Link copiado',
     description: 'Referencia direta do bloco copiada.',
@@ -1196,17 +1211,11 @@ function handleHoverMove(event: MouseEvent) {
 }
 
 function onEditorMouseLeave() {
-  setTimeout(() => {
-    if (!menuHovered.value) blockVisible.value = false
-  }, 150)
+  hideBlockDelayed()
 }
 
 watch(menuHovered, (hovered) => {
-  if (!hovered) {
-    setTimeout(() => {
-      if (!editorShellRef.value?.matches(':hover')) blockVisible.value = false
-    }, 100)
-  }
+  if (!hovered) hideBlockFromMenu()
 })
 
 function addBlockAfterActive() {
