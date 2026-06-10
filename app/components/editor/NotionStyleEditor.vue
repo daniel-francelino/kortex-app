@@ -165,9 +165,10 @@ const activeBlock = ref<TopLevelBlock | null>(null)
 const blockVisible = ref(false)
 const blockPos = ref({ x: 0, y: 0 })
 const draggingBlockIndex = ref<number | null>(null)
-const blockMenuRef = ref<{ containerRef: HTMLElement | null } | null>(null)
+const blockMenuRef = ref<{ containerRef: HTMLElement | null; dropdownOpen: boolean } | null>(null)
 const menuHovered = useElementHover(computed(() => blockMenuRef.value?.containerRef ?? null))
 const editorShellHovered = useElementHover(editorShellRef)
+const blockMenuDropdownOpen = computed(() => blockMenuRef.value?.dropdownOpen ?? false)
 const dropIndicatorY = ref<number | null>(null)
 const dropIndicatorRect = ref<{ left: number; width: number } | null>(null)
 let slashFromButton = false
@@ -175,16 +176,22 @@ let slashFromButton = false
 const { copy: copyToClipboard } = useClipboard({ legacy: true })
 
 const { start: hideBlockDelayed } = useTimeoutFn(
-  () => { if (!menuHovered.value) blockVisible.value = false },
+  () => { if (!menuHovered.value && !blockMenuDropdownOpen.value) blockVisible.value = false },
   150,
   { immediate: false }
 )
 
 const { start: hideBlockFromMenu } = useTimeoutFn(
-  () => { if (!editorShellHovered.value) blockVisible.value = false },
+  () => { if (!editorShellHovered.value && !blockMenuDropdownOpen.value) blockVisible.value = false },
   100,
   { immediate: false }
 )
+
+watch(blockMenuDropdownOpen, (open) => {
+  if (!open && !editorShellHovered.value && !menuHovered.value) {
+    blockVisible.value = false
+  }
+})
 
 const resolvedMentionItems = computed<MentionSuggestionItem[]>(() => {
   if (props.mentionItems.length) return props.mentionItems

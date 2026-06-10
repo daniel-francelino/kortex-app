@@ -21,7 +21,8 @@ const emit = defineEmits<{
 }>()
 
 const containerRef = ref<HTMLElement | null>(null)
-defineExpose({ containerRef })
+const dropdownOpen = ref(false)
+defineExpose({ containerRef, dropdownOpen })
 
 const contextItems = computed(() => [
   [
@@ -118,12 +119,13 @@ const contextItems = computed(() => [
       </button>
 
       <!-- Drag handle + context menu -->
-      <UDropdownMenu :items="contextItems">
+      <UDropdownMenu v-model:open="dropdownOpen" :items="contextItems">
         <button
           type="button"
           class="kortex-block-btn kortex-block-drag"
           title="Arrastar ou abrir opções"
           draggable="true"
+          @mousedown.stop
           @dragstart="emit('dragstart', $event)"
           @dragend="emit('dragend')"
         >
