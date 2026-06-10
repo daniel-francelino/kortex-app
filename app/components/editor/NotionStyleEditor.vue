@@ -1070,20 +1070,6 @@ function copyActiveBlockText() {
   void copyToClipboard(text)
 }
 
-function copyActiveBlockLink() {
-  const blockId = activeBlock.value?.node?.attrs.blockId
-  if (!blockId) return
-
-  const url = new URL(window.location.href)
-  url.hash = `block-${blockId}`
-  void copyToClipboard(url.href)
-  toast.add({
-    title: 'Link copiado',
-    description: 'Referencia direta do bloco copiada.',
-    color: 'success'
-  })
-}
-
 function turnActiveBlockInto(kind: 'paragraph' | 'heading1' | 'heading2' | 'heading3' | 'bulletList' | 'taskList') {
   const instance = editor.value
   if (!instance) return
@@ -1402,7 +1388,6 @@ defineExpose({
       @move="moveActiveBlock"
       @transform="turnActiveBlockInto"
       @duplicate="duplicateActiveBlock"
-      @copy-link="copyActiveBlockLink"
       @copy-text="copyActiveBlockText"
       @delete="deleteActiveBlock"
       @dragstart="onBlockDragStart"

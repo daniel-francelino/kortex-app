@@ -6,82 +6,235 @@ const props = defineProps<{
   visible: boolean
   pos: { x: number, y: number }
 }>()
+
+type BubbleView = 'toolbar' | 'link' | 'turninto'
+
+const view = ref<BubbleView>('toolbar')
+const linkUrl = ref('')
+const linkInputRef = ref<HTMLInputElement | null>(null)
+const bubbleRef = ref<HTMLElement | null>(null)
+
+const BLOCK_TYPES = [
+  { key: 'paragraph', label: 'Texto', icon: 'i-lucide-type', action: (e: Editor) => e.chain().focus().setParagraph().run() },
+  { key: 'heading1', label: 'Título 1', icon: 'i-lucide-heading-1', action: (e: Editor) => e.chain().focus().setHeading({ level: 1 }).run() },
+  { key: 'heading2', label: 'Título 2', icon: 'i-lucide-heading-2', action: (e: Editor) => e.chain().focus().setHeading({ level: 2 }).run() },
+  { key: 'heading3', label: 'Título 3', icon: 'i-lucide-heading-3', action: (e: Editor) => e.chain().focus().setHeading({ level: 3 }).run() },
+  { key: 'bulletList', label: 'Lista com marcadores', icon: 'i-lucide-list', action: (e: Editor) => e.chain().focus().toggleBulletList().run() },
+  { key: 'orderedList', label: 'Lista numerada', icon: 'i-lucide-list-ordered', action: (e: Editor) => e.chain().focus().toggleOrderedList().run() },
+  { key: 'blockquote', label: 'Citação', icon: 'i-lucide-quote', action: (e: Editor) => e.chain().focus().toggleBlockquote().run() },
+  { key: 'codeBlock', label: 'Bloco de código', icon: 'i-lucide-code-2', action: (e: Editor) => e.chain().focus().toggleCodeBlock().run() },
+]
+
+const currentBlockType = computed(() => {
+  const e = props.editor
+  if (!e) return BLOCK_TYPES[0]!
+  if (e.isActive('heading', { level: 1 })) return BLOCK_TYPES[1]!
+  if (e.isActive('heading', { level: 2 })) return BLOCK_TYPES[2]!
+  if (e.isActive('heading', { level: 3 })) return BLOCK_TYPES[3]!
+  if (e.isActive('bulletList')) return BLOCK_TYPES[4]!
+  if (e.isActive('orderedList')) return BLOCK_TYPES[5]!
+  if (e.isActive('blockquote')) return BLOCK_TYPES[6]!
+  if (e.isActive('codeBlock')) return BLOCK_TYPES[7]!
+  return BLOCK_TYPES[0]!
+})
+
+function openLinkView() {
+  const existing = props.editor?.getAttributes('link').href ?? ''
+  linkUrl.value = existing
+  view.value = 'link'
+  nextTick(() => linkInputRef.value?.focus())
+}
+
+function applyLink() {
+  const url = linkUrl.value.trim()
+  if (url) {
+    const href = /^https?:\/\//.test(url) ? url : `https://${url}`
+    props.editor?.chain().focus().setLink({ href }).run()
+  } else {
+    props.editor?.chain().focus().unsetLink().run()
+  }
+  view.value = 'toolbar'
+  linkUrl.value = ''
+}
+
+function selectBlockType(item: typeof BLOCK_TYPES[number]) {
+  if (props.editor) item.action(props.editor)
+  view.value = 'toolbar'
+}
+
+function clearFormatting() {
+  props.editor?.chain().focus().clearNodes().unsetAllMarks().run()
+}
+
+watch(() => props.visible, (v) => {
+  if (!v) {
+    view.value = 'toolbar'
+    linkUrl.value = ''
+  }
+})
 </script>
 
 <template>
   <Teleport to="body">
-    <div
-      v-if="visible"
-      class="kortex-bubble"
-      :style="{ left: `${pos.x}px`, top: `${pos.y}px` }"
-      @mousedown.prevent
-    >
-      <button
-        type="button"
-        :class="['kortex-menu-btn', { active: props.editor?.isActive('bold') }]"
-        title="Negrito"
-        @click="props.editor?.chain().focus().toggleBold().run()"
+    <Transition name="kortex-bubble-anim">
+      <div
+        v-if="visible"
+        ref="bubbleRef"
+        class="kortex-bubble"
+        :class="`kortex-bubble--${view}`"
+        :style="{ left: `${pos.x}px`, top: `${pos.y}px` }"
+        @mousedown.prevent
       >
-        <UIcon name="i-lucide-bold" class="size-3.5" />
-      </button>
-      <button
-        type="button"
-        :class="['kortex-menu-btn', { active: props.editor?.isActive('italic') }]"
-        title="Italico"
-        @click="props.editor?.chain().focus().toggleItalic().run()"
-      >
-        <UIcon name="i-lucide-italic" class="size-3.5" />
-      </button>
-      <button
-        type="button"
-        :class="['kortex-menu-btn', { active: props.editor?.isActive('underline') }]"
-        title="Sublinhado"
-        @click="props.editor?.chain().focus().toggleUnderline().run()"
-      >
-        <UIcon name="i-lucide-underline" class="size-3.5" />
-      </button>
-      <button
-        type="button"
-        :class="['kortex-menu-btn', { active: props.editor?.isActive('strike') }]"
-        title="Tachado"
-        @click="props.editor?.chain().focus().toggleStrike().run()"
-      >
-        <UIcon name="i-lucide-strikethrough" class="size-3.5" />
-      </button>
-      <button
-        type="button"
-        :class="['kortex-menu-btn', { active: props.editor?.isActive('code') }]"
-        title="Codigo inline"
-        @click="props.editor?.chain().focus().toggleCode().run()"
-      >
-        <UIcon name="i-lucide-code" class="size-3.5" />
-      </button>
-      <div class="kortex-menu-sep" />
-      <button
-        type="button"
-        :class="['kortex-menu-btn kortex-menu-btn--text', { active: props.editor?.isActive('heading', { level: 1 }) }]"
-        title="Titulo 1"
-        @click="props.editor?.chain().focus().toggleHeading({ level: 1 }).run()"
-      >
-        H1
-      </button>
-      <button
-        type="button"
-        :class="['kortex-menu-btn kortex-menu-btn--text', { active: props.editor?.isActive('heading', { level: 2 }) }]"
-        title="Titulo 2"
-        @click="props.editor?.chain().focus().toggleHeading({ level: 2 }).run()"
-      >
-        H2
-      </button>
-      <button
-        type="button"
-        :class="['kortex-menu-btn kortex-menu-btn--text', { active: props.editor?.isActive('heading', { level: 3 }) }]"
-        title="Titulo 3"
-        @click="props.editor?.chain().focus().toggleHeading({ level: 3 }).run()"
-      >
-        H3
-      </button>
-    </div>
+        <!-- Link editing view -->
+        <template v-if="view === 'link'">
+          <button
+            type="button"
+            class="kortex-menu-btn"
+            title="Voltar"
+            @click="view = 'toolbar'"
+          >
+            <UIcon name="i-lucide-arrow-left" class="size-3.5" />
+          </button>
+          <div class="kortex-bubble-link-wrap">
+            <UIcon name="i-lucide-link" class="size-3 text-muted shrink-0" />
+            <input
+              ref="linkInputRef"
+              v-model="linkUrl"
+              class="kortex-bubble-link-input"
+              placeholder="Cole ou digite um URL..."
+              @keydown.enter.prevent="applyLink"
+              @keydown.escape.prevent="view = 'toolbar'"
+            >
+          </div>
+          <button
+            type="button"
+            class="kortex-menu-btn"
+            :disabled="!linkUrl.trim()"
+            title="Aplicar"
+            @click="applyLink"
+          >
+            <UIcon name="i-lucide-check" class="size-3.5" />
+          </button>
+          <template v-if="editor?.isActive('link')">
+            <div class="kortex-menu-sep" />
+            <button
+              type="button"
+              class="kortex-menu-btn kortex-menu-btn--danger"
+              title="Remover link"
+              @click="editor?.chain().focus().unsetLink().run(); view = 'toolbar'"
+            >
+              <UIcon name="i-lucide-unlink" class="size-3.5" />
+            </button>
+          </template>
+        </template>
+
+        <!-- Turn into view -->
+        <template v-else-if="view === 'turninto'">
+          <button
+            type="button"
+            class="kortex-menu-btn"
+            title="Voltar"
+            @click="view = 'toolbar'"
+          >
+            <UIcon name="i-lucide-arrow-left" class="size-3.5" />
+          </button>
+          <div class="kortex-menu-sep" />
+          <p class="kortex-bubble-section-label">
+            Converter em
+          </p>
+          <div class="kortex-menu-sep" />
+          <button
+            v-for="item in BLOCK_TYPES"
+            :key="item.key"
+            type="button"
+            :class="['kortex-menu-btn kortex-bubble-turn-btn', { active: currentBlockType.key === item.key }]"
+            :title="item.label"
+            @click="selectBlockType(item)"
+          >
+            <UIcon :name="item.icon" class="size-3.5" />
+          </button>
+        </template>
+
+        <!-- Default toolbar -->
+        <template v-else>
+          <!-- Block type indicator -->
+          <button
+            type="button"
+            class="kortex-menu-btn kortex-bubble-type-btn"
+            title="Converter tipo de bloco"
+            @click="view = 'turninto'"
+          >
+            <UIcon :name="currentBlockType.icon" class="size-3.5" />
+            <span class="kortex-bubble-type-label">{{ currentBlockType.label }}</span>
+            <UIcon name="i-lucide-chevron-down" class="size-3 opacity-50" />
+          </button>
+
+          <div class="kortex-menu-sep" />
+
+          <!-- Text marks -->
+          <button
+            type="button"
+            :class="['kortex-menu-btn', { active: editor?.isActive('bold') }]"
+            title="Negrito"
+            @click="editor?.chain().focus().toggleBold().run()"
+          >
+            <UIcon name="i-lucide-bold" class="size-3.5" />
+          </button>
+          <button
+            type="button"
+            :class="['kortex-menu-btn', { active: editor?.isActive('italic') }]"
+            title="Itálico"
+            @click="editor?.chain().focus().toggleItalic().run()"
+          >
+            <UIcon name="i-lucide-italic" class="size-3.5" />
+          </button>
+          <button
+            type="button"
+            :class="['kortex-menu-btn', { active: editor?.isActive('underline') }]"
+            title="Sublinhado"
+            @click="editor?.chain().focus().toggleUnderline().run()"
+          >
+            <UIcon name="i-lucide-underline" class="size-3.5" />
+          </button>
+          <button
+            type="button"
+            :class="['kortex-menu-btn', { active: editor?.isActive('strike') }]"
+            title="Tachado"
+            @click="editor?.chain().focus().toggleStrike().run()"
+          >
+            <UIcon name="i-lucide-strikethrough" class="size-3.5" />
+          </button>
+          <button
+            type="button"
+            :class="['kortex-menu-btn', { active: editor?.isActive('code') }]"
+            title="Código inline"
+            @click="editor?.chain().focus().toggleCode().run()"
+          >
+            <UIcon name="i-lucide-code" class="size-3.5" />
+          </button>
+
+          <div class="kortex-menu-sep" />
+
+          <!-- Link & utilities -->
+          <button
+            type="button"
+            :class="['kortex-menu-btn', { active: editor?.isActive('link') }]"
+            title="Link"
+            @click="openLinkView"
+          >
+            <UIcon name="i-lucide-link" class="size-3.5" />
+          </button>
+          <button
+            type="button"
+            class="kortex-menu-btn"
+            title="Limpar formatação"
+            @click="clearFormatting"
+          >
+            <UIcon name="i-lucide-remove-formatting" class="size-3.5" />
+          </button>
+        </template>
+      </div>
+    </Transition>
   </Teleport>
 </template>
 
@@ -96,11 +249,103 @@ const props = defineProps<{
   border-radius: 8px;
   background: var(--ui-bg);
   border: 1px solid var(--ui-border);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12), 0 1px 4px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.14), 0 2px 6px rgba(0, 0, 0, 0.08);
   white-space: nowrap;
   transform: translateX(-50%) translateY(calc(-100% - 8px));
+  will-change: transform, opacity;
 }
 
+.kortex-bubble--link {
+  min-width: 280px;
+}
+
+/* Entrance animation */
+.kortex-bubble-anim-enter-active {
+  transition: opacity 0.12s ease, transform 0.12s cubic-bezier(0.2, 0, 0, 1.2);
+}
+
+.kortex-bubble-anim-leave-active {
+  transition: opacity 0.08s ease, transform 0.08s ease;
+}
+
+.kortex-bubble-anim-enter-from {
+  opacity: 0;
+  transform: translateX(-50%) translateY(calc(-100% - 4px)) scale(0.94);
+}
+
+.kortex-bubble-anim-leave-to {
+  opacity: 0;
+  transform: translateX(-50%) translateY(calc(-100% - 12px)) scale(0.96);
+}
+
+/* Block type button */
+.kortex-bubble-type-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 8px;
+  min-width: unset;
+}
+
+.kortex-bubble-type-label {
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: var(--ui-text-muted);
+  max-width: 72px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kortex-bubble-type-btn:hover .kortex-bubble-type-label {
+  color: var(--ui-text-highlighted);
+}
+
+/* Turn-into view */
+.kortex-bubble-section-label {
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--ui-text-dimmed);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 0 6px;
+  margin: 0;
+  white-space: nowrap;
+}
+
+.kortex-bubble-turn-btn {
+  min-width: 28px;
+}
+
+/* Link editing */
+.kortex-bubble-link-wrap {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0 6px;
+  flex: 1;
+  min-width: 0;
+  border-radius: 5px;
+  background: var(--ui-bg-muted);
+  height: 26px;
+}
+
+.kortex-bubble-link-input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  outline: none;
+  font-size: 0.8125rem;
+  color: var(--ui-text-highlighted);
+  line-height: 1;
+}
+
+.kortex-bubble-link-input::placeholder {
+  color: var(--ui-text-dimmed);
+}
+
+/* Shared button styles */
 .kortex-menu-btn {
   display: flex;
   align-items: center;
@@ -114,12 +359,7 @@ const props = defineProps<{
   color: var(--ui-text-muted);
   cursor: pointer;
   transition: background 0.1s, color 0.1s, opacity 0.1s;
-}
-
-.kortex-menu-btn--text {
-  font-size: 0.7rem;
-  font-weight: 700;
-  letter-spacing: 0;
+  flex-shrink: 0;
 }
 
 .kortex-menu-btn:hover {
@@ -130,6 +370,16 @@ const props = defineProps<{
 .kortex-menu-btn.active {
   background: var(--ui-bg-elevated);
   color: var(--ui-color-primary, #18b981);
+}
+
+.kortex-menu-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.kortex-menu-btn--danger:hover {
+  background: color-mix(in srgb, var(--ui-color-error, #ef4444) 10%, transparent);
+  color: var(--ui-color-error, #ef4444);
 }
 
 .kortex-menu-sep {

@@ -78,11 +78,6 @@ const contextItems = computed(() => [
       onSelect: () => emit('duplicate')
     },
     {
-      label: 'Copiar link do bloco',
-      icon: 'i-lucide-link',
-      onSelect: () => emit('copy-link')
-    },
-    {
       label: 'Copiar texto',
       icon: 'i-lucide-copy',
       onSelect: () => emit('copy-text')
