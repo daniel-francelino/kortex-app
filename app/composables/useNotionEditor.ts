@@ -2,6 +2,7 @@ import { Extension, Node as TiptapNode, mergeAttributes } from '@tiptap/core'
 import type { Editor, NodeViewRenderer, Range } from '@tiptap/core'
 import { VueNodeViewRenderer } from '@tiptap/vue-3'
 import Link from '@tiptap/extension-link'
+import EditorColumnNodeView from '~/components/editor/nodes/EditorColumnNodeView.vue'
 import Placeholder from '@tiptap/extension-placeholder'
 import { Table, TableCell, TableHeader, TableRow } from '@tiptap/extension-table'
 import TaskItem from '@tiptap/extension-task-item'
@@ -186,29 +187,29 @@ export function createNotionCommandItems(actions: NotionCommandActions = {}): No
     {
       group: 'Avançado',
       title: '2 Colunas',
-      description: 'Divide o bloco em 2 colunas',
+      description: 'Divide o bloco em 2 colunas iguais',
       icon: 'i-lucide-columns-2',
       command: ({ editor, range }) =>
         editor.chain().focus().deleteRange(range).insertContent({
           type: 'columns',
           content: [
-            { type: 'column', content: [{ type: 'paragraph' }] },
-            { type: 'column', content: [{ type: 'paragraph' }] }
+            { type: 'column', attrs: { width: 50 }, content: [{ type: 'paragraph' }] },
+            { type: 'column', attrs: { width: 50 }, content: [{ type: 'paragraph' }] }
           ]
         }).run()
     },
     {
       group: 'Avançado',
       title: '3 Colunas',
-      description: 'Divide o bloco em 3 colunas',
+      description: 'Divide o bloco em 3 colunas iguais',
       icon: 'i-lucide-columns-3',
       command: ({ editor, range }) =>
         editor.chain().focus().deleteRange(range).insertContent({
           type: 'columns',
           content: [
-            { type: 'column', content: [{ type: 'paragraph' }] },
-            { type: 'column', content: [{ type: 'paragraph' }] },
-            { type: 'column', content: [{ type: 'paragraph' }] }
+            { type: 'column', attrs: { width: 33.33 }, content: [{ type: 'paragraph' }] },
+            { type: 'column', attrs: { width: 33.33 }, content: [{ type: 'paragraph' }] },
+            { type: 'column', attrs: { width: 33.34 }, content: [{ type: 'paragraph' }] }
           ]
         }).run()
     },
@@ -599,12 +600,29 @@ export const ColumnNode = TiptapNode.create({
   content: 'block+',
   isolating: true,
 
+  addAttributes() {
+    return {
+      width: { default: null }
+    }
+  },
+
   parseHTML() {
     return [{ tag: 'div[data-type="column"]' }]
   },
 
-  renderHTML({ HTMLAttributes }) {
-    return ['div', mergeAttributes(HTMLAttributes, { 'data-type': 'column' }), 0]
+  renderHTML({ node, HTMLAttributes }) {
+    return [
+      'div',
+      mergeAttributes(HTMLAttributes, {
+        'data-type': 'column',
+        'style': node.attrs.width ? `flex: 0 0 ${node.attrs.width}%` : undefined
+      }),
+      0
+    ]
+  },
+
+  addNodeView(): NodeViewRenderer {
+    return VueNodeViewRenderer(EditorColumnNodeView)
   }
 })
 
