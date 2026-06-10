@@ -888,6 +888,44 @@ function selectWikiItem(item: WikiSuggestionItem) {
   hideWikiSuggestion()
 }
 
+function resolveFirstInlinePos(instance: Editor, block: TopLevelBlock): number {
+  const doc = instance.state.doc
+  let pos = block.from + 1
+
+  // Walk down nested block nodes (callout, blockquote, table, etc.) until we
+  // reach a node with inline content (paragraph, heading, codeBlock, etc.)
+  for (let depth = 0; depth < 8; depth++) {
+    if (pos >= block.to) break
+    try {
+      const resolved = doc.resolve(pos)
+      if (resolved.parent.inlineContent) break
+      pos += 1
+    } catch {
+      break
+    }
+  }
+
+  return Math.min(pos, doc.content.size - 1)
+}
+
+function getBlockControlCoords(instance: Editor, block: TopLevelBlock) {
+  const textPos = resolveFirstInlinePos(instance, block)
+  const coords = instance.view.coordsAtPos(textPos)
+
+  // Use the block's outer DOM element for the X position so nested content
+  // (callout icon, table cell padding, etc.) doesn't push the buttons too far right
+  const domEl = instance.view.nodeDOM(block.from)
+  const blockLeft = domEl instanceof Element
+    ? domEl.getBoundingClientRect().left
+    : coords.left
+
+  return {
+    left: blockLeft,
+    top: coords.top,
+    bottom: coords.bottom
+  }
+}
+
 function getTopLevelBlocks(instance = editor.value): TopLevelBlock[] {
   if (!instance) return []
 
@@ -929,7 +967,7 @@ function updateBlockTools() {
   }
 
   try {
-    const coords = instance.view.coordsAtPos(Math.min(block.from + 1, instance.state.doc.content.size))
+    const coords = getBlockControlCoords(instance, block)
     activeBlock.value = block
     blockPos.value = {
       x: Math.max(8, coords.left - 4),
@@ -1147,7 +1185,7 @@ function handleHoverMove(event: MouseEvent) {
   if (!block) return
 
   try {
-    const coords = instance.view.coordsAtPos(Math.min(block.from + 1, instance.state.doc.content.size))
+    const coords = getBlockControlCoords(instance, block)
     activeBlock.value = block
     blockPos.value = {
       x: Math.max(8, coords.left - 4),
