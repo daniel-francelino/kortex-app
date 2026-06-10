@@ -2464,4 +2464,25 @@ defineExpose({
 .kortex-editor-content .tiptap .resize-cursor {
   cursor: col-resize;
 }
+
+.kortex-editor-content .tiptap [data-type="columns"] {
+  display: flex;
+  gap: 0.75rem;
+  margin: 0.55rem 0;
+}
+
+.kortex-editor-content .tiptap [data-type="column"] {
+  flex: 1;
+  min-width: 0;
+  border-left: 2px solid var(--ui-border);
+  padding-left: 0.75rem;
+}
+
+.kortex-editor-content .tiptap [data-type="column"] > *:first-child {
+  margin-top: 0;
+}
+
+.kortex-editor-content .tiptap [data-type="column"] > *:last-child {
+  margin-bottom: 0;
+}
 </style>

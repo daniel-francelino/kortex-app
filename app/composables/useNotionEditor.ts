@@ -6,6 +6,7 @@ import Placeholder from '@tiptap/extension-placeholder'
 import { Table, TableCell, TableHeader, TableRow } from '@tiptap/extension-table'
 import TaskItem from '@tiptap/extension-task-item'
 import TaskList from '@tiptap/extension-task-list'
+import TextAlign from '@tiptap/extension-text-align'
 import Underline from '@tiptap/extension-underline'
 import StarterKit from '@tiptap/starter-kit'
 import Suggestion from '@tiptap/suggestion'
@@ -182,6 +183,35 @@ export function createNotionCommandItems(actions: NotionCommandActions = {}): No
       icon: 'i-lucide-minus',
       command: ({ editor, range }) => editor.chain().focus().deleteRange(range).setHorizontalRule().run()
     },
+    {
+      group: 'Avançado',
+      title: '2 Colunas',
+      description: 'Divide o bloco em 2 colunas',
+      icon: 'i-lucide-columns-2',
+      command: ({ editor, range }) =>
+        editor.chain().focus().deleteRange(range).insertContent({
+          type: 'columns',
+          content: [
+            { type: 'column', content: [{ type: 'paragraph' }] },
+            { type: 'column', content: [{ type: 'paragraph' }] }
+          ]
+        }).run()
+    },
+    {
+      group: 'Avançado',
+      title: '3 Colunas',
+      description: 'Divide o bloco em 3 colunas',
+      icon: 'i-lucide-columns-3',
+      command: ({ editor, range }) =>
+        editor.chain().focus().deleteRange(range).insertContent({
+          type: 'columns',
+          content: [
+            { type: 'column', content: [{ type: 'paragraph' }] },
+            { type: 'column', content: [{ type: 'paragraph' }] },
+            { type: 'column', content: [{ type: 'paragraph' }] }
+          ]
+        }).run()
+    },
 
     // Inline
     {
@@ -224,7 +254,9 @@ const BLOCK_ID_TYPES = [
   'editorImage',
   'editorFile',
   'linkPreview',
-  'table'
+  'table',
+  'columns',
+  'column'
 ]
 
 function createBlockId() {
@@ -561,6 +593,36 @@ export const LinkPreviewNode = TiptapNode.create({
   }
 })
 
+export const ColumnNode = TiptapNode.create({
+  name: 'column',
+  group: 'column',
+  content: 'block+',
+  isolating: true,
+
+  parseHTML() {
+    return [{ tag: 'div[data-type="column"]' }]
+  },
+
+  renderHTML({ HTMLAttributes }) {
+    return ['div', mergeAttributes(HTMLAttributes, { 'data-type': 'column' }), 0]
+  }
+})
+
+export const ColumnsNode = TiptapNode.create({
+  name: 'columns',
+  group: 'block',
+  content: 'column+',
+  defining: true,
+
+  parseHTML() {
+    return [{ tag: 'div[data-type="columns"]' }]
+  },
+
+  renderHTML({ HTMLAttributes }) {
+    return ['div', mergeAttributes(HTMLAttributes, { 'data-type': 'columns' }), 0]
+  }
+})
+
 export function createSlashCommandExtension(
   handlers: SlashCommandHandlers,
   getItems: () => NotionCommandItem[] = () => notionCommandItems
@@ -612,6 +674,7 @@ export function createNotionEditorExtensions(options: {
       underline: false
     }),
     Placeholder.configure({ placeholder: options.placeholder }),
+    TextAlign.configure({ types: ['heading', 'paragraph'] }),
     Underline,
     TaskList,
     TaskItem.configure({ nested: true }),
@@ -623,6 +686,8 @@ export function createNotionEditorExtensions(options: {
     MentionNode,
     EmojiNode,
     LinkPreviewNode,
+    ColumnNode,
+    ColumnsNode,
     ...(options.enableWikilinks ? [WikilinkNode] : []),
     options.slashCommand,
     Table.configure({ resizable: true }),

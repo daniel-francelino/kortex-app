@@ -232,6 +232,42 @@ watch(() => props.visible, (v) => {
           >
             <UIcon name="i-lucide-remove-formatting" class="size-3.5" />
           </button>
+
+          <div class="kortex-menu-sep" />
+
+          <!-- Alignment -->
+          <button
+            type="button"
+            :class="['kortex-menu-btn', { active: editor?.isActive({ textAlign: 'left' }) }]"
+            title="Alinhar à esquerda"
+            @click="editor?.chain().focus().setTextAlign('left').run()"
+          >
+            <UIcon name="i-lucide-align-left" class="size-3.5" />
+          </button>
+          <button
+            type="button"
+            :class="['kortex-menu-btn', { active: editor?.isActive({ textAlign: 'center' }) }]"
+            title="Centralizar"
+            @click="editor?.chain().focus().setTextAlign('center').run()"
+          >
+            <UIcon name="i-lucide-align-center" class="size-3.5" />
+          </button>
+          <button
+            type="button"
+            :class="['kortex-menu-btn', { active: editor?.isActive({ textAlign: 'right' }) }]"
+            title="Alinhar à direita"
+            @click="editor?.chain().focus().setTextAlign('right').run()"
+          >
+            <UIcon name="i-lucide-align-right" class="size-3.5" />
+          </button>
+          <button
+            type="button"
+            :class="['kortex-menu-btn', { active: editor?.isActive({ textAlign: 'justify' }) }]"
+            title="Justificado"
+            @click="editor?.chain().focus().setTextAlign('justify').run()"
+          >
+            <UIcon name="i-lucide-align-justify" class="size-3.5" />
+          </button>
         </template>
       </div>
     </Transition>
