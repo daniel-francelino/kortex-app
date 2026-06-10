@@ -1320,12 +1320,24 @@ function getEditor() {
   return editor.value
 }
 
+function insertWikilink(noteId: string, title: string) {
+  editor.value
+    ?.chain()
+    .focus()
+    .insertContent([
+      { type: 'wikilink', attrs: { noteId, title } },
+      { type: 'text', text: ' ' }
+    ])
+    .run()
+}
+
 defineExpose({
   focus,
   setContent,
   getContent,
   clearContent,
   getEditor,
+  insertWikilink,
   isEmpty: () => isEditorContentEmpty(getContent())
 })
 </script>

@@ -482,6 +482,7 @@ function onGraphSelectNote(noteId: string): void {
 }
 
 function switchToGraph(): void {
+  selectedNoteId.value = null;
   activeView.value = "graph";
   refreshGraph();
 }

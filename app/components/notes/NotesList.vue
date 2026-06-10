@@ -220,7 +220,7 @@ const hasFolders = computed(() => props.folders.length > 0)
             <UContextMenu :items="folderActionItems(node.folder)">
               <!-- Folder header (drop target) -->
               <div
-                class="flex items-center gap-1 pr-2 py-1.5 rounded-lg mx-1 transition-colors cursor-pointer select-none"
+                class="group/folder-row flex items-center gap-1 pr-1 py-1.5 rounded-lg mx-1 transition-colors cursor-pointer select-none"
                 :style="{ paddingLeft: `${0.5 + node.depth}rem` }"
                 :class="dragOverFolderId === node.folder.id
                   ? 'bg-primary/15 ring-1 ring-primary/40'
@@ -255,29 +255,27 @@ const hasFolders = computed(() => props.folders.length > 0)
                   {{ node.folder.name }}
                 </span>
 
-                <!-- Folder action buttons -->
-                <div class="flex items-center opacity-0 group-hover/folder:opacity-100">
-                  <UDropdownMenu
-                    :items="folderActionItems(node.folder)"
+                <!-- Folder action button -->
+                <UDropdownMenu
+                  :items="folderActionItems(node.folder)"
+                  @click.stop
+                >
+                  <UButton
+                    icon="i-lucide-ellipsis-vertical"
+                    color="neutral"
+                    variant="ghost"
+                    size="xs"
+                    class="opacity-0 group-hover/folder-row:opacity-100 transition-opacity shrink-0"
                     @click.stop
-                  >
-                    <UButton
-                      icon="i-lucide-ellipsis-vertical"
-                      color="neutral"
-                      variant="ghost"
-                      size="xs"
-                      class="shrink-0"
-                      @click.stop
-                    />
-                  </UDropdownMenu>
-                </div>
+                  />
+                </UDropdownMenu>
               </div>
             </UContextMenu>
 
             <!-- Notes inside this folder (when expanded) -->
             <div
               v-if="expandedFolders.has(node.folder.id) && (notesByFolder.get(node.folder.id) ?? []).length > 0"
-              class="border-l border-default/70 pl-3 py-0.5"
+              class="border-l border-default/70 pl-3 pr-1 py-0.5"
               :style="{ marginLeft: `${1.25 + node.depth}rem` }"
             >
               <UContextMenu
@@ -322,7 +320,7 @@ const hasFolders = computed(() => props.folders.length > 0)
                         color="neutral"
                         variant="ghost"
                         size="xs"
-                        class="opacity-0 group-hover/note:opacity-100 shrink-0"
+                        class="opacity-0 group-hover/note:opacity-100 transition-opacity shrink-0"
                         @click.stop
                       />
                     </UDropdownMenu>

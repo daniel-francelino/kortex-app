@@ -7,6 +7,7 @@ interface NotionStyleEditorRef {
   setContent: (value?: string | null) => void
   getContent: () => string
   clearContent: () => void
+  insertWikilink: (noteId: string, title: string) => void
 }
 
 type SaveStatus = 'idle' | 'unsaved' | 'saved' | 'error'
@@ -49,8 +50,6 @@ const lastChangeAt = ref(0)
 const syncingContent = ref(false)
 const iconPickerOpen = ref(false)
 
-const linkSearchOpen = ref(false)
-const linkSearchQuery = ref('')
 const isDragOver = ref(false)
 
 const savedAtText = computed(() =>
@@ -63,19 +62,6 @@ const dirty = computed(() => {
 })
 
 const showInitialLoading = computed(() => props.loading && !noteDetail.value)
-
-const availableNotesForLink = computed(() => {
-  if (!noteDetail.value) return []
-
-  const linked = new Set([
-    ...(noteDetail.value.links ?? []).map(link => link.targetNoteId),
-    noteDetail.value.id
-  ])
-
-  return props.availableNotes
-    .filter(note => !linked.has(note.id))
-    .filter(note => !linkSearchQuery.value || note.title.toLowerCase().includes(linkSearchQuery.value.toLowerCase()))
-})
 
 const SAVE_AFTER_MS = 60_000
 const POLL_INTERVAL_MS = 10_000
@@ -129,8 +115,6 @@ function resetNoteState() {
   lastChangeAt.value = 0
   saveStatus.value = 'idle'
   iconPickerOpen.value = false
-  linkSearchOpen.value = false
-  linkSearchQuery.value = ''
   editorRef.value?.clearContent()
   nextTick(() => {
     syncingContent.value = false
@@ -158,8 +142,6 @@ async function syncNote(detail: NoteDetail | null) {
   lastChangeAt.value = 0
   saveStatus.value = 'idle'
   iconPickerOpen.value = false
-  linkSearchOpen.value = false
-  linkSearchQuery.value = ''
 
   await nextTick()
   editorRef.value?.setContent(content.value)
@@ -206,6 +188,7 @@ async function saveNote() {
       saveStatus.value = 'saved'
       savedAt.value = new Date()
       emit('updated')
+      void syncLinksFromContent()
     } else {
       saveStatus.value = 'error'
     }
@@ -214,36 +197,66 @@ async function saveNote() {
   }
 }
 
-async function onDelete() {
-  if (!noteDetail.value) return
-
-  const ok = await props.deleteNote(noteDetail.value.id)
-  if (!ok) return
-
-  resetNoteState()
-  emit('deleted')
+interface ContentNode {
+  type: string
+  attrs?: Record<string, unknown>
+  content?: ContentNode[]
 }
 
-async function addLink(targetId: string) {
-  if (!noteDetail.value) return
+function extractLinkedNoteIds(contentJson: string): string[] {
+  try {
+    const doc = JSON.parse(contentJson) as { content?: ContentNode[] }
+    const ids: string[] = []
 
-  const detail = await props.linkNotes(noteDetail.value.id, targetId)
-  if (!detail) return
+    function walk(nodes: ContentNode[]) {
+      for (const node of nodes) {
+        if (node.type === 'wikilink' && typeof node.attrs?.noteId === 'string') {
+          ids.push(node.attrs.noteId)
+        }
+        if (node.type === 'mention' && node.attrs?.kind === 'note' && typeof node.attrs.id === 'string') {
+          ids.push(node.attrs.id)
+        }
+        if (node.content) walk(node.content)
+      }
+    }
 
-  noteDetail.value = detail
-  emit('note-loaded', detail)
-  linkSearchOpen.value = false
-  linkSearchQuery.value = ''
+    walk(doc.content ?? [])
+    return [...new Set(ids)]
+  } catch {
+    return []
+  }
 }
 
-async function removeLink(linkId: string) {
+async function syncLinksFromContent() {
   if (!noteDetail.value) return
 
-  const detail = await props.unlinkNotes(noteDetail.value.id, linkId)
-  if (!detail) return
+  const linkedIds = extractLinkedNoteIds(content.value)
+  const currentLinks = noteDetail.value.links ?? []
+  const currentTargetIds = new Set(currentLinks.map(l => l.targetNoteId))
+  const newTargetIds = new Set(linkedIds)
 
-  noteDetail.value = detail
-  emit('note-loaded', detail)
+  const toAdd = linkedIds.filter(id => !currentTargetIds.has(id))
+  const toRemove = currentLinks.filter(l => !newTargetIds.has(l.targetNoteId))
+
+  if (toAdd.length === 0 && toRemove.length === 0) return
+
+  const sourceId = noteDetail.value.id
+  let latestDetail: NoteDetail | null = null
+
+  for (const targetId of toAdd) {
+    const detail = await props.linkNotes(sourceId, targetId)
+    if (detail) latestDetail = detail
+  }
+
+  for (const link of toRemove) {
+    const detail = await props.unlinkNotes(sourceId, link.id)
+    if (detail) latestDetail = detail
+  }
+
+  if (latestDetail) {
+    noteDetail.value = latestDetail
+    emit('note-loaded', latestDetail)
+  }
 }
 
 interface BreadcrumbItem {
@@ -310,9 +323,12 @@ function onDragLeave(event: DragEvent) {
 function onDrop(event: DragEvent) {
   isDragOver.value = false
   const droppedNoteId = event.dataTransfer?.getData('application/x-notes-note-id')
-  if (droppedNoteId && droppedNoteId !== noteDetail.value?.id) {
-    void addLink(droppedNoteId)
-  }
+  if (!droppedNoteId || droppedNoteId === noteDetail.value?.id) return
+
+  const droppedNote = props.availableNotes.find(n => n.id === droppedNoteId)
+  if (!droppedNote) return
+
+  editorRef.value?.insertWikilink(droppedNoteId, droppedNote.title || 'Sem título')
 }
 
 defineExpose({
