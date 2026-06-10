@@ -15,9 +15,38 @@ const emit = defineEmits<{
 
 const menuRef = ref<HTMLElement | null>(null)
 
+interface GroupedItems {
+  label: string
+  items: { item: NotionCommandItem; index: number }[]
+}
+
+const groupOrder = ['Texto', 'Lista', 'Midia', 'Avancado', 'Inline']
+
+const groupedItems = computed<GroupedItems[]>(() => {
+  const map = new Map<string, GroupedItems>()
+
+  props.items.forEach((item, index) => {
+    const key = item.group ?? 'Geral'
+    if (!map.has(key)) map.set(key, { label: key, items: [] })
+    map.get(key)!.items.push({ item, index })
+  })
+
+  // Preserve defined order, then any extra groups at the end
+  const ordered: GroupedItems[] = []
+  for (const key of groupOrder) {
+    const g = map.get(key)
+    if (g) ordered.push(g)
+  }
+  for (const [key, g] of map) {
+    if (!groupOrder.includes(key)) ordered.push(g)
+  }
+
+  return ordered
+})
+
 watch(() => props.selectedIndex, (index) => {
   nextTick(() => {
-    const item = menuRef.value?.children[index] as HTMLElement | undefined
+    const item = menuRef.value?.querySelector<HTMLElement>(`[data-item-index="${index}"]`)
     item?.scrollIntoView({ block: 'nearest' })
   })
 })
@@ -31,25 +60,28 @@ watch(() => props.selectedIndex, (index) => {
       class="kortex-slash-menu"
       :style="{ top: `${pos.y}px`, left: `${pos.x}px` }"
     >
-      <p class="kortex-menu-label">
-        Blocos basicos
-      </p>
-      <button
-        v-for="(item, index) in items"
-        :key="item.title"
-        type="button"
-        :class="['kortex-command-item', { selected: index === selectedIndex }]"
-        @mouseenter="emit('hover', index)"
-        @click="emit('select', item)"
-      >
-        <span class="kortex-command-icon">
-          <UIcon :name="item.icon" class="size-4" />
-        </span>
-        <span class="kortex-command-text">
-          <span class="kortex-command-title">{{ item.title }}</span>
-          <span class="kortex-command-desc">{{ item.description }}</span>
-        </span>
-      </button>
+      <template v-for="group in groupedItems" :key="group.label">
+        <p class="kortex-menu-label">
+          {{ group.label }}
+        </p>
+        <button
+          v-for="{ item, index } in group.items"
+          :key="item.title"
+          type="button"
+          :data-item-index="index"
+          :class="['kortex-command-item', { selected: index === selectedIndex }]"
+          @mouseenter="emit('hover', index)"
+          @click="emit('select', item)"
+        >
+          <span class="kortex-command-icon">
+            <UIcon :name="item.icon" class="size-4" />
+          </span>
+          <span class="kortex-command-text">
+            <span class="kortex-command-title">{{ item.title }}</span>
+            <span class="kortex-command-desc">{{ item.description }}</span>
+          </span>
+        </button>
+      </template>
     </div>
   </Teleport>
 </template>
@@ -58,8 +90,8 @@ watch(() => props.selectedIndex, (index) => {
 .kortex-slash-menu {
   position: fixed;
   z-index: 9999;
-  width: 272px;
-  max-height: 360px;
+  width: 280px;
+  max-height: 380px;
   overflow-y: auto;
   border-radius: 8px;
   background: var(--ui-bg);
@@ -69,13 +101,17 @@ watch(() => props.selectedIndex, (index) => {
 }
 
 .kortex-menu-label {
-  font-size: 0.7rem;
+  font-size: 0.68rem;
   font-weight: 600;
   color: var(--ui-text-dimmed);
   text-transform: uppercase;
-  letter-spacing: 0.06em;
-  padding: 4px 8px 6px;
+  letter-spacing: 0.07em;
+  padding: 8px 8px 4px;
   margin: 0;
+}
+
+.kortex-menu-label:first-child {
+  padding-top: 4px;
 }
 
 .kortex-command-item {

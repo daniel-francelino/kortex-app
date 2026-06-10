@@ -15,6 +15,7 @@ export interface NotionCommandItem {
   title: string
   description: string
   icon: string
+  group: string
   command: (props: { editor: Editor, range: Range }) => void
 }
 
@@ -54,55 +55,101 @@ function clearCommandRange(editor: Editor, range: Range) {
 
 export function createNotionCommandItems(actions: NotionCommandActions = {}): NotionCommandItem[] {
   return [
+    // Texto
     {
+      group: 'Texto',
       title: 'Texto',
       description: 'Paragrafo normal',
       icon: 'i-lucide-type',
       command: ({ editor, range }) => editor.chain().focus().deleteRange(range).setParagraph().run()
     },
     {
+      group: 'Texto',
       title: 'Titulo 1',
-      description: 'Titulo grande',
+      description: 'Titulo grande de secao',
       icon: 'i-lucide-heading-1',
       command: ({ editor, range }) => editor.chain().focus().deleteRange(range).setHeading({ level: 1 }).run()
     },
     {
+      group: 'Texto',
       title: 'Titulo 2',
-      description: 'Titulo medio',
+      description: 'Titulo medio de secao',
       icon: 'i-lucide-heading-2',
       command: ({ editor, range }) => editor.chain().focus().deleteRange(range).setHeading({ level: 2 }).run()
     },
     {
+      group: 'Texto',
       title: 'Titulo 3',
-      description: 'Titulo pequeno',
+      description: 'Titulo pequeno de secao',
       icon: 'i-lucide-heading-3',
       command: ({ editor, range }) => editor.chain().focus().deleteRange(range).setHeading({ level: 3 }).run()
     },
     {
+      group: 'Texto',
+      title: 'Citacao',
+      description: 'Trecho em destaque ou referencia',
+      icon: 'i-lucide-quote',
+      command: ({ editor, range }) => editor.chain().focus().deleteRange(range).toggleBlockquote().run()
+    },
+
+    // Listas
+    {
+      group: 'Lista',
       title: 'Lista com marcadores',
       description: 'Lista nao ordenada',
       icon: 'i-lucide-list',
       command: ({ editor, range }) => editor.chain().focus().deleteRange(range).toggleBulletList().run()
     },
     {
+      group: 'Lista',
       title: 'Lista numerada',
-      description: 'Lista ordenada',
+      description: 'Lista ordenada por numero',
       icon: 'i-lucide-list-ordered',
       command: ({ editor, range }) => editor.chain().focus().deleteRange(range).toggleOrderedList().run()
     },
     {
+      group: 'Lista',
       title: 'Lista de tarefas',
-      description: 'Lista com checkboxes',
+      description: 'Itens com checkbox',
       icon: 'i-lucide-list-checks',
       command: ({ editor, range }) => editor.chain().focus().deleteRange(range).toggleTaskList().run()
     },
+
+    // Midia
     {
-      title: 'Citacao',
-      description: 'Bloco de citacao',
-      icon: 'i-lucide-quote',
-      command: ({ editor, range }) => editor.chain().focus().deleteRange(range).toggleBlockquote().run()
+      group: 'Midia',
+      title: 'Imagem',
+      description: 'Faz upload de uma imagem',
+      icon: 'i-lucide-image',
+      command: ({ editor, range }) => {
+        clearCommandRange(editor, range)
+        actions.uploadImage?.()
+      }
     },
     {
+      group: 'Midia',
+      title: 'Arquivo',
+      description: 'Faz upload de qualquer arquivo',
+      icon: 'i-lucide-paperclip',
+      command: ({ editor, range }) => {
+        clearCommandRange(editor, range)
+        actions.uploadFile?.()
+      }
+    },
+    {
+      group: 'Midia',
+      title: 'Preview de link',
+      description: 'Card visual para uma URL',
+      icon: 'i-lucide-panels-top-left',
+      command: ({ editor, range }) => {
+        clearCommandRange(editor, range)
+        actions.openLinkPreview?.()
+      }
+    },
+
+    // Avancado
+    {
+      group: 'Avancado',
       title: 'Callout',
       description: 'Bloco em destaque com icone',
       icon: 'i-lucide-lightbulb',
@@ -114,41 +161,33 @@ export function createNotionCommandItems(actions: NotionCommandActions = {}): No
         }).run()
     },
     {
+      group: 'Avancado',
       title: 'Bloco de codigo',
-      description: 'Codigo com destaque',
+      description: 'Codigo com realce de sintaxe',
       icon: 'i-lucide-code-2',
       command: ({ editor, range }) => editor.chain().focus().deleteRange(range).toggleCodeBlock().run()
     },
     {
-      title: 'Imagem',
-      description: 'Upload de imagem',
-      icon: 'i-lucide-image',
-      command: ({ editor, range }) => {
-        clearCommandRange(editor, range)
-        actions.uploadImage?.()
-      }
+      group: 'Avancado',
+      title: 'Tabela',
+      description: 'Tabela com linhas e colunas',
+      icon: 'i-lucide-table-2',
+      command: ({ editor, range }) =>
+        editor.chain().focus().deleteRange(range).insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()
     },
     {
-      title: 'Arquivo',
-      description: 'Upload de arquivo',
-      icon: 'i-lucide-paperclip',
-      command: ({ editor, range }) => {
-        clearCommandRange(editor, range)
-        actions.uploadFile?.()
-      }
+      group: 'Avancado',
+      title: 'Divisor',
+      description: 'Linha separadora horizontal',
+      icon: 'i-lucide-minus',
+      command: ({ editor, range }) => editor.chain().focus().deleteRange(range).setHorizontalRule().run()
     },
+
+    // Inline
     {
-      title: 'Preview de link',
-      description: 'Card visual para uma URL',
-      icon: 'i-lucide-panels-top-left',
-      command: ({ editor, range }) => {
-        clearCommandRange(editor, range)
-        actions.openLinkPreview?.()
-      }
-    },
-    {
+      group: 'Inline',
       title: 'Mencao',
-      description: 'Pessoa, nota ou entidade',
+      description: 'Menciona pessoa, nota ou entidade',
       icon: 'i-lucide-at-sign',
       command: ({ editor, range }) => {
         clearCommandRange(editor, range)
@@ -156,26 +195,14 @@ export function createNotionCommandItems(actions: NotionCommandActions = {}): No
       }
     },
     {
+      group: 'Inline',
       title: 'Emoji',
-      description: 'Marcador visual inline',
+      description: 'Insere um emoji no texto',
       icon: 'i-lucide-smile',
       command: ({ editor, range }) => {
         clearCommandRange(editor, range)
         actions.openEmoji?.()
       }
-    },
-    {
-      title: 'Divisor',
-      description: 'Linha separadora',
-      icon: 'i-lucide-minus',
-      command: ({ editor, range }) => editor.chain().focus().deleteRange(range).setHorizontalRule().run()
-    },
-    {
-      title: 'Tabela',
-      description: 'Tabela com linhas e colunas',
-      icon: 'i-lucide-table-2',
-      command: ({ editor, range }) =>
-        editor.chain().focus().deleteRange(range).insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()
     }
   ]
 }
