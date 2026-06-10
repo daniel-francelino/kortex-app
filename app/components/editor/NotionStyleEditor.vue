@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { Editor, Range } from '@tiptap/core'
 import { EditorContent, useEditor } from '@tiptap/vue-3'
+import { useElementHover, useEventListener, useThrottleFn } from '@vueuse/core'
 import type { NotionCommandItem, WikiSuggestionItem } from '~/composables/useNotionEditor'
 import {
   createNotionCommandItems,
@@ -164,6 +165,11 @@ const activeBlock = ref<TopLevelBlock | null>(null)
 const blockVisible = ref(false)
 const blockPos = ref({ x: 0, y: 0 })
 const draggingBlockIndex = ref<number | null>(null)
+const blockMenuRef = ref<{ containerRef: HTMLElement | null } | null>(null)
+const menuHovered = useElementHover(computed(() => blockMenuRef.value?.containerRef ?? null))
+const dropIndicatorY = ref<number | null>(null)
+const dropIndicatorRect = ref<{ left: number; width: number } | null>(null)
+let slashFromButton = false
 
 const resolvedMentionItems = computed<MentionSuggestionItem[]>(() => {
   if (props.mentionItems.length) return props.mentionItems
@@ -249,6 +255,7 @@ const slashCommandExtension = createSlashCommandExtension({
     slashVisible.value = false
     slashEditor = null
     slashRange = null
+    slashFromButton = false
   }
 }, () => commandItems.value)
 
@@ -370,6 +377,8 @@ watch(() => props.availableNotes, () => {
   if (wikiVisible.value) updateWikilinkSuggestion()
 })
 
+useEventListener(document, 'keydown', handleButtonMenuKeyDown, { capture: true })
+
 onBeforeUnmount(() => {
   for (const cleanup of pendingAttachmentCleanups.values()) {
     clearTimeout(cleanup.timer)
@@ -383,6 +392,7 @@ function selectSlashCommand(item: NotionCommandItem) {
   if (!slashEditor || !slashRange) return
   item.command({ editor: slashEditor, range: slashRange })
   slashVisible.value = false
+  slashFromButton = false
 }
 
 function openUploadPicker(kind: EditorUploadKind) {
@@ -919,11 +929,10 @@ function updateBlockTools() {
   }
 
   try {
-    const shellRect = shell.getBoundingClientRect()
     const coords = instance.view.coordsAtPos(Math.min(block.from + 1, instance.state.doc.content.size))
     activeBlock.value = block
     blockPos.value = {
-      x: Math.max(8, shellRect.left - 36),
+      x: Math.max(8, coords.left - 8),
       y: Math.max(8, coords.top - 1)
     }
     blockVisible.value = true
@@ -1032,6 +1041,8 @@ function onBlockDragStart(event: DragEvent) {
 
 function onBlockDragEnd() {
   draggingBlockIndex.value = null
+  dropIndicatorY.value = null
+  dropIndicatorRect.value = null
 }
 
 function onEditorDragOver(event: DragEvent) {
@@ -1040,6 +1051,40 @@ function onEditorDragOver(event: DragEvent) {
 
   event.preventDefault()
   if (event.dataTransfer) event.dataTransfer.dropEffect = 'move'
+
+  const instance = editor.value
+  const shell = editorShellRef.value
+  if (!instance || !shell || draggingBlockIndex.value === null) return
+
+  const shellRect = shell.getBoundingClientRect()
+  const blocks = getTopLevelBlocks(instance)
+
+  let contentLeft = shellRect.left + 8
+  const firstBlock = blocks[0]
+  if (firstBlock) {
+    try {
+      const fc = instance.view.coordsAtPos(Math.min(firstBlock.from + 1, instance.state.doc.content.size))
+      contentLeft = fc.left - 8
+    } catch { /* use fallback */ }
+  }
+  dropIndicatorRect.value = { left: contentLeft, width: shellRect.right - contentLeft }
+
+  const targetIndex = findDropTargetIndex(event.clientY)
+  try {
+    if (targetIndex < blocks.length) {
+      const block = blocks[targetIndex]!
+      const coords = instance.view.coordsAtPos(Math.min(block.from + 1, instance.state.doc.content.size))
+      dropIndicatorY.value = coords.top
+    } else {
+      const lastBlock = blocks[blocks.length - 1]
+      if (lastBlock) {
+        const coords = instance.view.coordsAtPos(Math.min(lastBlock.to - 1, instance.state.doc.content.size))
+        dropIndicatorY.value = coords.bottom
+      }
+    }
+  } catch {
+    dropIndicatorY.value = null
+  }
 }
 
 function onEditorDrop(event: DragEvent) {
@@ -1050,6 +1095,8 @@ function onEditorDrop(event: DragEvent) {
   event.preventDefault()
   reorderBlock(sourceIndex, findDropTargetIndex(event.clientY))
   draggingBlockIndex.value = null
+  dropIndicatorY.value = null
+  dropIndicatorRect.value = null
 }
 
 function findDropTargetIndex(clientY: number): number {
@@ -1069,6 +1116,138 @@ function findDropTargetIndex(clientY: number): number {
   }
 
   return Math.max(0, blocks.length - 1)
+}
+
+const onEditorMouseMove = useThrottleFn((event: MouseEvent) => {
+  if (!props.editable || !editor.value) return
+  handleHoverMove(event)
+}, 16)
+
+function handleHoverMove(event: MouseEvent) {
+  const instance = editor.value
+  const shell = editorShellRef.value
+  if (!props.editable || !instance?.isEditable || !shell) return
+
+  let posResult: { pos: number } | null = null
+  try {
+    posResult = instance.view.posAtCoords({ left: event.clientX, top: event.clientY })
+  } catch { return }
+  if (!posResult) return
+
+  const blocks = getTopLevelBlocks(instance)
+  const block = blocks.find(b => posResult!.pos >= b.from && posResult!.pos <= b.to) ?? null
+  if (!block) return
+
+  try {
+    const coords = instance.view.coordsAtPos(Math.min(block.from + 1, instance.state.doc.content.size))
+    activeBlock.value = block
+    blockPos.value = {
+      x: Math.max(8, coords.left - 8),
+      y: Math.max(8, coords.top - 1)
+    }
+    blockVisible.value = true
+  } catch { /* keep current state */ }
+}
+
+function onEditorMouseLeave() {
+  setTimeout(() => {
+    if (!menuHovered.value) blockVisible.value = false
+  }, 150)
+}
+
+watch(menuHovered, (hovered) => {
+  if (!hovered) {
+    setTimeout(() => {
+      if (!editorShellRef.value?.matches(':hover')) blockVisible.value = false
+    }, 100)
+  }
+})
+
+function addBlockAfterActive() {
+  const instance = editor.value
+  const block = activeBlock.value
+  if (!instance || !block) return
+
+  const isEmptyParagraph = !block.node.textContent.trim() && block.node.type.name === 'paragraph'
+
+  if (!isEmptyParagraph) {
+    instance
+      .chain()
+      .focus()
+      .command(({ tr, state, dispatch }) => {
+        const newNode = state.schema.nodes.paragraph!.create()
+        if (dispatch) dispatch(tr.insert(block.to, newNode))
+        return true
+      })
+      .run()
+    nextTick(() => {
+      try { instance.commands.setTextSelection(block.to + 1) } catch { /* ignore */ }
+      nextTick(openInsertMenu)
+    })
+  } else {
+    instance.chain().focus().setTextSelection(block.from + 1).run()
+    nextTick(openInsertMenu)
+  }
+}
+
+function openInsertMenu() {
+  const instance = editor.value
+  if (!instance) return
+
+  const pos = instance.state.selection.from
+  let coords: { left: number; bottom: number }
+  try {
+    const c = instance.view.coordsAtPos(pos)
+    coords = { left: c.left, bottom: c.bottom }
+  } catch { return }
+
+  slashFromButton = true
+  slashEditor = instance
+  slashRange = { from: pos, to: pos }
+  slashItems.value = commandItems.value
+  slashIndex.value = 0
+  slashPos.value = { x: coords.left, y: coords.bottom + 6 }
+  slashVisible.value = true
+}
+
+function handleButtonMenuKeyDown(event: KeyboardEvent) {
+  if (!slashVisible.value || !slashFromButton) return
+
+  const total = slashItems.value.length
+
+  if (event.key === 'Escape') {
+    slashVisible.value = false
+    slashFromButton = false
+    event.stopPropagation()
+    event.preventDefault()
+    return
+  }
+
+  if (!total) return
+
+  if (event.key === 'ArrowDown') {
+    slashIndex.value = (slashIndex.value + 1) % total
+    event.stopPropagation()
+    event.preventDefault()
+    return
+  }
+
+  if (event.key === 'ArrowUp') {
+    slashIndex.value = (slashIndex.value - 1 + total) % total
+    event.stopPropagation()
+    event.preventDefault()
+    return
+  }
+
+  if (event.key === 'Enter') {
+    const item = slashItems.value[slashIndex.value]
+    if (item) {
+      selectSlashCommand(item)
+      slashFromButton = false
+    }
+    event.stopPropagation()
+    event.preventDefault()
+  }
 }
 
 function focus() {
@@ -1130,6 +1309,8 @@ defineExpose({
       class="kortex-editor-shell"
       @dragover="onEditorDragOver"
       @drop="onEditorDrop"
+      @mousemove="onEditorMouseMove"
+      @mouseleave="onEditorMouseLeave"
     >
       <EditorUploadPanel
         :tasks="uploadTasks"
@@ -1150,10 +1331,12 @@ defineExpose({
     />
 
     <EditorBlockMenu
+      ref="blockMenuRef"
       :visible="blockVisible && editable"
       :pos="blockPos"
       :active-index="activeBlock?.index ?? null"
       :block-count="getTopLevelBlocks().length"
+      @add="addBlockAfterActive"
       @move="moveActiveBlock"
       @transform="turnActiveBlockInto"
       @duplicate="duplicateActiveBlock"
@@ -1163,6 +1346,18 @@ defineExpose({
       @dragstart="onBlockDragStart"
       @dragend="onBlockDragEnd"
     />
+
+    <Teleport to="body">
+      <div
+        v-if="dropIndicatorY !== null && dropIndicatorRect !== null"
+        class="kortex-drop-indicator"
+        :style="{
+          top: `${dropIndicatorY - 1}px`,
+          left: `${dropIndicatorRect.left}px`,
+          width: `${dropIndicatorRect.width}px`
+        }"
+      />
+    </Teleport>
 
     <EditorMentionMenu
       ref="mentionMenuRef"
@@ -1365,6 +1560,15 @@ defineExpose({
 
 .kortex-menu-sep--vertical {
   margin: 0 1px;
+}
+
+.kortex-drop-indicator {
+  position: fixed;
+  height: 2px;
+  background: var(--ui-color-primary, #18b981);
+  z-index: 9998;
+  pointer-events: none;
+  border-radius: 1px;
 }
 
 .kortex-slash-menu,

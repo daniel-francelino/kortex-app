@@ -1,7 +1,7 @@
 <script setup lang="ts">
 type BlockTransformKind = 'paragraph' | 'heading1' | 'heading2' | 'heading3' | 'bulletList' | 'taskList'
 
-defineProps<{
+const props = defineProps<{
   visible: boolean
   pos: { x: number, y: number }
   activeIndex: number | null
@@ -9,6 +9,7 @@ defineProps<{
 }>()
 
 const emit = defineEmits<{
+  'add': []
   'move': [direction: -1 | 1]
   'transform': [kind: BlockTransformKind]
   'duplicate': []
@@ -18,177 +19,158 @@ const emit = defineEmits<{
   'dragstart': [event: DragEvent]
   'dragend': []
 }>()
+
+const containerRef = ref<HTMLElement | null>(null)
+defineExpose({ containerRef })
+
+const contextItems = computed(() => [
+  [
+    {
+      label: 'Mover para cima',
+      icon: 'i-lucide-arrow-up',
+      disabled: props.activeIndex === 0,
+      onSelect: () => emit('move', -1)
+    },
+    {
+      label: 'Mover para baixo',
+      icon: 'i-lucide-arrow-down',
+      disabled: props.activeIndex !== null && props.activeIndex >= props.blockCount - 1,
+      onSelect: () => emit('move', 1)
+    }
+  ],
+  [
+    {
+      label: 'Converter em texto',
+      icon: 'i-lucide-type',
+      onSelect: () => emit('transform', 'paragraph')
+    },
+    {
+      label: 'Converter em H1',
+      icon: 'i-lucide-heading-1',
+      onSelect: () => emit('transform', 'heading1')
+    },
+    {
+      label: 'Converter em H2',
+      icon: 'i-lucide-heading-2',
+      onSelect: () => emit('transform', 'heading2')
+    },
+    {
+      label: 'Converter em H3',
+      icon: 'i-lucide-heading-3',
+      onSelect: () => emit('transform', 'heading3')
+    },
+    {
+      label: 'Lista com marcadores',
+      icon: 'i-lucide-list',
+      onSelect: () => emit('transform', 'bulletList')
+    },
+    {
+      label: 'Lista de tarefas',
+      icon: 'i-lucide-list-checks',
+      onSelect: () => emit('transform', 'taskList')
+    }
+  ],
+  [
+    {
+      label: 'Duplicar',
+      icon: 'i-lucide-copy-plus',
+      onSelect: () => emit('duplicate')
+    },
+    {
+      label: 'Copiar link do bloco',
+      icon: 'i-lucide-link',
+      onSelect: () => emit('copy-link')
+    },
+    {
+      label: 'Copiar texto',
+      icon: 'i-lucide-copy',
+      onSelect: () => emit('copy-text')
+    }
+  ],
+  [
+    {
+      label: 'Excluir bloco',
+      icon: 'i-lucide-trash-2',
+      color: 'error' as const,
+      onSelect: () => emit('delete')
+    }
+  ]
+])
 </script>
 
 <template>
   <Teleport to="body">
     <div
       v-if="visible"
-      class="kortex-block-menu"
+      ref="containerRef"
+      class="kortex-block-controls"
       :style="{ left: `${pos.x}px`, top: `${pos.y}px` }"
-      @mousedown.stop
     >
+      <!-- Add block -->
       <button
         type="button"
-        class="kortex-block-handle"
-        title="Arrastar bloco"
-        draggable="true"
-        @dragstart="emit('dragstart', $event)"
-        @dragend="emit('dragend')"
+        class="kortex-block-btn"
+        title="Adicionar bloco"
+        @mousedown.stop
+        @click="emit('add')"
       >
-        <UIcon name="i-lucide-grip-vertical" class="size-4" />
+        <UIcon name="i-lucide-plus" class="size-3.5" />
       </button>
-      <button
-        type="button"
-        class="kortex-menu-btn"
-        title="Mover para cima"
-        :disabled="activeIndex === 0"
-        @click="emit('move', -1)"
-      >
-        <UIcon name="i-lucide-arrow-up" class="size-3.5" />
-      </button>
-      <button
-        type="button"
-        class="kortex-menu-btn"
-        title="Mover para baixo"
-        :disabled="activeIndex === blockCount - 1"
-        @click="emit('move', 1)"
-      >
-        <UIcon name="i-lucide-arrow-down" class="size-3.5" />
-      </button>
-      <div class="kortex-menu-sep kortex-menu-sep--vertical" />
-      <button
-        type="button"
-        class="kortex-menu-btn kortex-menu-btn--text"
-        title="Texto"
-        @click="emit('transform', 'paragraph')"
-      >
-        T
-      </button>
-      <button
-        type="button"
-        class="kortex-menu-btn kortex-menu-btn--text"
-        title="Titulo 1"
-        @click="emit('transform', 'heading1')"
-      >
-        H1
-      </button>
-      <button
-        type="button"
-        class="kortex-menu-btn"
-        title="Lista"
-        @click="emit('transform', 'bulletList')"
-      >
-        <UIcon name="i-lucide-list" class="size-3.5" />
-      </button>
-      <button
-        type="button"
-        class="kortex-menu-btn"
-        title="Tarefa"
-        @click="emit('transform', 'taskList')"
-      >
-        <UIcon name="i-lucide-list-checks" class="size-3.5" />
-      </button>
-      <div class="kortex-menu-sep kortex-menu-sep--vertical" />
-      <button
-        type="button"
-        class="kortex-menu-btn"
-        title="Duplicar bloco"
-        @click="emit('duplicate')"
-      >
-        <UIcon name="i-lucide-copy-plus" class="size-3.5" />
-      </button>
-      <button
-        type="button"
-        class="kortex-menu-btn"
-        title="Copiar link do bloco"
-        @click="emit('copy-link')"
-      >
-        <UIcon name="i-lucide-link" class="size-3.5" />
-      </button>
-      <button
-        type="button"
-        class="kortex-menu-btn"
-        title="Copiar texto do bloco"
-        @click="emit('copy-text')"
-      >
-        <UIcon name="i-lucide-copy" class="size-3.5" />
-      </button>
-      <button
-        type="button"
-        class="kortex-menu-btn kortex-menu-btn--danger"
-        title="Apagar bloco"
-        @click="emit('delete')"
-      >
-        <UIcon name="i-lucide-trash-2" class="size-3.5" />
-      </button>
+
+      <!-- Drag handle + context menu -->
+      <UDropdownMenu :items="contextItems">
+        <button
+          type="button"
+          class="kortex-block-btn kortex-block-drag"
+          title="Arrastar ou abrir opções"
+          draggable="true"
+          @dragstart="emit('dragstart', $event)"
+          @dragend="emit('dragend')"
+        >
+          <UIcon name="i-lucide-grip-vertical" class="size-3.5" />
+        </button>
+      </UDropdownMenu>
     </div>
   </Teleport>
 </template>
 
 <style scoped>
-.kortex-block-menu {
+.kortex-block-controls {
   position: fixed;
   z-index: 9999;
   display: flex;
   align-items: center;
   gap: 1px;
-  padding: 3px 4px;
-  border-radius: 8px;
-  background: var(--ui-bg);
-  border: 1px solid var(--ui-border);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12), 0 1px 4px rgba(0, 0, 0, 0.08);
-  white-space: nowrap;
-  transform: translateX(-100%);
+  transform: translateX(-100%) translateY(-50%);
+  padding-right: 4px;
 }
 
-.kortex-menu-btn,
-.kortex-block-handle {
+.kortex-block-btn {
   display: flex;
   align-items: center;
   justify-content: center;
-  min-width: 28px;
-  height: 28px;
-  padding: 0 4px;
-  border-radius: 5px;
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
   border: none;
   background: transparent;
   color: var(--ui-text-muted);
   cursor: pointer;
+  opacity: 0.45;
   transition: background 0.1s, color 0.1s, opacity 0.1s;
 }
 
-.kortex-menu-btn--text {
-  font-size: 0.7rem;
-  font-weight: 700;
-  letter-spacing: 0;
-}
-
-.kortex-menu-btn:hover,
-.kortex-block-handle:hover {
-  background: var(--ui-bg-muted);
+.kortex-block-btn:hover {
+  background: var(--ui-bg-elevated);
   color: var(--ui-text-highlighted);
+  opacity: 1;
 }
 
-.kortex-menu-btn:disabled {
-  opacity: 0.35;
-  cursor: default;
+.kortex-block-drag {
+  cursor: grab;
 }
 
-.kortex-menu-btn--danger:hover {
-  background: color-mix(in srgb, var(--ui-color-error, #ef4444) 10%, transparent);
-  color: var(--ui-color-error, #ef4444);
-}
-
-.kortex-menu-sep {
-  width: 1px;
-  height: 16px;
-  background: var(--ui-border);
-  margin: 0 2px;
-  flex-shrink: 0;
-}
-
-.kortex-menu-sep--vertical {
-  margin: 0 1px;
+.kortex-block-drag:active {
+  cursor: grabbing;
 }
 </style>
