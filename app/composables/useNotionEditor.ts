@@ -117,7 +117,7 @@ export function createNotionCommandItems(actions: NotionCommandActions = {}): No
 
     // Midia
     {
-      group: 'Midia',
+      group: 'Mídia',
       title: 'Imagem',
       description: 'Faz upload de uma imagem',
       icon: 'i-lucide-image',
@@ -127,7 +127,7 @@ export function createNotionCommandItems(actions: NotionCommandActions = {}): No
       }
     },
     {
-      group: 'Midia',
+      group: 'Mídia',
       title: 'Arquivo',
       description: 'Faz upload de qualquer arquivo',
       icon: 'i-lucide-paperclip',
@@ -137,7 +137,7 @@ export function createNotionCommandItems(actions: NotionCommandActions = {}): No
       }
     },
     {
-      group: 'Midia',
+      group: 'Mídia',
       title: 'Preview de link',
       description: 'Card visual para uma URL',
       icon: 'i-lucide-panels-top-left',
@@ -149,7 +149,7 @@ export function createNotionCommandItems(actions: NotionCommandActions = {}): No
 
     // Avancado
     {
-      group: 'Avancado',
+      group: 'Avançado',
       title: 'Callout',
       description: 'Bloco em destaque com icone',
       icon: 'i-lucide-lightbulb',
@@ -161,14 +161,14 @@ export function createNotionCommandItems(actions: NotionCommandActions = {}): No
         }).run()
     },
     {
-      group: 'Avancado',
+      group: 'Avançado',
       title: 'Bloco de codigo',
       description: 'Codigo com realce de sintaxe',
       icon: 'i-lucide-code-2',
       command: ({ editor, range }) => editor.chain().focus().deleteRange(range).toggleCodeBlock().run()
     },
     {
-      group: 'Avancado',
+      group: 'Avançado',
       title: 'Tabela',
       description: 'Tabela com linhas e colunas',
       icon: 'i-lucide-table-2',
@@ -176,7 +176,7 @@ export function createNotionCommandItems(actions: NotionCommandActions = {}): No
         editor.chain().focus().deleteRange(range).insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()
     },
     {
-      group: 'Avancado',
+      group: 'Avançado',
       title: 'Divisor',
       description: 'Linha separadora horizontal',
       icon: 'i-lucide-minus',

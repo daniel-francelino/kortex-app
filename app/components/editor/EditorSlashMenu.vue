@@ -20,7 +20,7 @@ interface GroupedItems {
   items: { item: NotionCommandItem; index: number }[]
 }
 
-const groupOrder = ['Texto', 'Lista', 'Midia', 'Avancado', 'Inline']
+const groupOrder = ['Texto', 'Lista', 'Mídia', 'Avançado', 'Inline']
 
 const groupedItems = computed<GroupedItems[]>(() => {
   const map = new Map<string, GroupedItems>()
