@@ -957,8 +957,16 @@ function reorderBlock(sourceIndex: number, targetIndex: number) {
   nodes.splice(boundedTarget, 0, moved)
 
   const transaction = instance.state.tr.replaceWith(0, instance.state.doc.content.size, nodes)
-  instance.view.dispatch(transaction.scrollIntoView())
-  instance.commands.focus()
+  instance.view.dispatch(transaction)
+
+  // After dispatch the state is already updated — find the moved block's new position
+  const newBlocks = getTopLevelBlocks(instance)
+  const targetBlock = newBlocks[boundedTarget]
+  if (targetBlock) {
+    instance.chain().focus().setTextSelection(targetBlock.from + 1).scrollIntoView().run()
+  } else {
+    instance.commands.focus()
+  }
   nextTick(updateBlockTools)
 }
 
