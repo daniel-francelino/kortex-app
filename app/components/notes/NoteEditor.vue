@@ -441,7 +441,7 @@ defineExpose({
       </div>
 
       <!-- Content: emoji icon + title + save status -->
-      <div class="px-10 pt-8 pb-2 shrink-0">
+      <div class="pl-16 pr-10 pt-8 pb-2 shrink-0">
         <div class="flex items-center gap-2.5">
           <UPopover
             v-if="editIcon"
@@ -504,7 +504,7 @@ defineExpose({
       </div>
 
       <div
-        class="flex-1 overflow-y-auto px-10 pb-10 cursor-text"
+        class="flex-1 overflow-y-auto pl-16 pr-10 pb-10 cursor-text"
         @click.self="editorRef?.focus()"
       >
         <EditorNotionStyleEditor

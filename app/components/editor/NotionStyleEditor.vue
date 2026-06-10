@@ -932,8 +932,8 @@ function updateBlockTools() {
     const coords = instance.view.coordsAtPos(Math.min(block.from + 1, instance.state.doc.content.size))
     activeBlock.value = block
     blockPos.value = {
-      x: Math.max(8, coords.left - 8),
-      y: Math.max(8, coords.top - 1)
+      x: Math.max(8, coords.left - 4),
+      y: Math.max(8, coords.top + (coords.bottom - coords.top) / 2)
     }
     blockVisible.value = true
   } catch {
@@ -1142,8 +1142,8 @@ function handleHoverMove(event: MouseEvent) {
     const coords = instance.view.coordsAtPos(Math.min(block.from + 1, instance.state.doc.content.size))
     activeBlock.value = block
     blockPos.value = {
-      x: Math.max(8, coords.left - 8),
-      y: Math.max(8, coords.top - 1)
+      x: Math.max(8, coords.left - 4),
+      y: Math.max(8, coords.top + (coords.bottom - coords.top) / 2)
     }
     blockVisible.value = true
   } catch { /* keep current state */ }
