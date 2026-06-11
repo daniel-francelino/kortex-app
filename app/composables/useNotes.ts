@@ -228,12 +228,10 @@ export function useNotes() {
         method: 'POST',
         body: payload
       })
-      toast.add({ title: 'Vínculo criado', description: 'As notas foram vinculadas.', color: 'success' })
       await refreshGraph()
       return true
     } catch (err: unknown) {
-      const message = (err as { data?: { message?: string } })?.data?.message ?? 'Falha ao vincular notas.'
-      toast.add({ title: 'Erro', description: message, color: 'error' })
+      console.error('[linkNotes]', err)
       return false
     }
   }
@@ -241,11 +239,10 @@ export function useNotes() {
   async function unlinkNotes(linkId: string): Promise<boolean> {
     try {
       await $fetch(`/api/notes/links/${linkId}`, { method: 'DELETE' })
-      toast.add({ title: 'Vínculo removido', color: 'success' })
       await refreshGraph()
       return true
-    } catch {
-      toast.add({ title: 'Erro', description: 'Falha ao remover vínculo.', color: 'error' })
+    } catch (err: unknown) {
+      console.error('[unlinkNotes]', err)
       return false
     }
   }

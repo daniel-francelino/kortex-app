@@ -450,10 +450,30 @@ defineExpose({
           </div>
         </nav>
 
-        <!-- Right: last edited timestamp -->
-        <span class="text-xs text-muted whitespace-nowrap shrink-0">
-          Editado {{ formatDate(noteDetail.updatedAt) }}
-        </span>
+        <!-- Right: unified save / edited indicator -->
+        <div class="flex items-center gap-1 text-xs text-muted whitespace-nowrap shrink-0">
+          <template v-if="saveStatus === 'unsaved'">
+            <span class="size-1.5 rounded-full bg-amber-400 dark:bg-amber-500 animate-pulse" />
+            <span>Não salvo</span>
+          </template>
+          <template v-else-if="saveStatus === 'saved'">
+            <UIcon name="i-lucide-check-circle" class="size-3 text-success" />
+            <span>Salvo às {{ savedAtText }}</span>
+          </template>
+          <template v-else-if="saveStatus === 'error'">
+            <UIcon name="i-lucide-alert-circle" class="size-3 text-error" />
+            <button
+              type="button"
+              class="text-error underline underline-offset-2 cursor-pointer"
+              @click="saveNote"
+            >
+              Erro — Tentar novamente
+            </button>
+          </template>
+          <template v-else>
+            <span>Editado {{ formatDate(noteDetail.updatedAt) }}</span>
+          </template>
+        </div>
       </div>
 
       <!-- Content: emoji icon + title + save status -->
@@ -488,39 +508,10 @@ defineExpose({
             @blur="saveNote"
           >
         </div>
-
-        <div class="flex items-center gap-3 mt-1.5">
-          <div class="flex items-center gap-1 text-xs shrink-0">
-            <template v-if="saveStatus === 'unsaved'">
-              <span class="size-1.5 rounded-full bg-amber-400 dark:bg-amber-500 animate-pulse" />
-              <span class="text-muted">Não salvo</span>
-            </template>
-            <template v-else-if="saveStatus === 'saved'">
-              <UIcon
-                name="i-lucide-check-circle"
-                class="size-3 text-success"
-              />
-              <span class="text-muted">Salvo as {{ savedAtText }}</span>
-            </template>
-            <template v-else-if="saveStatus === 'error'">
-              <UIcon
-                name="i-lucide-alert-circle"
-                class="size-3 text-error"
-              />
-              <button
-                type="button"
-                class="text-primary underline underline-offset-2 cursor-pointer"
-                @click="saveNote"
-              >
-                Tentar novamente
-              </button>
-            </template>
-          </div>
-        </div>
       </div>
 
       <div
-        class="flex-1 overflow-y-auto pl-16 pr-10 pb-10 cursor-text"
+        class="flex-1 overflow-y-auto overflow-x-hidden pl-16 pr-10 pb-10 cursor-text"
         @click.self="editorRef?.focus()"
       >
         <EditorNotionStyleEditor

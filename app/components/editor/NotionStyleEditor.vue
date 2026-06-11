@@ -2591,17 +2591,12 @@ defineExpose({
   flex: 1 1 0;
   min-width: 120px;
   padding: 0.5rem 0.75rem 0.5rem 0.75rem;
-  border-left: 2px solid var(--ui-border);
-  transition: border-color 0.15s;
+  border-left: 1px solid color-mix(in srgb, var(--ui-border) 35%, transparent);
 }
 
 .editor-column:first-child {
   border-left: none;
   padding-left: 0;
-}
-
-.editor-column:hover {
-  border-left-color: var(--ui-border-muted, var(--ui-border));
 }
 
 /* Actions bar */

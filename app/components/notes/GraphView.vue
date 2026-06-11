@@ -51,14 +51,26 @@ watch(
     const width = containerRef.value?.clientWidth ?? 800
     const height = containerRef.value?.clientHeight ?? 600
 
-    simNodes.value = data.nodes.map(n => ({
-      ...n,
-      x: width / 2 + (Math.random() - 0.5) * width * 0.6,
-      y: height / 2 + (Math.random() - 0.5) * height * 0.6,
-      vx: 0,
-      vy: 0,
-      radius: Math.max(6, Math.min(20, 6 + (n.linkCount ?? 0) * 2))
-    }))
+    // Preserve positions for nodes that already exist so the graph doesn't
+    // jump back to random positions after a link is created/removed.
+    const existingPos = new Map(simNodes.value.map(n => [n.id, { x: n.x, y: n.y }]))
+
+    simNodes.value = data.nodes.map(n => {
+      const pos = existingPos.get(n.id)
+      return {
+        ...n,
+        x: pos?.x ?? width / 2 + (Math.random() - 0.5) * width * 0.6,
+        y: pos?.y ?? height / 2 + (Math.random() - 0.5) * height * 0.6,
+        vx: 0,
+        vy: 0,
+        radius: Math.max(6, Math.min(20, 6 + (n.linkCount ?? 0) * 2))
+      }
+    })
+
+    // Reset stale interactive state so no dangling references exist
+    dragging.value = null
+    hoveredNode.value = null
+    panning.value = false
 
     simEdges.value = data.edges.map(e => ({ source: e.source, target: e.target }))
 

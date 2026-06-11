@@ -156,11 +156,13 @@ watch(
   [notesData, allNotes, visibleFolders],
   () => {
     const paginatedNotes = notesData.value?.data;
+    // When folders are present, always use allNotes as the single source of
+    // truth so the folder tree and root list never show conflicting data.
+    // Return null (= keep current) if allNotes is still loading to avoid a
+    // flash that replaces the folder view with the paginated flat list.
     const nextNotes =
       visibleFolders.value.length > 0
-        ? Array.isArray(allNotes.value)
-          ? allNotes.value
-          : paginatedNotes
+        ? Array.isArray(allNotes.value) ? allNotes.value : null
         : paginatedNotes;
 
     if (nextNotes) {
@@ -574,7 +576,7 @@ async function onUnlinkNotes(
           class="shrink-0 flex flex-col h-full border-r border-default"
           :style="{ width: sidebarWidth + 'px' }"
         >
-          <div class="px-3 py-2 border-b border-default flex items-center gap-1">
+          <div class="px-3 h-9 border-b border-default flex items-center gap-1">
             <USkeleton v-for="i in 5" :key="i" class="size-7 rounded-md" />
           </div>
           <div class="flex-1 p-2 space-y-1">
@@ -603,7 +605,7 @@ async function onUnlinkNotes(
           :style="{ width: sidebarWidth + 'px' }"
         >
           <!-- Sidebar header -->
-          <div class="px-3 py-2 border-b border-default">
+          <div class="px-3 h-9 border-b border-default flex items-center">
             <div class="flex items-center justify-center gap-1">
               <UTooltip text="Nova nota">
                 <UButton

@@ -4,6 +4,11 @@ export default defineAppConfig({
       primary: 'green',
       neutral: 'zinc'
     },
+    dashboardNavbar: {
+      slots: {
+        root: 'h-12 shrink-0 flex items-center justify-between border-b border-default px-4 sm:px-6 gap-1.5'
+      }
+    },
     popover: {
       slots: {
         content: 'z-[320]'
