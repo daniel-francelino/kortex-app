@@ -2584,12 +2584,14 @@ defineExpose({
   gap: 0;
   margin: 0.6rem 0;
   align-items: stretch;
+  width: 100%;
+  overflow: hidden;
 }
 
 .editor-column {
   position: relative;
   flex: 1 1 0;
-  min-width: 120px;
+  min-width: 0;
   padding: 0.5rem 0.75rem 0.5rem 0.75rem;
   border-left: 1px solid color-mix(in srgb, var(--ui-border) 35%, transparent);
 }
@@ -2712,13 +2714,13 @@ defineExpose({
 .editor-column-resizer::after {
   content: '';
   position: absolute;
-  top: 10%;
+  top: 0;
   left: 50%;
   transform: translateX(-50%);
-  width: 3px;
-  height: 80%;
+  width: 2px;
+  height: 100%;
   border-radius: 2px;
-  background: transparent;
+  background: color-mix(in srgb, var(--ui-border) 50%, transparent);
   transition: background 0.15s;
 }
 

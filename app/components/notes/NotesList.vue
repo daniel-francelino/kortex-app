@@ -94,33 +94,6 @@ const rootActionItems = computed(() => [[
   { label: 'Nova pasta', icon: 'i-lucide-folder-plus', onSelect: () => emit('new-folder') }
 ]])
 
-// ─── Folder tree ───────────────────────────────────────────────────────────────
-
-interface FolderTreeNode {
-  folder: NoteFolder
-  depth: number
-}
-
-const flatFolderTree = computed<FolderTreeNode[]>(() => {
-  const result: FolderTreeNode[] = []
-
-  function addChildren(parentId: string | null, depth: number) {
-    const children = [...props.folders]
-      .filter(f => f.parentId === parentId)
-      .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR', { sensitivity: 'base' }))
-
-    for (const folder of children) {
-      result.push({ folder, depth })
-      if (expandedFolders.value.has(folder.id)) {
-        addChildren(folder.id, depth + 1)
-      }
-    }
-  }
-
-  addChildren(null, 0)
-  return result
-})
-
 // ─── Drag & drop ───────────────────────────────────────────────────────────────
 
 const dragOverFolderId = ref<string | null>(null)
@@ -147,6 +120,7 @@ function onFolderDragLeave(folderId: string, e: DragEvent) {
 }
 
 function onFolderDrop(folderId: string, e: DragEvent) {
+  e.stopPropagation()
   dragOverFolderId.value = null
   const noteId = e.dataTransfer?.getData('application/x-notes-note-id')
   if (noteId) emit('move-to-folder', noteId, folderId)
@@ -185,6 +159,46 @@ const notesByFolder = computed(() => {
 })
 
 const rootNotes = computed(() => notesByFolder.value.get(null) ?? [])
+const hasFolders = computed(() => props.folders.length > 0)
+
+// ─── Unified flat list ─────────────────────────────────────────────────────────
+
+type ListRow =
+  | { kind: 'folder'; folder: NoteFolder; depth: number }
+  | { kind: 'note'; note: Note; depth: number }
+
+const flatList = computed<ListRow[]>(() => {
+  const result: ListRow[] = []
+
+  function addFolderWithChildren(parentId: string | null, depth: number) {
+    const children = [...props.folders]
+      .filter(f => f.parentId === parentId)
+      .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR', { sensitivity: 'base' }))
+
+    for (const folder of children) {
+      result.push({ kind: 'folder', folder, depth })
+      if (expandedFolders.value.has(folder.id)) {
+        for (const note of notesByFolder.value.get(folder.id) ?? []) {
+          result.push({ kind: 'note', note, depth: depth + 1 })
+        }
+        addFolderWithChildren(folder.id, depth + 1)
+      }
+    }
+  }
+
+  if (hasFolders.value) {
+    addFolderWithChildren(null, 0)
+    for (const note of rootNotes.value) {
+      result.push({ kind: 'note', note, depth: 0 })
+    }
+  } else {
+    for (const note of props.notes) {
+      result.push({ kind: 'note', note, depth: 0 })
+    }
+  }
+
+  return result
+})
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -193,128 +207,112 @@ const totalPages = computed(() => Math.max(1, Math.ceil(props.total / props.page
 function getTypeMeta(type: string) {
   return NOTE_TYPE_META[type as NoteType] ?? NOTE_TYPE_META[NoteType.Note]
 }
-
-function formatDate(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })
-}
-
-const hasFolders = computed(() => props.folders.length > 0)
 </script>
 
 <template>
   <UContextMenu :items="rootActionItems" class="flex flex-col h-full min-h-0">
-    <div class="flex flex-col h-full min-h-0">
+    <div
+      class="flex flex-col h-full min-h-0 transition-colors"
+      :class="dragOverRoot && hasFolders ? 'bg-primary/5' : ''"
+      @dragover.prevent="hasFolders ? onRootDragOver($event) : undefined"
+      @dragleave="hasFolders ? onRootDragLeave($event) : undefined"
+      @drop.prevent="hasFolders ? onRootDrop($event) : undefined"
+    >
       <!-- Loading skeleton -->
       <div v-if="loading" class="space-y-2 p-2">
         <USkeleton v-for="i in 6" :key="i" class="h-10 w-full" />
       </div>
 
       <template v-else>
-        <!-- Folders section (tree) -->
-        <div v-if="hasFolders" class="shrink-0">
-          <div
-            v-for="node in flatFolderTree"
-            :key="node.folder.id"
-            class="group/folder"
-          >
-            <UContextMenu :items="folderActionItems(node.folder)">
-              <!-- Folder header (drop target) -->
-              <div
-                class="group/folder-row flex items-center gap-1 pr-1 py-1.5 rounded-lg mx-1 transition-colors cursor-pointer select-none"
-                :style="{ paddingLeft: `${0.5 + node.depth}rem` }"
-                :class="dragOverFolderId === node.folder.id
-                  ? 'bg-primary/15 ring-1 ring-primary/40'
-                  : 'hover:bg-elevated/80'"
-                @click="toggleFolder(node.folder.id)"
-                @dragover.prevent="onFolderDragOver(node.folder.id, $event)"
-                @dragleave="onFolderDragLeave(node.folder.id, $event)"
-                @drop.prevent="onFolderDrop(node.folder.id, $event)"
-              >
-                <UIcon
-                  :name="expandedFolders.has(node.folder.id) ? 'i-lucide-chevron-down' : 'i-lucide-chevron-right'"
-                  class="size-3 text-muted shrink-0 transition-transform"
-                />
-                <UIcon
-                  :name="expandedFolders.has(node.folder.id) ? 'i-lucide-folder-open' : 'i-lucide-folder'"
-                  class="size-3.5 shrink-0"
-                  :class="dragOverFolderId === node.folder.id ? 'text-primary' : 'text-amber-500'"
-                />
-
-                <!-- Inline rename -->
-                <input
-                  v-if="editingFolderId === node.folder.id"
-                  ref="editInput"
-                  v-model="editingName"
-                  class="flex-1 text-xs font-medium bg-transparent outline-none border-b border-primary"
-                  @blur="commitEdit(node.folder.id)"
-                  @keydown.enter.prevent="commitEdit(node.folder.id)"
-                  @keydown.escape.prevent="editingFolderId = null"
-                  @click.stop
-                >
-                <span v-else class="flex-1 text-xs font-medium text-highlighted truncate">
-                  {{ node.folder.name }}
-                </span>
-
-                <!-- Folder action button -->
-                <UDropdownMenu
-                  :items="folderActionItems(node.folder)"
-                  @click.stop
-                >
-                  <UButton
-                    icon="i-lucide-ellipsis-vertical"
-                    color="neutral"
-                    variant="ghost"
-                    size="xs"
-                    class="opacity-0 group-hover/folder-row:opacity-100 transition-opacity shrink-0"
-                    @click.stop
-                  />
-                </UDropdownMenu>
-              </div>
-            </UContextMenu>
-
-            <!-- Notes inside this folder (when expanded) -->
-            <div
-              v-if="expandedFolders.has(node.folder.id) && (notesByFolder.get(node.folder.id) ?? []).length > 0"
-              class="border-l border-default/70 pl-3 pr-1 py-0.5"
-              :style="{ marginLeft: `${1.25 + node.depth}rem` }"
+        <div class="flex-1 min-h-0 overflow-y-auto">
+          <div class="p-1 space-y-0.5">
+            <template
+              v-for="row in flatList"
+              :key="row.kind === 'folder' ? `f-${row.folder.id}` : `n-${row.note.id}`"
             >
-              <UContextMenu
-                v-for="note in notesByFolder.get(node.folder.id) ?? []"
-                :key="note.id"
-                :items="noteActionItems(note)"
-              >
+              <!-- ── Folder row ── -->
+              <UContextMenu v-if="row.kind === 'folder'" :items="folderActionItems(row.folder)">
+                <div
+                  class="group/folder-row flex items-center gap-1 pr-1 py-1.5 rounded-lg mx-1 transition-colors cursor-pointer select-none"
+                  :style="{ paddingLeft: `${0.5 + row.depth}rem` }"
+                  :class="dragOverFolderId === row.folder.id
+                    ? 'bg-primary/15 ring-1 ring-primary/40'
+                    : 'hover:bg-elevated/80'"
+                  @click="toggleFolder(row.folder.id)"
+                  @dragover.prevent.stop="onFolderDragOver(row.folder.id, $event)"
+                  @dragleave="onFolderDragLeave(row.folder.id, $event)"
+                  @drop.prevent.stop="onFolderDrop(row.folder.id, $event)"
+                >
+                  <UIcon
+                    :name="expandedFolders.has(row.folder.id) ? 'i-lucide-chevron-down' : 'i-lucide-chevron-right'"
+                    class="size-3 text-muted shrink-0 transition-transform"
+                  />
+                  <UIcon
+                    :name="expandedFolders.has(row.folder.id) ? 'i-lucide-folder-open' : 'i-lucide-folder'"
+                    class="size-3.5 shrink-0"
+                    :class="dragOverFolderId === row.folder.id ? 'text-primary' : 'text-amber-500'"
+                  />
+
+                  <input
+                    v-if="editingFolderId === row.folder.id"
+                    ref="editInput"
+                    v-model="editingName"
+                    class="flex-1 text-xs font-medium bg-transparent outline-none border-b border-primary"
+                    @blur="commitEdit(row.folder.id)"
+                    @keydown.enter.prevent="commitEdit(row.folder.id)"
+                    @keydown.escape.prevent="editingFolderId = null"
+                    @click.stop
+                  >
+                  <span v-else class="flex-1 text-xs font-medium text-highlighted truncate">
+                    {{ row.folder.name }}
+                  </span>
+
+                  <UDropdownMenu :items="folderActionItems(row.folder)" @click.stop>
+                    <UButton
+                      icon="i-lucide-ellipsis-vertical"
+                      color="neutral"
+                      variant="ghost"
+                      size="xs"
+                      class="opacity-0 group-hover/folder-row:opacity-100 transition-opacity shrink-0"
+                      @click.stop
+                    />
+                  </UDropdownMenu>
+                </div>
+              </UContextMenu>
+
+              <!-- ── Note row ── -->
+              <UContextMenu v-else :items="noteActionItems(row.note)">
                 <button
                   draggable="true"
-                  class="group/note relative w-full cursor-grab rounded-lg px-2 py-1.5 text-left transition-colors before:absolute before:-left-3 before:top-1/2 before:h-px before:w-2 before:bg-default/70 hover:bg-elevated/80 active:cursor-grabbing"
-                  :class="{ 'bg-elevated ring-1 ring-primary/30': selectedId === note.id }"
-                  @click="emit('select', note)"
-                  @dragstart="onNoteDragStart(note, $event)"
+                  class="group/note w-full cursor-grab rounded-lg py-1.5 pr-1 text-left transition-colors hover:bg-elevated/80 active:cursor-grabbing"
+                  :style="{ paddingLeft: `${0.5 + row.depth}rem` }"
+                  :class="{ 'bg-elevated ring-1 ring-primary/30': selectedId === row.note.id }"
+                  @click="emit('select', row.note)"
+                  @dragstart="onNoteDragStart(row.note, $event)"
+                  @drop.prevent.stop
                 >
                   <div class="flex items-center gap-2 min-w-0">
-                    <span v-if="note.icon" class="text-sm leading-none shrink-0">{{ note.icon }}</span>
+                    <span v-if="row.note.icon" class="text-sm leading-none shrink-0">{{ row.note.icon }}</span>
                     <UIcon
                       v-else
-                      :name="getTypeMeta(note.type).icon"
+                      :name="getTypeMeta(row.note.type).icon"
                       class="size-3.5 shrink-0"
-                      :class="`text-${getTypeMeta(note.type).color}-500`"
+                      :class="`text-${getTypeMeta(row.note.type).color}-500`"
                     />
                     <input
-                      v-if="editingNoteId === note.id"
+                      v-if="editingNoteId === row.note.id"
                       ref="noteEditInput"
                       v-model="editingNoteTitle"
                       class="min-w-0 flex-1 bg-transparent text-xs font-medium text-highlighted outline-none border-b border-primary"
-                      @blur="commitNoteEdit(note.id)"
-                      @keydown.enter.prevent="commitNoteEdit(note.id)"
+                      @blur="commitNoteEdit(row.note.id)"
+                      @keydown.enter.prevent="commitNoteEdit(row.note.id)"
                       @keydown.escape.prevent="editingNoteId = null"
                       @click.stop
                     >
                     <p v-else class="text-xs font-medium truncate flex-1 text-highlighted">
-                      {{ note.title || 'Sem título' }}
+                      {{ row.note.title || 'Sem título' }}
                     </p>
-                    <UDropdownMenu
-                      :items="noteActionItems(note)"
-                      @click.stop
-                    >
+                    <UDropdownMenu :items="noteActionItems(row.note)" @click.stop>
                       <UButton
                         icon="i-lucide-ellipsis-vertical"
                         color="neutral"
@@ -327,118 +325,7 @@ const hasFolders = computed(() => props.folders.length > 0)
                   </div>
                 </button>
               </UContextMenu>
-            </div>
-          </div>
-
-          <!-- Divider before root notes -->
-          <div
-            v-if="rootNotes.length > 0 || dragOverRoot"
-            class="flex items-center gap-2 px-3 py-1 mt-1 transition-colors"
-            :class="dragOverRoot ? 'bg-primary/5' : ''"
-            @dragover.prevent="onRootDragOver"
-            @dragleave="onRootDragLeave"
-            @drop.prevent="onRootDrop"
-          >
-            <div class="flex-1 h-px bg-border" />
-            <span class="text-xs text-dimmed shrink-0">Sem pasta</span>
-            <div class="flex-1 h-px bg-border" />
-          </div>
-        </div>
-
-        <!-- Root notes (no folder, or all notes when no folders exist) -->
-        <div
-          class="flex-1 min-h-0 overflow-y-auto"
-          @dragover.prevent="hasFolders ? onRootDragOver($event) : undefined"
-          @dragleave="hasFolders ? onRootDragLeave($event) : undefined"
-          @drop.prevent="hasFolders ? onRootDrop($event) : undefined"
-        >
-          <!-- Empty state -->
-          <div
-            v-if="!hasFolders && notes.length === 0"
-            class="flex flex-col items-center justify-center py-12 gap-3 px-4"
-          />
-          <div v-else class="space-y-0.5 p-1">
-            <UContextMenu
-              v-for="note in hasFolders ? rootNotes : notes"
-              :key="note.id"
-              :items="noteActionItems(note)"
-            >
-              <button
-                draggable="true"
-                class="w-full text-left rounded-lg px-3 py-2.5 transition-colors hover:bg-elevated/80 group cursor-grab active:cursor-grabbing"
-                :class="{ 'bg-elevated ring-1 ring-primary/30': selectedId === note.id }"
-                @click="emit('select', note)"
-                @dragstart="onNoteDragStart(note, $event)"
-              >
-                <div class="flex items-start gap-2">
-                  <span v-if="note.icon" class="text-base leading-none shrink-0 mt-0.5">{{ note.icon }}</span>
-                  <UIcon
-                    v-else
-                    :name="getTypeMeta(note.type).icon"
-                    class="size-4 mt-0.5 shrink-0"
-                    :class="`text-${getTypeMeta(note.type).color}-500`"
-                  />
-                  <div class="min-w-0 flex-1">
-                    <div class="flex items-center gap-1.5">
-                      <UIcon v-if="note.pinned" name="i-lucide-pin" class="size-3 text-primary shrink-0" />
-                      <input
-                        v-if="editingNoteId === note.id"
-                        ref="noteEditInput"
-                        v-model="editingNoteTitle"
-                        class="min-w-0 flex-1 bg-transparent text-sm font-medium text-highlighted outline-none border-b border-primary"
-                        @blur="commitNoteEdit(note.id)"
-                        @keydown.enter.prevent="commitNoteEdit(note.id)"
-                        @keydown.escape.prevent="editingNoteId = null"
-                        @click.stop
-                      >
-                      <p v-else class="text-sm font-medium truncate">
-                        {{ note.title }}
-                      </p>
-                    </div>
-                    <div class="flex items-center gap-2 mt-0.5">
-                      <span class="text-xs text-muted">{{ formatDate(note.updatedAt) }}</span>
-                      <UBadge
-                        v-if="(note.linkCount ?? 0) > 0"
-                        size="xs"
-                        color="primary"
-                        variant="subtle"
-                      >
-                        <UIcon name="i-lucide-link" class="size-2.5 mr-0.5" />
-                        {{ note.linkCount }}
-                      </UBadge>
-                    </div>
-                    <div v-if="note.tags && note.tags.length > 0" class="flex flex-wrap gap-1 mt-1">
-                      <UBadge
-                        v-for="tag in note.tags.slice(0, 3)"
-                        :key="tag.id"
-                        size="xs"
-                        color="neutral"
-                        variant="subtle"
-                      >
-                        #{{ tag.name }}
-                      </UBadge>
-                      <UBadge
-                        v-if="note.tags.length > 3"
-                        size="xs"
-                        color="neutral"
-                        variant="subtle"
-                      >
-                        +{{ note.tags.length - 3 }}
-                      </UBadge>
-                    </div>
-                  </div>
-                  <UDropdownMenu :items="noteActionItems(note)">
-                    <UButton
-                      icon="i-lucide-ellipsis-vertical"
-                      color="neutral"
-                      variant="ghost"
-                      size="xs"
-                      class="opacity-0 group-hover:opacity-100 transition-opacity"
-                    />
-                  </UDropdownMenu>
-                </div>
-              </button>
-            </UContextMenu>
+            </template>
           </div>
 
           <!-- Pagination (only when not in folder mode) -->

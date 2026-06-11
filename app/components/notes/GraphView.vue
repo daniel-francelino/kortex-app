@@ -102,8 +102,8 @@ function simulate(): void {
   const nodes = simNodes.value
   const edges = simEdges.value
   const alpha = 0.3
-  const repulsion = 2000
-  const attraction = 0.005
+  const repulsion = 3500
+  const attraction = 0.01
   const centerForce = 0.01
   const damping = 0.85
 
@@ -137,11 +137,13 @@ function simulate(): void {
     const dx = t.x - s.x
     const dy = t.y - s.y
     const dist = Math.max(1, Math.sqrt(dx * dx + dy * dy))
-    const force = dist * attraction
-    s.vx += dx * force * alpha
-    s.vy += dy * force * alpha
-    t.vx -= dx * force * alpha
-    t.vy -= dy * force * alpha
+    const restLength = 160
+    const displacement = dist - restLength
+    const force = displacement * attraction
+    s.vx += (dx / dist) * force * alpha
+    s.vy += (dy / dist) * force * alpha
+    t.vx -= (dx / dist) * force * alpha
+    t.vy -= (dy / dist) * force * alpha
   }
 
   // Center force

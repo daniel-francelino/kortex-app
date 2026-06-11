@@ -511,7 +511,7 @@ defineExpose({
       </div>
 
       <div
-        class="flex-1 overflow-y-auto overflow-x-hidden pl-16 pr-10 pb-10 cursor-text"
+        class="flex-1 overflow-y-auto pl-16 pr-10 pb-10 cursor-text"
         @click.self="editorRef?.focus()"
       >
         <EditorNotionStyleEditor

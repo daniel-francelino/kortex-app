@@ -229,8 +229,7 @@ async function loadCurrentNoteDetail(
     return null;
   }
 
-  currentNoteLoading.value =
-    !hasLoadedNoteDetailOnce.value && !currentNoteDetail.value;
+  currentNoteLoading.value = true;
 
   try {
     const detail = await fetchNoteDetail(noteId);
