@@ -627,213 +627,199 @@ async function onUnlinkNotes(
     </template>
 
     <template #body>
-      <AnimatePresence mode="wait">
-        <!-- ── Initial load skeleton ─────────────────────────────────────────────────── -->
-        <motion.div
-          v-if="notesListInitialLoading"
-          key="skeleton"
-          class="flex h-full"
-          :initial="{ opacity: 0 }"
-          :animate="{ opacity: 1 }"
-          :exit="{ opacity: 0 }"
-          :transition="{ duration: 0.15 }"
+      <!-- ── Initial load skeleton ─────────────────────────────────────────────────── -->
+      <div
+        v-if="notesListInitialLoading"
+        class="flex h-full"
+      >
+        <!-- Sidebar skeleton -->
+        <div
+          class="shrink-0 flex flex-col h-full border-r border-default"
+          :style="{ width: sidebarWidth + 'px' }"
         >
-          <!-- Sidebar skeleton -->
-          <div
-            class="shrink-0 flex flex-col h-full border-r border-default"
-            :style="{ width: sidebarWidth + 'px' }"
-          >
-            <div class="px-3 h-9 border-b border-default flex items-center gap-1">
-              <USkeleton v-for="i in 5" :key="i" class="size-7 rounded-md" />
-            </div>
-            <div class="flex-1 p-2 space-y-1">
-              <USkeleton v-for="i in 10" :key="i" class="h-9 w-full rounded-lg" />
+          <div class="px-3 h-9 border-b border-default flex items-center gap-1">
+            <USkeleton v-for="i in 5" :key="i" class="size-7 rounded-md" />
+          </div>
+          <div class="flex-1 p-2 space-y-1">
+            <USkeleton v-for="i in 10" :key="i" class="h-9 w-full rounded-lg" />
+          </div>
+        </div>
+        <!-- Main area skeleton -->
+        <div class="flex-1 flex flex-col px-16 py-10 gap-3 max-w-3xl">
+          <USkeleton class="h-8 w-2/5 mb-2" />
+          <USkeleton class="h-4 w-full" />
+          <USkeleton class="h-4 w-full" />
+          <USkeleton class="h-4 w-4/6" />
+          <USkeleton class="h-4 w-full mt-4" />
+          <USkeleton class="h-4 w-5/6" />
+          <USkeleton class="h-4 w-full" />
+          <USkeleton class="h-4 w-3/6 mt-4" />
+          <USkeleton class="h-4 w-full" />
+          <USkeleton class="h-4 w-full" />
+        </div>
+      </div>
+
+      <div v-else class="flex h-full">
+        <!-- ── Left sidebar (notes list + tags) ──────────────────────────────────── -->
+        <div
+          class="shrink-0 flex flex-col h-full relative"
+          :style="{ width: sidebarWidth + 'px' }"
+        >
+          <!-- Sidebar header -->
+          <div class="px-3 h-9 border-b border-default flex items-center">
+            <div class="flex items-center justify-center gap-1">
+              <UTooltip text="Nova nota">
+                <UButton
+                  icon="i-lucide-square-pen"
+                  size="xs"
+                  variant="ghost"
+                  color="neutral"
+                  :loading="creatingQuickNote"
+                  @click="onQuickCreateNote()"
+                />
+              </UTooltip>
+
+              <UTooltip text="Nova pasta">
+                <UButton
+                  icon="i-lucide-folder-plus"
+                  size="xs"
+                  variant="ghost"
+                  color="neutral"
+                  :loading="creatingQuickFolder"
+                  @click="onQuickCreateFolder()"
+                />
+              </UTooltip>
+
+              <UDropdownMenu :items="sortMenuItems">
+                <UTooltip :text="`Ordenar: ${activeSortOption.label}`">
+                  <UButton
+                    :icon="activeSortOption.icon"
+                    size="xs"
+                    variant="ghost"
+                    color="neutral"
+                  />
+                </UTooltip>
+              </UDropdownMenu>
+
+              <UTooltip text="Buscar">
+                <UButton
+                  icon="i-lucide-search"
+                  size="xs"
+                  variant="ghost"
+                  color="neutral"
+                  @click="openNotesSearch"
+                />
+              </UTooltip>
+
+              <UTooltip
+                :text="activeView === 'graph' ? 'Abrir editor' : 'Abrir grafo'"
+              >
+                <UButton
+                  :icon="
+                    activeView === 'graph'
+                      ? 'i-lucide-file-text'
+                      : 'i-lucide-network'
+                  "
+                  size="xs"
+                  variant="ghost"
+                  :color="activeView === 'graph' ? 'primary' : 'neutral'"
+                  @click="
+                    activeView === 'graph'
+                      ? (activeView = 'editor')
+                      : switchToGraph()
+                  "
+                />
+              </UTooltip>
             </div>
           </div>
-          <!-- Main area skeleton -->
-          <div class="flex-1 flex flex-col px-16 py-10 gap-3 max-w-3xl">
-            <USkeleton class="h-8 w-2/5 mb-2" />
-            <USkeleton class="h-4 w-full" />
-            <USkeleton class="h-4 w-full" />
-            <USkeleton class="h-4 w-4/6" />
-            <USkeleton class="h-4 w-full mt-4" />
-            <USkeleton class="h-4 w-5/6" />
-            <USkeleton class="h-4 w-full" />
-            <USkeleton class="h-4 w-3/6 mt-4" />
-            <USkeleton class="h-4 w-full" />
-            <USkeleton class="h-4 w-full" />
-          </div>
-        </motion.div>
 
-        <motion.div
-          v-else
-          key="content"
-          class="flex h-full"
-          :initial="{ opacity: 0 }"
-          :animate="{ opacity: 1 }"
-          :transition="{ duration: 0.2 }"
-        >
-          <!-- ── Left sidebar (notes list + tags) ──────────────────────────────────── -->
-          <div
-            class="shrink-0 flex flex-col h-full relative"
-            :style="{ width: sidebarWidth + 'px' }"
-          >
-            <!-- Sidebar header -->
-            <div class="px-3 h-9 border-b border-default flex items-center">
-              <div class="flex items-center justify-center gap-1">
-                <UTooltip text="Nova nota">
-                  <UButton
-                    icon="i-lucide-square-pen"
-                    size="xs"
-                    variant="ghost"
-                    color="neutral"
-                    :loading="creatingQuickNote"
-                    @click="onQuickCreateNote()"
-                  />
-                </UTooltip>
-
-                <UTooltip text="Nova pasta">
-                  <UButton
-                    icon="i-lucide-folder-plus"
-                    size="xs"
-                    variant="ghost"
-                    color="neutral"
-                    :loading="creatingQuickFolder"
-                    @click="onQuickCreateFolder()"
-                  />
-                </UTooltip>
-
-                <UDropdownMenu :items="sortMenuItems">
-                  <UTooltip :text="`Ordenar: ${activeSortOption.label}`">
-                    <UButton
-                      :icon="activeSortOption.icon"
-                      size="xs"
-                      variant="ghost"
-                      color="neutral"
-                    />
-                  </UTooltip>
-                </UDropdownMenu>
-
-                <UTooltip text="Buscar">
-                  <UButton
-                    icon="i-lucide-search"
-                    size="xs"
-                    variant="ghost"
-                    color="neutral"
-                    @click="openNotesSearch"
-                  />
-                </UTooltip>
-
-                <UTooltip
-                  :text="activeView === 'graph' ? 'Abrir editor' : 'Abrir grafo'"
-                >
-                  <UButton
-                    :icon="
-                      activeView === 'graph'
-                        ? 'i-lucide-file-text'
-                        : 'i-lucide-network'
-                    "
-                    size="xs"
-                    variant="ghost"
-                    :color="activeView === 'graph' ? 'primary' : 'neutral'"
-                    @click="
-                      activeView === 'graph'
-                        ? (activeView = 'editor')
-                        : switchToGraph()
-                    "
-                  />
-                </UTooltip>
-              </div>
-            </div>
-
-            <!-- Sidebar content -->
-            <div class="flex-1 overflow-y-auto">
-              <NotesList
-                :notes="sortedVisibleNotes"
-                :folders="sortedVisibleFolders"
-                :total="visibleNotesTotal"
-                :page="page"
-                :page-size="pageSize"
-                :loading="notesListInitialLoading"
-                :selected-id="selectedNoteId"
-                :sort-mode="noteSortMode"
-                @select="onSelectNote"
-                @new-note="onQuickCreateNote()"
-                @new-folder="onQuickCreateFolder"
-                @new-subfolder="onQuickCreateFolder"
-                @new-note-in-folder="onQuickCreateNote"
-                @update:page="page = $event"
-                @pin="onPinNote"
-                @delete="onDeleteNote"
-                @move-to-folder="onMoveToFolder"
-                @rename-note="onRenameNote"
-                @rename-folder="onRenameFolder"
-                @delete-folder="onDeleteFolder"
-                @toggle-folder="onToggleFolder"
-                @reorder-note="onReorderNote"
-                @reorder-folder="onReorderFolder"
-              />
-            </div>
-
-            <!-- Resize handle -->
-            <div
-              class="absolute right-0 top-0 h-full w-1 cursor-col-resize border-r border-default hover:border-primary transition-colors z-10"
-              @mousedown.prevent="startResize"
+          <!-- Sidebar content -->
+          <div class="flex-1 overflow-y-auto">
+            <NotesList
+              :notes="sortedVisibleNotes"
+              :folders="sortedVisibleFolders"
+              :total="visibleNotesTotal"
+              :page="page"
+              :page-size="pageSize"
+              :loading="notesListInitialLoading"
+              :selected-id="selectedNoteId"
+              :sort-mode="noteSortMode"
+              @select="onSelectNote"
+              @new-note="onQuickCreateNote()"
+              @new-folder="onQuickCreateFolder"
+              @new-subfolder="onQuickCreateFolder"
+              @new-note-in-folder="onQuickCreateNote"
+              @update:page="page = $event"
+              @pin="onPinNote"
+              @delete="onDeleteNote"
+              @move-to-folder="onMoveToFolder"
+              @rename-note="onRenameNote"
+              @rename-folder="onRenameFolder"
+              @delete-folder="onDeleteFolder"
+              @toggle-folder="onToggleFolder"
+              @reorder-note="onReorderNote"
+              @reorder-folder="onReorderFolder"
             />
           </div>
 
-          <!-- ── Main area (navbar + editor + right panel) ──────────────────────────── -->
-          <div class="flex-1 flex flex-col h-full min-w-0">
-            <!-- Content: editor + right panel -->
-            <div class="flex-1 flex overflow-hidden">
-              <!-- Graph or Editor -->
-              <div class="flex-1 overflow-hidden">
-                <AnimatePresence mode="wait">
-                  <motion.div
-                    :key="activeView"
-                    class="h-full"
-                    :initial="{ opacity: 0 }"
-                    :animate="{ opacity: 1 }"
-                    :exit="{ opacity: 0 }"
-                    :transition="{ duration: 0.15 }"
-                  >
-                    <NotesGraphView
-                      v-if="activeView === 'graph'"
-                      :graph-data="graphData ?? null"
-                      :loading="graphStatus === 'pending' && !graphData"
-                      @select-note="onGraphSelectNote"
-                    />
+          <!-- Resize handle -->
+          <div
+            class="absolute right-0 top-0 h-full w-1 cursor-col-resize border-r border-default hover:border-primary transition-colors z-10"
+            @mousedown.prevent="startResize"
+          />
+        </div>
 
-                    <NotesNoteEditor
-                      v-else
-                      ref="noteEditorRef"
-                      :note-id="selectedNoteId"
-                      :note="currentNoteDetail"
-                      :loading="currentNoteLoading"
-                      :folders="sortedVisibleFolders"
-                      :available-notes="editorAvailableNotes"
-                      :update-note="onUpdateNote"
-                      :delete-note="onDeleteNoteById"
-                      :link-notes="onLinkNotes"
-                      :unlink-notes="onUnlinkNotes"
-                      :can-go-back="canGoBack"
-                      :can-go-forward="canGoForward"
-                      @updated="onNoteUpdated"
-                      @deleted="onNoteDeleted"
-                      @go-back="goBack"
-                      @go-forward="goForward"
-                      @navigate-note="onNavigateNote"
-                      @navigate-to-folder="onNavigateToFolder"
-                      @note-loaded="onNoteLoaded"
-                      @content-change="onContentChange"
-                    />
-                  </motion.div>
-                </AnimatePresence>
-              </div>
+        <!-- ── Main area (navbar + editor + right panel) ──────────────────────────── -->
+        <div class="flex-1 flex flex-col h-full min-w-0">
+          <!-- Content: editor + right panel -->
+          <div class="flex-1 flex overflow-hidden">
+            <!-- Graph or Editor -->
+            <div class="flex-1 overflow-hidden">
+              <AnimatePresence mode="wait">
+                <motion.div
+                  :key="activeView"
+                  class="h-full"
+                  :initial="{ opacity: 0 }"
+                  :animate="{ opacity: 1 }"
+                  :exit="{ opacity: 0 }"
+                  :transition="{ duration: 0.15 }"
+                >
+                  <NotesGraphView
+                    v-if="activeView === 'graph'"
+                    :graph-data="graphData ?? null"
+                    :loading="graphStatus === 'pending' && !graphData"
+                    @select-note="onGraphSelectNote"
+                  />
+
+                  <NotesNoteEditor
+                    v-else
+                    ref="noteEditorRef"
+                    :note-id="selectedNoteId"
+                    :note="currentNoteDetail"
+                    :loading="currentNoteLoading"
+                    :folders="sortedVisibleFolders"
+                    :available-notes="editorAvailableNotes"
+                    :update-note="onUpdateNote"
+                    :delete-note="onDeleteNoteById"
+                    :link-notes="onLinkNotes"
+                    :unlink-notes="onUnlinkNotes"
+                    :can-go-back="canGoBack"
+                    :can-go-forward="canGoForward"
+                    @updated="onNoteUpdated"
+                    @deleted="onNoteDeleted"
+                    @go-back="goBack"
+                    @go-forward="goForward"
+                    @navigate-note="onNavigateNote"
+                    @navigate-to-folder="onNavigateToFolder"
+                    @note-loaded="onNoteLoaded"
+                    @content-change="onContentChange"
+                  />
+                </motion.div>
+              </AnimatePresence>
             </div>
           </div>
-        </motion.div>
-      </AnimatePresence>
+        </div>
+      </div>
     </template>
   </UDashboardPanel>
 
