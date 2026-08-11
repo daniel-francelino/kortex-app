@@ -565,6 +565,20 @@ const rowTransition = { duration: 0.12, ease: 'easeOut' }
                       <p v-else class="text-xs font-medium truncate flex-1 text-highlighted">
                         {{ row.note.title || 'Sem título' }}
                       </p>
+                      <AnimatePresence>
+                        <motion.div
+                          v-if="row.note.pinned"
+                          class="shrink-0 flex items-center"
+                          :initial="{ opacity: 0, scale: 0.5 }"
+                          :animate="{ opacity: 1, scale: 1 }"
+                          :exit="{ opacity: 0, scale: 0.5 }"
+                          :transition="{ duration: 0.15 }"
+                        >
+                          <UTooltip text="Nota fixada">
+                            <UIcon name="i-lucide-pin" class="size-3 text-primary" />
+                          </UTooltip>
+                        </motion.div>
+                      </AnimatePresence>
                       <UDropdownMenu :items="noteActionItems(row.note)" @click.stop>
                         <UButton
                           icon="i-lucide-ellipsis-vertical"
