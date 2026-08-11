@@ -45,10 +45,18 @@ function toggleFolder(folder: NoteFolder) {
   emit('toggle-folder', folder.id, !folder.isExpanded)
 }
 
+// Runs after nextTick's DOM patch *and* the next paint frame, so it wins over a
+// dropdown/context menu returning focus to its trigger button when it closes.
+function focusEditInput(el: HTMLInputElement | null) {
+  if (!el) return
+  el.focus()
+  el.select()
+}
+
 function startEdit(folder: NoteFolder) {
   editingFolderId.value = folder.id
   editingName.value = folder.name
-  nextTick(() => editInput.value?.select())
+  nextTick(() => requestAnimationFrame(() => focusEditInput(editInput.value)))
 }
 
 function commitEdit(folderId: string) {
@@ -60,7 +68,7 @@ function commitEdit(folderId: string) {
 function startEditNote(note: Note) {
   editingNoteId.value = note.id
   editingNoteTitle.value = note.title
-  nextTick(() => noteEditInput.value?.select())
+  nextTick(() => requestAnimationFrame(() => focusEditInput(noteEditInput.value)))
 }
 
 function commitNoteEdit(noteId: string) {
@@ -430,6 +438,7 @@ const rowTransition = { duration: 0.12, ease: 'easeOut' }
                       ? 'bg-primary/15 ring-1 ring-primary/40'
                       : 'hover:bg-elevated/80'"
                     @click="toggleFolder(row.folder)"
+                    @dblclick.stop="startEdit(row.folder)"
                     @dragstart="onFolderDragStart(row.folder, $event)"
                     @dragover.prevent.stop="onFolderDragOver(row.folder.id, row.folder, $event)"
                     @dragleave="onFolderDragLeave(row.folder.id, $event)"
@@ -477,6 +486,7 @@ const rowTransition = { duration: 0.12, ease: 'easeOut' }
                       @keydown.enter.prevent="commitEdit(row.folder.id)"
                       @keydown.escape.prevent="editingFolderId = null"
                       @click.stop
+                      @dblclick.stop
                     >
                     <span v-else class="flex-1 text-xs font-medium text-highlighted truncate">
                       {{ row.folder.name }}
@@ -513,6 +523,7 @@ const rowTransition = { duration: 0.12, ease: 'easeOut' }
                     :style="{ paddingLeft: `${0.5 + row.depth}rem` }"
                     :class="{ 'bg-elevated ring-1 ring-primary/30': selectedId === row.note.id }"
                     @click="emit('select', row.note)"
+                    @dblclick.stop="startEditNote(row.note)"
                     @dragstart="onNoteDragStart(row.note, $event)"
                     @dragover.prevent.stop="onNoteRowDragOver(row.note, $event)"
                     @dragleave="onNoteRowDragLeave(row.note, $event)"
@@ -549,6 +560,7 @@ const rowTransition = { duration: 0.12, ease: 'easeOut' }
                         @keydown.enter.prevent="commitNoteEdit(row.note.id)"
                         @keydown.escape.prevent="editingNoteId = null"
                         @click.stop
+                        @dblclick.stop
                       >
                       <p v-else class="text-xs font-medium truncate flex-1 text-highlighted">
                         {{ row.note.title || 'Sem título' }}
