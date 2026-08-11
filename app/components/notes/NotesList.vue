@@ -28,7 +28,7 @@ const emit = defineEmits<{
   'new-note-in-folder': [folderId: string]
   'new-subfolder': [parentFolderId: string]
   'toggle-folder': [folderId: string, isExpanded: boolean]
-  'reorder-note': [noteId: string, beforeId: string | null, afterId: string | null]
+  'reorder-note': [noteId: string, beforeId: string | null, afterId: string | null, folderId: string | null]
   'reorder-folder': [folderId: string, beforeId: string | null, afterId: string | null]
 }>()
 
@@ -291,17 +291,18 @@ function onNoteRowDrop(note: Note, e: DragEvent) {
   clearRowDragState()
   if (!isCustomSort.value || !draggedId || draggedId === note.id || !edge) return
 
-  const group = notesByFolder.value.get(note.folderId ?? null) ?? []
-  if (!group.some(n => n.id === draggedId)) return // different folder — reordering doesn't move it, use move-to-folder instead
-
-  const siblings = group.filter(n => n.id !== draggedId)
+  // Always target the folder the drop actually landed in — dropping a note from
+  // outside onto a row inside a folder moves it there *and* positions it there,
+  // in one gesture. Dropping within the same folder just repositions it.
+  const targetFolderId = note.folderId ?? null
+  const siblings = (notesByFolder.value.get(targetFolderId) ?? []).filter(n => n.id !== draggedId)
   const targetIndex = siblings.findIndex(n => n.id === note.id)
   if (targetIndex === -1) return
 
   const insertAt = edge === 'top' ? targetIndex : targetIndex + 1
   const beforeId = siblings[insertAt - 1]?.id ?? null
   const afterId = siblings[insertAt]?.id ?? null
-  emit('reorder-note', draggedId, beforeId, afterId)
+  emit('reorder-note', draggedId, beforeId, afterId, targetFolderId)
 }
 
 function onRootDragOver(e: DragEvent) {

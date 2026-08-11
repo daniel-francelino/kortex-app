@@ -654,14 +654,30 @@ export function useNotes() {
     return (before + after) / 2
   }
 
-  async function reorderNote(noteId: string, position: number): Promise<boolean> {
+  /**
+   * Repositions a note, optionally also moving it into a different folder in the
+   * same operation — dragging a note onto a row inside another folder must move
+   * *and* position it atomically, in a single optimistic update and a single
+   * request, rather than two separate steps that could disagree with each other.
+   */
+  async function reorderNote(noteId: string, position: number, folderId?: string | null): Promise<boolean> {
     const previous = notesById.get(noteId)
     if (!previous) return false
 
+    const changingFolder = folderId !== undefined && folderId !== previous.folderId
+    const optimisticNote: Note = {
+      ...previous,
+      position,
+      ...(changingFolder ? { folderId } : {})
+    }
+
     const result = await runOptimisticAction({
-      apply: () => notesById.set(noteId, { ...previous, position }),
+      apply: () => notesById.set(noteId, optimisticNote),
       rollback: () => notesById.set(noteId, previous),
-      request: () => $fetch<Note>(`/api/notes/${noteId}`, { method: 'PUT', body: { position } }),
+      request: () => $fetch<Note>(`/api/notes/${noteId}`, {
+        method: 'PUT',
+        body: changingFolder ? { position, folderId } : { position }
+      }),
       reconcile: updated => notesById.set(noteId, { ...notesById.get(noteId), ...updated }),
       errorMessage: 'Falha ao reordenar nota.'
     })

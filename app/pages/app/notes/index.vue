@@ -513,10 +513,10 @@ function onToggleFolder(folderId: string, isExpanded: boolean): void {
   setFolderExpanded(folderId, isExpanded)
 }
 
-function onReorderNote(noteId: string, beforeId: string | null, afterId: string | null): void {
+function onReorderNote(noteId: string, beforeId: string | null, afterId: string | null, folderId: string | null): void {
   const beforePos = beforeId ? (visibleNotes.value.find(n => n.id === beforeId)?.position ?? null) : null
   const afterPos = afterId ? (visibleNotes.value.find(n => n.id === afterId)?.position ?? null) : null
-  void reorderNote(noteId, computePositionBetween(beforePos, afterPos))
+  void reorderNote(noteId, computePositionBetween(beforePos, afterPos), folderId)
 }
 
 function onReorderFolder(folderId: string, beforeId: string | null, afterId: string | null): void {
