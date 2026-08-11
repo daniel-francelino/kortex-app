@@ -532,7 +532,7 @@ const rowTransition = { duration: 0.12, ease: 'easeOut' }
                     :transition="rowTransition"
                     :draggable="isCustomSort"
                     class="group/folder-row relative flex items-center gap-1 pr-1 py-1.5 rounded-lg mx-1 transition-colors cursor-pointer select-none"
-                    :style="{ paddingLeft: `${0.5 + row.depth}rem` }"
+                    :style="{ paddingLeft: `${0.25 + row.depth * 0.75}rem` }"
                     :class="dragOverFolderId === row.folder.id
                       ? 'bg-primary/15 ring-1 ring-primary/40'
                       : 'hover:bg-elevated/80'"
@@ -618,8 +618,8 @@ const rowTransition = { duration: 0.12, ease: 'easeOut' }
                     :exit="rowExit"
                     :transition="rowTransition"
                     draggable="true"
-                    class="group/note relative w-full cursor-grab rounded-lg py-1.5 pr-1 text-left transition-colors hover:bg-elevated/80 active:cursor-grabbing"
-                    :style="{ paddingLeft: `${0.5 + row.depth}rem` }"
+                    class="group/note relative w-full cursor-grab rounded-lg py-1.5 pr-1 text-left transition-colors hover:bg-elevated/80 active:cursor-grabbing flex items-center gap-1"
+                    :style="{ paddingLeft: `${0.25 + row.depth * 0.75}rem` }"
                     :class="{ 'bg-elevated ring-1 ring-primary/30': selectedId === row.note.id }"
                     @click="emit('select', row.note)"
                     @dblclick.stop="startEditNote(row.note)"
@@ -642,7 +642,10 @@ const rowTransition = { duration: 0.12, ease: 'easeOut' }
                       />
                     </AnimatePresence>
 
-                    <div class="flex items-center gap-2 min-w-0">
+                    <!-- Chevron-width spacer so the note icon lines up with folder icons at the same depth -->
+                    <span class="size-3 shrink-0" />
+
+                    <div class="flex items-center gap-2 min-w-0 flex-1">
                       <span v-if="row.note.icon" class="text-sm leading-none shrink-0">{{ row.note.icon }}</span>
                       <UIcon
                         v-else
