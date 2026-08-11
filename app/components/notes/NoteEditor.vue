@@ -302,7 +302,7 @@ const breadcrumbItems = computed((): BreadcrumbItem[] => {
       folderId: null,
       isNote: true,
       icon: editIcon.value,
-      noteType: noteDetail.value.type
+      noteType: editType.value
     }
   ]
 })
@@ -310,6 +310,16 @@ const breadcrumbItems = computed((): BreadcrumbItem[] => {
 function getTypeMeta(type: string) {
   return NOTE_TYPE_META[type as NoteType] ?? NOTE_TYPE_META[NoteType.Note]
 }
+
+const typeMenuItems = computed(() => [
+  Object.entries(NOTE_TYPE_META).map(([value, meta]) => ({
+    label: meta.label,
+    icon: meta.icon,
+    type: 'checkbox' as const,
+    checked: editType.value === value,
+    onUpdateChecked: () => setType(value as NoteType)
+  }))
+])
 
 function formatDate(value: string) {
   return new Date(value).toLocaleDateString('pt-BR', {
@@ -419,6 +429,17 @@ defineExpose({
               <AppEmojiPicker @select="(emoji) => setIcon(emoji)" />
             </template>
           </UPopover>
+          <UDropdownMenu v-model:open="typePickerOpen" :items="typeMenuItems">
+            <UTooltip :text="`Tipo: ${getTypeMeta(editType).label}`">
+              <UButton
+                :icon="getTypeMeta(editType).icon"
+                :label="getTypeMeta(editType).label"
+                size="xs"
+                variant="ghost"
+                color="neutral"
+              />
+            </UTooltip>
+          </UDropdownMenu>
         </div>
 
         <!-- Center: breadcrumb -->
