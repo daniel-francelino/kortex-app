@@ -41,6 +41,7 @@ const editorRef = ref<NotionStyleEditorRef | null>(null)
 const noteDetail = ref<NoteDetail | null>(null)
 const editTitle = ref('')
 const editIcon = ref<string | null>(null)
+const editType = ref<NoteType>(NoteType.Note)
 const content = ref('')
 const lastSavedTitle = ref('')
 const lastSavedContent = ref('')
@@ -49,6 +50,7 @@ const savedAt = ref<Date | null>(null)
 const lastChangeAt = ref(0)
 const syncingContent = ref(false)
 const iconPickerOpen = ref(false)
+const typePickerOpen = ref(false)
 
 const isDragOver = ref(false)
 
@@ -109,12 +111,14 @@ function resetNoteState() {
   syncingContent.value = true
   editTitle.value = ''
   editIcon.value = null
+  editType.value = NoteType.Note
   content.value = ''
   lastSavedTitle.value = ''
   lastSavedContent.value = ''
   lastChangeAt.value = 0
   saveStatus.value = 'idle'
   iconPickerOpen.value = false
+  typePickerOpen.value = false
   editorRef.value?.clearContent()
   nextTick(() => {
     syncingContent.value = false
@@ -136,12 +140,14 @@ async function syncNote(detail: NoteDetail | null) {
   syncingContent.value = true
   editTitle.value = detail.title
   editIcon.value = detail.icon ?? null
+  editType.value = detail.type
   content.value = detail.content ?? ''
   lastSavedTitle.value = detail.title
   lastSavedContent.value = detail.content ?? ''
   lastChangeAt.value = 0
   saveStatus.value = 'idle'
   iconPickerOpen.value = false
+  typePickerOpen.value = false
 
   await nextTick()
   editorRef.value?.setContent(content.value)
@@ -158,7 +164,16 @@ async function setIcon(icon: string | null) {
   if (!noteDetail.value) return
   editIcon.value = icon
   iconPickerOpen.value = false
+  typePickerOpen.value = false
   const result = await props.updateNote(noteDetail.value.id, { icon }, { silent: true })
+  if (result) emit('updated')
+}
+
+async function setType(type: NoteType) {
+  if (!noteDetail.value) return
+  editType.value = type
+  typePickerOpen.value = false
+  const result = await props.updateNote(noteDetail.value.id, { type }, { silent: true })
   if (result) emit('updated')
 }
 

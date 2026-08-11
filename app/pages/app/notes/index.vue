@@ -513,16 +513,12 @@ function onToggleFolder(folderId: string, isExpanded: boolean): void {
   setFolderExpanded(folderId, isExpanded)
 }
 
-function onReorderNote(noteId: string, beforeId: string | null, afterId: string | null, folderId: string | null): void {
-  const beforePos = beforeId ? (visibleNotes.value.find(n => n.id === beforeId)?.position ?? null) : null
-  const afterPos = afterId ? (visibleNotes.value.find(n => n.id === afterId)?.position ?? null) : null
-  void reorderNote(noteId, computePositionBetween(beforePos, afterPos), folderId)
+function onReorderNote(noteId: string, beforePosition: number | null, afterPosition: number | null, folderId: string | null): void {
+  void reorderNote(noteId, computePositionBetween(beforePosition, afterPosition), folderId)
 }
 
-function onReorderFolder(folderId: string, beforeId: string | null, afterId: string | null): void {
-  const beforePos = beforeId ? (visibleFolders.value.find(f => f.id === beforeId)?.position ?? null) : null
-  const afterPos = afterId ? (visibleFolders.value.find(f => f.id === afterId)?.position ?? null) : null
-  void reorderFolder(folderId, computePositionBetween(beforePos, afterPos))
+function onReorderFolder(folderId: string, beforePosition: number | null, afterPosition: number | null): void {
+  void reorderFolder(folderId, computePositionBetween(beforePosition, afterPosition))
 }
 
 async function onPinNote(note: Note): Promise<void> {

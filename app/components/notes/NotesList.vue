@@ -28,8 +28,8 @@ const emit = defineEmits<{
   'new-note-in-folder': [folderId: string]
   'new-subfolder': [parentFolderId: string]
   'toggle-folder': [folderId: string, isExpanded: boolean]
-  'reorder-note': [noteId: string, beforeId: string | null, afterId: string | null, folderId: string | null]
-  'reorder-folder': [folderId: string, beforeId: string | null, afterId: string | null]
+  'reorder-note': [noteId: string, beforePosition: number | null, afterPosition: number | null, folderId: string | null]
+  'reorder-folder': [folderId: string, beforePosition: number | null, afterPosition: number | null]
 }>()
 
 // ─── Folder state ──────────────────────────────────────────────────────────────
@@ -111,9 +111,82 @@ const notesByFolder = computed(() => {
   return map
 })
 
-const rootNotes = computed(() => notesByFolder.value.get(null) ?? [])
 const hasFolders = computed(() => props.folders.length > 0)
 const isCustomSort = computed(() => props.sortMode === 'custom')
+
+// ─── Combined siblings (folders + notes sharing a parent) ──────────────────────
+// In custom sort mode, folders and notes at the same level are ordered together
+// by `position`, so they can be freely interleaved (folder, note, folder, ...).
+// Outside custom mode, folders keep sorting as a block before notes, matching
+// the conventional "folders first" listing.
+
+type SiblingEntry
+  = { kind: 'folder', folder: NoteFolder }
+    | { kind: 'note', note: Note }
+
+function siblingPosition(entry: SiblingEntry): number {
+  return entry.kind === 'folder' ? entry.folder.position : entry.note.position
+}
+
+function siblingMatches(entry: SiblingEntry, kind: SiblingEntry['kind'], id: string): boolean {
+  return entry.kind === kind && (entry.kind === 'folder' ? entry.folder.id : entry.note.id) === id
+}
+
+const siblingsByParent = computed(() => {
+  const map = new Map<string | null, SiblingEntry[]>()
+  const parentIds = new Set<string | null>([null])
+  for (const f of props.folders) parentIds.add(f.parentId ?? null)
+  for (const n of props.notes) parentIds.add(n.folderId ?? null)
+
+  for (const parentId of parentIds) {
+    const entries: SiblingEntry[] = [
+      ...props.folders
+        .filter(f => (f.parentId ?? null) === parentId)
+        .map(folder => ({ kind: 'folder' as const, folder })),
+      ...(notesByFolder.value.get(parentId) ?? [])
+        .map(note => ({ kind: 'note' as const, note }))
+    ]
+
+    if (isCustomSort.value) {
+      entries.sort((a, b) => siblingPosition(a) - siblingPosition(b))
+    } else {
+      entries.sort((a, b) => {
+        if (a.kind !== b.kind) return a.kind === 'folder' ? -1 : 1
+        if (a.kind === 'folder' && b.kind === 'folder') {
+          return a.folder.name.localeCompare(b.folder.name, 'pt-BR', { sensitivity: 'base' })
+        }
+        return 0 // notes: keep the order they arrived in (already sorted upstream)
+      })
+    }
+
+    map.set(parentId, entries)
+  }
+
+  return map
+})
+
+/** Positions the neighboring siblings would end up at if `excludeKind`/`excludeId` were inserted at `edge` of `targetKind`/`targetId`. */
+function computeNeighborPositions(
+  parentId: string | null,
+  targetKind: SiblingEntry['kind'],
+  targetId: string,
+  excludeKind: SiblingEntry['kind'],
+  excludeId: string,
+  edge: 'top' | 'bottom'
+): { before: number | null, after: number | null } | null {
+  const siblings = (siblingsByParent.value.get(parentId) ?? [])
+    .filter(entry => !siblingMatches(entry, excludeKind, excludeId))
+  const targetIndex = siblings.findIndex(entry => siblingMatches(entry, targetKind, targetId))
+  if (targetIndex === -1) return null
+
+  const insertAt = edge === 'top' ? targetIndex : targetIndex + 1
+  const beforeEntry = siblings[insertAt - 1]
+  const afterEntry = siblings[insertAt]
+  return {
+    before: beforeEntry ? siblingPosition(beforeEntry) : null,
+    after: afterEntry ? siblingPosition(afterEntry) : null
+  }
+}
 
 // ─── Drag & drop ───────────────────────────────────────────────────────────────
 // States surfaced to the UI at every step of a drag gesture:
@@ -203,6 +276,18 @@ function edgeForEvent(e: DragEvent): 'top' | 'bottom' {
   return (e.clientY - rect.top) < rect.height / 2 ? 'top' : 'bottom'
 }
 
+const ROW_EDGE_ZONE = 8
+
+/** Three-zone hit test for dropping onto a folder row: a thin top/bottom band means
+ * "reorder as a sibling", the middle band means "move inside this folder". */
+function zoneForEvent(e: DragEvent): 'top' | 'middle' | 'bottom' {
+  const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+  const y = e.clientY - rect.top
+  if (y < ROW_EDGE_ZONE) return 'top'
+  if (y > rect.height - ROW_EDGE_ZONE) return 'bottom'
+  return 'middle'
+}
+
 function onNoteDragStart(note: Note, e: DragEvent) {
   e.dataTransfer?.setData('application/x-notes-note-id', note.id)
   e.dataTransfer?.setData('text/plain', note.title)
@@ -220,7 +305,23 @@ function onFolderDragStart(folder: NoteFolder, e: DragEvent) {
 
 function onFolderDragOver(folderId: string, folder: NoteFolder, e: DragEvent) {
   if (e.dataTransfer?.types.includes('application/x-notes-note-id')) {
-    dragOverFolderId.value = folderId
+    // In custom mode, a thin band at the top/bottom of the row means "position
+    // as a sibling of this folder" instead of "move inside it" — same 3-zone
+    // pattern as most file-manager sidebars.
+    if (isCustomSort.value) {
+      const zone = zoneForEvent(e)
+      if (zone === 'middle') {
+        dragOverFolderId.value = folderId
+        dragOverRowKey.value = null
+        dragOverRowEdge.value = null
+      } else {
+        dragOverFolderId.value = null
+        dragOverRowKey.value = `f-${folderId}`
+        dragOverRowEdge.value = zone
+      }
+    } else {
+      dragOverFolderId.value = folderId
+    }
     if (e.dataTransfer) e.dataTransfer.dropEffect = 'move'
     return
   }
@@ -244,10 +345,24 @@ function onFolderDragLeave(folderId: string, e: DragEvent) {
 
 function onFolderDrop(folderId: string, folder: NoteFolder, e: DragEvent) {
   e.stopPropagation()
+  const parentId = folder.parentId ?? null
 
   const noteId = e.dataTransfer?.getData('application/x-notes-note-id')
   if (noteId) {
-    dragOverFolderId.value = null
+    const droppedInMiddleZone = dragOverFolderId.value === folderId
+    const edge = dragOverRowEdge.value
+    clearRowDragState()
+
+    if (!droppedInMiddleZone && isCustomSort.value && edge) {
+      // Dropped on the thin top/bottom band — reposition the note as a sibling
+      // of this folder instead of moving it inside.
+      const result = computeNeighborPositions(parentId, 'folder', folderId, 'note', noteId, edge)
+      if (result) {
+        emit('reorder-note', noteId, result.before, result.after, parentId)
+        return
+      }
+    }
+
     emit('move-to-folder', noteId, folderId)
     return
   }
@@ -259,24 +374,18 @@ function onFolderDrop(folderId: string, folder: NoteFolder, e: DragEvent) {
     if (draggedFolderId === folderId || !edge) return
 
     const draggedFolder = props.folders.find(f => f.id === draggedFolderId)
-    if (!draggedFolder || draggedFolder.parentId !== folder.parentId) return // different parent — reordering doesn't reparent
+    if (!draggedFolder || (draggedFolder.parentId ?? null) !== parentId) return // different parent — reordering doesn't reparent
 
-    const siblings = [...props.folders]
-      .filter(f => f.parentId === folder.parentId && f.id !== draggedFolderId)
-      .sort((a, b) => a.position - b.position)
-    const targetIndex = siblings.findIndex(f => f.id === folderId)
-    if (targetIndex === -1) return
-
-    const insertAt = edge === 'top' ? targetIndex : targetIndex + 1
-    const beforeId = siblings[insertAt - 1]?.id ?? null
-    const afterId = siblings[insertAt]?.id ?? null
-    emit('reorder-folder', draggedFolderId, beforeId, afterId)
+    const result = computeNeighborPositions(parentId, 'folder', folderId, 'folder', draggedFolderId, edge)
+    if (result) emit('reorder-folder', draggedFolderId, result.before, result.after)
   }
 }
 
 function onNoteRowDragOver(note: Note, e: DragEvent) {
   if (!isCustomSort.value) return
-  if (!e.dataTransfer?.types.includes('application/x-notes-note-id')) return
+  const isNoteDrag = e.dataTransfer?.types.includes('application/x-notes-note-id')
+  const isFolderDrag = e.dataTransfer?.types.includes('application/x-notes-folder-id')
+  if (!isNoteDrag && !isFolderDrag) return
   dragOverRowKey.value = `n-${note.id}`
   dragOverRowEdge.value = edgeForEvent(e)
   if (e.dataTransfer) e.dataTransfer.dropEffect = 'move'
@@ -294,23 +403,30 @@ function onNoteRowDragLeave(note: Note, e: DragEvent) {
 
 function onNoteRowDrop(note: Note, e: DragEvent) {
   e.stopPropagation()
-  const draggedId = e.dataTransfer?.getData('application/x-notes-note-id')
+  const draggedNoteId = e.dataTransfer?.getData('application/x-notes-note-id')
+  const draggedFolderId = e.dataTransfer?.getData('application/x-notes-folder-id')
   const edge = dragOverRowEdge.value
   clearRowDragState()
-  if (!isCustomSort.value || !draggedId || draggedId === note.id || !edge) return
+  if (!isCustomSort.value || !edge) return
 
-  // Always target the folder the drop actually landed in — dropping a note from
-  // outside onto a row inside a folder moves it there *and* positions it there,
-  // in one gesture. Dropping within the same folder just repositions it.
-  const targetFolderId = note.folderId ?? null
-  const siblings = (notesByFolder.value.get(targetFolderId) ?? []).filter(n => n.id !== draggedId)
-  const targetIndex = siblings.findIndex(n => n.id === note.id)
-  if (targetIndex === -1) return
+  // Always target the folder the drop actually landed in — dropping something
+  // from outside onto a row inside a folder moves it there *and* positions it
+  // there, in one gesture. Dropping within the same folder just repositions it.
+  const targetParentId = note.folderId ?? null
 
-  const insertAt = edge === 'top' ? targetIndex : targetIndex + 1
-  const beforeId = siblings[insertAt - 1]?.id ?? null
-  const afterId = siblings[insertAt]?.id ?? null
-  emit('reorder-note', draggedId, beforeId, afterId, targetFolderId)
+  if (draggedNoteId && draggedNoteId !== note.id) {
+    const result = computeNeighborPositions(targetParentId, 'note', note.id, 'note', draggedNoteId, edge)
+    if (result) emit('reorder-note', draggedNoteId, result.before, result.after, targetParentId)
+    return
+  }
+
+  if (draggedFolderId) {
+    const draggedFolder = props.folders.find(f => f.id === draggedFolderId)
+    if (!draggedFolder || (draggedFolder.parentId ?? null) !== targetParentId) return // different parent — reordering doesn't reparent
+
+    const result = computeNeighborPositions(targetParentId, 'note', note.id, 'folder', draggedFolderId, edge)
+    if (result) emit('reorder-folder', draggedFolderId, result.before, result.after)
+  }
 }
 
 function onRootDragOver(e: DragEvent) {
@@ -342,37 +458,20 @@ type ListRow
 const flatList = computed<ListRow[]>(() => {
   const result: ListRow[] = []
 
-  function compareFolders(a: NoteFolder, b: NoteFolder): number {
-    if (isCustomSort.value) return a.position - b.position
-    return a.name.localeCompare(b.name, 'pt-BR', { sensitivity: 'base' })
-  }
-
-  function addFolderWithChildren(parentId: string | null, depth: number) {
-    const children = [...props.folders]
-      .filter(f => f.parentId === parentId)
-      .sort(compareFolders)
-
-    for (const folder of children) {
-      result.push({ kind: 'folder', folder, depth })
-      if (folder.isExpanded) {
-        for (const note of notesByFolder.value.get(folder.id) ?? []) {
-          result.push({ kind: 'note', note, depth: depth + 1 })
+  function addChildren(parentId: string | null, depth: number) {
+    for (const entry of siblingsByParent.value.get(parentId) ?? []) {
+      if (entry.kind === 'folder') {
+        result.push({ kind: 'folder', folder: entry.folder, depth })
+        if (entry.folder.isExpanded) {
+          addChildren(entry.folder.id, depth + 1)
         }
-        addFolderWithChildren(folder.id, depth + 1)
+      } else {
+        result.push({ kind: 'note', note: entry.note, depth })
       }
     }
   }
 
-  if (hasFolders.value) {
-    addFolderWithChildren(null, 0)
-    for (const note of rootNotes.value) {
-      result.push({ kind: 'note', note, depth: 0 })
-    }
-  } else {
-    for (const note of props.notes) {
-      result.push({ kind: 'note', note, depth: 0 })
-    }
-  }
+  addChildren(null, 0)
 
   return result
 })
