@@ -190,9 +190,9 @@ export function useNotes() {
     data: allNotesFetchResult,
     status: allNotesStatus,
     refresh: refreshAllNotes
-  } = useFetch<Note[]>('/api/notes', {
+  } = useFetch<NoteListResponse>('/api/notes', {
     query: computed(() => ({ page: 1, pageSize: 500 })),
-    transform: (res: { data: Note[] }) => res.data,
+    transform: res => res.data,
     lazy: true,
     key: 'notes-all'
   })
@@ -338,7 +338,7 @@ export function useNotes() {
         if (!allNoteIds.value.includes(id)) allNoteIds.value = [...allNoteIds.value, id]
         if (!paginatedNoteIds.value.includes(id)) paginatedNoteIds.value = [...paginatedNoteIds.value, id]
       },
-      request: () => $fetch(`/api/notes/${id}`, { method: 'DELETE' }),
+      request: () => $fetch<{ success: boolean }>(`/api/notes/${id}`, { method: 'DELETE' }),
       errorMessage: 'Falha ao excluir nota. A nota foi restaurada.'
     })
 

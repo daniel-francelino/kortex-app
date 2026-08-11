@@ -123,7 +123,72 @@ function clearRowDragState() {
   dragOverFolderId.value = null
   dragOverRoot.value = false
   draggingKey.value = null
+  stopAutoScroll()
 }
+
+// ─── Auto-scroll while dragging near the top/bottom edge of the list ───────────
+// Attached in the capture phase on the scroll container so it keeps seeing every
+// dragover regardless of row-level handlers calling stopPropagation.
+
+const scrollContainer = ref<HTMLElement | null>(null)
+const autoScrollSpeed = ref(0)
+let autoScrollRaf: number | null = null
+
+const AUTO_SCROLL_EDGE = 56
+const AUTO_SCROLL_MAX_SPEED = 16
+
+function stepAutoScroll() {
+  const el = scrollContainer.value
+  if (el && autoScrollSpeed.value !== 0) {
+    el.scrollTop += autoScrollSpeed.value
+    autoScrollRaf = requestAnimationFrame(stepAutoScroll)
+  } else {
+    autoScrollRaf = null
+  }
+}
+
+function updateAutoScroll(e: DragEvent) {
+  const el = scrollContainer.value
+  if (!el || el.scrollHeight <= el.clientHeight) {
+    autoScrollSpeed.value = 0
+    return
+  }
+
+  const rect = el.getBoundingClientRect()
+  const distFromTop = e.clientY - rect.top
+  const distFromBottom = rect.bottom - e.clientY
+
+  if (distFromTop < AUTO_SCROLL_EDGE) {
+    const intensity = 1 - Math.max(distFromTop, 0) / AUTO_SCROLL_EDGE
+    autoScrollSpeed.value = -Math.ceil(intensity * AUTO_SCROLL_MAX_SPEED)
+  } else if (distFromBottom < AUTO_SCROLL_EDGE) {
+    const intensity = 1 - Math.max(distFromBottom, 0) / AUTO_SCROLL_EDGE
+    autoScrollSpeed.value = Math.ceil(intensity * AUTO_SCROLL_MAX_SPEED)
+  } else {
+    autoScrollSpeed.value = 0
+  }
+
+  if (autoScrollSpeed.value !== 0 && autoScrollRaf === null) {
+    autoScrollRaf = requestAnimationFrame(stepAutoScroll)
+  }
+}
+
+function stopAutoScroll() {
+  autoScrollSpeed.value = 0
+  if (autoScrollRaf !== null) {
+    cancelAnimationFrame(autoScrollRaf)
+    autoScrollRaf = null
+  }
+}
+
+function onScrollContainerDragLeave(e: DragEvent) {
+  const target = e.currentTarget as Element
+  if (!e.relatedTarget || !target.contains(e.relatedTarget as Node)) {
+    stopAutoScroll()
+  }
+}
+
+onBeforeUnmount(stopAutoScroll)
 
 function edgeForEvent(e: DragEvent): 'top' | 'bottom' {
   const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
@@ -331,7 +396,13 @@ const rowTransition = { duration: 0.18, ease: 'easeOut' }
       </div>
 
       <template v-else>
-        <div class="flex-1 min-h-0 overflow-y-auto">
+        <div
+          ref="scrollContainer"
+          class="flex-1 min-h-0 overflow-y-auto"
+          @dragover.capture="updateAutoScroll"
+          @dragleave.capture="onScrollContainerDragLeave"
+          @drop.capture="stopAutoScroll"
+        >
           <div class="p-1 space-y-0.5">
             <AnimatePresence>
               <template
