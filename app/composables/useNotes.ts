@@ -285,6 +285,9 @@ export function useNotes() {
     if (result) {
       toast.add({ title: 'Nota criada', description: `"${result.title}" foi criada com sucesso.`, color: 'success' })
       refreshGraph()
+      // Corrects the paginated view's `total` (and server ordering) in the background —
+      // the optimistic apply() above already placed the note where the user expects it.
+      refreshNotes()
     }
     return result
   }
@@ -342,6 +345,7 @@ export function useNotes() {
     if (result !== null) {
       toast.add({ title: 'Nota excluída', description: 'A nota foi removida.', color: 'success' })
       refreshGraph()
+      refreshNotes()
     }
     return result !== null
   }
@@ -621,6 +625,7 @@ export function useNotes() {
         : undefined
       toast.add({ title: 'Pasta excluída', description: extra, color: 'success' })
       refreshGraph()
+      if (affectedNoteIds.length > 0) refreshNotes()
     }
     return result !== null
   }

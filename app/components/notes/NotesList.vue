@@ -116,6 +116,8 @@ const dragOverRowEdge = ref<'top' | 'bottom' | null>(null)
 function clearRowDragState() {
   dragOverRowKey.value = null
   dragOverRowEdge.value = null
+  dragOverFolderId.value = null
+  dragOverRoot.value = false
 }
 
 function edgeForEvent(e: DragEvent): 'top' | 'bottom' {
@@ -173,6 +175,9 @@ function onFolderDrop(folderId: string, folder: NoteFolder, e: DragEvent) {
     clearRowDragState()
     if (draggedFolderId === folderId || !edge) return
 
+    const draggedFolder = props.folders.find(f => f.id === draggedFolderId)
+    if (!draggedFolder || draggedFolder.parentId !== folder.parentId) return // different parent — reordering doesn't reparent
+
     const siblings = [...props.folders]
       .filter(f => f.parentId === folder.parentId && f.id !== draggedFolderId)
       .sort((a, b) => a.position - b.position)
@@ -208,9 +213,12 @@ function onNoteRowDrop(note: Note, e: DragEvent) {
   clearRowDragState()
   if (!isCustomSort.value || !draggedId || draggedId === note.id || !edge) return
 
-  const siblings = (notesByFolder.value.get(note.folderId ?? null) ?? []).filter(n => n.id !== draggedId)
+  const group = notesByFolder.value.get(note.folderId ?? null) ?? []
+  if (!group.some(n => n.id === draggedId)) return // different folder — reordering doesn't move it, use move-to-folder instead
+
+  const siblings = group.filter(n => n.id !== draggedId)
   const targetIndex = siblings.findIndex(n => n.id === note.id)
-  if (targetIndex === -1) return // dragged from a different folder — handled by move-to-folder instead
+  if (targetIndex === -1) return
 
   const insertAt = edge === 'top' ? targetIndex : targetIndex + 1
   const beforeId = siblings[insertAt - 1]?.id ?? null
@@ -315,7 +323,7 @@ function getTypeMeta(type: string) {
               <!-- ── Folder row ── -->
               <UContextMenu v-if="row.kind === 'folder'" :items="folderActionItems(row.folder)">
                 <div
-                  draggable="true"
+                  :draggable="isCustomSort"
                   class="group/folder-row flex items-center gap-1 pr-1 py-1.5 rounded-lg mx-1 transition-colors cursor-pointer select-none"
                   :style="{ paddingLeft: `${0.5 + row.depth}rem` }"
                   :class="[

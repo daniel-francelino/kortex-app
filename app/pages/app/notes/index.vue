@@ -426,6 +426,21 @@ function getAvailableName(baseName: string, existingNames: string[]): string {
   return nextName
 }
 
+// Expands the target folder and every ancestor above it, so a note created
+// inside a collapsed folder (or nested inside a collapsed parent) is actually
+// visible in the tree right away instead of looking like it wasn't created there.
+function expandFolderChain(folderId: string): void {
+  let currentId: string | null = folderId
+  const visited = new Set<string>()
+
+  while (currentId && !visited.has(currentId)) {
+    visited.add(currentId)
+    setFolderExpanded(currentId, true)
+    const folder = visibleFolders.value.find(f => f.id === currentId)
+    currentId = folder?.parentId ?? null
+  }
+}
+
 async function onQuickCreateNote(folderId?: string | null): Promise<void> {
   if (creatingQuickNote.value) return
 
@@ -442,6 +457,7 @@ async function onQuickCreateNote(folderId?: string | null): Promise<void> {
     })
 
     if (note) {
+      if (folderId) expandFolderChain(folderId)
       await refreshAllNotes()
       await navigateTo(note.id)
     }
@@ -459,7 +475,8 @@ async function onQuickCreateFolder(parentId?: string): Promise<void> {
       ? visibleFolders.value.filter(f => f.parentId === parentId).map(f => f.name)
       : visibleFolders.value.filter(f => !f.parentId).map(f => f.name)
     const name = getAvailableName('Nova pasta', siblingNames)
-    await createFolder({ name, parentId: parentId ?? null })
+    const folder = await createFolder({ name, parentId: parentId ?? null })
+    if (folder && parentId) expandFolderChain(parentId)
   } finally {
     creatingQuickFolder.value = false
   }
@@ -654,7 +671,7 @@ async function onUnlinkNotes(
                   variant="ghost"
                   color="neutral"
                   :loading="creatingQuickNote"
-                  @click="onQuickCreateNote"
+                  @click="onQuickCreateNote()"
                 />
               </UTooltip>
 
@@ -665,7 +682,7 @@ async function onUnlinkNotes(
                   variant="ghost"
                   color="neutral"
                   :loading="creatingQuickFolder"
-                  @click="onQuickCreateFolder"
+                  @click="onQuickCreateFolder()"
                 />
               </UTooltip>
 
