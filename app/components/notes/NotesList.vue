@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { AnimatePresence, motion } from 'motion-v'
 import type { Note, NoteFolder } from '~/types/notes'
 import { NOTE_TYPE_META, NoteType } from '~/types/notes'
 
@@ -107,17 +108,21 @@ const hasFolders = computed(() => props.folders.length > 0)
 const isCustomSort = computed(() => props.sortMode === 'custom')
 
 // ─── Drag & drop ───────────────────────────────────────────────────────────────
+// States surfaced to the UI at every step of a drag gesture:
+//  idle -> dragging (source row) -> drag-over (target row/folder) -> drop -> reordered (layout animation)
 
 const dragOverFolderId = ref<string | null>(null)
 const dragOverRoot = ref(false)
 const dragOverRowKey = ref<string | null>(null)
 const dragOverRowEdge = ref<'top' | 'bottom' | null>(null)
+const draggingKey = ref<string | null>(null)
 
 function clearRowDragState() {
   dragOverRowKey.value = null
   dragOverRowEdge.value = null
   dragOverFolderId.value = null
   dragOverRoot.value = false
+  draggingKey.value = null
 }
 
 function edgeForEvent(e: DragEvent): 'top' | 'bottom' {
@@ -129,6 +134,7 @@ function onNoteDragStart(note: Note, e: DragEvent) {
   e.dataTransfer?.setData('application/x-notes-note-id', note.id)
   e.dataTransfer?.setData('text/plain', note.title)
   if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move'
+  draggingKey.value = `n-${note.id}`
 }
 
 function onFolderDragStart(folder: NoteFolder, e: DragEvent) {
@@ -136,6 +142,7 @@ function onFolderDragStart(folder: NoteFolder, e: DragEvent) {
   e.dataTransfer?.setData('application/x-notes-folder-id', folder.id)
   e.dataTransfer?.setData('text/plain', folder.name)
   if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move'
+  draggingKey.value = `f-${folder.id}`
 }
 
 function onFolderDragOver(folderId: string, folder: NoteFolder, e: DragEvent) {
@@ -155,7 +162,10 @@ function onFolderDragLeave(folderId: string, e: DragEvent) {
   const target = e.currentTarget as Element
   if (!e.relatedTarget || !target.contains(e.relatedTarget as Node)) {
     if (dragOverFolderId.value === folderId) dragOverFolderId.value = null
-    if (dragOverRowKey.value === `f-${folderId}`) clearRowDragState()
+    if (dragOverRowKey.value === `f-${folderId}`) {
+      dragOverRowKey.value = null
+      dragOverRowEdge.value = null
+    }
   }
 }
 
@@ -202,7 +212,10 @@ function onNoteRowDragOver(note: Note, e: DragEvent) {
 function onNoteRowDragLeave(note: Note, e: DragEvent) {
   const target = e.currentTarget as Element
   if (!e.relatedTarget || !target.contains(e.relatedTarget as Node)) {
-    if (dragOverRowKey.value === `n-${note.id}`) clearRowDragState()
+    if (dragOverRowKey.value === `n-${note.id}`) {
+      dragOverRowKey.value = null
+      dragOverRowEdge.value = null
+    }
   }
 }
 
@@ -297,6 +310,10 @@ const totalPages = computed(() => Math.max(1, Math.ceil(props.total / props.page
 function getTypeMeta(type: string) {
   return NOTE_TYPE_META[type as NoteType] ?? NOTE_TYPE_META[NoteType.Note]
 }
+
+const rowEnter = { opacity: 0, y: -6, height: 0 }
+const rowExit = { opacity: 0, height: 0, transition: { duration: 0.16, ease: 'easeIn' } }
+const rowTransition = { duration: 0.18, ease: 'easeOut' }
 </script>
 
 <template>
@@ -316,120 +333,169 @@ function getTypeMeta(type: string) {
       <template v-else>
         <div class="flex-1 min-h-0 overflow-y-auto">
           <div class="p-1 space-y-0.5">
-            <template
-              v-for="row in flatList"
-              :key="row.kind === 'folder' ? `f-${row.folder.id}` : `n-${row.note.id}`"
-            >
-              <!-- ── Folder row ── -->
-              <UContextMenu v-if="row.kind === 'folder'" :items="folderActionItems(row.folder)">
-                <div
-                  :draggable="isCustomSort"
-                  class="group/folder-row flex items-center gap-1 pr-1 py-1.5 rounded-lg mx-1 transition-colors cursor-pointer select-none"
-                  :style="{ paddingLeft: `${0.5 + row.depth}rem` }"
-                  :class="[
-                    dragOverFolderId === row.folder.id
+            <AnimatePresence>
+              <template
+                v-for="row in flatList"
+                :key="row.kind === 'folder' ? `f-${row.folder.id}` : `n-${row.note.id}`"
+              >
+                <!-- ── Folder row ── -->
+                <UContextMenu v-if="row.kind === 'folder'" :items="folderActionItems(row.folder)">
+                  <motion.div
+                    layout
+                    :initial="rowEnter"
+                    :animate="{
+                      opacity: draggingKey === `f-${row.folder.id}` ? 0.45 : 1,
+                      y: 0,
+                      height: 'auto',
+                      scale: draggingKey === `f-${row.folder.id}` ? 0.97 : 1
+                    }"
+                    :exit="rowExit"
+                    :transition="rowTransition"
+                    :draggable="isCustomSort"
+                    class="group/folder-row relative flex items-center gap-1 pr-1 py-1.5 rounded-lg mx-1 transition-colors cursor-pointer select-none"
+                    :style="{ paddingLeft: `${0.5 + row.depth}rem` }"
+                    :class="dragOverFolderId === row.folder.id
                       ? 'bg-primary/15 ring-1 ring-primary/40'
-                      : 'hover:bg-elevated/80',
-                    dragOverRowKey === `f-${row.folder.id}` && dragOverRowEdge === 'top' ? 'border-t-2 border-primary' : 'border-t-2 border-transparent',
-                    dragOverRowKey === `f-${row.folder.id}` && dragOverRowEdge === 'bottom' ? 'border-b-2 border-primary' : 'border-b-2 border-transparent'
-                  ]"
-                  @click="toggleFolder(row.folder)"
-                  @dragstart="onFolderDragStart(row.folder, $event)"
-                  @dragover.prevent.stop="onFolderDragOver(row.folder.id, row.folder, $event)"
-                  @dragleave="onFolderDragLeave(row.folder.id, $event)"
-                  @drop.prevent.stop="onFolderDrop(row.folder.id, row.folder, $event)"
-                  @dragend="clearRowDragState"
-                >
-                  <UIcon
-                    :name="row.folder.isExpanded ? 'i-lucide-chevron-down' : 'i-lucide-chevron-right'"
-                    class="size-3 text-muted shrink-0 transition-transform"
-                  />
-                  <UIcon
-                    :name="row.folder.isExpanded ? 'i-lucide-folder-open' : 'i-lucide-folder'"
-                    class="size-3.5 shrink-0"
-                    :class="dragOverFolderId === row.folder.id ? 'text-primary' : 'text-amber-500'"
-                  />
-
-                  <input
-                    v-if="editingFolderId === row.folder.id"
-                    ref="editInput"
-                    v-model="editingName"
-                    class="flex-1 text-xs font-medium bg-transparent outline-none border-b border-primary"
-                    @blur="commitEdit(row.folder.id)"
-                    @keydown.enter.prevent="commitEdit(row.folder.id)"
-                    @keydown.escape.prevent="editingFolderId = null"
-                    @click.stop
+                      : 'hover:bg-elevated/80'"
+                    @click="toggleFolder(row.folder)"
+                    @dragstart="onFolderDragStart(row.folder, $event)"
+                    @dragover.prevent.stop="onFolderDragOver(row.folder.id, row.folder, $event)"
+                    @dragleave="onFolderDragLeave(row.folder.id, $event)"
+                    @drop.prevent.stop="onFolderDrop(row.folder.id, row.folder, $event)"
+                    @dragend="clearRowDragState"
                   >
-                  <span v-else class="flex-1 text-xs font-medium text-highlighted truncate">
-                    {{ row.folder.name }}
-                  </span>
+                    <!-- Drop indicator (reorder target) -->
+                    <AnimatePresence>
+                      <motion.div
+                        v-if="dragOverRowKey === `f-${row.folder.id}`"
+                        class="absolute left-1 right-1 h-0.5 rounded-full bg-primary origin-left pointer-events-none"
+                        :class="dragOverRowEdge === 'top' ? '-top-px' : '-bottom-px'"
+                        :initial="{ scaleX: 0, opacity: 0 }"
+                        :animate="{ scaleX: 1, opacity: 1 }"
+                        :exit="{ scaleX: 0, opacity: 0 }"
+                        :transition="{ duration: 0.12 }"
+                      />
+                    </AnimatePresence>
 
-                  <UDropdownMenu :items="folderActionItems(row.folder)" @click.stop>
-                    <UButton
-                      icon="i-lucide-ellipsis-vertical"
-                      color="neutral"
-                      variant="ghost"
-                      size="xs"
-                      class="opacity-0 group-hover/folder-row:opacity-100 transition-opacity shrink-0"
-                      @click.stop
-                    />
-                  </UDropdownMenu>
-                </div>
-              </UContextMenu>
+                    <motion.div
+                      class="shrink-0 flex items-center"
+                      :animate="{ rotate: row.folder.isExpanded ? 90 : 0 }"
+                      :transition="{ duration: 0.15 }"
+                    >
+                      <UIcon name="i-lucide-chevron-right" class="size-3 text-muted" />
+                    </motion.div>
+                    <motion.div
+                      class="shrink-0 flex items-center"
+                      :animate="{ scale: dragOverFolderId === row.folder.id ? 1.15 : 1 }"
+                      :transition="{ duration: 0.15 }"
+                    >
+                      <UIcon
+                        :name="row.folder.isExpanded ? 'i-lucide-folder-open' : 'i-lucide-folder'"
+                        class="size-3.5 shrink-0"
+                        :class="dragOverFolderId === row.folder.id ? 'text-primary' : 'text-amber-500'"
+                      />
+                    </motion.div>
 
-              <!-- ── Note row ── -->
-              <UContextMenu v-else :items="noteActionItems(row.note)">
-                <button
-                  draggable="true"
-                  class="group/note w-full cursor-grab rounded-lg py-1.5 pr-1 text-left transition-colors hover:bg-elevated/80 active:cursor-grabbing"
-                  :style="{ paddingLeft: `${0.5 + row.depth}rem` }"
-                  :class="[
-                    { 'bg-elevated ring-1 ring-primary/30': selectedId === row.note.id },
-                    dragOverRowKey === `n-${row.note.id}` && dragOverRowEdge === 'top' ? 'border-t-2 border-primary' : 'border-t-2 border-transparent',
-                    dragOverRowKey === `n-${row.note.id}` && dragOverRowEdge === 'bottom' ? 'border-b-2 border-primary' : 'border-b-2 border-transparent'
-                  ]"
-                  @click="emit('select', row.note)"
-                  @dragstart="onNoteDragStart(row.note, $event)"
-                  @dragover.prevent.stop="onNoteRowDragOver(row.note, $event)"
-                  @dragleave="onNoteRowDragLeave(row.note, $event)"
-                  @drop.prevent.stop="onNoteRowDrop(row.note, $event)"
-                  @dragend="clearRowDragState"
-                >
-                  <div class="flex items-center gap-2 min-w-0">
-                    <span v-if="row.note.icon" class="text-sm leading-none shrink-0">{{ row.note.icon }}</span>
-                    <UIcon
-                      v-else
-                      :name="getTypeMeta(row.note.type).icon"
-                      class="size-3.5 shrink-0"
-                      :class="`text-${getTypeMeta(row.note.type).color}-500`"
-                    />
                     <input
-                      v-if="editingNoteId === row.note.id"
-                      ref="noteEditInput"
-                      v-model="editingNoteTitle"
-                      class="min-w-0 flex-1 bg-transparent text-xs font-medium text-highlighted outline-none border-b border-primary"
-                      @blur="commitNoteEdit(row.note.id)"
-                      @keydown.enter.prevent="commitNoteEdit(row.note.id)"
-                      @keydown.escape.prevent="editingNoteId = null"
+                      v-if="editingFolderId === row.folder.id"
+                      ref="editInput"
+                      v-model="editingName"
+                      class="flex-1 text-xs font-medium bg-transparent outline-none border-b border-primary"
+                      @blur="commitEdit(row.folder.id)"
+                      @keydown.enter.prevent="commitEdit(row.folder.id)"
+                      @keydown.escape.prevent="editingFolderId = null"
                       @click.stop
                     >
-                    <p v-else class="text-xs font-medium truncate flex-1 text-highlighted">
-                      {{ row.note.title || 'Sem título' }}
-                    </p>
-                    <UDropdownMenu :items="noteActionItems(row.note)" @click.stop>
+                    <span v-else class="flex-1 text-xs font-medium text-highlighted truncate">
+                      {{ row.folder.name }}
+                    </span>
+
+                    <UDropdownMenu :items="folderActionItems(row.folder)" @click.stop>
                       <UButton
                         icon="i-lucide-ellipsis-vertical"
                         color="neutral"
                         variant="ghost"
                         size="xs"
-                        class="opacity-0 group-hover/note:opacity-100 transition-opacity shrink-0"
+                        class="opacity-0 group-hover/folder-row:opacity-100 transition-opacity shrink-0"
                         @click.stop
                       />
                     </UDropdownMenu>
-                  </div>
-                </button>
-              </UContextMenu>
-            </template>
+                  </motion.div>
+                </UContextMenu>
+
+                <!-- ── Note row ── -->
+                <UContextMenu v-else :items="noteActionItems(row.note)">
+                  <motion.button
+                    layout
+                    :initial="rowEnter"
+                    :animate="{
+                      opacity: draggingKey === `n-${row.note.id}` ? 0.45 : 1,
+                      y: 0,
+                      height: 'auto',
+                      scale: draggingKey === `n-${row.note.id}` ? 0.97 : 1
+                    }"
+                    :exit="rowExit"
+                    :transition="rowTransition"
+                    draggable="true"
+                    class="group/note relative w-full cursor-grab rounded-lg py-1.5 pr-1 text-left transition-colors hover:bg-elevated/80 active:cursor-grabbing"
+                    :style="{ paddingLeft: `${0.5 + row.depth}rem` }"
+                    :class="{ 'bg-elevated ring-1 ring-primary/30': selectedId === row.note.id }"
+                    @click="emit('select', row.note)"
+                    @dragstart="onNoteDragStart(row.note, $event)"
+                    @dragover.prevent.stop="onNoteRowDragOver(row.note, $event)"
+                    @dragleave="onNoteRowDragLeave(row.note, $event)"
+                    @drop.prevent.stop="onNoteRowDrop(row.note, $event)"
+                    @dragend="clearRowDragState"
+                  >
+                    <!-- Drop indicator (reorder target) -->
+                    <AnimatePresence>
+                      <motion.div
+                        v-if="dragOverRowKey === `n-${row.note.id}`"
+                        class="absolute left-1 right-1 h-0.5 rounded-full bg-primary origin-left pointer-events-none"
+                        :class="dragOverRowEdge === 'top' ? '-top-px' : '-bottom-px'"
+                        :initial="{ scaleX: 0, opacity: 0 }"
+                        :animate="{ scaleX: 1, opacity: 1 }"
+                        :exit="{ scaleX: 0, opacity: 0 }"
+                        :transition="{ duration: 0.12 }"
+                      />
+                    </AnimatePresence>
+
+                    <div class="flex items-center gap-2 min-w-0">
+                      <span v-if="row.note.icon" class="text-sm leading-none shrink-0">{{ row.note.icon }}</span>
+                      <UIcon
+                        v-else
+                        :name="getTypeMeta(row.note.type).icon"
+                        class="size-3.5 shrink-0"
+                        :class="`text-${getTypeMeta(row.note.type).color}-500`"
+                      />
+                      <input
+                        v-if="editingNoteId === row.note.id"
+                        ref="noteEditInput"
+                        v-model="editingNoteTitle"
+                        class="min-w-0 flex-1 bg-transparent text-xs font-medium text-highlighted outline-none border-b border-primary"
+                        @blur="commitNoteEdit(row.note.id)"
+                        @keydown.enter.prevent="commitNoteEdit(row.note.id)"
+                        @keydown.escape.prevent="editingNoteId = null"
+                        @click.stop
+                      >
+                      <p v-else class="text-xs font-medium truncate flex-1 text-highlighted">
+                        {{ row.note.title || 'Sem título' }}
+                      </p>
+                      <UDropdownMenu :items="noteActionItems(row.note)" @click.stop>
+                        <UButton
+                          icon="i-lucide-ellipsis-vertical"
+                          color="neutral"
+                          variant="ghost"
+                          size="xs"
+                          class="opacity-0 group-hover/note:opacity-100 transition-opacity shrink-0"
+                          @click.stop
+                        />
+                      </UDropdownMenu>
+                    </div>
+                  </motion.button>
+                </UContextMenu>
+              </template>
+            </AnimatePresence>
           </div>
 
           <!-- Pagination (only when not in folder mode) -->
