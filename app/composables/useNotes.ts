@@ -251,6 +251,7 @@ export function useNotes() {
       content: payload.content ?? null,
       type: payload.type ?? NoteType.Note,
       pinned: false,
+      pinnedAt: null,
       icon: null,
       position,
       folderId: payload.folderId ?? null,
@@ -365,9 +366,13 @@ export function useNotes() {
     const previous = notesById.get(note.id)
     if (!previous) return false
     const nextPinned = !previous.pinned
+    // Optimistic guess — reconcile() below overwrites it with the server's
+    // clock once the request resolves, which is what sub-ordering pinned notes
+    // in custom sort mode actually relies on.
+    const nextPinnedAt = nextPinned ? new Date().toISOString() : null
 
     const result = await runOptimisticAction({
-      apply: () => notesById.set(note.id, { ...previous, pinned: nextPinned }),
+      apply: () => notesById.set(note.id, { ...previous, pinned: nextPinned, pinnedAt: nextPinnedAt }),
       rollback: () => notesById.set(note.id, previous),
       request: () => $fetch<Note>(`/api/notes/${note.id}`, { method: 'PUT', body: { pinned: nextPinned } }),
       reconcile: updated => notesById.set(note.id, { ...notesById.get(note.id), ...updated }),

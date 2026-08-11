@@ -208,6 +208,12 @@ const sortedVisibleNotes = computed(() => {
     if (a.pinned !== b.pinned) return a.pinned ? -1 : 1
 
     if (noteSortMode.value === 'custom') {
+      // Pin priority outranks manual position — among pinned notes, order by
+      // when they were pinned (earliest first) instead of drag position, since
+      // dragging is disabled for pinned notes.
+      if (a.pinned) {
+        return new Date(a.pinnedAt ?? a.createdAt).getTime() - new Date(b.pinnedAt ?? b.createdAt).getTime()
+      }
       return a.position - b.position
     }
 

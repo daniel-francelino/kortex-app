@@ -25,10 +25,14 @@ export default eventHandler(async (event) => {
   if (payload.title !== undefined) updateData.title = payload.title
   if (payload.content !== undefined) updateData.content = payload.content
   if (payload.type !== undefined) updateData.type = payload.type
-  if (payload.pinned !== undefined) updateData.pinned = payload.pinned
+  if (payload.pinned !== undefined) {
+    updateData.pinned = payload.pinned
+    // Server clock is the source of truth for "when was this pinned" — used to
+    // sub-order pinned notes (earliest pinned first) in custom sort mode.
+    updateData.pinned_at = payload.pinned ? new Date().toISOString() : null
+  }
   if (payload.icon !== undefined) updateData.icon = payload.icon
   if (payload.folderId !== undefined) updateData.folder_id = payload.folderId
-  if (payload.position !== undefined) updateData.position = payload.position
   if (payload.position !== undefined) updateData.position = payload.position
 
   const { data, error } = await supabase
@@ -62,6 +66,7 @@ export default eventHandler(async (event) => {
     content: data.content ?? null,
     type: data.type,
     pinned: data.pinned,
+    pinnedAt: data.pinned_at ?? null,
     icon: data.icon ?? null,
     position: data.position ?? 0,
     createdAt: data.created_at,

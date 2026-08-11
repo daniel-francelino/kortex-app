@@ -132,6 +132,10 @@ function siblingMatches(entry: SiblingEntry, kind: SiblingEntry['kind'], id: str
   return entry.kind === kind && (entry.kind === 'folder' ? entry.folder.id : entry.note.id) === id
 }
 
+function isPinnedEntry(entry: SiblingEntry): boolean {
+  return entry.kind === 'note' && entry.note.pinned
+}
+
 const siblingsByParent = computed(() => {
   const map = new Map<string | null, SiblingEntry[]>()
   const parentIds = new Set<string | null>([null])
@@ -148,7 +152,21 @@ const siblingsByParent = computed(() => {
     ]
 
     if (isCustomSort.value) {
-      entries.sort((a, b) => siblingPosition(a) - siblingPosition(b))
+      entries.sort((a, b) => {
+        // Pin priority always outranks manual position, even over folders —
+        // pinned notes float to the top of their level. Among pinned notes,
+        // order by when they were pinned (dragging pinned notes is disabled,
+        // so there's no manual position to fall back to).
+        const aPinned = isPinnedEntry(a)
+        const bPinned = isPinnedEntry(b)
+        if (aPinned !== bPinned) return aPinned ? -1 : 1
+        if (aPinned && bPinned && a.kind === 'note' && b.kind === 'note') {
+          const aTime = new Date(a.note.pinnedAt ?? a.note.createdAt).getTime()
+          const bTime = new Date(b.note.pinnedAt ?? b.note.createdAt).getTime()
+          return aTime - bTime
+        }
+        return siblingPosition(a) - siblingPosition(b)
+      })
     } else {
       entries.sort((a, b) => {
         if (a.kind !== b.kind) return a.kind === 'folder' ? -1 : 1
@@ -165,7 +183,9 @@ const siblingsByParent = computed(() => {
   return map
 })
 
-/** Positions the neighboring siblings would end up at if `excludeKind`/`excludeId` were inserted at `edge` of `targetKind`/`targetId`. */
+/** Positions the neighboring siblings would end up at if `excludeKind`/`excludeId` were inserted at `edge` of `targetKind`/`targetId`.
+ * Pinned notes are excluded — they don't participate in manual positioning, so their (unused) `position` value must not leak into
+ * neighbor calculations for draggable siblings. */
 function computeNeighborPositions(
   parentId: string | null,
   targetKind: SiblingEntry['kind'],
@@ -175,7 +195,7 @@ function computeNeighborPositions(
   edge: 'top' | 'bottom'
 ): { before: number | null, after: number | null } | null {
   const siblings = (siblingsByParent.value.get(parentId) ?? [])
-    .filter(entry => !siblingMatches(entry, excludeKind, excludeId))
+    .filter(entry => !isPinnedEntry(entry) && !siblingMatches(entry, excludeKind, excludeId))
   const targetIndex = siblings.findIndex(entry => siblingMatches(entry, targetKind, targetId))
   if (targetIndex === -1) return null
 
@@ -289,6 +309,7 @@ function zoneForEvent(e: DragEvent): 'top' | 'middle' | 'bottom' {
 }
 
 function onNoteDragStart(note: Note, e: DragEvent) {
+  if (note.pinned) return // pinned notes always stay at the top of their level — no manual reordering
   e.dataTransfer?.setData('application/x-notes-note-id', note.id)
   e.dataTransfer?.setData('text/plain', note.title)
   if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move'
@@ -382,7 +403,7 @@ function onFolderDrop(folderId: string, folder: NoteFolder, e: DragEvent) {
 }
 
 function onNoteRowDragOver(note: Note, e: DragEvent) {
-  if (!isCustomSort.value) return
+  if (!isCustomSort.value || note.pinned) return // pinned notes aren't a valid reorder target — their order isn't position-based
   const isNoteDrag = e.dataTransfer?.types.includes('application/x-notes-note-id')
   const isFolderDrag = e.dataTransfer?.types.includes('application/x-notes-folder-id')
   if (!isNoteDrag && !isFolderDrag) return
@@ -407,7 +428,7 @@ function onNoteRowDrop(note: Note, e: DragEvent) {
   const draggedFolderId = e.dataTransfer?.getData('application/x-notes-folder-id')
   const edge = dragOverRowEdge.value
   clearRowDragState()
-  if (!isCustomSort.value || !edge) return
+  if (!isCustomSort.value || !edge || note.pinned) return
 
   // Always target the folder the drop actually landed in — dropping something
   // from outside onto a row inside a folder moves it there *and* positions it
@@ -617,10 +638,13 @@ const rowTransition = { duration: 0.12, ease: 'easeOut' }
                     }"
                     :exit="rowExit"
                     :transition="rowTransition"
-                    draggable="true"
-                    class="group/note relative w-full cursor-grab rounded-lg py-1.5 pr-1 text-left transition-colors hover:bg-elevated/80 active:cursor-grabbing flex items-center gap-1"
+                    :draggable="!row.note.pinned"
+                    class="group/note relative w-full rounded-lg py-1.5 pr-1 text-left transition-colors hover:bg-elevated/80 flex items-center gap-1"
                     :style="{ paddingLeft: `${0.25 + row.depth * 0.75}rem` }"
-                    :class="{ 'bg-elevated ring-1 ring-primary/30': selectedId === row.note.id }"
+                    :class="[
+                      { 'bg-elevated ring-1 ring-primary/30': selectedId === row.note.id },
+                      row.note.pinned ? 'cursor-default' : 'cursor-grab active:cursor-grabbing'
+                    ]"
                     @click="emit('select', row.note)"
                     @dblclick.stop="startEditNote(row.note)"
                     @dragstart="onNoteDragStart(row.note, $event)"

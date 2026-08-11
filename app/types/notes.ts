@@ -58,6 +58,7 @@ export interface Note {
   content: string | null
   type: NoteType
   pinned: boolean
+  pinnedAt: string | null
   icon: string | null
   position: number
   createdAt: string

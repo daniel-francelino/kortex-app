@@ -61,6 +61,7 @@ export default eventHandler(async (event) => {
     content: (row.content as string) ?? null,
     type: row.type as string,
     pinned: row.pinned as boolean,
+    pinnedAt: (row.pinned_at as string) ?? null,
     icon: (row.icon as string) ?? null,
     position: (row.position as number) ?? 0,
     createdAt: row.created_at as string,
