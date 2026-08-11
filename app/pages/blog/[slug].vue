@@ -19,14 +19,11 @@ useSeoMeta({
   title,
   ogTitle: title,
   description,
-  ogDescription: description
+  ogDescription: description,
+  ogImage: post.value.image?.src || undefined
 })
 
-if (post.value.image?.src) {
-  defineOgImage({
-    url: post.value.image.src
-  })
-} else {
+if (!post.value.image?.src) {
   defineOgImageComponent('Saas', {
     headline: 'Blog'
   })
