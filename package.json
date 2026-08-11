@@ -65,7 +65,7 @@
     "driver.js": "^1.4.0",
     "emoji-mart": "^5.6.0",
     "html-to-image": "^1.11.13",
-    "nuxt": "^4.3.1",
+    "nuxt": "^4.5.2",
     "nuxt-og-image": "^5.1.13",
     "onesignal-cordova-plugin": "^5.3.4",
     "posthog-js": "^1.360.2",
