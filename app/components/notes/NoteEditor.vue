@@ -433,7 +433,6 @@ defineExpose({
             <UTooltip :text="`Tipo: ${getTypeMeta(editType).label}`">
               <UButton
                 :icon="getTypeMeta(editType).icon"
-                :label="getTypeMeta(editType).label"
                 size="xs"
                 variant="ghost"
                 color="neutral"
