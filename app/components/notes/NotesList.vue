@@ -378,8 +378,8 @@ function getTypeMeta(type: string) {
 }
 
 const rowEnter = { opacity: 0, y: -6, height: 0 }
-const rowExit = { opacity: 0, height: 0, transition: { duration: 0.16, ease: 'easeIn' } }
-const rowTransition = { duration: 0.18, ease: 'easeOut' }
+const rowExit = { opacity: 0, height: 0, transition: { duration: 0.1, ease: 'easeIn' } }
+const rowTransition = { duration: 0.12, ease: 'easeOut' }
 </script>
 
 <template>
@@ -413,7 +413,7 @@ const rowTransition = { duration: 0.18, ease: 'easeOut' }
                 <!-- ── Folder row ── -->
                 <UContextMenu v-if="row.kind === 'folder'" :items="folderActionItems(row.folder)">
                   <motion.div
-                    layout
+                    layout="position"
                     :initial="rowEnter"
                     :animate="{
                       opacity: draggingKey === `f-${row.folder.id}` ? 0.45 : 1,
@@ -498,7 +498,7 @@ const rowTransition = { duration: 0.18, ease: 'easeOut' }
                 <!-- ── Note row ── -->
                 <UContextMenu v-else :items="noteActionItems(row.note)">
                   <motion.button
-                    layout
+                    layout="position"
                     :initial="rowEnter"
                     :animate="{
                       opacity: draggingKey === `n-${row.note.id}` ? 0.45 : 1,
