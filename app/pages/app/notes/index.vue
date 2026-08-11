@@ -5,12 +5,12 @@ import type {
   Note,
   NoteDetail,
   NoteFolder,
-  UpdateNotePayload,
-} from "~/types/notes";
-import { NoteType } from "~/types/notes";
+  UpdateNotePayload
+} from '~/types/notes'
+import { NoteType } from '~/types/notes'
 
-definePageMeta({ layout: "app", ssr: false });
-useSeoMeta({ title: "Notas" });
+definePageMeta({ layout: 'app', ssr: false })
+useSeoMeta({ title: 'Notas' })
 
 const {
   notesData,
@@ -42,28 +42,34 @@ const {
   updateFolder,
   deleteFolder,
   moveNoteToFolder,
-} = useNotes();
+  getFolderDeletionImpact,
+  setFolderExpanded,
+  computePositionBetween,
+  reorderNote,
+  reorderFolder
+} = useNotes()
 
 // ─── State ────────────────────────────────────────────────────────────────────
 
-const selectedNoteId = ref<string | null>(null);
-const activeView = ref<"editor" | "graph">("editor");
-const createModalOpen = ref(false);
+const selectedNoteId = ref<string | null>(null)
+const activeView = ref<'editor' | 'graph'>('editor')
+const createModalOpen = ref(false)
 const noteEditorRef = ref<{
-  isUnsaved: () => boolean;
-  doSave: () => Promise<void>;
-} | null>(null);
+  isUnsaved: () => boolean
+  doSave: () => Promise<void>
+} | null>(null)
 
 onBeforeRouteLeave(async () => {
   if (noteEditorRef.value?.isUnsaved()) {
-    await noteEditorRef.value.doSave();
+    await noteEditorRef.value.doSave()
   }
-});
-const sidebarTab = ref<"notes" | "tags">("notes");
+})
+const sidebarTab = ref<'notes' | 'tags'>('notes')
 const rightTab = ref<'properties' | 'outline'>('properties')
 const creatingQuickNote = ref(false)
 const creatingQuickFolder = ref(false)
 const searchDialogOpen = ref(false)
+const deleteFolderTarget = ref<{ id: string, name: string, noteCount: number, subfolderCount: number } | null>(null)
 
 const sidebarWidth = useStorage('notes-sidebar-width', 288)
 
@@ -86,359 +92,368 @@ function startResize(e: MouseEvent) {
   })
 }
 
-const noteSortMode = useStorage<'updated-desc' | 'updated-asc' | 'title-asc'>(
+const noteSortMode = useStorage<'updated-desc' | 'updated-asc' | 'title-asc' | 'custom'>(
   'notes-sort-mode',
-  'updated-desc',
+  'updated-desc'
 )
 const noteSortOptions = [
   {
-    label: "Mais recentes",
-    value: "updated-desc" as const,
-    icon: "i-lucide-arrow-down-wide-narrow",
+    label: 'Mais recentes',
+    value: 'updated-desc' as const,
+    icon: 'i-lucide-arrow-down-wide-narrow'
   },
   {
-    label: "Mais antigas",
-    value: "updated-asc" as const,
-    icon: "i-lucide-arrow-up-wide-narrow",
+    label: 'Mais antigas',
+    value: 'updated-asc' as const,
+    icon: 'i-lucide-arrow-up-wide-narrow'
   },
   {
-    label: "A-Z",
-    value: "title-asc" as const,
-    icon: "i-lucide-arrow-down-a-z",
+    label: 'A-Z',
+    value: 'title-asc' as const,
+    icon: 'i-lucide-arrow-down-a-z'
   },
-];
+  {
+    label: 'Personalizado',
+    value: 'custom' as const,
+    icon: 'i-lucide-grip-vertical'
+  }
+]
 const activeSortOption = computed(
   () =>
-    noteSortOptions.find((option) => option.value === noteSortMode.value) ??
-    noteSortOptions[0]!,
-);
+    noteSortOptions.find(option => option.value === noteSortMode.value)
+    ?? noteSortOptions[0]!
+)
 const sortMenuItems = computed(() => [
-  noteSortOptions.map((option) => ({
+  noteSortOptions.map(option => ({
     label: option.label,
     icon: option.icon,
-    type: "checkbox" as const,
+    type: 'checkbox' as const,
     checked: noteSortMode.value === option.value,
     onUpdateChecked: () => {
-      noteSortMode.value = option.value;
-    },
-  })),
-]);
+      noteSortMode.value = option.value
+    }
+  }))
+])
 
-const ALL_TYPE_VALUE = "__all__";
+const ALL_TYPE_VALUE = '__all__'
 const typeFilterModel = computed({
   get: () => filters.type || ALL_TYPE_VALUE,
   set: (v: string) => {
-    filters.type = v === ALL_TYPE_VALUE ? "" : v;
-  },
-});
+    filters.type = v === ALL_TYPE_VALUE ? '' : v
+  }
+})
 const typeFilterOptions = computed(() => [
-  { label: "Todos tipos", value: ALL_TYPE_VALUE },
-  ...noteTypeOptions,
-]);
+  { label: 'Todos tipos', value: ALL_TYPE_VALUE },
+  ...noteTypeOptions
+])
 
 // Keep the last rendered list stable while requests refresh in the background.
-const visibleFolders = ref<NoteFolder[]>([]);
-const visibleNotes = ref<Note[]>([]);
-const visibleNotesTotal = ref(0);
-const hasLoadedNotesListOnce = ref(false);
+const visibleFolders = ref<NoteFolder[]>([])
+const visibleNotes = ref<Note[]>([])
+const visibleNotesTotal = ref(0)
+const hasLoadedNotesListOnce = ref(false)
 
 watch(
   folders,
   (value) => {
     if (Array.isArray(value)) {
-      visibleFolders.value = value;
+      visibleFolders.value = value
     }
   },
-  { immediate: true },
-);
+  { immediate: true }
+)
 
 watch(
   [notesData, allNotes, visibleFolders],
   () => {
-    const paginatedNotes = notesData.value?.data;
+    const paginatedNotes = notesData.value?.data
     // When folders are present, always use allNotes as the single source of
     // truth so the folder tree and root list never show conflicting data.
     // Return null (= keep current) if allNotes is still loading to avoid a
     // flash that replaces the folder view with the paginated flat list.
-    const nextNotes =
-      visibleFolders.value.length > 0
+    const nextNotes
+      = visibleFolders.value.length > 0
         ? Array.isArray(allNotes.value) ? allNotes.value : null
-        : paginatedNotes;
+        : paginatedNotes
 
     if (nextNotes) {
-      visibleNotes.value = nextNotes;
-      hasLoadedNotesListOnce.value = true;
+      visibleNotes.value = nextNotes
+      hasLoadedNotesListOnce.value = true
     }
 
     if (notesData.value) {
-      visibleNotesTotal.value = notesData.value.total;
+      visibleNotesTotal.value = notesData.value.total
     }
   },
-  { immediate: true },
-);
+  { immediate: true }
+)
 
 const notesListInitialLoading = computed(
   () =>
-    !hasLoadedNotesListOnce.value &&
-    (notesStatus.value === "pending" || allNotesStatus.value === "pending"),
-);
+    !hasLoadedNotesListOnce.value
+    && (notesStatus.value === 'pending' || allNotesStatus.value === 'pending')
+)
 
 const sortedVisibleFolders = computed(() =>
   [...visibleFolders.value].sort((a, b) =>
-    a.name.localeCompare(b.name, "pt-BR", { sensitivity: "base" }),
-  ),
-);
+    a.name.localeCompare(b.name, 'pt-BR', { sensitivity: 'base' })
+  )
+)
 
 const sortedVisibleNotes = computed(() => {
-  const notes = [...visibleNotes.value];
+  const notes = [...visibleNotes.value]
 
   return notes.sort((a, b) => {
-    if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
+    if (a.pinned !== b.pinned) return a.pinned ? -1 : 1
 
-    if (noteSortMode.value === "title-asc") {
-      return (a.title || "Sem título").localeCompare(
-        b.title || "Sem título",
-        "pt-BR",
-        { sensitivity: "base" },
-      );
+    if (noteSortMode.value === 'custom') {
+      return a.position - b.position
     }
 
-    const left = new Date(a.updatedAt).getTime();
-    const right = new Date(b.updatedAt).getTime();
-    return noteSortMode.value === "updated-asc" ? left - right : right - left;
-  });
-});
+    if (noteSortMode.value === 'title-asc') {
+      return (a.title || 'Sem título').localeCompare(
+        b.title || 'Sem título',
+        'pt-BR',
+        { sensitivity: 'base' }
+      )
+    }
+
+    const left = new Date(a.updatedAt).getTime()
+    const right = new Date(b.updatedAt).getTime()
+    return noteSortMode.value === 'updated-asc' ? left - right : right - left
+  })
+})
 
 // ─── Note detail (shared between editor + right panel) ────────────────────────
 
-const currentNoteDetail = ref<NoteDetail | null>(null);
-const currentNoteLoading = ref(false);
-const currentContent = ref("");
-const hasLoadedNoteDetailOnce = ref(false);
-let currentNoteRequestId = 0;
+const currentNoteDetail = ref<NoteDetail | null>(null)
+const currentNoteLoading = ref(false)
+const currentContent = ref('')
+const hasLoadedNoteDetailOnce = ref(false)
+let currentNoteRequestId = 0
 
 async function loadCurrentNoteDetail(
-  noteId: string | null,
+  noteId: string | null
 ): Promise<NoteDetail | null> {
-  const requestId = ++currentNoteRequestId;
+  const requestId = ++currentNoteRequestId
 
   if (!noteId) {
-    currentNoteDetail.value = null;
-    currentContent.value = "";
-    currentNoteLoading.value = false;
-    return null;
+    currentNoteDetail.value = null
+    currentContent.value = ''
+    currentNoteLoading.value = false
+    return null
   }
 
-  currentNoteLoading.value = true;
+  currentNoteLoading.value = true
 
   try {
-    const detail = await fetchNoteDetail(noteId);
-    if (requestId !== currentNoteRequestId) return null;
+    const detail = await fetchNoteDetail(noteId)
+    if (requestId !== currentNoteRequestId) return null
 
-    currentNoteDetail.value = detail;
-    currentContent.value = detail?.content ?? "";
+    currentNoteDetail.value = detail
+    currentContent.value = detail?.content ?? ''
     if (detail) {
-      hasLoadedNoteDetailOnce.value = true;
+      hasLoadedNoteDetailOnce.value = true
     }
-    return detail;
+    return detail
   } finally {
     if (requestId === currentNoteRequestId) {
-      currentNoteLoading.value = false;
+      currentNoteLoading.value = false
     }
   }
 }
 
 watch(selectedNoteId, (noteId) => {
-  void loadCurrentNoteDetail(noteId);
-});
+  void loadCurrentNoteDetail(noteId)
+})
 
 function onNoteLoaded(note: NoteDetail | null) {
-  currentNoteDetail.value = note;
-  currentContent.value = note?.content ?? "";
+  currentNoteDetail.value = note
+  currentContent.value = note?.content ?? ''
 }
 
 function onContentChange(content: string) {
-  currentContent.value = content;
+  currentContent.value = content
 }
 
 // ─── Outline parsing ──────────────────────────────────────────────────────────
 
 const outline = computed(() => {
-  if (!currentContent.value) return [];
+  if (!currentContent.value) return []
   try {
-    const doc = JSON.parse(currentContent.value);
-    const result: { level: number; text: string }[] = [];
+    const doc = JSON.parse(currentContent.value)
+    const result: { level: number, text: string }[] = []
     function walk(
       nodes: {
-        type: string;
-        attrs?: Record<string, unknown>;
-        content?: unknown[];
-      }[],
+        type: string
+        attrs?: Record<string, unknown>
+        content?: unknown[]
+      }[]
     ) {
       for (const node of nodes) {
-        if (node.type === "heading") {
+        if (node.type === 'heading') {
           const text = (node.content ?? [])
-            .map((c: unknown) => (c as { text?: string }).text ?? "")
-            .join("");
+            .map((c: unknown) => (c as { text?: string }).text ?? '')
+            .join('')
           if (text)
-            result.push({ level: (node.attrs?.level as number) ?? 1, text });
+            result.push({ level: (node.attrs?.level as number) ?? 1, text })
         }
-        if (node.content) walk(node.content as typeof nodes);
+        if (node.content) walk(node.content as typeof nodes)
       }
     }
-    walk(doc.content ?? []);
-    return result;
+    walk(doc.content ?? [])
+    return result
   } catch {
-    return [];
+    return []
   }
-});
+})
 
 // ─── History (back / forward) ─────────────────────────────────────────────────
 
-const noteHistory = ref<string[]>([]);
-const historyIndex = ref(-1);
+const noteHistory = ref<string[]>([])
+const historyIndex = ref(-1)
 
-const canGoBack = computed(() => historyIndex.value > 0);
+const canGoBack = computed(() => historyIndex.value > 0)
 const canGoForward = computed(
-  () => historyIndex.value < noteHistory.value.length - 1,
-);
+  () => historyIndex.value < noteHistory.value.length - 1
+)
 
 async function saveCurrentNoteIfNeeded(): Promise<void> {
   if (noteEditorRef.value?.isUnsaved()) {
-    await noteEditorRef.value.doSave();
+    await noteEditorRef.value.doSave()
   }
 }
 
 async function navigateTo(noteId: string) {
-  if (selectedNoteId.value === noteId) return;
-  await saveCurrentNoteIfNeeded();
+  if (selectedNoteId.value === noteId) return
+  await saveCurrentNoteIfNeeded()
   // Truncate forward history
-  noteHistory.value = noteHistory.value.slice(0, historyIndex.value + 1);
-  noteHistory.value.push(noteId);
-  historyIndex.value++;
-  selectedNoteId.value = noteId;
-  activeView.value = "editor";
+  noteHistory.value = noteHistory.value.slice(0, historyIndex.value + 1)
+  noteHistory.value.push(noteId)
+  historyIndex.value++
+  selectedNoteId.value = noteId
+  activeView.value = 'editor'
 }
 
 async function goBack() {
-  if (!canGoBack.value) return;
-  await saveCurrentNoteIfNeeded();
-  historyIndex.value--;
-  selectedNoteId.value = noteHistory.value[historyIndex.value] ?? null;
+  if (!canGoBack.value) return
+  await saveCurrentNoteIfNeeded()
+  historyIndex.value--
+  selectedNoteId.value = noteHistory.value[historyIndex.value] ?? null
 }
 
 async function goForward() {
-  if (!canGoForward.value) return;
-  await saveCurrentNoteIfNeeded();
-  historyIndex.value++;
-  selectedNoteId.value = noteHistory.value[historyIndex.value] ?? null;
+  if (!canGoForward.value) return
+  await saveCurrentNoteIfNeeded()
+  historyIndex.value++
+  selectedNoteId.value = noteHistory.value[historyIndex.value] ?? null
 }
 
 // ─── Handlers ─────────────────────────────────────────────────────────────────
 
 function onSelectNote(note: string | Note): void {
-  const id = typeof note === "string" ? note : note.id;
-  void navigateTo(id);
+  const id = typeof note === 'string' ? note : note.id
+  void navigateTo(id)
 }
 
 function openNotesSearch(): void {
-  searchQuery.value = "";
-  searchDialogOpen.value = true;
+  searchQuery.value = ''
+  searchDialogOpen.value = true
 }
 
 function onSearchNoteSelected(noteId: string): void {
-  void navigateTo(noteId);
+  void navigateTo(noteId)
 }
 
 function onNoteSaved(note: { id: string }): void {
-  createModalOpen.value = false;
-  void navigateTo(note.id);
+  createModalOpen.value = false
+  void navigateTo(note.id)
 }
 
 function onNoteUpdated(): void {
-  refreshNotes();
-  refreshAllNotes();
+  refreshNotes()
+  refreshAllNotes()
 }
 
 function onNoteDeleted(): void {
   // Remove deleted note from history
-  const deletedId = selectedNoteId.value;
+  const deletedId = selectedNoteId.value
   if (deletedId) {
-    noteHistory.value = noteHistory.value.filter((id) => id !== deletedId);
+    noteHistory.value = noteHistory.value.filter(id => id !== deletedId)
     historyIndex.value = Math.min(
       historyIndex.value,
-      noteHistory.value.length - 1,
-    );
+      noteHistory.value.length - 1
+    )
   }
-  selectedNoteId.value = noteHistory.value[historyIndex.value] ?? null;
-  currentNoteDetail.value = null;
+  selectedNoteId.value = noteHistory.value[historyIndex.value] ?? null
+  currentNoteDetail.value = null
 }
 
 async function onDeleteNoteById(noteId: string): Promise<boolean> {
-  const ok = await deleteNote(noteId);
+  const ok = await deleteNote(noteId)
   if (ok) {
-    await refreshAllNotes();
+    await refreshAllNotes()
   }
-  return ok;
+  return ok
 }
 
 async function onDeleteNote(note: Note): Promise<void> {
-  const ok = await onDeleteNoteById(note.id);
+  const ok = await onDeleteNoteById(note.id)
   if (ok && selectedNoteId.value === note.id) {
-    onNoteDeleted();
+    onNoteDeleted()
   }
 }
 
 async function onMoveToFolder(
   noteId: string,
-  folderId: string | null,
+  folderId: string | null
 ): Promise<void> {
-  await moveNoteToFolder(noteId, folderId);
+  await moveNoteToFolder(noteId, folderId)
 }
 
 function getAvailableName(baseName: string, existingNames: string[]): string {
   const names = new Set(
-    existingNames.map((name) => name.trim().toLocaleLowerCase("pt-BR")),
-  );
-  if (!names.has(baseName.toLocaleLowerCase("pt-BR"))) return baseName;
+    existingNames.map(name => name.trim().toLocaleLowerCase('pt-BR'))
+  )
+  if (!names.has(baseName.toLocaleLowerCase('pt-BR'))) return baseName
 
-  let index = 1;
-  let nextName = `${baseName} ${index}`;
-  while (names.has(nextName.toLocaleLowerCase("pt-BR"))) {
-    index++;
-    nextName = `${baseName} ${index}`;
+  let index = 1
+  let nextName = `${baseName} ${index}`
+  while (names.has(nextName.toLocaleLowerCase('pt-BR'))) {
+    index++
+    nextName = `${baseName} ${index}`
   }
-  return nextName;
+  return nextName
 }
 
 async function onQuickCreateNote(folderId?: string | null): Promise<void> {
-  if (creatingQuickNote.value) return;
+  if (creatingQuickNote.value) return
 
-  creatingQuickNote.value = true;
+  creatingQuickNote.value = true
   try {
     const title = getAvailableName(
-      "Untitled",
-      visibleNotes.value.map((note) => note.title),
-    );
+      'Untitled',
+      visibleNotes.value.map(note => note.title)
+    )
     const note = await createNote({
       title,
       type: NoteType.Note,
       folderId: folderId ?? null
-    });
+    })
 
     if (note) {
-      await refreshAllNotes();
-      await navigateTo(note.id);
+      await refreshAllNotes()
+      await navigateTo(note.id)
     }
   } finally {
-    creatingQuickNote.value = false;
+    creatingQuickNote.value = false
   }
 }
 
 async function onQuickCreateFolder(parentId?: string): Promise<void> {
-  if (creatingQuickFolder.value) return;
+  if (creatingQuickFolder.value) return
 
-  creatingQuickFolder.value = true;
+  creatingQuickFolder.value = true
   try {
     const siblingNames = parentId
       ? visibleFolders.value.filter(f => f.parentId === parentId).map(f => f.name)
@@ -446,32 +461,58 @@ async function onQuickCreateFolder(parentId?: string): Promise<void> {
     const name = getAvailableName('Nova pasta', siblingNames)
     await createFolder({ name, parentId: parentId ?? null })
   } finally {
-    creatingQuickFolder.value = false;
+    creatingQuickFolder.value = false
   }
 }
 
 async function onRenameFolder(folderId: string, name: string): Promise<void> {
-  await updateFolder(folderId, { name });
+  await updateFolder(folderId, { name })
 }
 
 async function onRenameNote(noteId: string, title: string): Promise<void> {
-  const note = await onUpdateNote(noteId, { title });
+  const note = await onUpdateNote(noteId, { title })
   if (note) {
-    refreshNotes();
-    refreshAllNotes();
+    refreshNotes()
+    refreshAllNotes()
   }
 }
 
-async function onDeleteFolder(folderId: string): Promise<void> {
-  await deleteFolder(folderId);
+function onDeleteFolder(folderId: string): void {
+  const folder = visibleFolders.value.find(f => f.id === folderId)
+  if (!folder) return
+  const impact = getFolderDeletionImpact(folderId)
+  deleteFolderTarget.value = { id: folderId, name: folder.name, ...impact }
+}
+
+async function confirmDeleteFolder(): Promise<void> {
+  const target = deleteFolderTarget.value
+  if (!target) return
+  deleteFolderTarget.value = null
+  await deleteFolder(target.id)
+}
+
+function onToggleFolder(folderId: string, isExpanded: boolean): void {
+  setFolderExpanded(folderId, isExpanded)
+}
+
+function onReorderNote(noteId: string, beforeId: string | null, afterId: string | null): void {
+  const beforePos = beforeId ? (visibleNotes.value.find(n => n.id === beforeId)?.position ?? null) : null
+  const afterPos = afterId ? (visibleNotes.value.find(n => n.id === afterId)?.position ?? null) : null
+  void reorderNote(noteId, computePositionBetween(beforePos, afterPos))
+}
+
+function onReorderFolder(folderId: string, beforeId: string | null, afterId: string | null): void {
+  const beforePos = beforeId ? (visibleFolders.value.find(f => f.id === beforeId)?.position ?? null) : null
+  const afterPos = afterId ? (visibleFolders.value.find(f => f.id === afterId)?.position ?? null) : null
+  void reorderFolder(folderId, computePositionBetween(beforePos, afterPos))
 }
 
 async function onPinNote(note: Note): Promise<void> {
-  await togglePin(note);
+  await togglePin(note)
 }
 
 function onNavigateNote(noteId: string): void {
-  void navigateTo(noteId);
+  void navigateTo(noteId)
 }
 
 function onNavigateToFolder(_folderId: string): void {
@@ -479,71 +520,71 @@ function onNavigateToFolder(_folderId: string): void {
 }
 
 function onGraphSelectNote(noteId: string): void {
-  void navigateTo(noteId);
+  void navigateTo(noteId)
 }
 
 function switchToGraph(): void {
-  selectedNoteId.value = null;
-  activeView.value = "graph";
-  refreshGraph();
+  selectedNoteId.value = null
+  activeView.value = 'graph'
+  refreshGraph()
 }
 
 function onPropertiesUpdated(): void {
-  refreshNotes();
+  refreshNotes()
 }
 
 const editorAvailableNotes = computed<Note[]>(() => {
-  if (Array.isArray(allNotes.value)) return allNotes.value;
-  return notesData.value?.data ?? visibleNotes.value;
-});
+  if (Array.isArray(allNotes.value)) return allNotes.value
+  return notesData.value?.data ?? visibleNotes.value
+})
 
 async function onCreateNote(payload: CreateNotePayload): Promise<Note | null> {
-  const note = await createNote(payload);
+  const note = await createNote(payload)
   if (note) {
-    await refreshAllNotes();
+    await refreshAllNotes()
   }
-  return note;
+  return note
 }
 
 async function onUpdateNote(
   noteId: string,
   payload: UpdateNotePayload,
-  options?: { silent?: boolean },
+  options?: { silent?: boolean }
 ): Promise<Note | null> {
-  const note = await updateNote(noteId, payload, options);
+  const note = await updateNote(noteId, payload, options)
 
   if (note && currentNoteDetail.value?.id === noteId) {
-    currentNoteDetail.value = { ...currentNoteDetail.value, ...note };
+    currentNoteDetail.value = { ...currentNoteDetail.value, ...note }
   }
 
-  return note;
+  return note
 }
 
 async function reloadNoteDetail(noteId: string): Promise<NoteDetail | null> {
-  const detail = await fetchNoteDetail(noteId);
+  const detail = await fetchNoteDetail(noteId)
   if (selectedNoteId.value === noteId) {
-    currentNoteDetail.value = detail;
-    currentContent.value = detail?.content ?? "";
+    currentNoteDetail.value = detail
+    currentContent.value = detail?.content ?? ''
   }
-  return detail;
+  return detail
 }
 
 async function onLinkNotes(
   sourceId: string,
-  targetId: string,
+  targetId: string
 ): Promise<NoteDetail | null> {
-  const ok = await linkNotes(sourceId, { targetNoteId: targetId });
-  if (!ok) return null;
-  return await reloadNoteDetail(sourceId);
+  const ok = await linkNotes(sourceId, { targetNoteId: targetId })
+  if (!ok) return null
+  return await reloadNoteDetail(sourceId)
 }
 
 async function onUnlinkNotes(
   sourceId: string,
-  linkId: string,
+  linkId: string
 ): Promise<NoteDetail | null> {
-  const ok = await unlinkNotes(linkId);
-  if (!ok) return null;
-  return await reloadNoteDetail(sourceId);
+  const ok = await unlinkNotes(linkId)
+  if (!ok) return null
+  return await reloadNoteDetail(sourceId)
 }
 </script>
 
@@ -681,6 +722,7 @@ async function onUnlinkNotes(
               :page-size="pageSize"
               :loading="notesListInitialLoading"
               :selected-id="selectedNoteId"
+              :sort-mode="noteSortMode"
               @select="onSelectNote"
               @new-note="onQuickCreateNote()"
               @new-folder="onQuickCreateFolder"
@@ -693,6 +735,9 @@ async function onUnlinkNotes(
               @rename-note="onRenameNote"
               @rename-folder="onRenameFolder"
               @delete-folder="onDeleteFolder"
+              @toggle-folder="onToggleFolder"
+              @reorder-note="onReorderNote"
+              @reorder-folder="onReorderFolder"
             />
           </div>
 
@@ -767,4 +812,44 @@ async function onUnlinkNotes(
     @update:query="searchQuery = $event"
     @select="onSearchNoteSelected"
   />
+
+  <!-- Delete folder confirmation -->
+  <UModal
+    :open="!!deleteFolderTarget"
+    @update:open="(value: boolean) => { if (!value) deleteFolderTarget = null }"
+  >
+    <template #header>
+      <h3 class="text-lg font-semibold">
+        Excluir pasta "{{ deleteFolderTarget?.name }}"?
+      </h3>
+    </template>
+
+    <template #body>
+      <p class="text-sm text-muted">
+        <template v-if="deleteFolderTarget && (deleteFolderTarget.noteCount > 0 || deleteFolderTarget.subfolderCount > 0)">
+          Isso vai excluir permanentemente
+          <strong>{{ deleteFolderTarget.noteCount }}</strong> nota(s) e
+          <strong>{{ deleteFolderTarget.subfolderCount }}</strong> subpasta(s) contidas nela.
+          Essa ação não pode ser desfeita.
+        </template>
+        <template v-else>
+          Essa ação não pode ser desfeita.
+        </template>
+      </p>
+
+      <div class="flex justify-end gap-2 pt-4">
+        <UButton
+          label="Cancelar"
+          color="neutral"
+          variant="subtle"
+          @click="deleteFolderTarget = null"
+        />
+        <UButton
+          label="Excluir"
+          color="error"
+          @click="confirmDeleteFolder"
+        />
+      </div>
+    </template>
+  </UModal>
 </template>

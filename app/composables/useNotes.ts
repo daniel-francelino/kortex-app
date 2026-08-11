@@ -19,6 +19,26 @@ import { NoteType, NOTE_TYPE_META } from '~/types/notes'
 
 export function useNotes() {
   const toast = useToast()
+  const { runOptimisticAction } = useOptimisticAction()
+
+  // ─── Local reactive store ───────────────────────────────────────────────────
+  // Single source of truth for the UI. Fetch results are merged (upserted) into
+  // these maps instead of replacing them wholesale, so mutations applied here
+  // (optimistic or reconciled) show up instantly, and a background refetch never
+  // flashes the list back to empty/loading.
+  const notesById = reactive(new Map<string, Note>())
+  const foldersById = reactive(new Map<string, NoteFolder>())
+  const tagsById = reactive(new Map<string, NoteTag>())
+
+  function upsertNote(note: Note) {
+    notesById.set(note.id, { ...notesById.get(note.id), ...note })
+  }
+  function upsertFolder(folder: NoteFolder) {
+    foldersById.set(folder.id, { ...foldersById.get(folder.id), ...folder })
+  }
+  function upsertTag(tag: NoteTag) {
+    tagsById.set(tag.id, { ...tagsById.get(tag.id), ...tag })
+  }
 
   // ─── Notes list (paginated) ─────────────────────────────────────────────────
   const notesPage = ref(1)
@@ -36,7 +56,7 @@ export function useNotes() {
   })
 
   const {
-    data: notesData,
+    data: notesFetchResult,
     status: notesStatus,
     refresh: refreshNotes
   } = useFetch<NoteListResponse>('/api/notes', {
@@ -51,6 +71,36 @@ export function useNotes() {
     lazy: true,
     key: 'notes',
     watch: [notesPage, notesPageSize, notesType, notesTagId, notesPinned]
+  })
+
+  const paginatedNoteIds = ref<string[]>([])
+  const notesLoadedOnce = ref(false)
+  const lastKnownTotal = ref(0)
+  const lastKnownPage = ref(1)
+  const lastKnownPageSize = ref(notesPageSize.value)
+
+  watch(notesFetchResult, (res) => {
+    if (!res) return
+    for (const n of res.data) upsertNote(n)
+    paginatedNoteIds.value = res.data.map(n => n.id)
+    lastKnownTotal.value = res.total
+    lastKnownPage.value = res.page
+    lastKnownPageSize.value = res.pageSize
+    notesLoadedOnce.value = true
+  }, { immediate: true })
+
+  const paginatedNotes = computed(() =>
+    paginatedNoteIds.value.map(id => notesById.get(id)).filter((n): n is Note => !!n)
+  )
+
+  const notesData = computed<NoteListResponse | null>(() => {
+    if (!notesLoadedOnce.value) return null
+    return {
+      data: paginatedNotes.value,
+      total: lastKnownTotal.value,
+      page: lastKnownPage.value,
+      pageSize: lastKnownPageSize.value
+    }
   })
 
   const debouncedRefreshNotes = useDebounceFn(() => {
@@ -79,13 +129,27 @@ export function useNotes() {
 
   // ─── Tags ───────────────────────────────────────────────────────────────────
   const {
-    data: tags,
+    data: tagsFetchResult,
     status: tagsStatus,
     refresh: refreshTags
   } = useFetch<NoteTag[]>('/api/notes/tags', {
     lazy: true,
     key: 'notes-tags'
   })
+
+  const tagIds = ref<string[]>([])
+  const tagsLoadedOnce = ref(false)
+
+  watch(tagsFetchResult, (list) => {
+    if (!Array.isArray(list)) return
+    for (const t of list) upsertTag(t)
+    tagIds.value = list.map(t => t.id)
+    tagsLoadedOnce.value = true
+  }, { immediate: true })
+
+  const tags = computed<NoteTag[] | null>(() =>
+    tagsLoadedOnce.value ? tagIds.value.map(id => tagsById.get(id)).filter((t): t is NoteTag => !!t) : null
+  )
 
   // ─── Graph ──────────────────────────────────────────────────────────────────
   const {
@@ -97,8 +161,9 @@ export function useNotes() {
     key: 'notes-graph'
   })
 
+  // ─── Folders ────────────────────────────────────────────────────────────────
   const {
-    data: folders,
+    data: foldersFetchResult,
     status: foldersStatus,
     refresh: refreshFolders
   } = useFetch<NoteFolder[]>('/api/notes/folders', {
@@ -106,8 +171,23 @@ export function useNotes() {
     key: 'notes-folders'
   })
 
+  const folderIds = ref<string[]>([])
+  const foldersLoadedOnce = ref(false)
+
+  watch(foldersFetchResult, (list) => {
+    if (!Array.isArray(list)) return
+    for (const f of list) upsertFolder(f)
+    folderIds.value = list.map(f => f.id)
+    foldersLoadedOnce.value = true
+  }, { immediate: true })
+
+  const folders = computed<NoteFolder[] | null>(() =>
+    foldersLoadedOnce.value ? folderIds.value.map(id => foldersById.get(id)).filter((f): f is NoteFolder => !!f) : null
+  )
+
+  // ─── All notes (used by the folder tree + editor wikilink suggestions) ──────
   const {
-    data: allNotes,
+    data: allNotesFetchResult,
     status: allNotesStatus,
     refresh: refreshAllNotes
   } = useFetch<Note[]>('/api/notes', {
@@ -116,6 +196,20 @@ export function useNotes() {
     lazy: true,
     key: 'notes-all'
   })
+
+  const allNoteIds = ref<string[]>([])
+  const allNotesLoadedOnce = ref(false)
+
+  watch(allNotesFetchResult, (list) => {
+    if (!Array.isArray(list)) return
+    for (const n of list) upsertNote(n)
+    allNoteIds.value = list.map(n => n.id)
+    allNotesLoadedOnce.value = true
+  }, { immediate: true })
+
+  const allNotes = computed<Note[] | null>(() =>
+    allNotesLoadedOnce.value ? allNoteIds.value.map(id => notesById.get(id)).filter((n): n is Note => !!n) : null
+  )
 
   // ─── Search ─────────────────────────────────────────────────────────────────
   const searchQuery = ref('')
@@ -146,56 +240,117 @@ export function useNotes() {
   // ─── Note CRUD ──────────────────────────────────────────────────────────────
 
   async function createNote(payload: CreateNotePayload): Promise<Note | null> {
-    try {
-      const note = await $fetch<Note>('/api/notes', {
-        method: 'POST',
-        body: payload
-      })
-      toast.add({ title: 'Nota criada', description: `"${note.title}" foi criada com sucesso.`, color: 'success' })
-      await refreshNotes()
-      await refreshGraph()
-      return note
-    } catch {
-      toast.add({ title: 'Erro', description: 'Falha ao criar nota.', color: 'error' })
-      return null
+    const tempId = `temp-${crypto.randomUUID()}`
+    const allPositions = Array.from(notesById.values()).map(n => n.position)
+    const position = allPositions.length > 0 ? Math.min(...allPositions) - 1000 : 0
+
+    const optimisticNote: Note = {
+      id: tempId,
+      userId: '',
+      title: payload.title,
+      content: payload.content ?? null,
+      type: payload.type ?? NoteType.Note,
+      pinned: false,
+      icon: null,
+      position,
+      folderId: payload.folderId ?? null,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      tags: [],
+      linkCount: 0,
+      backlinkCount: 0
     }
+
+    const result = await runOptimisticAction({
+      apply: () => {
+        notesById.set(tempId, optimisticNote)
+        allNoteIds.value = [tempId, ...allNoteIds.value]
+        paginatedNoteIds.value = [tempId, ...paginatedNoteIds.value]
+      },
+      rollback: () => {
+        notesById.delete(tempId)
+        allNoteIds.value = allNoteIds.value.filter(id => id !== tempId)
+        paginatedNoteIds.value = paginatedNoteIds.value.filter(id => id !== tempId)
+      },
+      request: () => $fetch<Note>('/api/notes', { method: 'POST', body: payload }),
+      reconcile: (serverNote) => {
+        notesById.delete(tempId)
+        notesById.set(serverNote.id, serverNote)
+        allNoteIds.value = allNoteIds.value.map(id => id === tempId ? serverNote.id : id)
+        paginatedNoteIds.value = paginatedNoteIds.value.map(id => id === tempId ? serverNote.id : id)
+      },
+      errorMessage: 'Falha ao criar nota.'
+    })
+
+    if (result) {
+      toast.add({ title: 'Nota criada', description: `"${result.title}" foi criada com sucesso.`, color: 'success' })
+      refreshGraph()
+    }
+    return result
   }
 
   async function updateNote(id: string, payload: UpdateNotePayload, options?: { silent?: boolean }): Promise<Note | null> {
-    try {
-      const note = await $fetch<Note>(`/api/notes/${id}`, {
-        method: 'PUT',
-        body: payload
-      })
-      if (!options?.silent) {
-        toast.add({ title: 'Nota atualizada', description: 'Alterações salvas.', color: 'success' })
-        await refreshNotes()
-      }
-      return note
-    } catch {
-      if (!options?.silent) {
-        toast.add({ title: 'Erro', description: 'Falha ao atualizar nota.', color: 'error' })
-      }
-      return null
+    const previous = notesById.get(id)
+    if (!previous) return null
+
+    const optimisticNote: Note = {
+      ...previous,
+      ...(payload.title !== undefined ? { title: payload.title } : {}),
+      ...(payload.content !== undefined ? { content: payload.content } : {}),
+      ...(payload.type !== undefined ? { type: payload.type } : {}),
+      ...(payload.pinned !== undefined ? { pinned: payload.pinned } : {}),
+      ...(payload.icon !== undefined ? { icon: payload.icon } : {}),
+      ...(payload.folderId !== undefined ? { folderId: payload.folderId } : {}),
+      ...(payload.position !== undefined ? { position: payload.position } : {}),
+      updatedAt: new Date().toISOString()
     }
+
+    const result = await runOptimisticAction({
+      apply: () => notesById.set(id, optimisticNote),
+      rollback: () => notesById.set(id, previous),
+      request: () => $fetch<Note>(`/api/notes/${id}`, { method: 'PUT', body: payload }),
+      reconcile: updated => notesById.set(id, { ...notesById.get(id), ...updated }),
+      errorMessage: 'Falha ao atualizar nota.',
+      silent: options?.silent
+    })
+
+    if (result && !options?.silent) {
+      toast.add({ title: 'Nota atualizada', description: 'Alterações salvas.', color: 'success' })
+    }
+    return result
   }
 
   async function deleteNote(id: string): Promise<boolean> {
-    try {
-      await $fetch(`/api/notes/${id}`, { method: 'DELETE' })
+    const previous = notesById.get(id)
+    if (!previous) return false
+
+    const result = await runOptimisticAction({
+      apply: () => {
+        notesById.delete(id)
+        allNoteIds.value = allNoteIds.value.filter(nid => nid !== id)
+        paginatedNoteIds.value = paginatedNoteIds.value.filter(nid => nid !== id)
+      },
+      rollback: () => {
+        notesById.set(id, previous)
+        if (!allNoteIds.value.includes(id)) allNoteIds.value = [...allNoteIds.value, id]
+        if (!paginatedNoteIds.value.includes(id)) paginatedNoteIds.value = [...paginatedNoteIds.value, id]
+      },
+      request: () => $fetch(`/api/notes/${id}`, { method: 'DELETE' }),
+      errorMessage: 'Falha ao excluir nota. A nota foi restaurada.'
+    })
+
+    if (result !== null) {
       toast.add({ title: 'Nota excluída', description: 'A nota foi removida.', color: 'success' })
-      await refreshNotes()
-      await refreshGraph()
-      return true
-    } catch {
-      toast.add({ title: 'Erro', description: 'Falha ao excluir nota.', color: 'error' })
-      return false
+      refreshGraph()
     }
+    return result !== null
   }
 
   async function fetchNoteDetail(id: string): Promise<NoteDetail | null> {
     try {
-      return await $fetch<NoteDetail>(`/api/notes/${id}`)
+      const detail = await $fetch<NoteDetail>(`/api/notes/${id}`)
+      notesById.set(id, { ...notesById.get(id), ...detail })
+      return detail
     } catch {
       toast.add({ title: 'Erro', description: 'Falha ao carregar nota.', color: 'error' })
       return null
@@ -203,21 +358,22 @@ export function useNotes() {
   }
 
   async function togglePin(note: Note): Promise<boolean> {
-    try {
-      await $fetch(`/api/notes/${note.id}`, {
-        method: 'PUT',
-        body: { pinned: !note.pinned }
-      })
-      toast.add({
-        title: note.pinned ? 'Nota desafixada' : 'Nota fixada',
-        color: 'success'
-      })
-      await refreshNotes()
-      return true
-    } catch {
-      toast.add({ title: 'Erro', description: 'Falha ao alterar fixação.', color: 'error' })
-      return false
+    const previous = notesById.get(note.id)
+    if (!previous) return false
+    const nextPinned = !previous.pinned
+
+    const result = await runOptimisticAction({
+      apply: () => notesById.set(note.id, { ...previous, pinned: nextPinned }),
+      rollback: () => notesById.set(note.id, previous),
+      request: () => $fetch<Note>(`/api/notes/${note.id}`, { method: 'PUT', body: { pinned: nextPinned } }),
+      reconcile: updated => notesById.set(note.id, { ...notesById.get(note.id), ...updated }),
+      errorMessage: 'Falha ao alterar fixação.'
+    })
+
+    if (result) {
+      toast.add({ title: nextPinned ? 'Nota fixada' : 'Nota desafixada', color: 'success' })
     }
+    return !!result
   }
 
   // ─── Links ──────────────────────────────────────────────────────────────────
@@ -228,7 +384,7 @@ export function useNotes() {
         method: 'POST',
         body: payload
       })
-      await refreshGraph()
+      refreshGraph()
       return true
     } catch (err: unknown) {
       console.error('[linkNotes]', err)
@@ -239,7 +395,7 @@ export function useNotes() {
   async function unlinkNotes(linkId: string): Promise<boolean> {
     try {
       await $fetch(`/api/notes/links/${linkId}`, { method: 'DELETE' })
-      await refreshGraph()
+      refreshGraph()
       return true
     } catch (err: unknown) {
       console.error('[unlinkNotes]', err)
@@ -250,91 +406,304 @@ export function useNotes() {
   // ─── Tags CRUD ──────────────────────────────────────────────────────────────
 
   async function createTag(payload: CreateTagPayload): Promise<NoteTag | null> {
-    try {
-      const tag = await $fetch<NoteTag>('/api/notes/tags', {
-        method: 'POST',
-        body: payload
-      })
-      toast.add({ title: 'Tag criada', description: `"${tag.name}" criada.`, color: 'success' })
-      await refreshTags()
-      return tag
-    } catch {
-      toast.add({ title: 'Erro', description: 'Falha ao criar tag.', color: 'error' })
-      return null
+    const tempId = `temp-${crypto.randomUUID()}`
+    const optimisticTag: NoteTag = {
+      id: tempId,
+      userId: '',
+      name: payload.name,
+      color: payload.color ?? null,
+      createdAt: new Date().toISOString()
     }
+
+    const result = await runOptimisticAction({
+      apply: () => {
+        tagsById.set(tempId, optimisticTag)
+        tagIds.value = [...tagIds.value, tempId]
+      },
+      rollback: () => {
+        tagsById.delete(tempId)
+        tagIds.value = tagIds.value.filter(id => id !== tempId)
+      },
+      request: () => $fetch<NoteTag>('/api/notes/tags', { method: 'POST', body: payload }),
+      reconcile: (serverTag) => {
+        tagsById.delete(tempId)
+        tagsById.set(serverTag.id, serverTag)
+        tagIds.value = tagIds.value.map(id => id === tempId ? serverTag.id : id)
+      },
+      errorMessage: 'Falha ao criar tag.'
+    })
+
+    if (result) {
+      toast.add({ title: 'Tag criada', description: `"${result.name}" criada.`, color: 'success' })
+    }
+    return result
   }
 
   async function updateTag(id: string, payload: UpdateTagPayload): Promise<NoteTag | null> {
-    try {
-      const tag = await $fetch<NoteTag>(`/api/notes/tags/${id}`, {
-        method: 'PUT',
-        body: payload
-      })
-      toast.add({ title: 'Tag atualizada', color: 'success' })
-      await refreshTags()
-      return tag
-    } catch {
-      toast.add({ title: 'Erro', description: 'Falha ao atualizar tag.', color: 'error' })
-      return null
+    const previous = tagsById.get(id)
+    if (!previous) return null
+
+    const optimisticTag: NoteTag = {
+      ...previous,
+      ...(payload.name !== undefined ? { name: payload.name } : {}),
+      ...(payload.color !== undefined ? { color: payload.color } : {})
     }
+
+    const result = await runOptimisticAction({
+      apply: () => tagsById.set(id, optimisticTag),
+      rollback: () => tagsById.set(id, previous),
+      request: () => $fetch<NoteTag>(`/api/notes/tags/${id}`, { method: 'PUT', body: payload }),
+      reconcile: updated => tagsById.set(id, { ...tagsById.get(id), ...updated }),
+      errorMessage: 'Falha ao atualizar tag.'
+    })
+
+    if (result) {
+      toast.add({ title: 'Tag atualizada', color: 'success' })
+    }
+    return result
   }
 
   async function deleteTag(id: string): Promise<boolean> {
-    try {
-      await $fetch(`/api/notes/tags/${id}`, { method: 'DELETE' })
+    const previous = tagsById.get(id)
+    if (!previous) return false
+
+    const result = await runOptimisticAction({
+      apply: () => {
+        tagsById.delete(id)
+        tagIds.value = tagIds.value.filter(tid => tid !== id)
+      },
+      rollback: () => {
+        tagsById.set(id, previous)
+        if (!tagIds.value.includes(id)) tagIds.value = [...tagIds.value, id]
+      },
+      request: () => $fetch(`/api/notes/tags/${id}`, { method: 'DELETE' }),
+      errorMessage: 'Falha ao excluir tag.'
+    })
+
+    if (result !== null) {
       toast.add({ title: 'Tag excluída', color: 'success' })
-      await refreshTags()
-      return true
-    } catch {
-      toast.add({ title: 'Erro', description: 'Falha ao excluir tag.', color: 'error' })
-      return false
     }
+    return result !== null
   }
 
+  // ─── Folders CRUD ───────────────────────────────────────────────────────────
+
   async function createFolder(payload: CreateFolderPayload): Promise<NoteFolder | null> {
-    try {
-      const folder = await $fetch<NoteFolder>('/api/notes/folders', { method: 'POST', body: payload })
-      toast.add({ title: 'Pasta criada', description: `"${folder.name}" criada.`, color: 'success' })
-      await refreshFolders()
-      return folder
-    } catch {
-      toast.add({ title: 'Erro', description: 'Falha ao criar pasta.', color: 'error' })
-      return null
+    const tempId = `temp-${crypto.randomUUID()}`
+    const siblingPositions = Array.from(foldersById.values())
+      .filter(f => (f.parentId ?? null) === (payload.parentId ?? null))
+      .map(f => f.position)
+    const position = siblingPositions.length > 0 ? Math.min(...siblingPositions) - 1000 : 0
+
+    const optimisticFolder: NoteFolder = {
+      id: tempId,
+      userId: '',
+      name: payload.name,
+      parentId: payload.parentId ?? null,
+      position,
+      isExpanded: true,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
     }
+
+    const result = await runOptimisticAction({
+      apply: () => {
+        foldersById.set(tempId, optimisticFolder)
+        folderIds.value = [...folderIds.value, tempId]
+      },
+      rollback: () => {
+        foldersById.delete(tempId)
+        folderIds.value = folderIds.value.filter(id => id !== tempId)
+      },
+      request: () => $fetch<NoteFolder>('/api/notes/folders', { method: 'POST', body: payload }),
+      reconcile: (serverFolder) => {
+        foldersById.delete(tempId)
+        foldersById.set(serverFolder.id, serverFolder)
+        folderIds.value = folderIds.value.map(id => id === tempId ? serverFolder.id : id)
+      },
+      errorMessage: 'Falha ao criar pasta.'
+    })
+
+    if (result) {
+      toast.add({ title: 'Pasta criada', description: `"${result.name}" criada.`, color: 'success' })
+    }
+    return result
   }
 
   async function updateFolder(id: string, payload: UpdateFolderPayload): Promise<NoteFolder | null> {
-    try {
-      const folder = await $fetch<NoteFolder>(`/api/notes/folders/${id}`, { method: 'PUT', body: payload })
-      await refreshFolders()
-      return folder
-    } catch {
-      toast.add({ title: 'Erro', description: 'Falha ao renomear pasta.', color: 'error' })
-      return null
+    const previous = foldersById.get(id)
+    if (!previous) return null
+
+    const optimisticFolder: NoteFolder = {
+      ...previous,
+      ...(payload.name !== undefined ? { name: payload.name } : {}),
+      ...(payload.parentId !== undefined ? { parentId: payload.parentId } : {}),
+      ...(payload.position !== undefined ? { position: payload.position } : {}),
+      ...(payload.isExpanded !== undefined ? { isExpanded: payload.isExpanded } : {}),
+      updatedAt: new Date().toISOString()
     }
+
+    return runOptimisticAction({
+      apply: () => foldersById.set(id, optimisticFolder),
+      rollback: () => foldersById.set(id, previous),
+      request: () => $fetch<NoteFolder>(`/api/notes/folders/${id}`, { method: 'PUT', body: payload }),
+      reconcile: updated => foldersById.set(id, { ...foldersById.get(id), ...updated }),
+      errorMessage: 'Falha ao renomear pasta.'
+    })
+  }
+
+  function getDescendantFolderIds(folderId: string): string[] {
+    const result: string[] = []
+    const stack = [folderId]
+    while (stack.length > 0) {
+      const current = stack.pop() as string
+      for (const folder of foldersById.values()) {
+        if (folder.parentId === current) {
+          result.push(folder.id)
+          stack.push(folder.id)
+        }
+      }
+    }
+    return result
+  }
+
+  function getAffectedNoteIds(folderIdsToCheck: string[]): string[] {
+    const idSet = new Set(folderIdsToCheck)
+    return Array.from(notesById.values())
+      .filter(n => n.folderId && idSet.has(n.folderId))
+      .map(n => n.id)
+  }
+
+  /** Notes/subfolders that would be permanently removed if this folder is deleted — used to confirm before deleting. */
+  function getFolderDeletionImpact(folderId: string): { noteCount: number, subfolderCount: number } {
+    const descendantFolderIds = getDescendantFolderIds(folderId)
+    const affectedNoteIds = getAffectedNoteIds([folderId, ...descendantFolderIds])
+    return { noteCount: affectedNoteIds.length, subfolderCount: descendantFolderIds.length }
   }
 
   async function deleteFolder(id: string): Promise<boolean> {
-    try {
-      await $fetch(`/api/notes/folders/${id}`, { method: 'DELETE' })
-      toast.add({ title: 'Pasta excluída', color: 'success' })
-      await Promise.all([refreshFolders(), refreshAllNotes(), refreshNotes()])
-      return true
-    } catch {
-      toast.add({ title: 'Erro', description: 'Falha ao excluir pasta.', color: 'error' })
-      return false
+    const targetFolder = foldersById.get(id)
+    if (!targetFolder) return false
+
+    const descendantFolderIds = getDescendantFolderIds(id)
+    const removedFolderIds = [id, ...descendantFolderIds]
+    const affectedNoteIds = getAffectedNoteIds(removedFolderIds)
+
+    const folderSnapshots = removedFolderIds
+      .map(fid => foldersById.get(fid))
+      .filter((f): f is NoteFolder => !!f)
+    const noteSnapshots = affectedNoteIds
+      .map(nid => notesById.get(nid))
+      .filter((n): n is Note => !!n)
+
+    const result = await runOptimisticAction({
+      apply: () => {
+        for (const fid of removedFolderIds) foldersById.delete(fid)
+        for (const nid of affectedNoteIds) notesById.delete(nid)
+        folderIds.value = folderIds.value.filter(fid => !removedFolderIds.includes(fid))
+        allNoteIds.value = allNoteIds.value.filter(nid => !affectedNoteIds.includes(nid))
+        paginatedNoteIds.value = paginatedNoteIds.value.filter(nid => !affectedNoteIds.includes(nid))
+      },
+      rollback: () => {
+        for (const f of folderSnapshots) foldersById.set(f.id, f)
+        for (const n of noteSnapshots) notesById.set(n.id, n)
+        folderIds.value = [...folderIds.value, ...removedFolderIds]
+        allNoteIds.value = [...allNoteIds.value, ...affectedNoteIds]
+        paginatedNoteIds.value = [...paginatedNoteIds.value, ...affectedNoteIds]
+      },
+      request: () => $fetch(`/api/notes/folders/${id}`, { method: 'DELETE' }),
+      errorMessage: 'Falha ao excluir pasta. A pasta foi restaurada.'
+    })
+
+    if (result !== null) {
+      const extra = affectedNoteIds.length > 0 || descendantFolderIds.length > 0
+        ? ` ${affectedNoteIds.length} nota(s) e ${descendantFolderIds.length} subpasta(s) também foram removidas.`
+        : undefined
+      toast.add({ title: 'Pasta excluída', description: extra, color: 'success' })
+      refreshGraph()
     }
+    return result !== null
   }
 
   async function moveNoteToFolder(noteId: string, folderId: string | null): Promise<boolean> {
-    try {
-      await $fetch(`/api/notes/${noteId}`, { method: 'PUT', body: { folderId } })
-      await refreshAllNotes()
-      return true
-    } catch {
-      toast.add({ title: 'Erro', description: 'Falha ao mover nota.', color: 'error' })
-      return false
-    }
+    const previous = notesById.get(noteId)
+    if (!previous) return false
+
+    const result = await runOptimisticAction({
+      apply: () => notesById.set(noteId, { ...previous, folderId }),
+      rollback: () => notesById.set(noteId, previous),
+      request: () => $fetch<Note>(`/api/notes/${noteId}`, { method: 'PUT', body: { folderId } }),
+      reconcile: updated => notesById.set(noteId, { ...notesById.get(noteId), ...updated }),
+      errorMessage: 'Falha ao mover nota.'
+    })
+    return !!result
+  }
+
+  // ─── Custom (drag-and-drop) ordering ────────────────────────────────────────
+
+  /** Fractional position between two siblings; pass null for "at the start/end". */
+  function computePositionBetween(before: number | null, after: number | null): number {
+    if (before === null && after === null) return 0
+    if (before === null) return (after as number) - 1000
+    if (after === null) return before + 1000
+    return (before + after) / 2
+  }
+
+  async function reorderNote(noteId: string, position: number): Promise<boolean> {
+    const previous = notesById.get(noteId)
+    if (!previous) return false
+
+    const result = await runOptimisticAction({
+      apply: () => notesById.set(noteId, { ...previous, position }),
+      rollback: () => notesById.set(noteId, previous),
+      request: () => $fetch<Note>(`/api/notes/${noteId}`, { method: 'PUT', body: { position } }),
+      reconcile: updated => notesById.set(noteId, { ...notesById.get(noteId), ...updated }),
+      errorMessage: 'Falha ao reordenar nota.'
+    })
+    return !!result
+  }
+
+  async function reorderFolder(folderId: string, position: number): Promise<boolean> {
+    const previous = foldersById.get(folderId)
+    if (!previous) return false
+
+    const result = await runOptimisticAction({
+      apply: () => foldersById.set(folderId, { ...previous, position }),
+      rollback: () => foldersById.set(folderId, previous),
+      request: () => $fetch<NoteFolder>(`/api/notes/folders/${folderId}`, { method: 'PUT', body: { position } }),
+      reconcile: updated => foldersById.set(folderId, { ...foldersById.get(folderId), ...updated }),
+      errorMessage: 'Falha ao reordenar pasta.'
+    })
+    return !!result
+  }
+
+  // ─── Expand/collapse persistence (debounced write, instant local reflection) ─
+
+  const expandDebounceTimers = new Map<string, ReturnType<typeof setTimeout>>()
+
+  function setFolderExpanded(folderId: string, isExpanded: boolean): void {
+    const folder = foldersById.get(folderId)
+    if (!folder || folder.isExpanded === isExpanded) return
+    const previousExpanded = folder.isExpanded
+
+    foldersById.set(folderId, { ...folder, isExpanded })
+
+    const pending = expandDebounceTimers.get(folderId)
+    if (pending) clearTimeout(pending)
+
+    expandDebounceTimers.set(folderId, setTimeout(() => {
+      expandDebounceTimers.delete(folderId)
+      runOptimisticAction({
+        apply: () => {},
+        rollback: () => {
+          const current = foldersById.get(folderId)
+          if (current) foldersById.set(folderId, { ...current, isExpanded: previousExpanded })
+        },
+        request: () => $fetch<NoteFolder>(`/api/notes/folders/${folderId}`, { method: 'PUT', body: { isExpanded } }),
+        reconcile: updated => foldersById.set(folderId, { ...foldersById.get(folderId), ...updated }),
+        errorMessage: 'Falha ao salvar estado da pasta.'
+      })
+    }, 400))
   }
 
   // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -386,6 +755,8 @@ export function useNotes() {
     updateFolder,
     deleteFolder,
     moveNoteToFolder,
+    getFolderDeletionImpact,
+    setFolderExpanded,
 
     // Search
     searchQuery,
@@ -398,6 +769,11 @@ export function useNotes() {
     deleteNote,
     fetchNoteDetail,
     togglePin,
+
+    // Custom ordering
+    computePositionBetween,
+    reorderNote,
+    reorderFolder,
 
     // Links
     linkNotes,

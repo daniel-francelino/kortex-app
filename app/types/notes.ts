@@ -33,6 +33,8 @@ export interface NoteFolder {
   userId: string
   name: string
   parentId: string | null
+  position: number
+  isExpanded: boolean
   createdAt: string
   updatedAt: string
 }
@@ -45,6 +47,8 @@ export interface CreateFolderPayload {
 export interface UpdateFolderPayload {
   name?: string
   parentId?: string | null
+  position?: number
+  isExpanded?: boolean
 }
 
 export interface Note {
@@ -55,6 +59,7 @@ export interface Note {
   type: NoteType
   pinned: boolean
   icon: string | null
+  position: number
   createdAt: string
   updatedAt: string
   folderId: string | null
@@ -108,6 +113,7 @@ export interface CreateNotePayload {
   content?: string
   type?: NoteType
   tagIds?: string[]
+  folderId?: string | null
 }
 
 export interface UpdateNotePayload {
@@ -118,6 +124,7 @@ export interface UpdateNotePayload {
   icon?: string | null
   tagIds?: string[]
   folderId?: string | null
+  position?: number
 }
 
 export interface CreateTagPayload {

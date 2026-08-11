@@ -7,7 +7,7 @@ export default eventHandler(async (event) => {
 
   const { data, error } = await supabase
     .from('note_folders')
-    .select('id, user_id, name, parent_id, created_at, updated_at')
+    .select('id, user_id, name, parent_id, position, is_expanded, created_at, updated_at')
     .eq('user_id', user.id)
     .order('name')
 
@@ -20,6 +20,8 @@ export default eventHandler(async (event) => {
     userId: row.user_id,
     name: row.name,
     parentId: row.parent_id ?? null,
+    position: (row.position as number) ?? 0,
+    isExpanded: (row.is_expanded as boolean) ?? true,
     createdAt: row.created_at,
     updatedAt: row.updated_at
   }))
