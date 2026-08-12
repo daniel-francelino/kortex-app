@@ -24,6 +24,7 @@ import { NoteType, NoteVisibility, NOTE_TYPE_META } from '~/types/notes'
 export function useNotes() {
   const toast = useToast()
   const { runOptimisticAction } = useOptimisticAction()
+  const { loadCachedNotes, saveCachedNotes, loadCachedFolders, saveCachedFolders } = useOfflineCache()
 
   // ─── Local reactive store ───────────────────────────────────────────────────
   // Single source of truth for the UI. Fetch results are merged (upserted) into
@@ -183,7 +184,20 @@ export function useNotes() {
     for (const f of list) upsertFolder(f)
     folderIds.value = list.map(f => f.id)
     foldersLoadedOnce.value = true
+    void saveCachedFolders(list)
   }, { immediate: true })
+
+  // Offline boot fallback — the live fetch above never resolved (no
+  // connection), so hydrate the tree from the last-known IndexedDB snapshot
+  // instead of leaving the sidebar empty.
+  watch(foldersStatus, async (status) => {
+    if (status !== 'error' || foldersLoadedOnce.value) return
+    const cached = await loadCachedFolders()
+    if (cached.length === 0) return
+    for (const f of cached) upsertFolder(f)
+    folderIds.value = cached.map(f => f.id)
+    foldersLoadedOnce.value = true
+  })
 
   const folders = computed<NoteFolder[] | null>(() =>
     foldersLoadedOnce.value ? folderIds.value.map(id => foldersById.get(id)).filter((f): f is NoteFolder => !!f) : null
@@ -225,7 +239,18 @@ export function useNotes() {
     for (const n of list) upsertNote(n)
     allNoteIds.value = list.map(n => n.id)
     allNotesLoadedOnce.value = true
+    void saveCachedNotes(list)
   }, { immediate: true })
+
+  // Offline boot fallback — see the matching folders watcher above.
+  watch(allNotesStatus, async (status) => {
+    if (status !== 'error' || allNotesLoadedOnce.value) return
+    const cached = await loadCachedNotes()
+    if (cached.length === 0) return
+    for (const n of cached) upsertNote(n)
+    allNoteIds.value = cached.map(n => n.id)
+    allNotesLoadedOnce.value = true
+  })
 
   const allNotes = computed<Note[] | null>(() =>
     allNotesLoadedOnce.value ? allNoteIds.value.map(id => notesById.get(id)).filter((n): n is Note => !!n) : null
@@ -302,7 +327,16 @@ export function useNotes() {
         allNoteIds.value = allNoteIds.value.map(id => id === tempId ? serverNote.id : id)
         paginatedNoteIds.value = paginatedNoteIds.value.map(id => id === tempId ? serverNote.id : id)
       },
-      errorMessage: 'Falha ao criar nota.'
+      errorMessage: 'Falha ao criar nota.',
+      offline: {
+        entity: 'note',
+        action: 'create',
+        method: 'POST',
+        url: '/api/notes',
+        body: payload,
+        tempId,
+        optimisticResult: optimisticNote
+      }
     })
 
     if (result) {
@@ -337,7 +371,16 @@ export function useNotes() {
       request: () => $fetch<Note>(`/api/notes/${id}`, { method: 'PUT', body: payload }),
       reconcile: updated => notesById.set(id, { ...notesById.get(id), ...updated }),
       errorMessage: 'Falha ao atualizar nota.',
-      silent: options?.silent
+      silent: options?.silent,
+      offline: {
+        entity: 'note',
+        action: 'update',
+        method: 'PUT',
+        url: `/api/notes/${id}`,
+        body: payload,
+        tempId: id.startsWith('temp-') ? id : undefined,
+        optimisticResult: optimisticNote
+      }
     })
 
     if (result && !options?.silent) {
@@ -362,7 +405,15 @@ export function useNotes() {
         if (!paginatedNoteIds.value.includes(id)) paginatedNoteIds.value = [...paginatedNoteIds.value, id]
       },
       request: () => $fetch<{ success: boolean }>(`/api/notes/${id}`, { method: 'DELETE' }),
-      errorMessage: 'Falha ao excluir nota. A nota foi restaurada.'
+      errorMessage: 'Falha ao excluir nota. A nota foi restaurada.',
+      offline: {
+        entity: 'note',
+        action: 'delete',
+        method: 'DELETE',
+        url: `/api/notes/${id}`,
+        tempId: id.startsWith('temp-') ? id : undefined,
+        optimisticResult: { success: true }
+      }
     })
 
     if (result !== null) {
@@ -393,12 +444,23 @@ export function useNotes() {
     // in custom sort mode actually relies on.
     const nextPinnedAt = nextPinned ? new Date().toISOString() : null
 
+    const optimisticNote = { ...previous, pinned: nextPinned, pinnedAt: nextPinnedAt }
+
     const result = await runOptimisticAction({
-      apply: () => notesById.set(note.id, { ...previous, pinned: nextPinned, pinnedAt: nextPinnedAt }),
+      apply: () => notesById.set(note.id, optimisticNote),
       rollback: () => notesById.set(note.id, previous),
       request: () => $fetch<Note>(`/api/notes/${note.id}`, { method: 'PUT', body: { pinned: nextPinned } }),
       reconcile: updated => notesById.set(note.id, { ...notesById.get(note.id), ...updated }),
-      errorMessage: 'Falha ao alterar fixação.'
+      errorMessage: 'Falha ao alterar fixação.',
+      offline: {
+        entity: 'note',
+        action: 'update',
+        method: 'PUT',
+        url: `/api/notes/${note.id}`,
+        body: { pinned: nextPinned },
+        tempId: note.id.startsWith('temp-') ? note.id : undefined,
+        optimisticResult: optimisticNote
+      }
     })
 
     if (result) {
@@ -622,7 +684,16 @@ export function useNotes() {
         foldersById.set(serverFolder.id, serverFolder)
         folderIds.value = folderIds.value.map(id => id === tempId ? serverFolder.id : id)
       },
-      errorMessage: 'Falha ao criar pasta.'
+      errorMessage: 'Falha ao criar pasta.',
+      offline: {
+        entity: 'folder',
+        action: 'create',
+        method: 'POST',
+        url: '/api/notes/folders',
+        body: payload,
+        tempId,
+        optimisticResult: optimisticFolder
+      }
     })
 
     if (result) {
@@ -649,7 +720,16 @@ export function useNotes() {
       rollback: () => foldersById.set(id, previous),
       request: () => $fetch<NoteFolder>(`/api/notes/folders/${id}`, { method: 'PUT', body: payload }),
       reconcile: updated => foldersById.set(id, { ...foldersById.get(id), ...updated }),
-      errorMessage: 'Falha ao renomear pasta.'
+      errorMessage: 'Falha ao renomear pasta.',
+      offline: {
+        entity: 'folder',
+        action: 'update',
+        method: 'PUT',
+        url: `/api/notes/folders/${id}`,
+        body: payload,
+        tempId: id.startsWith('temp-') ? id : undefined,
+        optimisticResult: optimisticFolder
+      }
     })
   }
 
@@ -713,7 +793,15 @@ export function useNotes() {
         paginatedNoteIds.value = [...paginatedNoteIds.value, ...affectedNoteIds]
       },
       request: () => $fetch(`/api/notes/folders/${id}`, { method: 'DELETE' }),
-      errorMessage: 'Falha ao excluir pasta. A pasta foi restaurada.'
+      errorMessage: 'Falha ao excluir pasta. A pasta foi restaurada.',
+      offline: {
+        entity: 'folder',
+        action: 'delete',
+        method: 'DELETE',
+        url: `/api/notes/folders/${id}`,
+        tempId: id.startsWith('temp-') ? id : undefined,
+        optimisticResult: { success: true }
+      }
     })
 
     if (result !== null) {
@@ -731,12 +819,23 @@ export function useNotes() {
     const previous = notesById.get(noteId)
     if (!previous) return false
 
+    const optimisticNote = { ...previous, folderId }
+
     const result = await runOptimisticAction({
-      apply: () => notesById.set(noteId, { ...previous, folderId }),
+      apply: () => notesById.set(noteId, optimisticNote),
       rollback: () => notesById.set(noteId, previous),
       request: () => $fetch<Note>(`/api/notes/${noteId}`, { method: 'PUT', body: { folderId } }),
       reconcile: updated => notesById.set(noteId, { ...notesById.get(noteId), ...updated }),
-      errorMessage: 'Falha ao mover nota.'
+      errorMessage: 'Falha ao mover nota.',
+      offline: {
+        entity: 'note',
+        action: 'update',
+        method: 'PUT',
+        url: `/api/notes/${noteId}`,
+        body: { folderId },
+        tempId: noteId.startsWith('temp-') ? noteId : undefined,
+        optimisticResult: optimisticNote
+      }
     })
     return !!result
   }
@@ -768,15 +867,23 @@ export function useNotes() {
       ...(changingFolder ? { folderId } : {})
     }
 
+    const reorderBody = changingFolder ? { position, folderId } : { position }
+
     const result = await runOptimisticAction({
       apply: () => notesById.set(noteId, optimisticNote),
       rollback: () => notesById.set(noteId, previous),
-      request: () => $fetch<Note>(`/api/notes/${noteId}`, {
-        method: 'PUT',
-        body: changingFolder ? { position, folderId } : { position }
-      }),
+      request: () => $fetch<Note>(`/api/notes/${noteId}`, { method: 'PUT', body: reorderBody }),
       reconcile: updated => notesById.set(noteId, { ...notesById.get(noteId), ...updated }),
-      errorMessage: 'Falha ao reordenar nota.'
+      errorMessage: 'Falha ao reordenar nota.',
+      offline: {
+        entity: 'note',
+        action: 'update',
+        method: 'PUT',
+        url: `/api/notes/${noteId}`,
+        body: reorderBody,
+        tempId: noteId.startsWith('temp-') ? noteId : undefined,
+        optimisticResult: optimisticNote
+      }
     })
     return !!result
   }
@@ -785,12 +892,23 @@ export function useNotes() {
     const previous = foldersById.get(folderId)
     if (!previous) return false
 
+    const optimisticFolder = { ...previous, position }
+
     const result = await runOptimisticAction({
-      apply: () => foldersById.set(folderId, { ...previous, position }),
+      apply: () => foldersById.set(folderId, optimisticFolder),
       rollback: () => foldersById.set(folderId, previous),
       request: () => $fetch<NoteFolder>(`/api/notes/folders/${folderId}`, { method: 'PUT', body: { position } }),
       reconcile: updated => foldersById.set(folderId, { ...foldersById.get(folderId), ...updated }),
-      errorMessage: 'Falha ao reordenar pasta.'
+      errorMessage: 'Falha ao reordenar pasta.',
+      offline: {
+        entity: 'folder',
+        action: 'update',
+        method: 'PUT',
+        url: `/api/notes/folders/${folderId}`,
+        body: { position },
+        tempId: folderId.startsWith('temp-') ? folderId : undefined,
+        optimisticResult: optimisticFolder
+      }
     })
     return !!result
   }
@@ -819,10 +937,85 @@ export function useNotes() {
         },
         request: () => $fetch<NoteFolder>(`/api/notes/folders/${folderId}`, { method: 'PUT', body: { isExpanded } }),
         reconcile: updated => foldersById.set(folderId, { ...foldersById.get(folderId), ...updated }),
-        errorMessage: 'Falha ao salvar estado da pasta.'
+        errorMessage: 'Falha ao salvar estado da pasta.',
+        offline: {
+          entity: 'folder',
+          action: 'update',
+          method: 'PUT',
+          url: `/api/notes/folders/${folderId}`,
+          body: { isExpanded },
+          tempId: folderId.startsWith('temp-') ? folderId : undefined,
+          optimisticResult: { ...folder, isExpanded }
+        }
       })
     }, 400))
   }
+
+  // ─── Offline sync engine ─────────────────────────────────────────────────────
+  // Drains the mutation queue in insertion order once the connection comes
+  // back. There's no live closure to reconcile individual results with here —
+  // the mutations being replayed may well have been queued in a previous
+  // session (page reload, app restart) — so instead of fine-grained
+  // reconciliation, a full refetch after the drain is what converges the UI
+  // with the server. See docs/PLANO_COMPARTILHAMENTO_E_OFFLINE.md (Fase B5).
+  const { pendingMutations, pendingCount, dequeue: dequeueMutation, markRetry, ensureLoaded: ensureQueueLoaded } = useMutationQueue()
+  const { isOnline, onReconnect } = useConnectionStatus()
+  const syncingOffline = ref(false)
+
+  /** tempId -> real server id, populated as queued 'create' mutations replay —
+   * lets the page redirect a still-selected offline-created note to its real id. */
+  const tempIdReconciliations = reactive(new Map<string, string>())
+
+  async function drainMutationQueue(): Promise<void> {
+    if (syncingOffline.value) return
+    await ensureQueueLoaded()
+    if (pendingMutations.value.length === 0) return
+
+    syncingOffline.value = true
+    let replayedAny = false
+
+    try {
+      const queue = [...pendingMutations.value]
+
+      for (const mutation of queue) {
+        // Coalesced/cancelled by a later action since the snapshot was taken.
+        if (!pendingMutations.value.some(m => m.id === mutation.id)) continue
+        if (!isOnline.value) break
+
+        try {
+          const response = await $fetch<Record<string, unknown>>(mutation.url, {
+            method: mutation.method,
+            body: mutation.body as Record<string, unknown> | undefined
+          })
+          if (mutation.action === 'create' && mutation.tempId && typeof response?.id === 'string') {
+            tempIdReconciliations.set(mutation.tempId, response.id)
+          }
+          await dequeueMutation(mutation.id)
+          replayedAny = true
+        } catch (err) {
+          if (!isOnline.value) break // connection dropped mid-replay, not a real rejection
+          console.error('[offline-sync] mutation failed', mutation, err)
+          await markRetry(mutation.id)
+        }
+      }
+    } finally {
+      syncingOffline.value = false
+      if (replayedAny) {
+        refreshAllNotes()
+        refreshFolders()
+        refreshNotes()
+        refreshGraph()
+        toast.add({ title: 'Sincronizado', description: 'Suas alterações offline foram salvas.', color: 'success' })
+      }
+    }
+  }
+
+  onReconnect(() => {
+    void drainMutationQueue()
+  })
+  onMounted(() => {
+    if (isOnline.value) void drainMutationQueue()
+  })
 
   // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -880,6 +1073,12 @@ export function useNotes() {
     sharedWithMe,
     sharedWithMeStatus,
     refreshSharedWithMe,
+
+    // Offline
+    isOnline,
+    pendingSyncCount: pendingCount,
+    syncingOffline,
+    tempIdReconciliations,
 
     // Search
     searchQuery,

@@ -10,7 +10,7 @@ interface NotionStyleEditorRef {
   insertWikilink: (noteId: string, title: string) => void
 }
 
-type SaveStatus = 'idle' | 'unsaved' | 'saved' | 'error'
+type SaveStatus = 'idle' | 'unsaved' | 'saved' | 'offline-pending' | 'error'
 
 const props = defineProps<{
   noteId: string | null
@@ -18,6 +18,7 @@ const props = defineProps<{
   loading: boolean
   folders: NoteFolder[]
   availableNotes: Note[]
+  isOnline: boolean
   updateNote: (id: string, payload: UpdateNotePayload, options?: { silent?: boolean }) => Promise<Note | null>
   deleteNote: (id: string) => Promise<boolean>
   linkNotes: (sourceId: string, targetId: string) => Promise<NoteDetail | null>
@@ -210,10 +211,13 @@ async function saveNote() {
       lastSavedTitle.value = editTitle.value
       lastSavedContent.value = content.value
       lastChangeAt.value = 0
-      saveStatus.value = 'saved'
+      saveStatus.value = props.isOnline ? 'saved' : 'offline-pending'
       savedAt.value = new Date()
       emit('updated')
-      void syncLinksFromContent()
+      // Wikilink/backlink sync needs a real round trip against the server —
+      // skip it while offline, the mutation queue will replay the content
+      // save itself, and links can resync next time this note saves online.
+      if (props.isOnline) void syncLinksFromContent()
     } else {
       saveStatus.value = 'error'
     }
@@ -534,6 +538,10 @@ defineExpose({
           <template v-else-if="saveStatus === 'saved'">
             <UIcon name="i-lucide-check-circle" class="size-3 text-success" />
             <span>Salvo às {{ savedAtText }}</span>
+          </template>
+          <template v-else-if="saveStatus === 'offline-pending'">
+            <UIcon name="i-lucide-cloud-off" class="size-3 text-warning" />
+            <span>Salvo localmente — sincroniza ao reconectar</span>
           </template>
           <template v-else-if="saveStatus === 'error'">
             <UIcon name="i-lucide-alert-circle" class="size-3 text-error" />

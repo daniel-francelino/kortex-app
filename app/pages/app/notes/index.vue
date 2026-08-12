@@ -56,7 +56,11 @@ const {
   reorderNote,
   reorderFolder,
   sharedWithMe,
-  getNoteMeta
+  getNoteMeta,
+  isOnline,
+  pendingSyncCount,
+  syncingOffline,
+  tempIdReconciliations
 } = useNotes()
 
 const sharedSectionExpanded = ref(true)
@@ -283,6 +287,15 @@ async function loadCurrentNoteDetail(
 
 watch(selectedNoteId, (noteId) => {
   void loadCurrentNoteDetail(noteId)
+})
+
+// A note created while offline is briefly identified by a temp-* id; if it's
+// still selected once the mutation queue replays and the server hands back
+// the real id, follow the selection so the editor doesn't go stale.
+watch(() => tempIdReconciliations.size, () => {
+  if (!selectedNoteId.value) return
+  const realId = tempIdReconciliations.get(selectedNoteId.value)
+  if (realId) selectedNoteId.value = realId
 })
 
 function onNoteLoaded(note: NoteDetail | null) {
@@ -762,6 +775,22 @@ async function onRegenerateShareLink(noteId: string): Promise<Note | null> {
             </div>
           </div>
 
+          <!-- Offline / pending sync indicator -->
+          <div
+            v-if="!isOnline || pendingSyncCount > 0"
+            class="flex items-center gap-1.5 px-3 py-1.5 text-xs border-b border-default/50 shrink-0"
+            :class="!isOnline ? 'text-warning bg-warning/5' : 'text-muted'"
+          >
+            <UIcon
+              :name="!isOnline ? 'i-lucide-cloud-off' : syncingOffline ? 'i-lucide-loader-2' : 'i-lucide-cloud-upload'"
+              class="size-3.5 shrink-0"
+              :class="syncingOffline ? 'animate-spin' : ''"
+            />
+            <span v-if="!isOnline">Offline — as alterações serão sincronizadas ao reconectar</span>
+            <span v-else-if="syncingOffline">Sincronizando alterações offline...</span>
+            <span v-else>{{ pendingSyncCount }} alteração(ões) pendente(s) de sincronização</span>
+          </div>
+
           <!-- Sidebar content -->
           <div class="flex-1 overflow-y-auto">
             <div
@@ -881,6 +910,7 @@ async function onRegenerateShareLink(noteId: string): Promise<Note | null> {
                     :loading="currentNoteLoading"
                     :folders="sortedVisibleFolders"
                     :available-notes="editorAvailableNotes"
+                    :is-online="isOnline"
                     :update-note="onUpdateNote"
                     :delete-note="onDeleteNoteById"
                     :link-notes="onLinkNotes"
