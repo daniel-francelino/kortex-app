@@ -302,7 +302,7 @@ export function useNotes() {
       ...(payload.title !== undefined ? { title: payload.title } : {}),
       ...(payload.content !== undefined ? { content: payload.content } : {}),
       ...(payload.type !== undefined ? { type: payload.type } : {}),
-      ...(payload.pinned !== undefined ? { pinned: payload.pinned } : {}),
+      ...(payload.pinned !== undefined ? { pinned: payload.pinned, pinnedAt: payload.pinned ? new Date().toISOString() : null } : {}),
       ...(payload.icon !== undefined ? { icon: payload.icon } : {}),
       ...(payload.folderId !== undefined ? { folderId: payload.folderId } : {}),
       ...(payload.position !== undefined ? { position: payload.position } : {}),
