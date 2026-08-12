@@ -14,6 +14,7 @@ import type {
   NoteDetail,
   NoteListResponse,
   NoteSearchResult,
+  SharedNote,
   UpdateNotePayload,
   UpdateNoteSharePayload,
   UpdateTagPayload
@@ -187,6 +188,18 @@ export function useNotes() {
   const folders = computed<NoteFolder[] | null>(() =>
     foldersLoadedOnce.value ? folderIds.value.map(id => foldersById.get(id)).filter((f): f is NoteFolder => !!f) : null
   )
+
+  // ─── Shared with me ─────────────────────────────────────────────────────────
+  const {
+    data: sharedWithMeFetchResult,
+    status: sharedWithMeStatus,
+    refresh: refreshSharedWithMe
+  } = useFetch<SharedNote[]>('/api/notes/shared-with-me', {
+    lazy: true,
+    key: 'notes-shared-with-me'
+  })
+
+  const sharedWithMe = computed<SharedNote[] | null>(() => sharedWithMeFetchResult.value ?? null)
 
   // ─── All notes (used by the folder tree + editor wikilink suggestions) ──────
   // No `transform` option here — Nuxt's useFetch overload resolution for
@@ -396,18 +409,20 @@ export function useNotes() {
 
   // ─── Sharing ────────────────────────────────────────────────────────────────
 
-  async function setNoteVisibility(noteId: string, visibility: NoteVisibility): Promise<boolean> {
+  async function setNoteVisibility(noteId: string, visibility: NoteVisibility): Promise<Note | null> {
     const previous = notesById.get(noteId)
-    if (!previous) return false
+    if (!previous) return null
 
-    const result = await runOptimisticAction({
+    // Returns the full updated note (not just a boolean) — going public for the
+    // first time generates a share_token server-side, and callers need that
+    // token back immediately instead of waiting for a separate refetch.
+    return runOptimisticAction({
       apply: () => notesById.set(noteId, { ...previous, visibility }),
       rollback: () => notesById.set(noteId, previous),
       request: () => $fetch<Note>(`/api/notes/${noteId}/visibility`, { method: 'PUT', body: { visibility } }),
       reconcile: updated => notesById.set(noteId, { ...notesById.get(noteId), ...updated }),
       errorMessage: 'Falha ao alterar a visibilidade da nota.'
     })
-    return !!result
   }
 
   async function regenerateShareLink(noteId: string): Promise<Note | null> {
@@ -860,6 +875,11 @@ export function useNotes() {
     moveNoteToFolder,
     getFolderDeletionImpact,
     setFolderExpanded,
+
+    // Shared with me
+    sharedWithMe,
+    sharedWithMeStatus,
+    refreshSharedWithMe,
 
     // Search
     searchQuery,

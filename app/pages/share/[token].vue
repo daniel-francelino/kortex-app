@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { NOTE_TYPE_META, NoteType, type PublicNote } from '~/types/notes'
+import { NOTE_TYPE_META, type PublicNote } from '~/types/notes'
 
 definePageMeta({ layout: false, ssr: true })
 

@@ -1,18 +1,23 @@
 import { z } from 'zod'
 import { getSupabaseAdminClient } from '../../utils/supabase'
 import { requireAuthUser } from '../../utils/require-auth'
+import { getNoteAccessRole } from '../../utils/note-access'
 
 export default eventHandler(async (event) => {
   const user = await requireAuthUser(event)
   const id = z.string().uuid().parse(getRouterParam(event, 'id'))
   const supabase = getSupabaseAdminClient()
 
-  // Fetch note
+  // Owner, or anyone this note has been explicitly shared with, can view it.
+  const accessRole = await getNoteAccessRole(supabase, id, user.id)
+  if (!accessRole) {
+    throw createError({ statusCode: 404, statusMessage: 'Nota não encontrada' })
+  }
+
   const { data: note, error } = await supabase
     .from('notes')
     .select('*')
     .eq('id', id)
-    .eq('user_id', user.id)
     .single()
 
   if (error || !note) {
@@ -89,6 +94,7 @@ export default eventHandler(async (event) => {
     folderId: note.folder_id ?? null,
     visibility: note.visibility ?? 'private',
     shareToken: note.share_token ?? null,
+    accessRole,
     tags,
     links,
     backlinks

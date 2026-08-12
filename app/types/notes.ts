@@ -198,10 +198,21 @@ export interface NoteListResponse {
   pageSize: number
 }
 
+/** 'owner' = full control; 'edit' = shared with edit permission (content only,
+ * not folder placement/sharing settings); 'view' = shared read-only. */
+export type NoteAccessRole = 'owner' | 'edit' | 'view'
+
 export interface NoteDetail extends Note {
   tags: NoteTag[]
   links: NoteLink[]
   backlinks: NoteLink[]
+  accessRole: NoteAccessRole
+}
+
+/** A note shared with the current user (not owned by them) — returned by
+ * GET /api/notes/shared-with-me. */
+export interface SharedNote extends Note {
+  permission: NoteSharePermission
 }
 
 export interface NoteSearchResult {

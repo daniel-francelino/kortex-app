@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { getSupabaseAdminClient } from '../../utils/supabase'
 import { requireAuthUser } from '../../utils/require-auth'
+import { getNoteAccessRole } from '../../utils/note-access'
 
 const bodySchema = z.object({
   title: z.string().min(1).max(500).optional(),
@@ -20,6 +21,15 @@ export default eventHandler(async (event) => {
   const payload = bodySchema.parse(body)
   const supabase = getSupabaseAdminClient()
 
+  const accessRole = await getNoteAccessRole(supabase, id, user.id)
+  if (!accessRole) {
+    throw createError({ statusCode: 404, statusMessage: 'Nota não encontrada' })
+  }
+  if (accessRole === 'view') {
+    throw createError({ statusCode: 403, statusMessage: 'Você só tem permissão de visualização nesta nota' })
+  }
+  const isOwner = accessRole === 'owner'
+
   const updateData: Record<string, unknown> = { updated_at: new Date().toISOString() }
 
   if (payload.title !== undefined) updateData.title = payload.title
@@ -32,14 +42,16 @@ export default eventHandler(async (event) => {
     updateData.pinned_at = payload.pinned ? new Date().toISOString() : null
   }
   if (payload.icon !== undefined) updateData.icon = payload.icon
-  if (payload.folderId !== undefined) updateData.folder_id = payload.folderId
-  if (payload.position !== undefined) updateData.position = payload.position
+  // folderId/position belong to the owner's personal organization scheme —
+  // an "edit" share grant covers the note's content, not where it lives in
+  // someone else's folder tree, so those two fields are owner-only.
+  if (payload.folderId !== undefined && isOwner) updateData.folder_id = payload.folderId
+  if (payload.position !== undefined && isOwner) updateData.position = payload.position
 
   const { data, error } = await supabase
     .from('notes')
     .update(updateData)
     .eq('id', id)
-    .eq('user_id', user.id)
     .select()
     .single()
 

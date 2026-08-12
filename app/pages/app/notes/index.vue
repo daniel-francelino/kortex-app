@@ -54,8 +54,12 @@ const {
   setFolderExpanded,
   computePositionBetween,
   reorderNote,
-  reorderFolder
+  reorderFolder,
+  sharedWithMe,
+  getNoteMeta
 } = useNotes()
+
+const sharedSectionExpanded = ref(true)
 
 // ─── State ────────────────────────────────────────────────────────────────────
 
@@ -615,11 +619,11 @@ async function onUnlinkNotes(
 }
 
 async function onSetNoteVisibility(noteId: string, visibility: NoteVisibility): Promise<boolean> {
-  const ok = await setNoteVisibility(noteId, visibility)
-  if (ok && currentNoteDetail.value?.id === noteId) {
-    currentNoteDetail.value = { ...currentNoteDetail.value, visibility }
+  const updated = await setNoteVisibility(noteId, visibility)
+  if (updated && currentNoteDetail.value?.id === noteId) {
+    currentNoteDetail.value = { ...currentNoteDetail.value, ...updated }
   }
-  return ok
+  return !!updated
 }
 
 async function onRegenerateShareLink(noteId: string): Promise<Note | null> {
@@ -760,6 +764,59 @@ async function onRegenerateShareLink(noteId: string): Promise<Note | null> {
 
           <!-- Sidebar content -->
           <div class="flex-1 overflow-y-auto">
+            <div
+              v-if="sharedWithMe && sharedWithMe.length > 0"
+              class="border-b border-default/50 shrink-0"
+            >
+              <button
+                type="button"
+                class="w-full flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-muted hover:text-highlighted transition-colors"
+                @click="sharedSectionExpanded = !sharedSectionExpanded"
+              >
+                <UIcon
+                  name="i-lucide-chevron-right"
+                  class="size-3 shrink-0 transition-transform"
+                  :class="sharedSectionExpanded ? 'rotate-90' : ''"
+                />
+                <UIcon name="i-lucide-users" class="size-3.5 shrink-0" />
+                <span class="flex-1 text-left">Compartilhadas comigo</span>
+                <UBadge color="neutral" variant="subtle" size="sm">
+                  {{ sharedWithMe.length }}
+                </UBadge>
+              </button>
+              <ul v-if="sharedSectionExpanded" class="pb-2">
+                <li
+                  v-for="sharedNote in sharedWithMe"
+                  :key="sharedNote.id"
+                >
+                  <button
+                    type="button"
+                    class="w-full flex items-center gap-2 mx-1 px-2 py-1.5 rounded-md text-xs transition-colors"
+                    :class="selectedNoteId === sharedNote.id ? 'bg-elevated text-highlighted' : 'text-muted hover:bg-elevated hover:text-highlighted'"
+                    style="width: calc(100% - 0.5rem)"
+                    @click="onSelectNote(sharedNote.id)"
+                  >
+                    <span
+                      v-if="sharedNote.icon"
+                      class="text-sm leading-none shrink-0"
+                    >{{ sharedNote.icon }}</span>
+                    <UIcon
+                      v-else
+                      :name="getNoteMeta(sharedNote.type).icon"
+                      class="size-3.5 shrink-0"
+                      :class="`text-${getNoteMeta(sharedNote.type).color}-500`"
+                    />
+                    <span class="truncate flex-1 text-left">{{ sharedNote.title || 'Sem título' }}</span>
+                    <UIcon
+                      v-if="sharedNote.permission === 'view'"
+                      name="i-lucide-eye"
+                      class="size-3 text-dimmed shrink-0"
+                    />
+                  </button>
+                </li>
+              </ul>
+            </div>
+
             <NotesList
               :notes="sortedVisibleNotes"
               :folders="sortedVisibleFolders"

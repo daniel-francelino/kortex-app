@@ -178,6 +178,7 @@ async function onRemoveShare(share: NoteShare) {
             <USelect
               v-model="newPermission"
               :items="[{ label: 'Visualizar', value: 'view' }, { label: 'Editar', value: 'edit' }]"
+              value-key="value"
               size="sm"
               class="w-32"
             />
@@ -206,12 +207,18 @@ async function onRemoveShare(share: NoteShare) {
                 class="size-3.5 text-dimmed shrink-0"
               />
               <span class="flex-1 truncate">{{ share.sharedWithEmail }}</span>
-              <UBadge v-if="share.status === 'pending'" color="neutral" variant="subtle" size="sm">
+              <UBadge
+                v-if="share.status === 'pending'"
+                color="neutral"
+                variant="subtle"
+                size="sm"
+              >
                 Convite pendente
               </UBadge>
               <USelect
                 :model-value="share.permission"
                 :items="[{ label: 'Visualizar', value: 'view' }, { label: 'Editar', value: 'edit' }]"
+                value-key="value"
                 size="sm"
                 class="w-28"
                 @update:model-value="(value: NoteSharePermission) => onChangePermission(share, value)"

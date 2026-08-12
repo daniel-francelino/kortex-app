@@ -71,6 +71,8 @@ const dirty = computed(() => {
 })
 
 const showInitialLoading = computed(() => props.loading && !noteDetail.value)
+const isOwner = computed(() => (noteDetail.value?.accessRole ?? 'owner') === 'owner')
+const canEdit = computed(() => (noteDetail.value?.accessRole ?? 'owner') !== 'view')
 
 const SAVE_AFTER_MS = 60_000
 const POLL_INTERVAL_MS = 10_000
@@ -126,6 +128,7 @@ function resetNoteState() {
   saveStatus.value = 'idle'
   iconPickerOpen.value = false
   typePickerOpen.value = false
+  shareDialogOpen.value = false
   editorRef.value?.clearContent()
   nextTick(() => {
     syncingContent.value = false
@@ -168,7 +171,7 @@ function markDirty() {
 }
 
 async function setIcon(icon: string | null) {
-  if (!noteDetail.value) return
+  if (!noteDetail.value || !canEdit.value) return
   editIcon.value = icon
   iconPickerOpen.value = false
   typePickerOpen.value = false
@@ -177,7 +180,7 @@ async function setIcon(icon: string | null) {
 }
 
 async function setType(type: NoteType) {
-  if (!noteDetail.value) return
+  if (!noteDetail.value || !canEdit.value) return
   editType.value = type
   typePickerOpen.value = false
   const result = await props.updateNote(noteDetail.value.id, { type }, { silent: true })
@@ -191,7 +194,7 @@ function onEditorChange(value: string) {
 }
 
 async function saveNote() {
-  if (!noteDetail.value || !dirty.value) return
+  if (!noteDetail.value || !dirty.value || !canEdit.value) return
 
   try {
     const result = await props.updateNote(
@@ -354,6 +357,7 @@ function onDragLeave(event: DragEvent) {
 
 function onDrop(event: DragEvent) {
   isDragOver.value = false
+  if (!canEdit.value) return
   const droppedNoteId = event.dataTransfer?.getData('application/x-notes-note-id')
   if (!droppedNoteId || droppedNoteId === noteDetail.value?.id) return
 
@@ -423,7 +427,7 @@ defineExpose({
               @click="emit('go-forward')"
             />
           </UTooltip>
-          <UPopover v-if="!editIcon" v-model:open="iconPickerOpen">
+          <UPopover v-if="!editIcon && canEdit" v-model:open="iconPickerOpen">
             <UTooltip text="Adicionar ícone">
               <UButton
                 icon="i-lucide-smile-plus"
@@ -436,13 +440,14 @@ defineExpose({
               <AppEmojiPicker @select="(emoji) => setIcon(emoji)" />
             </template>
           </UPopover>
-          <UDropdownMenu v-model:open="typePickerOpen" :items="typeMenuItems">
+          <UDropdownMenu v-model:open="typePickerOpen" :items="typeMenuItems" :disabled="!canEdit">
             <UTooltip :text="`Tipo: ${getTypeMeta(editType).label}`">
               <UButton
                 :icon="getTypeMeta(editType).icon"
                 size="xs"
                 variant="ghost"
                 color="neutral"
+                :disabled="!canEdit"
               />
             </UTooltip>
           </UDropdownMenu>
@@ -495,14 +500,33 @@ defineExpose({
         <!-- Right: share button + unified save / edited indicator -->
         <div class="flex items-center gap-2 text-xs text-muted whitespace-nowrap shrink-0">
           <UButton
-            :icon="noteDetail.visibility === 'private' ? 'i-lucide-lock' : noteDetail.visibility === 'public' ? 'i-lucide-globe' : 'i-lucide-users'"
+            v-if="isOwner"
+            :icon="noteDetail.visibility === NoteVisibility.Private ? 'i-lucide-lock' : noteDetail.visibility === NoteVisibility.Public ? 'i-lucide-globe' : 'i-lucide-users'"
             size="xs"
-            :color="noteDetail.visibility === 'private' ? 'neutral' : 'primary'"
+            :color="noteDetail.visibility === NoteVisibility.Private ? 'neutral' : 'primary'"
             variant="ghost"
             @click="shareDialogOpen = true"
           >
             Compartilhar
           </UButton>
+          <UBadge
+            v-else-if="!canEdit"
+            icon="i-lucide-eye"
+            color="neutral"
+            variant="subtle"
+            size="sm"
+          >
+            Somente leitura
+          </UBadge>
+          <UBadge
+            v-else
+            icon="i-lucide-pencil"
+            color="neutral"
+            variant="subtle"
+            size="sm"
+          >
+            Compartilhada com você
+          </UBadge>
           <template v-if="saveStatus === 'unsaved'">
             <span class="size-1.5 rounded-full bg-amber-400 dark:bg-amber-500 animate-pulse" />
             <span>Não salvo</span>
@@ -531,7 +555,7 @@ defineExpose({
       <div class="pl-16 pr-10 pt-8 pb-2 shrink-0">
         <div class="flex items-center gap-2.5">
           <UPopover
-            v-if="editIcon"
+            v-if="editIcon && canEdit"
             v-model:open="iconPickerOpen"
           >
             <button
@@ -551,11 +575,16 @@ defineExpose({
               </button>
             </template>
           </UPopover>
+          <span
+            v-else-if="editIcon"
+            class="text-4xl leading-none shrink-0 select-none -mt-0.5"
+          >{{ editIcon }}</span>
 
           <input
             v-model="editTitle"
             class="flex-1 text-3xl font-bold bg-transparent border-none outline-none placeholder:text-muted/30 text-highlighted leading-tight"
             placeholder="Sem titulo..."
+            :readonly="!canEdit"
             @blur="saveNote"
           >
         </div>
@@ -572,6 +601,7 @@ defineExpose({
           min-height="300px"
           placeholder="Escreva algo... use / para blocos, [[ para vincular notas."
           enable-wikilinks
+          :editable="canEdit"
           :current-note-id="noteDetail.id"
           :available-notes="availableNotes"
           @change="onEditorChange"
