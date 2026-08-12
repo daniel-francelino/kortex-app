@@ -65,6 +65,8 @@ export default eventHandler(async (event) => {
     position: data.position ?? 0,
     createdAt: data.created_at,
     updatedAt: data.updated_at,
-    folderId: data.folder_id ?? null
+    folderId: data.folder_id ?? null,
+    visibility: data.visibility ?? 'private',
+    shareToken: data.share_token ?? null
   }
 })

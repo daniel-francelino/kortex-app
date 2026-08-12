@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { getSupabaseAnonClient } from '../../utils/supabase-anon'
 import { setAuthCookies } from '../../utils/auth-cookies'
 import { setAuthUserCookie, toAuthUser } from '../../utils/auth-user'
+import { reconcilePendingShares } from '../../utils/reconcile-pending-shares'
 
 const schema = z.object({
   email: z.string().email(),
@@ -42,6 +43,10 @@ export default eventHandler(async (event) => {
   }, { persistent: parsed.data.remember })
 
   setAuthCookies(event, data.session, { persistent: parsed.data.remember })
+
+  if (data.user.email) {
+    void reconcilePendingShares(data.user.id, data.user.email)
+  }
 
   return {
     user: toAuthUser(data.user),

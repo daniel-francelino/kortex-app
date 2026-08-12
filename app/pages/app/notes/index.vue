@@ -6,6 +6,7 @@ import type {
   Note,
   NoteDetail,
   NoteFolder,
+  NoteVisibility,
   UpdateNotePayload
 } from '~/types/notes'
 import { NoteType } from '~/types/notes'
@@ -35,6 +36,12 @@ const {
   deleteNote,
   linkNotes,
   unlinkNotes,
+  setNoteVisibility,
+  regenerateShareLink,
+  fetchNoteShares,
+  addNoteShare,
+  updateNoteShare,
+  removeNoteShare,
   folders,
   allNotes,
   allNotesStatus,
@@ -606,6 +613,22 @@ async function onUnlinkNotes(
   if (!ok) return null
   return await reloadNoteDetail(sourceId)
 }
+
+async function onSetNoteVisibility(noteId: string, visibility: NoteVisibility): Promise<boolean> {
+  const ok = await setNoteVisibility(noteId, visibility)
+  if (ok && currentNoteDetail.value?.id === noteId) {
+    currentNoteDetail.value = { ...currentNoteDetail.value, visibility }
+  }
+  return ok
+}
+
+async function onRegenerateShareLink(noteId: string): Promise<Note | null> {
+  const updated = await regenerateShareLink(noteId)
+  if (updated && currentNoteDetail.value?.id === noteId) {
+    currentNoteDetail.value = { ...currentNoteDetail.value, ...updated }
+  }
+  return updated
+}
 </script>
 
 <template>
@@ -805,6 +828,12 @@ async function onUnlinkNotes(
                     :delete-note="onDeleteNoteById"
                     :link-notes="onLinkNotes"
                     :unlink-notes="onUnlinkNotes"
+                    :set-note-visibility="onSetNoteVisibility"
+                    :regenerate-share-link="onRegenerateShareLink"
+                    :fetch-note-shares="fetchNoteShares"
+                    :add-note-share="addNoteShare"
+                    :update-note-share="updateNoteShare"
+                    :remove-note-share="removeNoteShare"
                     :can-go-back="canGoBack"
                     :can-go-forward="canGoForward"
                     @updated="onNoteUpdated"

@@ -8,6 +8,15 @@ export enum NoteType {
   BookNote = 'book_note'
 }
 
+export enum NoteVisibility {
+  Private = 'private',
+  Shared = 'shared',
+  Public = 'public'
+}
+
+export type NoteSharePermission = 'view' | 'edit'
+export type NoteShareStatus = 'pending' | 'accepted'
+
 // ─── Icon & Color Mappings ────────────────────────────────────────────────────
 
 export const NOTE_TYPE_META: Record<NoteType, { label: string, icon: string, color: 'primary' | 'info' | 'warning' | 'success' | 'neutral' }> = {
@@ -64,10 +73,48 @@ export interface Note {
   createdAt: string
   updatedAt: string
   folderId: string | null
+  visibility: NoteVisibility
+  shareToken: string | null
   // Populated via joins
   tags?: NoteTag[]
   linkCount?: number
   backlinkCount?: number
+}
+
+export interface NoteShare {
+  id: string
+  noteId: string
+  ownerId: string
+  sharedWithUserId: string | null
+  sharedWithEmail: string
+  permission: NoteSharePermission
+  status: NoteShareStatus
+  createdAt: string
+}
+
+export interface CreateNoteSharePayload {
+  email: string
+  permission: NoteSharePermission
+}
+
+export interface UpdateNoteSharePayload {
+  permission: NoteSharePermission
+}
+
+/** Public, read-only projection served by GET /api/share/[token] — deliberately
+ * excludes owner-only fields (userId, tags, backlinks to private notes, etc).
+ * `publicWikilinkTargets` maps note id -> share token, for every wikilink/mention
+ * target found in `content` that is itself public (so the client can link to
+ * `/share/<token>`). Any note id referenced in the content but absent from this
+ * map must be rendered as plain (non-clickable) text — exposing it would leak
+ * that a private note exists. */
+export interface PublicNote {
+  title: string
+  icon: string | null
+  type: NoteType
+  content: string | null
+  updatedAt: string
+  publicWikilinkTargets: Record<string, string>
 }
 
 export interface NoteLink {

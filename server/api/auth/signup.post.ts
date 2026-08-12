@@ -3,6 +3,7 @@ import { getSupabaseAnonClient } from '../../utils/supabase-anon'
 import { getSupabaseAdminClient } from '../../utils/supabase'
 import { setAuthCookies } from '../../utils/auth-cookies'
 import { setAuthUserCookie, toAuthUser } from '../../utils/auth-user'
+import { reconcilePendingShares } from '../../utils/reconcile-pending-shares'
 
 const schema = z.object({
   name: z.string().min(1),
@@ -76,6 +77,10 @@ export default eventHandler(async (event) => {
         statusCode: 500,
         statusMessage: 'Não foi possível inicializar as preferências do usuário'
       })
+    }
+
+    if (data.user.email) {
+      void reconcilePendingShares(data.user.id, data.user.email)
     }
   }
 

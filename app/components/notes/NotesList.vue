@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { AnimatePresence, motion } from 'motion-v'
 import type { Note, NoteFolder } from '~/types/notes'
-import { NOTE_TYPE_META, NoteType } from '~/types/notes'
+import { NOTE_TYPE_META, NoteType, NoteVisibility } from '~/types/notes'
 
 const props = defineProps<{
   notes: Note[]
@@ -505,6 +505,12 @@ function getTypeMeta(type: string) {
   return NOTE_TYPE_META[type as NoteType] ?? NOTE_TYPE_META[NoteType.Note]
 }
 
+function getVisibilityMeta(note: Note) {
+  if (note.visibility === NoteVisibility.Public) return { icon: 'i-lucide-globe', tooltip: 'Nota pública' }
+  if (note.visibility === NoteVisibility.Shared) return { icon: 'i-lucide-users', tooltip: 'Nota compartilhada' }
+  return null
+}
+
 const rowEnter = { opacity: 0, y: -6, height: 0 }
 const rowExit = { opacity: 0, height: 0, transition: { duration: 0.1, ease: 'easeIn' } }
 const rowTransition = { duration: 0.12, ease: 'easeOut' }
@@ -705,6 +711,15 @@ const rowTransition = { duration: 0.12, ease: 'easeOut' }
                           </UTooltip>
                         </motion.div>
                       </AnimatePresence>
+                      <UTooltip
+                        v-if="getVisibilityMeta(row.note)"
+                        :text="getVisibilityMeta(row.note)!.tooltip"
+                      >
+                        <UIcon
+                          :name="getVisibilityMeta(row.note)!.icon"
+                          class="size-3 text-dimmed shrink-0"
+                        />
+                      </UTooltip>
                       <UDropdownMenu :items="noteActionItems(row.note)" @click.stop>
                         <UButton
                           icon="i-lucide-ellipsis-vertical"

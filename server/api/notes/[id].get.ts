@@ -87,6 +87,8 @@ export default eventHandler(async (event) => {
     createdAt: note.created_at,
     updatedAt: note.updated_at,
     folderId: note.folder_id ?? null,
+    visibility: note.visibility ?? 'private',
+    shareToken: note.share_token ?? null,
     tags,
     links,
     backlinks

@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import type { Note, NoteDetail, NoteFolder, UpdateNotePayload } from '~/types/notes'
-import { NOTE_TYPE_META, NoteType } from '~/types/notes'
+import type { CreateNoteSharePayload, Note, NoteDetail, NoteFolder, NoteShare, UpdateNotePayload, UpdateNoteSharePayload } from '~/types/notes'
+import { NOTE_TYPE_META, NoteType, NoteVisibility } from '~/types/notes'
 
 interface NotionStyleEditorRef {
   focus: () => void
@@ -22,6 +22,12 @@ const props = defineProps<{
   deleteNote: (id: string) => Promise<boolean>
   linkNotes: (sourceId: string, targetId: string) => Promise<NoteDetail | null>
   unlinkNotes: (sourceId: string, linkId: string) => Promise<NoteDetail | null>
+  setNoteVisibility: (noteId: string, visibility: NoteVisibility) => Promise<boolean>
+  regenerateShareLink: (noteId: string) => Promise<Note | null>
+  fetchNoteShares: (noteId: string) => Promise<NoteShare[]>
+  addNoteShare: (noteId: string, payload: CreateNoteSharePayload) => Promise<NoteShare | null>
+  updateNoteShare: (noteId: string, shareId: string, payload: UpdateNoteSharePayload) => Promise<NoteShare | null>
+  removeNoteShare: (noteId: string, shareId: string) => Promise<boolean>
   canGoBack: boolean
   canGoForward: boolean
 }>()
@@ -51,6 +57,7 @@ const lastChangeAt = ref(0)
 const syncingContent = ref(false)
 const iconPickerOpen = ref(false)
 const typePickerOpen = ref(false)
+const shareDialogOpen = ref(false)
 
 const isDragOver = ref(false)
 
@@ -485,8 +492,17 @@ defineExpose({
           </div>
         </nav>
 
-        <!-- Right: unified save / edited indicator -->
-        <div class="flex items-center gap-1 text-xs text-muted whitespace-nowrap shrink-0">
+        <!-- Right: share button + unified save / edited indicator -->
+        <div class="flex items-center gap-2 text-xs text-muted whitespace-nowrap shrink-0">
+          <UButton
+            :icon="noteDetail.visibility === 'private' ? 'i-lucide-lock' : noteDetail.visibility === 'public' ? 'i-lucide-globe' : 'i-lucide-users'"
+            size="xs"
+            :color="noteDetail.visibility === 'private' ? 'neutral' : 'primary'"
+            variant="ghost"
+            @click="shareDialogOpen = true"
+          >
+            Compartilhar
+          </UButton>
           <template v-if="saveStatus === 'unsaved'">
             <span class="size-1.5 rounded-full bg-amber-400 dark:bg-amber-500 animate-pulse" />
             <span>Não salvo</span>
@@ -581,6 +597,19 @@ defineExpose({
           Soltar para vincular nota
         </div>
       </div>
+
+      <NotesNoteShareDialog
+        v-model:open="shareDialogOpen"
+        :note-id="noteDetail.id"
+        :visibility="noteDetail.visibility"
+        :share-token="noteDetail.shareToken"
+        :set-visibility="setNoteVisibility"
+        :regenerate-share-link="regenerateShareLink"
+        :fetch-shares="fetchNoteShares"
+        :add-share="addNoteShare"
+        :update-share="updateNoteShare"
+        :remove-share="removeNoteShare"
+      />
     </template>
   </div>
 </template>

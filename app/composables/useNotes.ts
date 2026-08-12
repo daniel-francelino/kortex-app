@@ -1,9 +1,11 @@
 import { useDebounceFn } from '@vueuse/core'
 import type {
   CreateNotePayload,
+  CreateNoteSharePayload,
   CreateTagPayload,
   GraphData,
   Note,
+  NoteShare,
   NoteTag,
   NoteFolder,
   CreateFolderPayload,
@@ -13,9 +15,10 @@ import type {
   NoteListResponse,
   NoteSearchResult,
   UpdateNotePayload,
+  UpdateNoteSharePayload,
   UpdateTagPayload
 } from '~/types/notes'
-import { NoteType, NOTE_TYPE_META } from '~/types/notes'
+import { NoteType, NoteVisibility, NOTE_TYPE_META } from '~/types/notes'
 
 export function useNotes() {
   const toast = useToast()
@@ -259,6 +262,8 @@ export function useNotes() {
       icon: null,
       position,
       folderId: payload.folderId ?? null,
+      visibility: NoteVisibility.Private,
+      shareToken: null,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       tags: [],
@@ -387,6 +392,74 @@ export function useNotes() {
       toast.add({ title: nextPinned ? 'Nota fixada' : 'Nota desafixada', color: 'success' })
     }
     return !!result
+  }
+
+  // ─── Sharing ────────────────────────────────────────────────────────────────
+
+  async function setNoteVisibility(noteId: string, visibility: NoteVisibility): Promise<boolean> {
+    const previous = notesById.get(noteId)
+    if (!previous) return false
+
+    const result = await runOptimisticAction({
+      apply: () => notesById.set(noteId, { ...previous, visibility }),
+      rollback: () => notesById.set(noteId, previous),
+      request: () => $fetch<Note>(`/api/notes/${noteId}/visibility`, { method: 'PUT', body: { visibility } }),
+      reconcile: updated => notesById.set(noteId, { ...notesById.get(noteId), ...updated }),
+      errorMessage: 'Falha ao alterar a visibilidade da nota.'
+    })
+    return !!result
+  }
+
+  async function regenerateShareLink(noteId: string): Promise<Note | null> {
+    try {
+      const updated = await $fetch<Note>(`/api/notes/${noteId}/share-link/regenerate`, { method: 'POST' })
+      notesById.set(noteId, { ...notesById.get(noteId), ...updated })
+      toast.add({ title: 'Novo link gerado', description: 'O link anterior deixou de funcionar.', color: 'success' })
+      return updated
+    } catch {
+      toast.add({ title: 'Erro', description: 'Falha ao gerar novo link.', color: 'error' })
+      return null
+    }
+  }
+
+  async function fetchNoteShares(noteId: string): Promise<NoteShare[]> {
+    try {
+      return await $fetch<NoteShare[]>(`/api/notes/${noteId}/shares`)
+    } catch {
+      toast.add({ title: 'Erro', description: 'Falha ao carregar lista de acesso.', color: 'error' })
+      return []
+    }
+  }
+
+  async function addNoteShare(noteId: string, payload: CreateNoteSharePayload): Promise<NoteShare | null> {
+    try {
+      const share = await $fetch<NoteShare>(`/api/notes/${noteId}/shares`, { method: 'POST', body: payload })
+      toast.add({ title: 'Acesso concedido', description: `${payload.email} agora tem acesso a esta nota.`, color: 'success' })
+      return share
+    } catch (err: unknown) {
+      const message = (err as { data?: { statusMessage?: string } })?.data?.statusMessage
+      toast.add({ title: 'Erro', description: message ?? 'Falha ao compartilhar nota.', color: 'error' })
+      return null
+    }
+  }
+
+  async function updateNoteShare(noteId: string, shareId: string, payload: UpdateNoteSharePayload): Promise<NoteShare | null> {
+    try {
+      return await $fetch<NoteShare>(`/api/notes/${noteId}/shares/${shareId}`, { method: 'PUT', body: payload })
+    } catch {
+      toast.add({ title: 'Erro', description: 'Falha ao atualizar permissão.', color: 'error' })
+      return null
+    }
+  }
+
+  async function removeNoteShare(noteId: string, shareId: string): Promise<boolean> {
+    try {
+      await $fetch(`/api/notes/${noteId}/shares/${shareId}`, { method: 'DELETE' })
+      return true
+    } catch {
+      toast.add({ title: 'Erro', description: 'Falha ao remover acesso.', color: 'error' })
+      return false
+    }
   }
 
   // ─── Links ──────────────────────────────────────────────────────────────────
@@ -800,6 +873,14 @@ export function useNotes() {
     fetchNoteDetail,
     togglePin,
 
+    // Sharing
+    setNoteVisibility,
+    regenerateShareLink,
+    fetchNoteShares,
+    addNoteShare,
+    updateNoteShare,
+    removeNoteShare,
+
     // Custom ordering
     computePositionBetween,
     reorderNote,
@@ -817,6 +898,7 @@ export function useNotes() {
     // Helpers
     noteTypeOptions,
     getNoteMeta,
-    NoteType
+    NoteType,
+    NoteVisibility
   }
 }

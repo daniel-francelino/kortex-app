@@ -67,6 +67,8 @@ export default eventHandler(async (event) => {
     createdAt: row.created_at as string,
     updatedAt: row.updated_at as string,
     folderId: (row.folder_id as string) ?? null,
+    visibility: (row.visibility as string) ?? 'private',
+    shareToken: (row.share_token as string) ?? null,
     tags: [] as Array<{ id: string, name: string, color: string | null }>,
     linkCount: 0,
     backlinkCount: 0

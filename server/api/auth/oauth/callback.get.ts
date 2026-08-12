@@ -6,6 +6,7 @@ import { setAuthCookies } from '../../../utils/auth-cookies'
 import { getSupabaseAnonClient } from '../../../utils/supabase-anon'
 import { getSupabaseAdminClient } from '../../../utils/supabase'
 import { setAuthUserCookie, toAuthUser } from '../../../utils/auth-user'
+import { reconcilePendingShares } from '../../../utils/reconcile-pending-shares'
 
 const querySchema = z.object({
   code: z.string().min(1).optional(),
@@ -143,6 +144,10 @@ export default eventHandler(async (event) => {
       expiresAt,
       syncedAt: Date.now()
     })
+
+    if (userData.user.email) {
+      void reconcilePendingShares(userData.user.id, userData.user.email)
+    }
   }
 
   setAuthCookies(event, session)
