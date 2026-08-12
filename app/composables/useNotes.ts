@@ -186,16 +186,20 @@ export function useNotes() {
   )
 
   // ─── All notes (used by the folder tree + editor wikilink suggestions) ──────
+  // No `transform` option here — Nuxt's useFetch overload resolution for
+  // transform's return type has proven unstable across versions, so the raw
+  // response is fetched as-is and reshaped in a plain computed instead.
   const {
-    data: allNotesFetchResult,
+    data: allNotesRawResult,
     status: allNotesStatus,
     refresh: refreshAllNotes
   } = useFetch<NoteListResponse>('/api/notes', {
     query: computed(() => ({ page: 1, pageSize: 500 })),
-    transform: res => res.data,
     lazy: true,
     key: 'notes-all'
   })
+
+  const allNotesFetchResult = computed(() => allNotesRawResult.value?.data ?? null)
 
   const allNoteIds = ref<string[]>([])
   const allNotesLoadedOnce = ref(false)
