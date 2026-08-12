@@ -8,10 +8,18 @@ import { Table, TableCell, TableHeader, TableRow } from '@tiptap/extension-table
 import TaskItem from '@tiptap/extension-task-item'
 import TaskList from '@tiptap/extension-task-list'
 import TextAlign from '@tiptap/extension-text-align'
+import TextStyle from '@tiptap/extension-text-style'
+import Color from '@tiptap/extension-color'
+import Highlight from '@tiptap/extension-highlight'
 import Underline from '@tiptap/extension-underline'
 import StarterKit from '@tiptap/starter-kit'
 import Suggestion from '@tiptap/suggestion'
+import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight'
+import { createLowlight, common } from 'lowlight'
 import EditorImageNodeView from '~/components/editor/nodes/EditorImageNodeView.vue'
+import EditorCodeBlockNodeView from '~/components/editor/nodes/EditorCodeBlockNodeView.vue'
+
+const lowlight = createLowlight(common)
 
 export interface NotionCommandItem {
   title: string
@@ -689,14 +697,21 @@ export function createNotionEditorExtensions(options: {
     StarterKit.configure({
       heading: { levels: [1, 2, 3] },
       link: false,
-      underline: false
+      underline: false,
+      codeBlock: false
     }),
     Placeholder.configure({ placeholder: options.placeholder }),
     TextAlign.configure({ types: ['heading', 'paragraph'] }),
+    TextStyle,
+    Color,
+    Highlight.configure({ multicolor: true }),
     Underline,
     TaskList,
     TaskItem.configure({ nested: true }),
     Link.configure({ openOnClick: false, autolink: true }),
+    CodeBlockLowlight
+      .extend({ addNodeView: () => VueNodeViewRenderer(EditorCodeBlockNodeView) })
+      .configure({ lowlight }),
     BlockIdExtension,
     CalloutNode,
     EditorImageNode,

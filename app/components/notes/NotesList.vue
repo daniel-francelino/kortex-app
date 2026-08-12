@@ -20,6 +20,7 @@ const emit = defineEmits<{
   'new-note': []
   'new-folder': []
   'pin': [note: Note]
+  'duplicate': [note: Note]
   'delete': [note: Note]
   'move-to-folder': [noteId: string, folderId: string | null]
   'rename-note': [noteId: string, title: string]
@@ -90,6 +91,7 @@ function noteActionItems(note: Note) {
   return [[
     { label: 'Renomear', icon: 'i-lucide-pencil', onSelect: () => startEditNote(note) },
     { label: note.pinned ? 'Desafixar' : 'Fixar', icon: 'i-lucide-pin', onSelect: () => emit('pin', note) },
+    { label: 'Duplicar', icon: 'i-lucide-copy-plus', onSelect: () => emit('duplicate', note) },
     { label: 'Excluir', icon: 'i-lucide-trash-2', color: 'error' as const, onSelect: () => emit('delete', note) }
   ]]
 }

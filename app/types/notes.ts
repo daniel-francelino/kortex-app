@@ -160,6 +160,7 @@ export interface CreateNotePayload {
   title: string
   content?: string
   type?: NoteType
+  icon?: string | null
   tagIds?: string[]
   folderId?: string | null
 }

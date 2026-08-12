@@ -14,6 +14,9 @@ import { NoteType } from '~/types/notes'
 definePageMeta({ layout: 'app', ssr: false })
 useSeoMeta({ title: 'Notas' })
 
+const route = useRoute()
+const router = useRouter()
+
 const {
   notesData,
   notesStatus,
@@ -30,6 +33,7 @@ const {
   refreshGraph,
   noteTypeOptions,
   createNote,
+  duplicateNote,
   updateNote,
   fetchNoteDetail,
   togglePin,
@@ -67,7 +71,9 @@ const sharedSectionExpanded = ref(true)
 
 // ─── State ────────────────────────────────────────────────────────────────────
 
-const selectedNoteId = ref<string | null>(null)
+const selectedNoteId = ref<string | null>(
+  typeof route.query.note === 'string' ? route.query.note : null
+)
 const activeView = ref<'editor' | 'graph'>('editor')
 const createModalOpen = ref(false)
 const noteEditorRef = ref<{
@@ -287,7 +293,35 @@ async function loadCurrentNoteDetail(
 
 watch(selectedNoteId, (noteId) => {
   void loadCurrentNoteDetail(noteId)
-})
+  // `replace`, not `push` — this page keeps its own back/forward stack
+  // (noteHistory/historyIndex below), so every note change shouldn't also
+  // push a browser history entry on top of that.
+  void router.replace({ query: { ...route.query, note: noteId ?? undefined } })
+// `immediate` picks up a note id the page booted with (?note=<id>) — without
+// it, this watcher only reacts to later changes and the initial selection
+// from the URL would never actually load.
+}, { immediate: true })
+
+// Deep link to a specific block within the note the page booted with
+// (?note=<id>#block-<blockId>) — the element only exists once the editor has
+// rendered the note's content, which happens asynchronously, so poll briefly
+// instead of assuming it's already in the DOM.
+if (import.meta.client && route.hash.startsWith('#block-')) {
+  const targetId = route.hash.slice(1)
+  let attemptsLeft = 20
+  const tryScroll = () => {
+    const el = document.getElementById(targetId)
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      return
+    }
+    attemptsLeft--
+    if (attemptsLeft > 0) setTimeout(tryScroll, 150)
+  }
+  watch(currentNoteLoading, (loading) => {
+    if (!loading) setTimeout(tryScroll, 150)
+  }, { once: true })
+}
 
 // A note created while offline is briefly identified by a temp-* id; if it's
 // still selected once the mutation queue replays and the server hands back
@@ -433,6 +467,11 @@ async function onDeleteNote(note: Note): Promise<void> {
   if (ok && selectedNoteId.value === note.id) {
     onNoteDeleted()
   }
+}
+
+async function onDuplicateNote(note: Note): Promise<void> {
+  const created = await duplicateNote(note)
+  if (created) await navigateTo(created.id)
 }
 
 async function onMoveToFolder(
@@ -862,6 +901,7 @@ async function onRegenerateShareLink(noteId: string): Promise<Note | null> {
               @new-note-in-folder="onQuickCreateNote"
               @update:page="page = $event"
               @pin="onPinNote"
+              @duplicate="onDuplicateNote"
               @delete="onDeleteNote"
               @move-to-folder="onMoveToFolder"
               @rename-note="onRenameNote"

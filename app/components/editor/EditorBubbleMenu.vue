@@ -7,12 +7,45 @@ const props = defineProps<{
   pos: { x: number, y: number }
 }>()
 
-type BubbleView = 'toolbar' | 'link' | 'turninto'
+type BubbleView = 'toolbar' | 'link' | 'turninto' | 'color'
+type ColorMode = 'text' | 'highlight'
 
 const view = ref<BubbleView>('toolbar')
+const colorMode = ref<ColorMode>('text')
 const linkUrl = ref('')
 const linkInputRef = ref<HTMLInputElement | null>(null)
 const bubbleRef = ref<HTMLElement | null>(null)
+
+// Same ~9-color set Notion uses for both text color and highlight — kept
+// separate from the palette used elsewhere in the app (AppEmojiPicker, tags)
+// since these need to read clearly as small text/background swatches.
+const COLOR_SWATCHES = [
+  { label: 'Cinza', value: '#9ca3af' },
+  { label: 'Marrom', value: '#a8734a' },
+  { label: 'Laranja', value: '#f97316' },
+  { label: 'Amarelo', value: '#eab308' },
+  { label: 'Verde', value: '#22c55e' },
+  { label: 'Azul', value: '#3b82f6' },
+  { label: 'Roxo', value: '#a855f7' },
+  { label: 'Rosa', value: '#ec4899' },
+  { label: 'Vermelho', value: '#ef4444' }
+]
+
+function openColorView(mode: ColorMode) {
+  colorMode.value = mode
+  view.value = 'color'
+}
+
+function applyColor(value: string | null) {
+  if (colorMode.value === 'text') {
+    if (value) props.editor?.chain().focus().setColor(value).run()
+    else props.editor?.chain().focus().unsetColor().run()
+  } else {
+    if (value) props.editor?.chain().focus().toggleHighlight({ color: value }).run()
+    else props.editor?.chain().focus().unsetHighlight().run()
+  }
+  view.value = 'toolbar'
+}
 
 const BLOCK_TYPES = [
   { key: 'paragraph', label: 'Texto', icon: 'i-lucide-type', action: (e: Editor) => e.chain().focus().setParagraph().run() },
@@ -155,6 +188,40 @@ watch(() => props.visible, (v) => {
           </button>
         </template>
 
+        <!-- Color / highlight view -->
+        <template v-else-if="view === 'color'">
+          <button
+            type="button"
+            class="kortex-menu-btn"
+            title="Voltar"
+            @click="view = 'toolbar'"
+          >
+            <UIcon name="i-lucide-arrow-left" class="size-3.5" />
+          </button>
+          <div class="kortex-menu-sep" />
+          <p class="kortex-bubble-section-label">
+            {{ colorMode === 'text' ? 'Cor do texto' : 'Destaque' }}
+          </p>
+          <div class="kortex-menu-sep" />
+          <button
+            type="button"
+            class="kortex-menu-btn kortex-bubble-color-swatch kortex-bubble-color-swatch--none"
+            title="Padrão"
+            @click="applyColor(null)"
+          >
+            <UIcon name="i-lucide-x" class="size-3" />
+          </button>
+          <button
+            v-for="swatch in COLOR_SWATCHES"
+            :key="swatch.value"
+            type="button"
+            class="kortex-menu-btn kortex-bubble-color-swatch"
+            :title="swatch.label"
+            :style="{ '--swatch-color': swatch.value }"
+            @click="applyColor(swatch.value)"
+          />
+        </template>
+
         <!-- Default toolbar -->
         <template v-else>
           <!-- Block type indicator -->
@@ -211,6 +278,22 @@ watch(() => props.visible, (v) => {
             @click="editor?.chain().focus().toggleCode().run()"
           >
             <UIcon name="i-lucide-code" class="size-3.5" />
+          </button>
+          <button
+            type="button"
+            :class="['kortex-menu-btn', { active: !!editor?.getAttributes('textStyle').color }]"
+            title="Cor do texto"
+            @click="openColorView('text')"
+          >
+            <UIcon name="i-lucide-baseline" class="size-3.5" />
+          </button>
+          <button
+            type="button"
+            :class="['kortex-menu-btn', { active: editor?.isActive('highlight') }]"
+            title="Destaque"
+            @click="openColorView('highlight')"
+          >
+            <UIcon name="i-lucide-highlighter" class="size-3.5" />
           </button>
 
           <div class="kortex-menu-sep" />
@@ -351,6 +434,26 @@ watch(() => props.visible, (v) => {
 
 .kortex-bubble-turn-btn {
   min-width: 28px;
+}
+
+/* Color / highlight swatches */
+.kortex-bubble-color-swatch {
+  min-width: 22px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--swatch-color, transparent);
+  border: 1px solid color-mix(in srgb, var(--swatch-color, var(--ui-border)) 60%, transparent);
+}
+
+.kortex-bubble-color-swatch:hover {
+  transform: scale(1.12);
+}
+
+.kortex-bubble-color-swatch--none {
+  background: transparent;
+  border: 1px dashed var(--ui-border);
+  color: var(--ui-text-dimmed);
 }
 
 /* Link editing */

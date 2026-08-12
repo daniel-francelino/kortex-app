@@ -297,7 +297,7 @@ export function useNotes() {
       type: payload.type ?? NoteType.Note,
       pinned: false,
       pinnedAt: null,
-      icon: null,
+      icon: payload.icon ?? null,
       position,
       folderId: payload.folderId ?? null,
       visibility: NoteVisibility.Private,
@@ -347,6 +347,23 @@ export function useNotes() {
       refreshNotes()
     }
     return result
+  }
+
+  /** Creates a copy of a note (title, content, type, icon, tags, folder) — reuses the
+   * optimistic createNote() above rather than introducing a separate code path. */
+  async function duplicateNote(note: Note): Promise<Note | null> {
+    // List rows don't carry `content` (only the detail endpoint does) — fetch it if missing.
+    const detail = note.content != null ? note : await fetchNoteDetail(note.id)
+    if (!detail) return null
+
+    return createNote({
+      title: `${detail.title} (cópia)`,
+      content: detail.content ?? undefined,
+      type: detail.type,
+      icon: detail.icon,
+      tagIds: detail.tags?.map(t => t.id),
+      folderId: detail.folderId
+    })
   }
 
   async function updateNote(id: string, payload: UpdateNotePayload, options?: { silent?: boolean }): Promise<Note | null> {
@@ -1087,6 +1104,7 @@ export function useNotes() {
 
     // Note CRUD
     createNote,
+    duplicateNote,
     updateNote,
     deleteNote,
     fetchNoteDetail,

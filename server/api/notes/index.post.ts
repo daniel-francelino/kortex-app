@@ -6,6 +6,7 @@ const bodySchema = z.object({
   title: z.string().min(1, 'Título é obrigatório').max(500),
   content: z.string().optional(),
   type: z.enum(['note', 'idea', 'concept', 'research', 'book_note']).default('note'),
+  icon: z.string().nullable().optional(),
   tagIds: z.array(z.string().uuid()).optional(),
   folderId: z.string().uuid().nullable().optional()
 })
@@ -34,6 +35,7 @@ export default eventHandler(async (event) => {
       title: payload.title,
       content: payload.content ?? null,
       type: payload.type,
+      icon: payload.icon ?? null,
       folder_id: payload.folderId ?? null,
       position
     })

@@ -1073,6 +1073,14 @@ function copyActiveBlockText() {
   void copyToClipboard(text)
 }
 
+function copyActiveBlockLink() {
+  const blockId = activeBlock.value?.node?.attrs.blockId
+  if (!blockId || !props.currentNoteId) return
+  const url = `${window.location.origin}${window.location.pathname}?note=${props.currentNoteId}#block-${blockId}`
+  void copyToClipboard(url)
+  toast.add({ title: 'Link copiado', description: 'O link para este bloco foi copiado.', color: 'success' })
+}
+
 function turnActiveBlockInto(kind: 'paragraph' | 'heading1' | 'heading2' | 'heading3' | 'bulletList' | 'taskList') {
   const instance = editor.value
   if (!instance) return
@@ -1493,6 +1501,7 @@ defineExpose({
       @transform="turnActiveBlockInto"
       @duplicate="duplicateActiveBlock"
       @copy-text="copyActiveBlockText"
+      @copy-link="copyActiveBlockLink"
       @delete="deleteActiveBlock"
       @dragstart="onBlockDragStart"
       @dragend="onBlockDragEnd"
@@ -2230,6 +2239,60 @@ defineExpose({
   font-size: 0.875rem;
   line-height: 1.6;
   color: var(--ui-text-highlighted) !important;
+}
+
+/* Syntax highlight tokens (lowlight/highlight.js class names) — colors picked
+ * to sit on top of the dark editor background above, not a generic hljs theme. */
+.kortex-editor-content .tiptap pre code .hljs-comment,
+.kortex-editor-content .tiptap pre code .hljs-quote {
+  color: var(--ui-text-dimmed) !important;
+  font-style: italic;
+}
+
+.kortex-editor-content .tiptap pre code .hljs-keyword,
+.kortex-editor-content .tiptap pre code .hljs-selector-tag,
+.kortex-editor-content .tiptap pre code .hljs-literal,
+.kortex-editor-content .tiptap pre code .hljs-section,
+.kortex-editor-content .tiptap pre code .hljs-link {
+  color: #c084fc !important;
+}
+
+.kortex-editor-content .tiptap pre code .hljs-string,
+.kortex-editor-content .tiptap pre code .hljs-attr,
+.kortex-editor-content .tiptap pre code .hljs-regexp,
+.kortex-editor-content .tiptap pre code .hljs-addition {
+  color: #86efac !important;
+}
+
+.kortex-editor-content .tiptap pre code .hljs-number,
+.kortex-editor-content .tiptap pre code .hljs-symbol,
+.kortex-editor-content .tiptap pre code .hljs-bullet {
+  color: #fbbf24 !important;
+}
+
+.kortex-editor-content .tiptap pre code .hljs-title,
+.kortex-editor-content .tiptap pre code .hljs-name,
+.kortex-editor-content .tiptap pre code .hljs-built_in,
+.kortex-editor-content .tiptap pre code .hljs-type {
+  color: #60a5fa !important;
+}
+
+.kortex-editor-content .tiptap pre code .hljs-variable,
+.kortex-editor-content .tiptap pre code .hljs-template-variable,
+.kortex-editor-content .tiptap pre code .hljs-attribute {
+  color: #f472b6 !important;
+}
+
+.kortex-editor-content .tiptap pre code .hljs-deletion {
+  color: #fca5a5 !important;
+}
+
+.kortex-editor-content .tiptap pre code .hljs-emphasis {
+  font-style: italic;
+}
+
+.kortex-editor-content .tiptap pre code .hljs-strong {
+  font-weight: 700;
 }
 
 .kortex-editor-content .tiptap hr {

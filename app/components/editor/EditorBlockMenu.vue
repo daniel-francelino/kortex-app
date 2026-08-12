@@ -81,6 +81,11 @@ const contextItems = computed(() => [
       label: 'Copiar texto',
       icon: 'i-lucide-copy',
       onSelect: () => emit('copy-text')
+    },
+    {
+      label: 'Copiar link do bloco',
+      icon: 'i-lucide-link',
+      onSelect: () => emit('copy-link')
     }
   ],
   [
