@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { getSupabaseAdminClient } from '../../../../utils/supabase'
 import { requireAuthUser } from '../../../../utils/require-auth'
+import { createNotification } from '../../../../utils/notifications'
 
 const bodySchema = z.object({
   email: z.string().email().max(320),
@@ -16,7 +17,7 @@ export default eventHandler(async (event) => {
 
   const { data: note } = await supabase
     .from('notes')
-    .select('id')
+    .select('id, title')
     .eq('id', noteId)
     .eq('user_id', user.id)
     .is('deleted_at', null)
@@ -51,6 +52,25 @@ export default eventHandler(async (event) => {
       throw createError({ statusCode: 409, statusMessage: 'Esta pessoa já tem acesso a esta nota' })
     }
     throw createError({ statusCode: 500, statusMessage: 'Erro ao compartilhar nota', data: error.message })
+  }
+
+  // Only notify when the invite resolves to an existing account right away —
+  // pending invites (no account yet) get no notification until reconciled.
+  if (resolvedUserId && resolvedUserId !== user.id) {
+    const senderName = (user.user_metadata?.name as string | undefined) || user.email || 'Alguém'
+    const noteTitle = note.title || 'Sem título'
+
+    await createNotification(supabase, {
+      userId: resolvedUserId,
+      type: 'user',
+      category: 'note_shared',
+      body: `${senderName} compartilhou a nota "${noteTitle}" com você.`,
+      linkPath: '/app/notes/shared-with-me',
+      senderName,
+      senderEmail: user.email,
+      senderAvatarUrl: (user.user_metadata?.avatar_url as string | undefined) || null,
+      metadata: { noteId, noteShareId: data.id }
+    })
   }
 
   return {

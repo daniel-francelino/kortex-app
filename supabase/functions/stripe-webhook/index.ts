@@ -38,38 +38,24 @@ async function safeInsertNotification(
     metadata?: Record<string, unknown>
   }
 ) {
-  try {
-    const { error } = await supabase
-      .from('notifications')
-      .insert({
-        user_id: payload.user_id,
-        type: 'system',
-        body: payload.body,
-        link_path: payload.link_path ?? null,
-        sender_name: payload.sender_name ?? 'Kortex',
-        sender_email: payload.sender_email ?? null,
-        sender_avatar_url: payload.sender_avatar_url ?? null,
-        metadata: payload.metadata ?? {}
-      })
+  const { error } = await supabase
+    .from('notifications')
+    .insert({
+      user_id: payload.user_id,
+      type: 'system',
+      body: payload.body,
+      link_path: payload.link_path ?? null,
+      sender_name: payload.sender_name ?? 'Kortex',
+      sender_email: payload.sender_email ?? null,
+      sender_avatar_url: payload.sender_avatar_url ?? null,
+      metadata: payload.metadata ?? {}
+    })
 
-    if (!error)
-      return
-
-    // Backwards-compat (if DB still has is_system)
-    await supabase
-      .from('notifications')
-      .insert({
-        user_id: payload.user_id,
-        is_system: true,
-        body: payload.body,
-        link_path: payload.link_path ?? null,
-        sender_name: payload.sender_name ?? 'Kortex',
-        sender_email: payload.sender_email ?? null,
-        sender_avatar_url: payload.sender_avatar_url ?? null,
-        metadata: payload.metadata ?? {}
-      } as unknown as Record<string, unknown>)
-  } catch {
-    // best-effort
+  if (error) {
+    console.error('[stripe-webhook] failed to insert notification', {
+      user_id: payload.user_id,
+      error: error.message
+    })
   }
 }
 

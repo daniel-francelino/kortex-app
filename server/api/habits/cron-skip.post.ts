@@ -1,5 +1,6 @@
 import { getSupabaseAdminClient } from '../../utils/supabase'
 import { resolveHabitVersionIdForDate } from '../../utils/habit-versions'
+import { requireCronSecret } from '../../utils/require-cron-secret'
 
 /**
  * Marks all habits that were not logged for a given date as "skipped".
@@ -9,15 +10,7 @@ import { resolveHabitVersionIdForDate } from '../../utils/habit-versions'
  * The expected secret is stored in `runtimeConfig.cronSecret`.
  */
 export default eventHandler(async (event) => {
-  const config = useRuntimeConfig()
-  const cronSecret = config.cronSecret
-
-  if (cronSecret) {
-    const headerSecret = getHeader(event, 'x-cron-secret')
-    if (headerSecret !== cronSecret) {
-      throw createError({ statusCode: 401, statusMessage: 'Unauthorized' })
-    }
-  }
+  requireCronSecret(event)
 
   const query = getQuery(event)
   const targetDate = typeof query.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(query.date)

@@ -28,6 +28,10 @@ export default defineNuxtConfig({
     stripeAllowedPriceIds: process.env.STRIPE_ALLOWED_PRICE_IDS,
     stripeBillingPortalConfigurationId: process.env.STRIPE_BILLING_PORTAL_CONFIGURATION_ID,
 
+    // Shared secret for endpoints meant to be called by the external CRON API
+    // (see server/utils/require-cron-secret.ts). Unset only in local development.
+    cronSecret: process.env.CRON_SECRET,
+
     public: {
       siteUrl: process.env.NUXT_PUBLIC_SITE_URL ?? '',
       oneSignalEnabled: process.env.NODE_ENV === 'production' && process.env.NUXT_PUBLIC_ONESIGNAL_ENABLED === 'true',

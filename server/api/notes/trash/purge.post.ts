@@ -1,4 +1,5 @@
 import { getSupabaseAdminClient } from '../../../utils/supabase'
+import { requireCronSecret } from '../../../utils/require-cron-secret'
 
 const PURGE_AFTER_DAYS = 30
 
@@ -12,15 +13,7 @@ const PURGE_AFTER_DAYS = 30
  * secret is stored in `runtimeConfig.cronSecret`.
  */
 export default eventHandler(async (event) => {
-  const config = useRuntimeConfig()
-  const cronSecret = config.cronSecret
-
-  if (cronSecret) {
-    const headerSecret = getHeader(event, 'x-cron-secret')
-    if (headerSecret !== cronSecret) {
-      throw createError({ statusCode: 401, statusMessage: 'Unauthorized' })
-    }
-  }
+  requireCronSecret(event)
 
   const supabase = getSupabaseAdminClient()
   const cutoff = new Date(Date.now() - PURGE_AFTER_DAYS * 24 * 60 * 60 * 1000).toISOString()
