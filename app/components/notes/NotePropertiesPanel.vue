@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { Note, NoteTag, NoteDetail, UpdateNotePayload } from '~/types/notes'
-import { NOTE_TYPE_META, NoteType } from '~/types/notes'
+import { NoteType } from '~/types/notes'
+import { motion } from 'motion-v'
 
 const props = defineProps<{
   note: NoteDetail | null
@@ -10,19 +11,22 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
-  updated: []
+  'updated': []
   'navigate-note': [noteId: string]
 }>()
 
 const editType = ref<NoteType>(NoteType.Note)
 const editTagIds = ref<string[]>([])
 const saving = ref(false)
+const savingError = ref(false)
 
 const tagOptions = computed(() =>
   props.tags.map(t => ({ label: `#${t.name}`, value: t.id }))
 )
 
-const typeMeta = computed(() => NOTE_TYPE_META[editType.value] ?? NOTE_TYPE_META[NoteType.Note])
+// Read-only shared notes can't have their type/tags changed here — same rule
+// NoteEditor.vue applies to title/content (`accessRole !== 'view'`).
+const canEdit = computed(() => (props.note?.accessRole ?? 'owner') !== 'view')
 
 let syncing = false
 
@@ -31,30 +35,48 @@ watch(() => props.note, (note) => {
   syncing = true
   editType.value = note.type as NoteType
   editTagIds.value = (note.tags ?? []).map(t => t.id)
-  nextTick(() => { syncing = false })
+  nextTick(() => {
+    syncing = false
+  })
 }, { immediate: true })
 
 let saveTimer: ReturnType<typeof setTimeout> | null = null
 
 async function scheduleSave() {
-  if (syncing) return
+  if (syncing || !canEdit.value) return
+
   if (saveTimer) clearTimeout(saveTimer)
   saveTimer = setTimeout(async () => {
     if (!props.note) return
+
     saving.value = true
+    savingError.value = false
     try {
-      await props.updateNote(props.note.id, { type: editType.value, tagIds: editTagIds.value })
-      emit('updated')
+      const result = await props.updateNote(
+        props.note.id,
+        { type: editType.value, tagIds: editTagIds.value },
+        { silent: true }
+      )
+      if (result) emit('updated')
+      else savingError.value = true
+    } catch {
+      savingError.value = true
     } finally {
       saving.value = false
     }
   }, 600)
 }
 
-watch(editType, () => { if (!syncing && props.note) scheduleSave() })
-watch(editTagIds, () => { if (!syncing && props.note) scheduleSave() }, { deep: true })
+watch(editType, () => {
+  if (!syncing && props.note) scheduleSave()
+})
+watch(editTagIds, () => {
+  if (!syncing && props.note) scheduleSave()
+}, { deep: true })
 
-onUnmounted(() => { if (saveTimer) clearTimeout(saveTimer) })
+onUnmounted(() => {
+  if (saveTimer) clearTimeout(saveTimer)
+})
 
 function formatDate(d: string) {
   return new Date(d).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })
@@ -74,6 +96,7 @@ function formatDate(d: string) {
             value-key="value"
             size="xs"
             class="w-full"
+            :disabled="!canEdit"
           />
         </div>
 
@@ -88,6 +111,7 @@ function formatDate(d: string) {
             size="xs"
             placeholder="Sem tags"
             class="w-full"
+            :disabled="!canEdit"
           />
         </div>
 
@@ -110,20 +134,26 @@ function formatDate(d: string) {
               <UIcon name="i-lucide-link" class="size-3" />
               Vínculos
             </span>
-            <UBadge size="xs" variant="subtle" color="neutral">{{ note.links?.length ?? note.linkCount ?? 0 }}</UBadge>
+            <UBadge size="xs" variant="subtle" color="neutral">
+              {{ note.links?.length ?? note.linkCount ?? 0 }}
+            </UBadge>
           </div>
           <div class="flex items-center justify-between text-xs">
             <span class="text-muted flex items-center gap-1.5">
               <UIcon name="i-lucide-corner-down-left" class="size-3" />
               Backlinks
             </span>
-            <UBadge size="xs" variant="subtle" color="neutral">{{ note.backlinks?.length ?? note.backlinkCount ?? 0 }}</UBadge>
+            <UBadge size="xs" variant="subtle" color="neutral">
+              {{ note.backlinks?.length ?? note.backlinkCount ?? 0 }}
+            </UBadge>
           </div>
         </div>
 
         <!-- Backlinks list -->
         <div v-if="note.backlinks?.length" class="border-t border-default pt-3 space-y-0.5">
-          <p class="text-xs font-semibold text-muted uppercase tracking-wide mb-2">Mencionado em</p>
+          <p class="text-xs font-semibold text-muted uppercase tracking-wide mb-2">
+            Mencionado em
+          </p>
           <button
             v-for="bl in note.backlinks"
             :key="bl.id"
@@ -135,17 +165,34 @@ function formatDate(d: string) {
           </button>
         </div>
 
-        <!-- Save indicator -->
-        <div v-if="saving" class="text-xs text-muted flex items-center gap-1.5 pt-1">
-          <UIcon name="i-lucide-loader-2" class="size-3 animate-spin" />
-          Salvando...
-        </div>
+        <!-- Save / error indicator -->
+        <motion.div
+          v-if="saving || savingError"
+          :key="savingError ? 'error' : 'saving'"
+          class="text-xs flex items-center gap-1.5 pt-1"
+          :class="savingError ? 'text-error' : 'text-muted'"
+          :initial="{ opacity: 0 }"
+          :animate="{ opacity: 1 }"
+          :exit="{ opacity: 0 }"
+          :transition="{ duration: 0.15 }"
+        >
+          <template v-if="savingError">
+            <UIcon name="i-lucide-alert-circle" class="size-3" />
+            Erro ao salvar
+          </template>
+          <template v-else>
+            <UIcon name="i-lucide-loader-2" class="size-3 animate-spin" />
+            Salvando...
+          </template>
+        </motion.div>
       </div>
     </template>
 
     <div v-else class="flex flex-col items-center justify-center py-8 gap-2">
       <UIcon name="i-lucide-info" class="size-6 text-dimmed" />
-      <p class="text-xs text-muted">Selecione uma nota</p>
+      <p class="text-xs text-muted">
+        Selecione uma nota
+      </p>
     </div>
   </div>
 </template>

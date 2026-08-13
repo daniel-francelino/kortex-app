@@ -1060,37 +1060,44 @@ async function onRegenerateShareLink(noteId: string): Promise<Note | null> {
             </div>
 
             <!-- Right panel: Sumário / Propriedades (desktop only — mobile uses the drawer below) -->
-            <div
-              v-if="rightPanelOpen && rightPanelView && !isRightPanelMobile"
-              class="w-80 shrink-0 h-full border-l border-default flex flex-col"
-            >
-              <div class="flex items-center justify-between h-9 px-3 border-b border-default/50 shrink-0">
-                <span class="text-xs font-medium text-highlighted">
-                  {{ rightPanelView === 'outline' ? 'Sumário' : 'Propriedades' }}
-                </span>
-                <UButton
-                  icon="i-lucide-x"
-                  size="xs"
-                  variant="ghost"
-                  color="neutral"
-                  @click="rightPanelOpen = false"
-                />
-              </div>
-              <div class="flex-1 overflow-y-auto">
-                <NotesNoteRightPanelBody
-                  :view="rightPanelView"
-                  :outline="outline"
-                  :active-heading-id="activeHeadingId"
-                  :note="currentNoteDetail"
-                  :tags="tags"
-                  :note-type-options="noteTypeOptions"
-                  :update-note="onUpdateNote"
-                  @click-outline-item="onOutlineItemClick"
-                  @updated="onPropertiesUpdated"
-                  @navigate-note="onNavigateNote"
-                />
-              </div>
-            </div>
+            <AnimatePresence>
+              <motion.div
+                v-if="rightPanelOpen && rightPanelView && !isRightPanelMobile"
+                :key="rightPanelView"
+                class="w-80 shrink-0 h-full border-l border-default flex flex-col overflow-hidden"
+                :initial="{ opacity: 0, x: 16 }"
+                :animate="{ opacity: 1, x: 0 }"
+                :exit="{ opacity: 0, x: 16 }"
+                :transition="{ duration: 0.15 }"
+              >
+                <div class="flex items-center justify-between h-9 px-3 border-b border-default/50 shrink-0">
+                  <span class="text-xs font-medium text-highlighted">
+                    {{ rightPanelView === 'outline' ? 'Sumário' : 'Propriedades' }}
+                  </span>
+                  <UButton
+                    icon="i-lucide-x"
+                    size="xs"
+                    variant="ghost"
+                    color="neutral"
+                    @click="rightPanelOpen = false"
+                  />
+                </div>
+                <div class="flex-1 overflow-y-auto">
+                  <NotesNoteRightPanelBody
+                    :view="rightPanelView"
+                    :outline="outline"
+                    :active-heading-id="activeHeadingId"
+                    :note="currentNoteDetail"
+                    :tags="tags"
+                    :note-type-options="noteTypeOptions"
+                    :update-note="onUpdateNote"
+                    @click-outline-item="onOutlineItemClick"
+                    @updated="onPropertiesUpdated"
+                    @navigate-note="onNavigateNote"
+                  />
+                </div>
+              </motion.div>
+            </AnimatePresence>
           </div>
         </div>
       </div>
