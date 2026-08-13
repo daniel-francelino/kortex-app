@@ -105,6 +105,8 @@ watch(() => props.visible, (v) => {
     linkUrl.value = ''
   }
 })
+
+defineExpose({ el: bubbleRef })
 </script>
 
 <template>

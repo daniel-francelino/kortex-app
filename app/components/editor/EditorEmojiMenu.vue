@@ -7,12 +7,17 @@ defineProps<{
 const emit = defineEmits<{
   select: [emoji: string, name: string]
 }>()
+
+const menuRef = ref<HTMLElement | null>(null)
+
+defineExpose({ el: menuRef })
 </script>
 
 <template>
   <Teleport to="body">
     <div
       v-if="visible"
+      ref="menuRef"
       class="kortex-emoji-menu"
       :style="{ top: `${pos.y}px`, left: `${pos.x}px` }"
       @mousedown.prevent

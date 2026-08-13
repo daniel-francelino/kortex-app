@@ -930,20 +930,26 @@ export function useNotes() {
     }
   }
 
-  async function restoreNote(id: string): Promise<boolean> {
+  // `silent` skips the per-item toast and `skipRefresh` skips the
+  // graph/list refetch — both meant for bulk callers (NotesTrashView), which
+  // show one summary toast and do a single combined refresh instead of one
+  // per item.
+  async function restoreNote(id: string, options?: { silent?: boolean, skipRefresh?: boolean }): Promise<boolean> {
     try {
       const restored = await $fetch<Note>(`/api/notes/${id}/restore`, { method: 'POST' })
       trashItems.value = trashItems.value.filter(item => !(item.kind === 'note' && item.id === id))
       notesById.set(restored.id, restored)
       allNoteIds.value = [restored.id, ...allNoteIds.value.filter(nid => nid !== restored.id)]
       paginatedNoteIds.value = [restored.id, ...paginatedNoteIds.value.filter(nid => nid !== restored.id)]
-      toast.add({ title: 'Nota restaurada', color: 'success' })
-      refreshGraph()
-      refreshNotes()
+      if (!options?.silent) toast.add({ title: 'Nota restaurada', color: 'success' })
+      if (!options?.skipRefresh) {
+        refreshGraph()
+        refreshNotes()
+      }
       return true
     } catch (err) {
       console.error('[useNotes] restoreNote failed', id, err)
-      toast.add({ title: 'Erro', description: 'Falha ao restaurar nota.', color: 'error' })
+      if (!options?.silent) toast.add({ title: 'Erro', description: 'Falha ao restaurar nota.', color: 'error' })
       return false
     }
   }
@@ -951,44 +957,46 @@ export function useNotes() {
   // Cascading — restoring a folder brings back an unknown-in-advance set of
   // descendant subfolders/notes, so a full refetch is simpler and safer than
   // trying to patch the local store item by item.
-  async function restoreFolder(id: string): Promise<boolean> {
+  async function restoreFolder(id: string, options?: { silent?: boolean, skipRefresh?: boolean }): Promise<boolean> {
     try {
       await $fetch(`/api/notes/folders/${id}/restore`, { method: 'POST' })
-      toast.add({ title: 'Pasta restaurada', color: 'success' })
-      await Promise.all([refreshFolders(), refreshAllNotes(), refreshNotes(), fetchTrash()])
-      refreshGraph()
+      if (!options?.silent) toast.add({ title: 'Pasta restaurada', color: 'success' })
+      if (!options?.skipRefresh) {
+        await Promise.all([refreshFolders(), refreshAllNotes(), refreshNotes(), fetchTrash()])
+        refreshGraph()
+      }
       return true
     } catch (err) {
       console.error('[useNotes] restoreFolder failed', id, err)
-      toast.add({ title: 'Erro', description: 'Falha ao restaurar pasta.', color: 'error' })
+      if (!options?.silent) toast.add({ title: 'Erro', description: 'Falha ao restaurar pasta.', color: 'error' })
       return false
     }
   }
 
-  async function permanentlyDeleteNote(id: string): Promise<boolean> {
+  async function permanentlyDeleteNote(id: string, options?: { silent?: boolean }): Promise<boolean> {
     try {
       await $fetch(`/api/notes/${id}/permanent`, { method: 'DELETE' })
       trashItems.value = trashItems.value.filter(item => !(item.kind === 'note' && item.id === id))
-      toast.add({ title: 'Nota excluída permanentemente', color: 'success' })
+      if (!options?.silent) toast.add({ title: 'Nota excluída permanentemente', color: 'success' })
       return true
     } catch (err) {
       console.error('[useNotes] permanentlyDeleteNote failed', id, err)
-      toast.add({ title: 'Erro', description: 'Falha ao excluir nota permanentemente.', color: 'error' })
+      if (!options?.silent) toast.add({ title: 'Erro', description: 'Falha ao excluir nota permanentemente.', color: 'error' })
       return false
     }
   }
 
   // Cascading — see restoreFolder() above for why this refetches instead of
   // patching local state.
-  async function permanentlyDeleteFolder(id: string): Promise<boolean> {
+  async function permanentlyDeleteFolder(id: string, options?: { silent?: boolean, skipRefresh?: boolean }): Promise<boolean> {
     try {
       await $fetch(`/api/notes/folders/${id}/permanent`, { method: 'DELETE' })
-      toast.add({ title: 'Pasta excluída permanentemente', color: 'success' })
-      await fetchTrash()
+      if (!options?.silent) toast.add({ title: 'Pasta excluída permanentemente', color: 'success' })
+      if (!options?.skipRefresh) await fetchTrash()
       return true
     } catch (err) {
       console.error('[useNotes] permanentlyDeleteFolder failed', id, err)
-      toast.add({ title: 'Erro', description: 'Falha ao excluir pasta permanentemente.', color: 'error' })
+      if (!options?.silent) toast.add({ title: 'Erro', description: 'Falha ao excluir pasta permanentemente.', color: 'error' })
       return false
     }
   }

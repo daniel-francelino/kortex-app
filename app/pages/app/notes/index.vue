@@ -17,6 +17,7 @@ useSeoMeta({ title: 'Notas' })
 
 const route = useRoute()
 const router = useRouter()
+const toast = useToast()
 
 const {
   notesData,
@@ -67,6 +68,7 @@ const {
   restoreFolder,
   permanentlyDeleteNote,
   permanentlyDeleteFolder,
+  refreshFolders,
   computePositionBetween,
   reorderNote,
   reorderFolder,
@@ -89,13 +91,18 @@ const activeView = ref<'editor' | 'graph' | 'trash'>('editor')
 const createModalOpen = ref(false)
 const noteEditorRef = ref<{
   isUnsaved: () => boolean
-  doSave: () => Promise<void>
+  doSave: (options?: { notifyOnFailure?: boolean }) => Promise<void>
   scrollToHeading: (blockId: string) => void
 } | null>(null)
 
-onBeforeRouteLeave(async () => {
+// Fire-and-forget on purpose — awaiting the full round trip here used to
+// block navigation on every route change while a note was unsaved. The save
+// is optimistic already (the header status is just cosmetic confirmation),
+// so the risk worth guarding against isn't "did it save yet" but "did it
+// fail after the user already left" — that's what notifyOnFailure covers.
+onBeforeRouteLeave(() => {
   if (noteEditorRef.value?.isUnsaved()) {
-    await noteEditorRef.value.doSave()
+    void noteEditorRef.value.doSave({ notifyOnFailure: true })
   }
 })
 const sidebarTab = ref<'notes' | 'tags'>('notes')
@@ -421,9 +428,12 @@ const canGoForward = computed(
   () => historyIndex.value < noteHistory.value.length - 1
 )
 
+// Also fire-and-forget (see onBeforeRouteLeave above) — switching to another
+// note in the sidebar, or going back/forward, shouldn't wait on the network
+// either.
 async function saveCurrentNoteIfNeeded(): Promise<void> {
   if (noteEditorRef.value?.isUnsaved()) {
-    await noteEditorRef.value.doSave()
+    void noteEditorRef.value.doSave({ notifyOnFailure: true })
   }
 }
 
@@ -669,6 +679,57 @@ async function onPermanentDeleteTrashItem(item: TrashItem): Promise<void> {
   } else {
     await permanentlyDeleteFolder(item.id)
   }
+}
+
+// Bulk actions run every item with { silent: true, skipRefresh: true } (see
+// useNotes.ts) so a batch of N doesn't show N toasts or trigger N redundant
+// refetches — one combined refresh and one summary toast instead.
+async function refreshAfterBulkTrashAction(): Promise<void> {
+  refreshGraph()
+  refreshNotes()
+  await Promise.all([refreshFolders(), refreshAllNotes(), fetchTrash()])
+}
+
+function summarizeBulkResult(action: string, succeeded: number, failed: number): void {
+  if (failed === 0) {
+    toast.add({
+      title: succeeded === 1 ? `1 item ${action}` : `${succeeded} itens ${action}`,
+      color: 'success'
+    })
+    return
+  }
+
+  toast.add({
+    title: succeeded === 0 ? 'Falha na operação' : 'Operação parcial',
+    description: `${succeeded} com sucesso, ${failed} falharam.`,
+    color: succeeded > 0 ? 'warning' : 'error'
+  })
+}
+
+async function onBulkRestoreTrashItems(items: TrashItem[]): Promise<void> {
+  if (items.length === 0) return
+
+  const results = await Promise.all(items.map(item =>
+    item.kind === 'note'
+      ? restoreNote(item.id, { silent: true, skipRefresh: true })
+      : restoreFolder(item.id, { silent: true, skipRefresh: true })
+  ))
+
+  await refreshAfterBulkTrashAction()
+  summarizeBulkResult('restaurado(s)', results.filter(Boolean).length, results.filter(r => !r).length)
+}
+
+async function onBulkPermanentDeleteTrashItems(items: TrashItem[]): Promise<void> {
+  if (items.length === 0) return
+
+  const results = await Promise.all(items.map(item =>
+    item.kind === 'note'
+      ? permanentlyDeleteNote(item.id, { silent: true })
+      : permanentlyDeleteFolder(item.id, { silent: true, skipRefresh: true })
+  ))
+
+  await refreshAfterBulkTrashAction()
+  summarizeBulkResult('excluído(s) permanentemente', results.filter(Boolean).length, results.filter(r => !r).length)
 }
 
 function onPropertiesUpdated(): void {
@@ -1023,6 +1084,8 @@ async function onRegenerateShareLink(noteId: string): Promise<Note | null> {
                     :loading="trashStatus === 'pending'"
                     @restore="onRestoreTrashItem"
                     @permanent-delete="onPermanentDeleteTrashItem"
+                    @bulk-restore="onBulkRestoreTrashItems"
+                    @bulk-permanent-delete="onBulkPermanentDeleteTrashItems"
                   />
 
                   <NotesNoteEditor

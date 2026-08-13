@@ -269,35 +269,63 @@ function onEditorChange(value: string) {
   if (noteDetail.value && value !== lastSavedContent.value) markDirty()
 }
 
-async function saveNote() {
+async function saveNote(options?: { notifyOnFailure?: boolean }) {
   if (!noteDetail.value || !dirty.value || !canEdit.value) return
+
+  // Captured up front: when this is called on navigation (see `doSave`
+  // below), the caller doesn't wait for this to finish — the user can
+  // switch to a different note (or a whole other page) before this
+  // resolves. Everything below reads local snapshots, not live refs, and
+  // only touches this component's reactive state if it's still showing the
+  // note that was actually being saved.
+  const savingNoteId = noteDetail.value.id
+  const savingTitle = editTitle.value
+  const savingContent = content.value
+  const noteLabel = savingTitle || 'Sem título'
+
+  function notifyFailure() {
+    if (!options?.notifyOnFailure) return
+    useToast().add({
+      title: 'Não foi possível salvar',
+      description: `Alterações em "${noteLabel}" podem não ter sido salvas.`,
+      color: 'error'
+    })
+  }
 
   try {
     const result = await props.updateNote(
-      noteDetail.value.id,
+      savingNoteId,
       {
-        title: editTitle.value,
-        content: content.value
+        title: savingTitle,
+        content: savingContent
       },
       { silent: true }
     )
 
+    const stillSameNote = noteDetail.value?.id === savingNoteId
+
     if (result) {
-      lastSavedTitle.value = editTitle.value
-      lastSavedContent.value = content.value
-      lastChangeAt.value = 0
-      saveStatus.value = props.isOnline ? 'saved' : 'offline-pending'
-      savedAt.value = new Date()
+      if (stillSameNote) {
+        lastSavedTitle.value = savingTitle
+        lastSavedContent.value = savingContent
+        lastChangeAt.value = 0
+        saveStatus.value = props.isOnline ? 'saved' : 'offline-pending'
+        savedAt.value = new Date()
+        // Wikilink/backlink sync needs a real round trip against the server —
+        // skip it while offline, the mutation queue will replay the content
+        // save itself, and links can resync next time this note saves online.
+        // Also skipped if the user has since switched notes: it reads/writes
+        // `noteDetail`/`content`, which by now belong to a different note.
+        if (props.isOnline) void syncLinksFromContent()
+      }
       emit('updated')
-      // Wikilink/backlink sync needs a real round trip against the server —
-      // skip it while offline, the mutation queue will replay the content
-      // save itself, and links can resync next time this note saves online.
-      if (props.isOnline) void syncLinksFromContent()
     } else {
-      saveStatus.value = 'error'
+      if (stillSameNote) saveStatus.value = 'error'
+      notifyFailure()
     }
   } catch {
-    saveStatus.value = 'error'
+    if (noteDetail.value?.id === savingNoteId) saveStatus.value = 'error'
+    notifyFailure()
   }
 }
 

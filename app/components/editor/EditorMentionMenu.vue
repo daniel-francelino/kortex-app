@@ -20,6 +20,7 @@ const emit = defineEmits<{
 }>()
 
 const inputRef = ref<HTMLInputElement | null>(null)
+const menuRef = ref<HTMLElement | null>(null)
 
 function focus() {
   inputRef.value?.focus()
@@ -29,13 +30,14 @@ function onInput(event: Event) {
   emit('update:query', (event.target as HTMLInputElement).value)
 }
 
-defineExpose({ focus })
+defineExpose({ focus, el: menuRef })
 </script>
 
 <template>
   <Teleport to="body">
     <div
       v-if="visible"
+      ref="menuRef"
       class="kortex-mention-menu"
       :style="{ top: `${pos.y}px`, left: `${pos.x}px` }"
       @mousedown.prevent

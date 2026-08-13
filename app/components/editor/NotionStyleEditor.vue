@@ -160,11 +160,13 @@ const pendingAttachmentCleanups = new Map<string, {
 
 const bubbleVisible = ref(false)
 const bubblePos = ref({ x: 0, y: 0 })
+const bubbleMenuRef = ref<{ el: HTMLElement | null } | null>(null)
 
 const slashVisible = ref(false)
 const slashItems = ref<NotionCommandItem[]>([])
 const slashIndex = ref(0)
 const slashPos = ref({ x: 0, y: 0 })
+const slashMenuRef = ref<{ el: HTMLElement | null } | null>(null)
 let slashRange: Range | null = null
 let slashEditor: Editor | null = null
 
@@ -179,11 +181,12 @@ const mentionVisible = ref(false)
 const mentionQuery = ref('')
 const mentionPos = ref({ x: 0, y: 0 })
 const mentionInsertPos = ref(0)
-const mentionMenuRef = ref<{ focus: () => void } | null>(null)
+const mentionMenuRef = ref<{ focus: () => void, el: HTMLElement | null } | null>(null)
 
 const emojiVisible = ref(false)
 const emojiPos = ref({ x: 0, y: 0 })
 const emojiInsertPos = ref(0)
+const emojiMenuRef = ref<{ el: HTMLElement | null } | null>(null)
 
 const linkPreviewVisible = ref(false)
 const linkPreviewUrl = ref('')
@@ -192,6 +195,7 @@ const linkPreviewInsertPos = ref(0)
 const linkPreviewLoading = ref(false)
 const linkPreviewError = ref('')
 const linkPreviewInputRef = ref<HTMLInputElement | null>(null)
+const linkPreviewMenuRef = ref<HTMLElement | null>(null)
 
 const activeBlock = ref<ActiveBlockInfo | null>(null)
 const blockVisible = ref(false)
@@ -271,7 +275,12 @@ const slashCommandExtension = createSlashCommandExtension({
     slashVisible.value = true
 
     const rect = payload.clientRect?.()
-    if (rect) slashPos.value = { x: rect.left, y: rect.bottom + 6 }
+    if (rect) {
+      slashPos.value = { x: rect.left, y: rect.bottom + 6 }
+      nextTick(() => {
+        slashPos.value = clampMenuPosition(slashPos.value, slashMenuRef.value?.el, 'top-left')
+      })
+    }
   },
   onUpdate(payload) {
     slashEditor = payload.editor
@@ -279,7 +288,12 @@ const slashCommandExtension = createSlashCommandExtension({
     slashItems.value = payload.items
 
     const rect = payload.clientRect?.()
-    if (rect) slashPos.value = { x: rect.left, y: rect.bottom + 6 }
+    if (rect) {
+      slashPos.value = { x: rect.left, y: rect.bottom + 6 }
+      nextTick(() => {
+        slashPos.value = clampMenuPosition(slashPos.value, slashMenuRef.value?.el, 'top-left')
+      })
+    }
   },
   onKeyDown({ event }) {
     const total = slashItems.value.length
@@ -684,7 +698,10 @@ function openLinkPreviewMenu() {
   linkPreviewVisible.value = true
   mentionVisible.value = false
   emojiVisible.value = false
-  nextTick(() => linkPreviewInputRef.value?.focus())
+  nextTick(() => {
+    linkPreviewInputRef.value?.focus()
+    linkPreviewPos.value = clampMenuPosition(linkPreviewPos.value, linkPreviewMenuRef.value, 'top-left')
+  })
 }
 
 async function insertLinkPreview() {
@@ -734,7 +751,10 @@ function openMentionMenu() {
   mentionVisible.value = true
   emojiVisible.value = false
   linkPreviewVisible.value = false
-  nextTick(() => mentionMenuRef.value?.focus())
+  nextTick(() => {
+    mentionMenuRef.value?.focus()
+    mentionPos.value = clampMenuPosition(mentionPos.value, mentionMenuRef.value?.el, 'top-left')
+  })
 }
 
 function closeMentionMenu() {
@@ -790,6 +810,9 @@ function openEmojiMenu() {
   emojiVisible.value = true
   mentionVisible.value = false
   linkPreviewVisible.value = false
+  nextTick(() => {
+    emojiPos.value = clampMenuPosition(emojiPos.value, emojiMenuRef.value?.el, 'top-left')
+  })
 }
 
 function insertEmoji(emoji: string, name: string) {
@@ -844,6 +867,9 @@ function updateBubble() {
     y: Math.round(rect.top)
   }
   bubbleVisible.value = true
+  nextTick(() => {
+    bubblePos.value = clampMenuPosition(bubblePos.value, bubbleMenuRef.value?.el, 'bottom-center')
+  })
 }
 
 function hideWikiSuggestion() {
@@ -896,6 +922,9 @@ function updateWikilinkSuggestion() {
     const rect = instance.view.coordsAtPos(cursor.pos)
     wikiPos.value = { x: rect.left, y: rect.bottom + 6 }
     wikiVisible.value = true
+    nextTick(() => {
+      wikiPos.value = clampMenuPosition(wikiPos.value, wikiMenuRef.value, 'top-left')
+    })
   } catch {
     hideWikiSuggestion()
   }
@@ -1485,6 +1514,9 @@ function openInsertMenu() {
   slashIndex.value = 0
   slashPos.value = { x: coords.left, y: coords.bottom + 6 }
   slashVisible.value = true
+  nextTick(() => {
+    slashPos.value = clampMenuPosition(slashPos.value, slashMenuRef.value?.el, 'top-left')
+  })
 }
 
 function handleButtonMenuKeyDown(event: KeyboardEvent) {
@@ -1614,6 +1646,7 @@ defineExpose({
     </div>
 
     <EditorBubbleMenu
+      ref="bubbleMenuRef"
       :editor="editor"
       :visible="bubbleVisible && editable"
       :pos="bubblePos"
@@ -1669,6 +1702,7 @@ defineExpose({
     />
 
     <EditorEmojiMenu
+      ref="emojiMenuRef"
       :visible="emojiVisible"
       :pos="emojiPos"
       @select="insertEmoji"
@@ -1677,6 +1711,7 @@ defineExpose({
     <Teleport to="body">
       <form
         v-if="linkPreviewVisible"
+        ref="linkPreviewMenuRef"
         class="kortex-link-preview-menu"
         :style="{ top: `${linkPreviewPos.y}px`, left: `${linkPreviewPos.x}px` }"
         @submit.prevent="insertLinkPreview"

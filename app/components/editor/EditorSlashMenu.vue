@@ -50,6 +50,8 @@ watch(() => props.selectedIndex, (index) => {
     item?.scrollIntoView({ block: 'nearest' })
   })
 })
+
+defineExpose({ el: menuRef })
 </script>
 
 <template>
