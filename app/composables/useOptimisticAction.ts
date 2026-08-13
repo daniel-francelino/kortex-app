@@ -88,10 +88,9 @@ export function useOptimisticAction() {
       }
 
       opts.rollback()
+      console.error(`[useOptimisticAction] ${opts.errorMessage}`, err)
       if (!opts.silent) {
         toast.add({ title: 'Erro', description: opts.errorMessage, color: 'error' })
-      } else {
-        console.error(`[useOptimisticAction] ${opts.errorMessage}`, err)
       }
       return null
     }

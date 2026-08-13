@@ -64,6 +64,7 @@ export function useNotes() {
   const {
     data: notesFetchResult,
     status: notesStatus,
+    error: notesFetchError,
     refresh: refreshNotes
   } = useFetch<NoteListResponse>('/api/notes', {
     query: computed(() => ({
@@ -77,6 +78,15 @@ export function useNotes() {
     lazy: true,
     key: 'notes',
     watch: [notesPage, notesPageSize, notesType, notesTagId, notesPinned]
+  })
+
+  // The listing had no error handling at all before this — a failure here
+  // (bad connection, server error) used to fail completely silently, with
+  // nothing in the console and no feedback for the user.
+  watch(notesFetchError, (err) => {
+    if (!err) return
+    console.error('[useNotes] failed to load notes list', err)
+    toast.add({ title: 'Erro', description: 'Falha ao carregar as notas.', color: 'error' })
   })
 
   const paginatedNoteIds = ref<string[]>([])
@@ -272,7 +282,8 @@ export function useNotes() {
       searchResults.value = await $fetch<NoteSearchResult[]>('/api/notes/search', {
         query: { q: searchQuery.value }
       })
-    } catch {
+    } catch (err) {
+      console.error('[useNotes] search failed', err)
       searchResults.value = []
     } finally {
       searching.value = false
@@ -454,11 +465,12 @@ export function useNotes() {
         const detail = await $fetch<NoteDetail>(`/api/notes/${id}`)
         notesById.set(id, { ...notesById.get(id), ...detail })
         return detail
-      } catch {
+      } catch (err) {
         if (attempt === 0) {
           await new Promise(resolve => setTimeout(resolve, 400))
           continue
         }
+        console.error('[useNotes] fetchNoteDetail failed', id, err)
         toast.add({ title: 'Erro', description: 'Falha ao carregar nota.', color: 'error' })
         return null
       }
@@ -524,7 +536,8 @@ export function useNotes() {
       notesById.set(noteId, { ...notesById.get(noteId), ...updated })
       toast.add({ title: 'Novo link gerado', description: 'O link anterior deixou de funcionar.', color: 'success' })
       return updated
-    } catch {
+    } catch (err) {
+      console.error('[useNotes] regenerateShareLink failed', noteId, err)
       toast.add({ title: 'Erro', description: 'Falha ao gerar novo link.', color: 'error' })
       return null
     }
@@ -533,7 +546,8 @@ export function useNotes() {
   async function fetchNoteShares(noteId: string): Promise<NoteShare[]> {
     try {
       return await $fetch<NoteShare[]>(`/api/notes/${noteId}/shares`)
-    } catch {
+    } catch (err) {
+      console.error('[useNotes] fetchNoteShares failed', noteId, err)
       toast.add({ title: 'Erro', description: 'Falha ao carregar lista de acesso.', color: 'error' })
       return []
     }
@@ -545,6 +559,7 @@ export function useNotes() {
       toast.add({ title: 'Acesso concedido', description: `${payload.email} agora tem acesso a esta nota.`, color: 'success' })
       return share
     } catch (err: unknown) {
+      console.error('[useNotes] addNoteShare failed', noteId, err)
       const message = (err as { data?: { statusMessage?: string } })?.data?.statusMessage
       toast.add({ title: 'Erro', description: message ?? 'Falha ao compartilhar nota.', color: 'error' })
       return null
@@ -554,7 +569,8 @@ export function useNotes() {
   async function updateNoteShare(noteId: string, shareId: string, payload: UpdateNoteSharePayload): Promise<NoteShare | null> {
     try {
       return await $fetch<NoteShare>(`/api/notes/${noteId}/shares/${shareId}`, { method: 'PUT', body: payload })
-    } catch {
+    } catch (err) {
+      console.error('[useNotes] updateNoteShare failed', noteId, shareId, err)
       toast.add({ title: 'Erro', description: 'Falha ao atualizar permissão.', color: 'error' })
       return null
     }
@@ -564,7 +580,8 @@ export function useNotes() {
     try {
       await $fetch(`/api/notes/${noteId}/shares/${shareId}`, { method: 'DELETE' })
       return true
-    } catch {
+    } catch (err) {
+      console.error('[useNotes] removeNoteShare failed', noteId, shareId, err)
       toast.add({ title: 'Erro', description: 'Falha ao remover acesso.', color: 'error' })
       return false
     }
@@ -906,7 +923,8 @@ export function useNotes() {
     try {
       trashItems.value = await $fetch<TrashItem[]>('/api/notes/trash')
       trashStatus.value = 'success'
-    } catch {
+    } catch (err) {
+      console.error('[useNotes] fetchTrash failed', err)
       trashStatus.value = 'error'
       toast.add({ title: 'Erro', description: 'Falha ao carregar a lixeira.', color: 'error' })
     }
@@ -923,7 +941,8 @@ export function useNotes() {
       refreshGraph()
       refreshNotes()
       return true
-    } catch {
+    } catch (err) {
+      console.error('[useNotes] restoreNote failed', id, err)
       toast.add({ title: 'Erro', description: 'Falha ao restaurar nota.', color: 'error' })
       return false
     }
@@ -939,7 +958,8 @@ export function useNotes() {
       await Promise.all([refreshFolders(), refreshAllNotes(), refreshNotes(), fetchTrash()])
       refreshGraph()
       return true
-    } catch {
+    } catch (err) {
+      console.error('[useNotes] restoreFolder failed', id, err)
       toast.add({ title: 'Erro', description: 'Falha ao restaurar pasta.', color: 'error' })
       return false
     }
@@ -951,7 +971,8 @@ export function useNotes() {
       trashItems.value = trashItems.value.filter(item => !(item.kind === 'note' && item.id === id))
       toast.add({ title: 'Nota excluída permanentemente', color: 'success' })
       return true
-    } catch {
+    } catch (err) {
+      console.error('[useNotes] permanentlyDeleteNote failed', id, err)
       toast.add({ title: 'Erro', description: 'Falha ao excluir nota permanentemente.', color: 'error' })
       return false
     }
@@ -965,7 +986,8 @@ export function useNotes() {
       toast.add({ title: 'Pasta excluída permanentemente', color: 'success' })
       await fetchTrash()
       return true
-    } catch {
+    } catch (err) {
+      console.error('[useNotes] permanentlyDeleteFolder failed', id, err)
       toast.add({ title: 'Erro', description: 'Falha ao excluir pasta permanentemente.', color: 'error' })
       return false
     }

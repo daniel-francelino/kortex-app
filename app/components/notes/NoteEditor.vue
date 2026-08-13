@@ -598,16 +598,18 @@ defineExpose({
               @click="emit('open-panel', 'properties')"
             />
           </UTooltip>
-          <UButton
+          <UTooltip
             v-if="isOwner"
-            :icon="noteDetail.visibility === NoteVisibility.Private ? 'i-lucide-lock' : noteDetail.visibility === NoteVisibility.Public ? 'i-lucide-globe' : 'i-lucide-users'"
-            size="xs"
-            :color="noteDetail.visibility === NoteVisibility.Private ? 'neutral' : 'primary'"
-            variant="ghost"
-            @click="shareDialogOpen = true"
+            text="Compartilhar"
           >
-            Compartilhar
-          </UButton>
+            <UButton
+              :icon="noteDetail.visibility === NoteVisibility.Private ? 'i-lucide-lock' : noteDetail.visibility === NoteVisibility.Public ? 'i-lucide-globe' : 'i-lucide-users'"
+              size="xs"
+              :color="noteDetail.visibility === NoteVisibility.Private ? 'neutral' : 'primary'"
+              variant="ghost"
+              @click="shareDialogOpen = true"
+            />
+          </UTooltip>
           <UBadge
             v-else-if="!canEdit"
             icon="i-lucide-eye"

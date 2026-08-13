@@ -199,27 +199,25 @@ watch(() => props.visible, (v) => {
             <UIcon name="i-lucide-arrow-left" class="size-3.5" />
           </button>
           <div class="kortex-menu-sep" />
-          <p class="kortex-bubble-section-label">
-            {{ colorMode === 'text' ? 'Cor do texto' : 'Destaque' }}
-          </p>
-          <div class="kortex-menu-sep" />
-          <button
-            type="button"
-            class="kortex-menu-btn kortex-bubble-color-swatch kortex-bubble-color-swatch--none"
-            title="Padrão"
-            @click="applyColor(null)"
-          >
-            <UIcon name="i-lucide-x" class="size-3" />
-          </button>
-          <button
-            v-for="swatch in COLOR_SWATCHES"
-            :key="swatch.value"
-            type="button"
-            class="kortex-menu-btn kortex-bubble-color-swatch"
-            :title="swatch.label"
-            :style="{ '--swatch-color': swatch.value }"
-            @click="applyColor(swatch.value)"
-          />
+          <div class="kortex-bubble-color-swatches">
+            <button
+              type="button"
+              class="kortex-menu-btn kortex-bubble-color-swatch kortex-bubble-color-swatch--none"
+              title="Padrão"
+              @click="applyColor(null)"
+            >
+              <UIcon name="i-lucide-x" class="size-3" />
+            </button>
+            <button
+              v-for="swatch in COLOR_SWATCHES"
+              :key="swatch.value"
+              type="button"
+              class="kortex-menu-btn kortex-bubble-color-swatch"
+              :title="swatch.label"
+              :style="{ '--swatch-color': swatch.value }"
+              @click="applyColor(swatch.value)"
+            />
+          </div>
         </template>
 
         <!-- Default toolbar -->
@@ -307,14 +305,15 @@ watch(() => props.visible, (v) => {
           >
             <UIcon name="i-lucide-link" class="size-3.5" />
           </button>
-          <button
-            type="button"
-            class="kortex-menu-btn"
-            title="Limpar formatação"
-            @click="clearFormatting"
-          >
-            <UIcon name="i-lucide-remove-formatting" class="size-3.5" />
-          </button>
+          <UTooltip text="Limpar formatação">
+            <button
+              type="button"
+              class="kortex-menu-btn"
+              @click="clearFormatting"
+            >
+              <UIcon name="i-lucide-remove-formatting" class="size-3.5" />
+            </button>
+          </UTooltip>
 
           <div class="kortex-menu-sep" />
 
@@ -434,6 +433,14 @@ watch(() => props.visible, (v) => {
 
 .kortex-bubble-turn-btn {
   min-width: 28px;
+}
+
+/* Color / highlight swatches — own gap instead of the 1px shared by toolbar
+ * icons, which reads as "stuck together" on circular color swatches. */
+.kortex-bubble-color-swatches {
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 /* Color / highlight swatches — the extra `.kortex-menu-btn` in the selector

@@ -47,7 +47,7 @@ function confirmPermanentDelete() {
         Lixeira
       </h2>
       <p class="text-xs text-muted mt-0.5">
-        Notas e pastas excluídas ficam aqui até serem restauradas ou excluídas permanentemente.
+        Notas e pastas excluídas ficam aqui até serem restauradas ou excluídas permanentemente — itens com mais de 30 dias na lixeira são removidos automaticamente.
       </p>
     </div>
 
