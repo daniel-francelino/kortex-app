@@ -146,7 +146,7 @@ function relativeDeletedAt(deletedAt: string) {
     <div
       class="flex items-center justify-between gap-2 px-4 sm:px-6 py-2 border-b border-default bg-elevated/50 shrink-0"
     >
-      <div class="flex items-center gap-2.5 px-3 py-1.5">
+      <div class="flex items-center gap-2.5 py-1.5">
         <UCheckbox
           :model-value="allSelected"
           @update:model-value="toggleSelectAll"
