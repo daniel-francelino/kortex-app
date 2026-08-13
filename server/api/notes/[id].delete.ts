@@ -7,12 +7,15 @@ export default eventHandler(async (event) => {
   const id = z.string().uuid().parse(getRouterParam(event, 'id'))
   const supabase = getSupabaseAdminClient()
 
-  // Tags and links are deleted via CASCADE
+  // Soft delete — moves the note to the trash instead of removing it for
+  // good. Permanent removal only happens from the trash (see
+  // /api/notes/[id]/permanent.delete.ts).
   const { error } = await supabase
     .from('notes')
-    .delete()
+    .update({ deleted_at: new Date().toISOString() })
     .eq('id', id)
     .eq('user_id', user.id)
+    .is('deleted_at', null)
 
   if (error) {
     throw createError({ statusCode: 500, statusMessage: 'Erro ao excluir nota', data: error.message })

@@ -15,6 +15,7 @@ export default eventHandler(async (event) => {
     .select('title, icon, type, content, updated_at')
     .eq('share_token', token)
     .eq('visibility', 'public')
+    .is('deleted_at', null)
     .maybeSingle()
 
   // 404, never 403 — an invalid token and a token for a note that went back to
@@ -32,6 +33,7 @@ export default eventHandler(async (event) => {
       .select('id, share_token')
       .in('id', linkedNoteIds)
       .eq('visibility', 'public')
+      .is('deleted_at', null)
 
     for (const row of publicTargets ?? []) {
       const target = row as { id: string, share_token: string | null }

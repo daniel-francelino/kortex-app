@@ -223,3 +223,13 @@ export interface NoteSearchResult {
   excerpt: string | null
   updatedAt: string
 }
+
+/** A soft-deleted note or folder, as listed by GET /api/notes/trash. */
+export interface TrashItem {
+  id: string
+  kind: 'note' | 'folder'
+  title: string
+  icon: string | null
+  type: NoteType | null
+  deletedAt: string
+}

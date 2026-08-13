@@ -9,6 +9,7 @@ export default eventHandler(async (event) => {
     .from('note_folders')
     .select('id, user_id, name, parent_id, position, is_expanded, created_at, updated_at')
     .eq('user_id', user.id)
+    .is('deleted_at', null)
     .order('name')
 
   if (error) {

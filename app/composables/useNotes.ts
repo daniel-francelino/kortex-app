@@ -15,6 +15,7 @@ import type {
   NoteListResponse,
   NoteSearchResult,
   SharedNote,
+  TrashItem,
   UpdateNotePayload,
   UpdateNoteSharePayload,
   UpdateTagPayload
@@ -434,7 +435,7 @@ export function useNotes() {
     })
 
     if (result !== null) {
-      toast.add({ title: 'Nota excluída', description: 'A nota foi removida.', color: 'success' })
+      toast.add({ title: 'Nota movida para a lixeira', description: 'Você pode restaurá-la na Lixeira.', color: 'success' })
       refreshGraph()
       refreshNotes()
     }
@@ -823,9 +824,9 @@ export function useNotes() {
 
     if (result !== null) {
       const extra = affectedNoteIds.length > 0 || descendantFolderIds.length > 0
-        ? ` ${affectedNoteIds.length} nota(s) e ${descendantFolderIds.length} subpasta(s) também foram removidas.`
+        ? ` ${affectedNoteIds.length} nota(s) e ${descendantFolderIds.length} subpasta(s) também foram movidas.`
         : undefined
-      toast.add({ title: 'Pasta excluída', description: extra, color: 'success' })
+      toast.add({ title: 'Pasta movida para a lixeira', description: extra ?? 'Você pode restaurá-la na Lixeira.', color: 'success' })
       refreshGraph()
       if (affectedNoteIds.length > 0) refreshNotes()
     }
@@ -855,6 +856,81 @@ export function useNotes() {
       }
     })
     return !!result
+  }
+
+  // ─── Trash (soft delete) ────────────────────────────────────────────────────
+
+  const trashItems = ref<TrashItem[]>([])
+  const trashStatus = ref<'idle' | 'pending' | 'success' | 'error'>('idle')
+
+  async function fetchTrash(): Promise<void> {
+    trashStatus.value = 'pending'
+    try {
+      trashItems.value = await $fetch<TrashItem[]>('/api/notes/trash')
+      trashStatus.value = 'success'
+    } catch {
+      trashStatus.value = 'error'
+      toast.add({ title: 'Erro', description: 'Falha ao carregar a lixeira.', color: 'error' })
+    }
+  }
+
+  async function restoreNote(id: string): Promise<boolean> {
+    try {
+      const restored = await $fetch<Note>(`/api/notes/${id}/restore`, { method: 'POST' })
+      trashItems.value = trashItems.value.filter(item => !(item.kind === 'note' && item.id === id))
+      notesById.set(restored.id, restored)
+      allNoteIds.value = [restored.id, ...allNoteIds.value.filter(nid => nid !== restored.id)]
+      paginatedNoteIds.value = [restored.id, ...paginatedNoteIds.value.filter(nid => nid !== restored.id)]
+      toast.add({ title: 'Nota restaurada', color: 'success' })
+      refreshGraph()
+      refreshNotes()
+      return true
+    } catch {
+      toast.add({ title: 'Erro', description: 'Falha ao restaurar nota.', color: 'error' })
+      return false
+    }
+  }
+
+  // Cascading — restoring a folder brings back an unknown-in-advance set of
+  // descendant subfolders/notes, so a full refetch is simpler and safer than
+  // trying to patch the local store item by item.
+  async function restoreFolder(id: string): Promise<boolean> {
+    try {
+      await $fetch(`/api/notes/folders/${id}/restore`, { method: 'POST' })
+      toast.add({ title: 'Pasta restaurada', color: 'success' })
+      await Promise.all([refreshFolders(), refreshAllNotes(), refreshNotes(), fetchTrash()])
+      refreshGraph()
+      return true
+    } catch {
+      toast.add({ title: 'Erro', description: 'Falha ao restaurar pasta.', color: 'error' })
+      return false
+    }
+  }
+
+  async function permanentlyDeleteNote(id: string): Promise<boolean> {
+    try {
+      await $fetch(`/api/notes/${id}/permanent`, { method: 'DELETE' })
+      trashItems.value = trashItems.value.filter(item => !(item.kind === 'note' && item.id === id))
+      toast.add({ title: 'Nota excluída permanentemente', color: 'success' })
+      return true
+    } catch {
+      toast.add({ title: 'Erro', description: 'Falha ao excluir nota permanentemente.', color: 'error' })
+      return false
+    }
+  }
+
+  // Cascading — see restoreFolder() above for why this refetches instead of
+  // patching local state.
+  async function permanentlyDeleteFolder(id: string): Promise<boolean> {
+    try {
+      await $fetch(`/api/notes/folders/${id}/permanent`, { method: 'DELETE' })
+      toast.add({ title: 'Pasta excluída permanentemente', color: 'success' })
+      await fetchTrash()
+      return true
+    } catch {
+      toast.add({ title: 'Erro', description: 'Falha ao excluir pasta permanentemente.', color: 'error' })
+      return false
+    }
   }
 
   // ─── Custom (drag-and-drop) ordering ────────────────────────────────────────
@@ -1085,6 +1161,15 @@ export function useNotes() {
     moveNoteToFolder,
     getFolderDeletionImpact,
     setFolderExpanded,
+
+    // Trash
+    trashItems,
+    trashStatus,
+    fetchTrash,
+    restoreNote,
+    restoreFolder,
+    permanentlyDeleteNote,
+    permanentlyDeleteFolder,
 
     // Shared with me
     sharedWithMe,

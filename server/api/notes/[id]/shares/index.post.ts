@@ -19,6 +19,7 @@ export default eventHandler(async (event) => {
     .select('id')
     .eq('id', noteId)
     .eq('user_id', user.id)
+    .is('deleted_at', null)
     .single()
 
   if (!note) {

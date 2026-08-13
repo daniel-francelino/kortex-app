@@ -1,8 +1,11 @@
 import { Extension, Node as TiptapNode, mergeAttributes } from '@tiptap/core'
 import type { Editor, NodeViewRenderer, Range } from '@tiptap/core'
+import type { ResolvedPos } from '@tiptap/pm/model'
+import { TextSelection } from '@tiptap/pm/state'
 import { VueNodeViewRenderer } from '@tiptap/vue-3'
 import Link from '@tiptap/extension-link'
 import EditorColumnNodeView from '~/components/editor/nodes/EditorColumnNodeView.vue'
+import EditorToggleNodeView from '~/components/editor/nodes/EditorToggleNodeView.vue'
 import Placeholder from '@tiptap/extension-placeholder'
 import { Table, TableCell, TableHeader, TableRow } from '@tiptap/extension-table'
 import TaskItem from '@tiptap/extension-task-item'
@@ -179,6 +182,18 @@ export function createNotionCommandItems(actions: NotionCommandActions = {}): No
     },
     {
       group: 'Avançado',
+      title: 'Alternador',
+      description: 'Bloco recolhivel (toggle)',
+      icon: 'i-lucide-chevron-right',
+      command: ({ editor, range }) =>
+        editor.chain().focus().deleteRange(range).insertContent({
+          type: 'toggle',
+          attrs: { open: true },
+          content: [{ type: 'paragraph' }]
+        }).run()
+    },
+    {
+      group: 'Avançado',
       title: 'Tabela',
       description: 'Tabela com linhas e colunas',
       icon: 'i-lucide-table-2',
@@ -265,7 +280,8 @@ const BLOCK_ID_TYPES = [
   'linkPreview',
   'table',
   'columns',
-  'column'
+  'column',
+  'toggle'
 ]
 
 function createBlockId() {
@@ -649,6 +665,86 @@ export const ColumnsNode = TiptapNode.create({
   }
 })
 
+/** Depth of the nearest ancestor node of `typeName`, or null if the cursor isn't inside one. */
+function findAncestorDepth($pos: ResolvedPos, typeName: string): number | null {
+  for (let depth = $pos.depth; depth > 0; depth--) {
+    if ($pos.node(depth).type.name === typeName) return depth
+  }
+  return null
+}
+
+export const ToggleNode = TiptapNode.create({
+  name: 'toggle',
+  group: 'block',
+  content: 'block+',
+  defining: true,
+  isolating: true,
+
+  addAttributes() {
+    return {
+      open: { default: true }
+    }
+  },
+
+  parseHTML() {
+    return [{ tag: 'div[data-type="toggle"]' }]
+  },
+
+  renderHTML({ node, HTMLAttributes }) {
+    return [
+      'div',
+      mergeAttributes(HTMLAttributes, {
+        'data-type': 'toggle',
+        'data-open': node.attrs.open
+      }),
+      0
+    ]
+  },
+
+  addNodeView(): NodeViewRenderer {
+    return VueNodeViewRenderer(EditorToggleNodeView)
+  },
+
+  addKeyboardShortcuts() {
+    return {
+      // Pressing Enter in an empty paragraph that's the *last* child of a
+      // toggle's body exits the toggle instead of adding another empty line
+      // inside it — mirrors how blockquote/callout exits are expected to feel.
+      Enter: ({ editor }) => {
+        const { state, view } = editor
+        const { $from, empty } = state.selection
+        if (!empty) return false
+        if ($from.parent.type.name !== 'paragraph' || $from.parent.content.size > 0) return false
+
+        const toggleDepth = findAncestorDepth($from, 'toggle')
+        if (toggleDepth === null) return false
+
+        const paragraphDepth = toggleDepth + 1
+        if (paragraphDepth !== $from.depth) return false // paragraph must be a direct child of the toggle
+
+        const toggleNode = $from.node(toggleDepth)
+        const indexInToggle = $from.index(toggleDepth)
+        if (indexInToggle !== toggleNode.childCount - 1) return false // not the last child
+        if (toggleNode.childCount <= 1) return false // never empty out the toggle's only child
+
+        const toggleEnd = $from.after(toggleDepth)
+        const paragraphStart = $from.before(paragraphDepth)
+        const paragraphEnd = $from.after(paragraphDepth)
+
+        const tr = state.tr.delete(paragraphStart, paragraphEnd)
+        const insertPos = toggleEnd - (paragraphEnd - paragraphStart)
+        const paragraphType = state.schema.nodes.paragraph
+        if (!paragraphType) return false
+
+        tr.insert(insertPos, paragraphType.create())
+        tr.setSelection(TextSelection.near(tr.doc.resolve(insertPos + 1)))
+        view.dispatch(tr.scrollIntoView())
+        return true
+      }
+    }
+  }
+})
+
 export function createSlashCommandExtension(
   handlers: SlashCommandHandlers,
   getItems: () => NotionCommandItem[] = () => notionCommandItems
@@ -721,6 +817,7 @@ export function createNotionEditorExtensions(options: {
     LinkPreviewNode,
     ColumnNode,
     ColumnsNode,
+    ToggleNode,
     ...(options.enableWikilinks ? [WikilinkNode] : []),
     options.slashCommand,
     Table.configure({ resizable: true }),

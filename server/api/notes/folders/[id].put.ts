@@ -27,6 +27,7 @@ export default eventHandler(async (event) => {
     .update(updateData)
     .eq('id', id)
     .eq('user_id', user.id)
+    .is('deleted_at', null)
     .select()
     .single()
 

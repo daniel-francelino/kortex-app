@@ -19,6 +19,7 @@ export default eventHandler(async (event) => {
     .select('id')
     .eq('id', sourceId)
     .eq('user_id', user.id)
+    .is('deleted_at', null)
     .single()
 
   if (!sourceNote) {
@@ -31,6 +32,7 @@ export default eventHandler(async (event) => {
     .select('id')
     .eq('id', payload.targetNoteId)
     .eq('user_id', user.id)
+    .is('deleted_at', null)
     .single()
 
   if (!targetNote) {

@@ -7,6 +7,7 @@ import type {
   NoteDetail,
   NoteFolder,
   NoteVisibility,
+  TrashItem,
   UpdateNotePayload
 } from '~/types/notes'
 import { NoteType } from '~/types/notes'
@@ -56,6 +57,13 @@ const {
   moveNoteToFolder,
   getFolderDeletionImpact,
   setFolderExpanded,
+  trashItems,
+  trashStatus,
+  fetchTrash,
+  restoreNote,
+  restoreFolder,
+  permanentlyDeleteNote,
+  permanentlyDeleteFolder,
   computePositionBetween,
   reorderNote,
   reorderFolder,
@@ -74,7 +82,7 @@ const sharedSectionExpanded = ref(true)
 const selectedNoteId = ref<string | null>(
   typeof route.query.note === 'string' ? route.query.note : null
 )
-const activeView = ref<'editor' | 'graph'>('editor')
+const activeView = ref<'editor' | 'graph' | 'trash'>('editor')
 const createModalOpen = ref(false)
 const noteEditorRef = ref<{
   isUnsaved: () => boolean
@@ -612,6 +620,27 @@ function switchToGraph(): void {
   refreshGraph()
 }
 
+function switchToTrash(): void {
+  selectedNoteId.value = null
+  activeView.value = 'trash'
+  void fetchTrash()
+}
+
+async function onRestoreTrashItem(item: TrashItem): Promise<void> {
+  // Both restoreNote/restoreFolder already sync the local store on success —
+  // see useNotes.ts.
+  if (item.kind === 'note') await restoreNote(item.id)
+  else await restoreFolder(item.id)
+}
+
+async function onPermanentDeleteTrashItem(item: TrashItem): Promise<void> {
+  if (item.kind === 'note') {
+    await permanentlyDeleteNote(item.id)
+  } else {
+    await permanentlyDeleteFolder(item.id)
+  }
+}
+
 function onPropertiesUpdated(): void {
   refreshNotes()
 }
@@ -811,6 +840,22 @@ async function onRegenerateShareLink(noteId: string): Promise<Note | null> {
                   "
                 />
               </UTooltip>
+
+              <UTooltip
+                :text="activeView === 'trash' ? 'Abrir editor' : 'Lixeira'"
+              >
+                <UButton
+                  icon="i-lucide-trash-2"
+                  size="xs"
+                  variant="ghost"
+                  :color="activeView === 'trash' ? 'primary' : 'neutral'"
+                  @click="
+                    activeView === 'trash'
+                      ? (activeView = 'editor')
+                      : switchToTrash()
+                  "
+                />
+              </UTooltip>
             </div>
           </div>
 
@@ -940,6 +985,14 @@ async function onRegenerateShareLink(noteId: string): Promise<Note | null> {
                     :graph-data="graphData ?? null"
                     :loading="graphStatus === 'pending' && !graphData"
                     @select-note="onGraphSelectNote"
+                  />
+
+                  <NotesTrashView
+                    v-else-if="activeView === 'trash'"
+                    :items="trashItems"
+                    :loading="trashStatus === 'pending'"
+                    @restore="onRestoreTrashItem"
+                    @permanent-delete="onPermanentDeleteTrashItem"
                   />
 
                   <NotesNoteEditor

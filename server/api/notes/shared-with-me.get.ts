@@ -9,6 +9,7 @@ export default eventHandler(async (event) => {
     .from('note_shares')
     .select('permission, note:notes(*)')
     .eq('shared_with_user_id', user.id)
+    .is('note.deleted_at', null)
     .order('created_at', { ascending: false })
 
   if (error) {

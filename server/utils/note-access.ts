@@ -17,6 +17,7 @@ export async function getNoteAccessRole(
     .from('notes')
     .select('user_id')
     .eq('id', noteId)
+    .is('deleted_at', null)
     .maybeSingle()
 
   if (!note) return null

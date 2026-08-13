@@ -16,6 +16,7 @@ export default eventHandler(async (event) => {
     .from('notes')
     .select('id, title, type, content, updated_at')
     .eq('user_id', user.id)
+    .is('deleted_at', null)
     .or(`title.ilike.%${params.q}%,content.ilike.%${params.q}%`)
     .order('updated_at', { ascending: false })
     .limit(20)

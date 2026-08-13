@@ -13,6 +13,7 @@ export default eventHandler(async (event) => {
     .select('id, visibility')
     .eq('id', id)
     .eq('user_id', user.id)
+    .is('deleted_at', null)
     .single()
 
   if (fetchError || !existing) {

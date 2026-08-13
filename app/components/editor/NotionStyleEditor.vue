@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { Editor, Range } from '@tiptap/core'
+import type { ResolvedPos } from '@tiptap/pm/model'
 import { EditorContent, useEditor } from '@tiptap/vue-3'
 import { useClipboard, useElementHover, useEventListener, useThrottleFn, useTimeoutFn } from '@vueuse/core'
 import type { NotionCommandItem, WikiSuggestionItem } from '~/composables/useNotionEditor'
@@ -26,6 +27,37 @@ interface TopLevelBlock {
   to: number
   node: ProseMirrorNode
 }
+
+/**
+ * A block resolved at whatever depth the cursor/hover actually is — unlike
+ * TopLevelBlock (root-level only, still used by drag-and-drop/column
+ * creation), this is what "the current block" means for the +/handle
+ * controls and their actions (duplicate, delete, move, copy, convert),
+ * so those work correctly inside columns, list items and toggles too.
+ * See docs/PLANO_EDITOR_P1.md (Parte 5).
+ */
+interface ActiveBlockInfo {
+  node: ProseMirrorNode
+  from: number
+  to: number
+  depth: number
+  parent: ProseMirrorNode
+  parentFrom: number
+  indexInParent: number
+}
+
+// Never a candidate block themselves, always traversed through — either
+// because they exist only to connect their children (list wrappers) or
+// because the child that actually contains the cursor is what matters
+// (columns/toggle containers).
+const TRANSPARENT_TYPES = new Set(['column', 'columns', 'toggle'])
+const LIST_WRAPPER_TYPES = new Set(['bulletList', 'orderedList', 'taskList'])
+// Never descended into — the container itself is always "the block",
+// regardless of how many paragraphs/cells it has inside.
+const ATOMIC_TYPES = new Set(['blockquote', 'callout', 'table'])
+// The node itself is "the block", but a nested list inside it takes
+// priority (found first, being deeper) — see resolveBlockFromPos below.
+const ITEM_CONTAINER_TYPES = new Set(['listItem', 'taskItem'])
 
 interface MentionSuggestionItem {
   id: string
@@ -161,7 +193,7 @@ const linkPreviewLoading = ref(false)
 const linkPreviewError = ref('')
 const linkPreviewInputRef = ref<HTMLInputElement | null>(null)
 
-const activeBlock = ref<TopLevelBlock | null>(null)
+const activeBlock = ref<ActiveBlockInfo | null>(null)
 const blockVisible = ref(false)
 const blockPos = ref({ x: 0, y: 0 })
 const draggingBlockIndex = ref<number | null>(null)
@@ -913,7 +945,7 @@ function selectWikiItem(item: WikiSuggestionItem) {
   hideWikiSuggestion()
 }
 
-function resolveFirstInlinePos(instance: Editor, block: TopLevelBlock): number {
+function resolveFirstInlinePos(instance: Editor, block: ActiveBlockInfo): number {
   const doc = instance.state.doc
   let pos = block.from + 1
 
@@ -933,7 +965,7 @@ function resolveFirstInlinePos(instance: Editor, block: TopLevelBlock): number {
   return Math.min(pos, doc.content.size - 1)
 }
 
-function getBlockControlCoords(instance: Editor, block: TopLevelBlock) {
+function getBlockControlCoords(instance: Editor, block: ActiveBlockInfo) {
   const textPos = resolveFirstInlinePos(instance, block)
   const coords = instance.view.coordsAtPos(textPos)
 
@@ -967,11 +999,62 @@ function getTopLevelBlocks(instance = editor.value): TopLevelBlock[] {
   return blocks
 }
 
-function getActiveBlock(instance = editor.value): TopLevelBlock | null {
-  if (!instance) return null
+function buildActiveBlockInfo(node: ProseMirrorNode, depth: number, $pos: ResolvedPos): ActiveBlockInfo {
+  return {
+    node,
+    from: $pos.before(depth),
+    to: $pos.after(depth),
+    depth,
+    parent: $pos.node(depth - 1),
+    parentFrom: depth > 1 ? $pos.before(depth - 1) + 1 : 0,
+    indexInParent: $pos.index(depth - 1)
+  }
+}
 
-  const from = instance.state.selection.from
-  return getTopLevelBlocks(instance).find(block => from >= block.from && from <= block.to) ?? null
+/** Depth-aware block resolution — walks from the root down to $pos, picking
+ * the right "current block" per node category (atomic containers never
+ * descend, transparent wrappers always do, list items resolve to themselves
+ * unless a nested list goes deeper). See ATOMIC_TYPES/TRANSPARENT_TYPES/
+ * LIST_WRAPPER_TYPES/ITEM_CONTAINER_TYPES above and docs/PLANO_EDITOR_P1.md. */
+function resolveBlockFromPos($pos: ResolvedPos): ActiveBlockInfo | null {
+  let candidate: ActiveBlockInfo | null = null
+
+  for (let depth = 1; depth <= $pos.depth; depth++) {
+    const node = $pos.node(depth)
+    const type = node.type.name
+
+    if (LIST_WRAPPER_TYPES.has(type)) continue // connects list items, never itself a block
+
+    if (ATOMIC_TYPES.has(type) || ITEM_CONTAINER_TYPES.has(type)) {
+      candidate = buildActiveBlockInfo(node, depth, $pos)
+      // Keep descending only if a nested list follows (a sublist inside this
+      // item takes priority) — otherwise this is the resolved block.
+      const next = depth + 1 <= $pos.depth ? $pos.node(depth + 1) : null
+      if (!next || !LIST_WRAPPER_TYPES.has(next.type.name)) break
+      continue
+    }
+
+    if (TRANSPARENT_TYPES.has(type)) continue // the child containing the cursor matters, not this wrapper
+
+    // Leaf type (paragraph, heading, codeBlock, ...) — candidate, but keep
+    // looping since nothing relevant should be deeper than a leaf.
+    candidate = buildActiveBlockInfo(node, depth, $pos)
+  }
+
+  return candidate
+}
+
+function resolveActiveBlock(instance = editor.value): ActiveBlockInfo | null {
+  if (!instance) return null
+  return resolveBlockFromPos(instance.state.selection.$from)
+}
+
+function resolveActiveBlockAt(instance: Editor, pos: number): ActiveBlockInfo | null {
+  try {
+    return resolveBlockFromPos(instance.state.doc.resolve(pos))
+  } catch {
+    return null
+  }
 }
 
 function updateBlockTools() {
@@ -984,7 +1067,7 @@ function updateBlockTools() {
     return
   }
 
-  const block = getActiveBlock(instance)
+  const block = resolveActiveBlock(instance)
   if (!block) {
     blockVisible.value = false
     activeBlock.value = null
@@ -1033,10 +1116,31 @@ function reorderBlock(sourceIndex: number, targetIndex: number) {
   nextTick(updateBlockTools)
 }
 
+/** Moves the active block up/down among its actual siblings — the block's
+ * parent (root doc for top-level blocks, or the enclosing column/list
+ * item/toggle body for nested ones), not the whole document, so this works
+ * the same way at any depth. */
 function moveActiveBlock(direction: -1 | 1) {
+  const instance = editor.value
   const block = activeBlock.value
-  if (!block) return
-  reorderBlock(block.index, block.index + direction)
+  if (!instance || !block) return
+
+  const siblings: ProseMirrorNode[] = []
+  block.parent.forEach(child => siblings.push(child))
+
+  const targetIndex = block.indexInParent + direction
+  if (targetIndex < 0 || targetIndex >= siblings.length) return
+
+  const moved = siblings.splice(block.indexInParent, 1)[0]
+  if (!moved) return
+  siblings.splice(targetIndex, 0, moved)
+
+  const parentInnerFrom = block.parentFrom
+  const parentInnerTo = parentInnerFrom + block.parent.content.size
+  const transaction = instance.state.tr.replaceWith(parentInnerFrom, parentInnerTo, siblings)
+  instance.view.dispatch(transaction.scrollIntoView())
+  instance.commands.focus()
+  nextTick(updateBlockTools)
 }
 
 function duplicateActiveBlock() {
@@ -1055,8 +1159,24 @@ function deleteActiveBlock() {
   const block = activeBlock.value
   if (!instance || !block) return
 
-  if (instance.state.doc.childCount <= 1) {
+  const isRoot = block.depth === 1
+
+  if (isRoot && instance.state.doc.childCount <= 1) {
     instance.commands.clearContent()
+    nextTick(updateBlockTools)
+    return
+  }
+
+  if (!isRoot && block.parent.childCount <= 1) {
+    // Deleting the container's only child would leave it with no block
+    // content at all, which the schema doesn't allow (columns/toggle
+    // bodies/list items all require content: 'block+') — clear the block's
+    // own content instead of removing the node, mirroring the root fallback.
+    const paragraphType = instance.state.schema.nodes.paragraph
+    if (!paragraphType) return
+    const transaction = instance.state.tr.replaceWith(block.from, block.to, paragraphType.create())
+    instance.view.dispatch(transaction.scrollIntoView())
+    instance.commands.focus()
     nextTick(updateBlockTools)
     return
   }
@@ -1099,9 +1219,19 @@ function onBlockDragStart(event: DragEvent) {
   const block = activeBlock.value
   if (!block || !event.dataTransfer) return
 
-  draggingBlockIndex.value = block.index
+  // Mouse drag-and-drop reordering (and column creation) only understands
+  // root-level positions (see getTopLevelBlocks/reorderBlock below) —
+  // generalizing that to arbitrary depth is a separate project (see
+  // docs/PLANO_EDITOR_P1.md, Parte 5.4), so nested blocks can't be dragged
+  // yet even though their +/handle controls now show up correctly.
+  if (block.depth !== 1) {
+    event.preventDefault()
+    return
+  }
+
+  draggingBlockIndex.value = block.indexInParent
   event.dataTransfer.effectAllowed = 'move'
-  event.dataTransfer.setData('application/x-kortex-editor-block', String(block.index))
+  event.dataTransfer.setData('application/x-kortex-editor-block', String(block.indexInParent))
 }
 
 function onBlockDragEnd() {
@@ -1288,8 +1418,7 @@ function handleHoverMove(event: MouseEvent) {
   } catch { return }
   if (!posResult) return
 
-  const blocks = getTopLevelBlocks(instance)
-  const block = blocks.find(b => posResult!.pos >= b.from && posResult!.pos <= b.to) ?? null
+  const block = resolveActiveBlockAt(instance, posResult.pos)
   if (!block) return
 
   try {
@@ -1494,8 +1623,8 @@ defineExpose({
       ref="blockMenuRef"
       :visible="blockVisible && editable"
       :pos="blockPos"
-      :active-index="activeBlock?.index ?? null"
-      :block-count="getTopLevelBlocks().length"
+      :active-index="activeBlock?.indexInParent ?? null"
+      :block-count="activeBlock?.parent.childCount ?? 0"
       @add="addBlockAfterActive"
       @move="moveActiveBlock"
       @transform="turnActiveBlockInto"
@@ -2360,6 +2489,62 @@ defineExpose({
 
 .kortex-editor-content .tiptap [data-callout-content] > *:last-child {
   margin-bottom: 0;
+}
+
+.kortex-editor-content .tiptap [data-type="toggle"] {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.35rem;
+  margin: 0.4rem 0;
+}
+
+.kortex-editor-content .tiptap .kortex-toggle-chevron {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 1.25rem;
+  height: 1.6rem;
+  margin-top: 0.05rem;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--ui-text-muted);
+  cursor: pointer;
+}
+
+.kortex-editor-content .tiptap .kortex-toggle-chevron:hover {
+  background: var(--ui-bg-muted);
+  color: var(--ui-text-highlighted);
+}
+
+.kortex-editor-content .tiptap .kortex-toggle-chevron svg {
+  transition: transform 0.12s ease;
+}
+
+.kortex-editor-content .tiptap .kortex-toggle-chevron .rotate-90 {
+  transform: rotate(90deg);
+}
+
+.kortex-editor-content .tiptap .kortex-toggle-body {
+  min-width: 0;
+  flex: 1;
+}
+
+.kortex-editor-content .tiptap .kortex-toggle-body > * {
+  margin: 0;
+}
+
+/* Body content beyond the first child (the summary line) is the collapsible
+ * part — hidden via display:none rather than removed from the doc, so it's
+ * preserved on save/reload and simply re-shown when the toggle opens again. */
+.kortex-editor-content .tiptap .kortex-toggle-body > :not(:first-child) {
+  display: none;
+  margin-top: 0.28rem;
+}
+
+.kortex-editor-content .tiptap [data-type="toggle"][data-open="true"] .kortex-toggle-body > :not(:first-child) {
+  display: block;
 }
 
 .kortex-editor-content .tiptap [data-type="editor-image"] {

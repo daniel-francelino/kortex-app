@@ -32,6 +32,7 @@ export default eventHandler(async (event) => {
     .from('notes')
     .select('*', { count: 'exact' })
     .eq('user_id', user.id)
+    .is('deleted_at', null)
     .order('pinned', { ascending: false })
     .order('updated_at', { ascending: false })
     .range(from, to)

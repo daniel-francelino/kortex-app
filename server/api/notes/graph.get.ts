@@ -10,6 +10,7 @@ export default eventHandler(async (event) => {
     .from('notes')
     .select('id, title, type')
     .eq('user_id', user.id)
+    .is('deleted_at', null)
 
   if (notesError) {
     throw createError({ statusCode: 500, statusMessage: 'Erro ao buscar notas para o grafo', data: notesError.message })
@@ -31,9 +32,16 @@ export default eventHandler(async (event) => {
     throw createError({ statusCode: 500, statusMessage: 'Erro ao buscar vínculos para o grafo', data: linksError.message })
   }
 
+  const nodeIdSet = new Set(noteIds)
+  // source_note_id is already guaranteed non-deleted (filtered via the `.in`
+  // above); target_note_id isn't — a deleted note can still be the target of
+  // a link from a note that's still active, and that edge/node shouldn't
+  // show up in the graph.
+  const visibleLinks = (links ?? []).filter((l: Record<string, unknown>) => nodeIdSet.has(l.target_note_id as string))
+
   // Count links per node
   const linkCountMap = new Map<string, number>()
-  for (const link of (links ?? [])) {
+  for (const link of visibleLinks) {
     const sourceId = (link as Record<string, unknown>).source_note_id as string
     const targetId = (link as Record<string, unknown>).target_note_id as string
     linkCountMap.set(sourceId, (linkCountMap.get(sourceId) ?? 0) + 1)
@@ -47,7 +55,7 @@ export default eventHandler(async (event) => {
     linkCount: linkCountMap.get(n.id as string) ?? 0
   }))
 
-  const edges = (links ?? []).map((l: Record<string, unknown>) => ({
+  const edges = visibleLinks.map((l: Record<string, unknown>) => ({
     id: l.id as string,
     source: l.source_note_id as string,
     target: l.target_note_id as string
