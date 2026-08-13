@@ -165,12 +165,52 @@ function useBrowserTimezone() {
 }
 
 const fileRef = ref<HTMLInputElement>()
+const avatarPreviewUrl = ref<string | null>(null)
+const avatarUploading = ref(false)
 
-function onFileChange(e: Event) {
+// While uploading, show the local (session-only) preview; once it resolves,
+// profile.avatar_url holds the real, persistable URL and the preview is
+// revoked — a blob: URL must never be the value actually saved (see
+// onSubmit), since it stops resolving the moment this tab/session ends.
+const displayAvatarUrl = computed(() => avatarPreviewUrl.value ?? profile.avatar_url)
+
+async function onFileChange(e: Event) {
   const input = e.target as HTMLInputElement
-  if (!input.files?.length) return
-  profile.avatar_url = URL.createObjectURL(input.files[0]!)
+  const file = input.files?.[0]
+  input.value = ''
+  if (!file) return
+
+  if (avatarPreviewUrl.value) URL.revokeObjectURL(avatarPreviewUrl.value)
+  avatarPreviewUrl.value = URL.createObjectURL(file)
+  avatarUploading.value = true
+
+  try {
+    const form = new FormData()
+    form.append('file', file)
+    form.append('kind', 'image')
+
+    const uploaded = await $fetch<{ url: string }>('/api/editor/uploads', {
+      method: 'POST',
+      body: form
+    })
+
+    profile.avatar_url = uploaded.url
+  } catch (error: unknown) {
+    const err = error as { data?: { statusMessage?: string }, statusMessage?: string }
+    const message = err?.data?.statusMessage || err?.statusMessage || 'Não foi possível enviar a imagem'
+    toast.add({ title: 'Erro', description: message, color: 'error' })
+  } finally {
+    if (avatarPreviewUrl.value) {
+      URL.revokeObjectURL(avatarPreviewUrl.value)
+      avatarPreviewUrl.value = null
+    }
+    avatarUploading.value = false
+  }
 }
+
+onBeforeUnmount(() => {
+  if (avatarPreviewUrl.value) URL.revokeObjectURL(avatarPreviewUrl.value)
+})
 
 function onFileClick() {
   fileRef.value?.click()
@@ -249,13 +289,15 @@ function onFileClick() {
       >
         <div class="flex flex-wrap items-center gap-3">
           <UAvatar
-            :src="profile.avatar_url"
+            :src="displayAvatarUrl"
             :alt="profile.name"
             size="lg"
           />
           <UButton
             label="Escolher"
             color="neutral"
+            :loading="avatarUploading"
+            :disabled="avatarUploading"
             @click="onFileClick"
           />
           <input
