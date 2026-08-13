@@ -27,6 +27,9 @@ const pendingMutations = ref<PendingMutation[]>([])
 let loadPromise: Promise<void> | null = null
 
 function ensureLoaded(): Promise<void> {
+  // IndexedDB doesn't exist server-side — nothing to load there, and the
+  // offline queue is a client-only concern anyway.
+  if (!import.meta.client) return Promise.resolve()
   if (!loadPromise) {
     loadPromise = get<PendingMutation[]>(QUEUE_KEY).then((stored) => {
       if (stored) pendingMutations.value = stored
@@ -36,6 +39,7 @@ function ensureLoaded(): Promise<void> {
 }
 
 async function persist(): Promise<void> {
+  if (!import.meta.client) return
   await set(QUEUE_KEY, pendingMutations.value)
 }
 
