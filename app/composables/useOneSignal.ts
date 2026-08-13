@@ -25,7 +25,10 @@ type OneSignalWebUser = {
 }
 
 type OneSignalWebNotifications = {
-  permission?: NotificationPermission
+  // OneSignal Web SDK v16 exposes this as a boolean ("is push allowed"), not
+  // the granular Notification.permission string — never use it as a
+  // NotificationPermission value (see refreshWebState below).
+  permission?: boolean
   requestPermission?: () => Promise<void>
   addEventListener?: (
     event: 'click' | 'permissionChange',
@@ -302,7 +305,13 @@ const _useOneSignal = () => {
       return
     }
 
-    const permission = sdk.Notifications?.permission ?? (Notification.permission as NotificationPermission)
+    // Notification.permission (the real browser API) is the only reliable
+    // source for the granular 'default'|'granted'|'denied' string here —
+    // sdk.Notifications?.permission is a boolean, not this string union (see
+    // the OneSignalWebNotifications type above). loadWebSdk already checked
+    // `'Notification' in window` before resolving a non-null sdk, so this is
+    // safe to read directly at this point.
+    const permission = Notification.permission as NotificationPermission
     const pushSubscription = sdk.User?.PushSubscription
 
     state.value.supported = true
@@ -391,13 +400,20 @@ const _useOneSignal = () => {
       }
     }
 
-    await requestFetch('/api/settings/notifications/subscription', {
-      method: 'PUT',
-      body: payload,
-      credentials: 'include'
-    })
+    try {
+      await requestFetch('/api/settings/notifications/subscription', {
+        method: 'PUT',
+        body: payload,
+        credentials: 'include'
+      })
 
-    state.value.lastSyncedAt = Date.now()
+      state.value.lastSyncedAt = Date.now()
+    } catch (err) {
+      // Best-effort background sync — surfacing this as a toast on every
+      // permission/subscription change would be noisy, but it still needs to
+      // be visible somewhere instead of becoming an unhandled rejection.
+      console.error('[useOneSignal] failed to sync device subscription', err)
+    }
   }
 
   async function handleNotificationClick(event: unknown) {
