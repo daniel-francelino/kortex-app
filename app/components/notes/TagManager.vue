@@ -62,21 +62,6 @@ async function onDelete(tag: NoteTag): Promise<void> {
   await props.deleteTag(tag.id)
   deleting.value = null
 }
-
-const COLOR_MAP: Record<string, string> = {
-  red: 'bg-red-500',
-  orange: 'bg-orange-500',
-  yellow: 'bg-yellow-500',
-  green: 'bg-green-500',
-  blue: 'bg-blue-500',
-  purple: 'bg-purple-500',
-  pink: 'bg-pink-500'
-}
-
-function getColorClass(color: string | null | undefined): string {
-  if (!color) return 'bg-primary'
-  return COLOR_MAP[color] ?? 'bg-primary'
-}
 </script>
 
 <template>
@@ -101,7 +86,7 @@ function getColorClass(color: string | null | undefined): string {
         class="flex items-center justify-between rounded px-2 py-1.5 hover:bg-elevated group"
       >
         <div class="flex items-center gap-2">
-          <span :class="getColorClass(tag.color)" class="inline-block size-2.5 rounded-full" />
+          <span :class="getNoteTagColorClass(tag.color)" class="inline-block size-2.5 rounded-full" />
           <span class="text-sm text-default">#{{ tag.name }}</span>
         </div>
         <div class="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">

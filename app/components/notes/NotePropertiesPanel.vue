@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import type { Note, NoteTag, NoteDetail, UpdateNotePayload } from '~/types/notes'
-import { NoteType } from '~/types/notes'
+import type { CreateTagPayload, Note, NoteTag, NoteDetail, UpdateNotePayload, UpdateTagPayload } from '~/types/notes'
+import { NOTE_TYPE_META, NoteType } from '~/types/notes'
 import { motion } from 'motion-v'
 
 const props = defineProps<{
@@ -8,6 +8,9 @@ const props = defineProps<{
   tags: NoteTag[]
   noteTypeOptions: { label: string, value: string }[]
   updateNote: (id: string, payload: UpdateNotePayload, options?: { silent?: boolean }) => Promise<Note | null>
+  createTag: (payload: CreateTagPayload) => Promise<NoteTag | null>
+  updateTag: (id: string, payload: UpdateTagPayload) => Promise<NoteTag | null>
+  deleteTag: (id: string) => Promise<boolean>
 }>()
 
 const emit = defineEmits<{
@@ -20,8 +23,14 @@ const editTagIds = ref<string[]>([])
 const saving = ref(false)
 const savingError = ref(false)
 
-const tagOptions = computed(() =>
-  props.tags.map(t => ({ label: `#${t.name}`, value: t.id }))
+const typeItems = computed(() =>
+  props.noteTypeOptions.map(opt => ({ ...opt, icon: NOTE_TYPE_META[opt.value as NoteType]?.icon }))
+)
+
+const currentTypeIcon = computed(() => NOTE_TYPE_META[editType.value]?.icon)
+
+const tagItems = computed(() =>
+  props.tags.map(t => ({ label: `#${t.name}`, value: t.id, color: t.color }))
 )
 
 // Read-only shared notes can't have their type/tags changed here — same rule
@@ -92,27 +101,60 @@ function formatDate(d: string) {
           <label class="text-xs font-semibold text-muted uppercase tracking-wide block">Tipo</label>
           <USelect
             v-model="editType"
-            :items="noteTypeOptions"
+            :items="typeItems"
             value-key="value"
             size="xs"
             class="w-full"
+            :icon="currentTypeIcon"
             :disabled="!canEdit"
           />
         </div>
 
         <!-- Tags -->
         <div class="space-y-1.5">
-          <label class="text-xs font-semibold text-muted uppercase tracking-wide block">Tags</label>
+          <div class="flex items-center justify-between">
+            <label class="text-xs font-semibold text-muted uppercase tracking-wide block">Tags</label>
+            <UPopover v-if="canEdit">
+              <UTooltip text="Criar ou editar tags">
+                <UButton
+                  icon="i-lucide-settings-2"
+                  size="xs"
+                  variant="ghost"
+                  color="neutral"
+                />
+              </UTooltip>
+              <template #content>
+                <div class="p-3 w-64">
+                  <NotesTagManager
+                    :tags="tags"
+                    :create-tag="createTag"
+                    :update-tag="updateTag"
+                    :delete-tag="deleteTag"
+                  />
+                </div>
+              </template>
+            </UPopover>
+          </div>
+          <p class="text-[11px] text-dimmed leading-snug">
+            Etiquetas pra organizar e (no futuro) filtrar suas notas — clique no ícone acima pra criar ou editar.
+          </p>
           <USelect
             v-model="editTagIds"
-            :items="tagOptions"
+            :items="tagItems"
             value-key="value"
             multiple
             size="xs"
             placeholder="Sem tags"
             class="w-full"
             :disabled="!canEdit"
-          />
+          >
+            <template #item-leading="{ item }">
+              <span
+                :class="getNoteTagColorClass((item as { color?: string | null }).color)"
+                class="inline-block size-2 rounded-full"
+              />
+            </template>
+          </USelect>
         </div>
 
         <!-- Dates -->

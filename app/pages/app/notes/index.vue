@@ -36,6 +36,9 @@ const {
   createNote,
   duplicateNote,
   updateNote,
+  createTag,
+  updateTag,
+  deleteTag,
   fetchNoteDetail,
   togglePin,
   deleteNote,
@@ -1091,6 +1094,9 @@ async function onRegenerateShareLink(noteId: string): Promise<Note | null> {
                     :tags="tags"
                     :note-type-options="noteTypeOptions"
                     :update-note="onUpdateNote"
+                    :create-tag="createTag"
+                    :update-tag="updateTag"
+                    :delete-tag="deleteTag"
                     @click-outline-item="onOutlineItemClick"
                     @updated="onPropertiesUpdated"
                     @navigate-note="onNavigateNote"
@@ -1122,6 +1128,9 @@ async function onRegenerateShareLink(noteId: string): Promise<Note | null> {
           :tags="tags"
           :note-type-options="noteTypeOptions"
           :update-note="onUpdateNote"
+          :create-tag="createTag"
+          :update-tag="updateTag"
+          :delete-tag="deleteTag"
           @click-outline-item="onOutlineItemClick"
           @updated="onPropertiesUpdated"
           @navigate-note="onNavigateNote"

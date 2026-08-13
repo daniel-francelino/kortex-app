@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { Note, NoteDetail, NoteTag, UpdateNotePayload } from '~/types/notes'
+import type { CreateTagPayload, Note, NoteDetail, NoteTag, UpdateNotePayload, UpdateTagPayload } from '~/types/notes'
 
 type OutlineItem = { level: number, text: string, blockId: string }
 
@@ -11,6 +11,9 @@ defineProps<{
   tags: NoteTag[]
   noteTypeOptions: { label: string, value: string }[]
   updateNote: (id: string, payload: UpdateNotePayload, options?: { silent?: boolean }) => Promise<Note | null>
+  createTag: (payload: CreateTagPayload) => Promise<NoteTag | null>
+  updateTag: (id: string, payload: UpdateTagPayload) => Promise<NoteTag | null>
+  deleteTag: (id: string) => Promise<boolean>
 }>()
 
 const emit = defineEmits<{
@@ -33,6 +36,9 @@ const emit = defineEmits<{
     :tags="tags"
     :note-type-options="noteTypeOptions"
     :update-note="updateNote"
+    :create-tag="createTag"
+    :update-tag="updateTag"
+    :delete-tag="deleteTag"
     @updated="emit('updated')"
     @navigate-note="(noteId: string) => emit('navigate-note', noteId)"
   />
