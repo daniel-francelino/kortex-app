@@ -12,6 +12,8 @@ interface NotionStyleEditorRef {
 
 type SaveStatus = 'idle' | 'unsaved' | 'saved' | 'offline-pending' | 'error'
 
+type OutlineItem = { level: number, text: string, blockId: string }
+
 const props = defineProps<{
   noteId: string | null
   note: NoteDetail | null
@@ -19,6 +21,7 @@ const props = defineProps<{
   folders: NoteFolder[]
   availableNotes: Note[]
   isOnline: boolean
+  outline: OutlineItem[]
   updateNote: (id: string, payload: UpdateNotePayload, options?: { silent?: boolean }) => Promise<Note | null>
   deleteNote: (id: string) => Promise<boolean>
   linkNotes: (sourceId: string, targetId: string) => Promise<NoteDetail | null>
@@ -42,9 +45,15 @@ const emit = defineEmits<{
   'navigate-to-folder': [folderId: string]
   'note-loaded': [note: NoteDetail | null]
   'content-change': [content: string]
+  'open-panel': [view: 'outline' | 'properties']
+  'active-heading-change': [blockId: string | null]
 }>()
 
 const editorRef = ref<NotionStyleEditorRef | null>(null)
+const scrollContainerRef = ref<HTMLElement | null>(null)
+const activeHeadingId = ref<string | null>(null)
+let headingObserver: IntersectionObserver | null = null
+let headingElements: HTMLElement[] = []
 const noteDetail = ref<NoteDetail | null>(null)
 const editTitle = ref('')
 const editIcon = ref<string | null>(null)
@@ -98,12 +107,18 @@ watch(editTitle, (value) => {
   if (noteDetail.value && value !== lastSavedTitle.value) markDirty()
 })
 
+watch(() => props.outline, () => {
+  nextTick(setupHeadingObserver)
+})
+
 onMounted(() => {
   pollTimer = setInterval(() => {
     if (!dirty.value || lastChangeAt.value === 0) return
     if (Date.now() - lastChangeAt.value < SAVE_AFTER_MS) return
     void saveNote()
   }, POLL_INTERVAL_MS)
+
+  nextTick(setupHeadingObserver)
 })
 
 onBeforeUnmount(() => {
@@ -112,8 +127,68 @@ onBeforeUnmount(() => {
     pollTimer = null
   }
 
+  headingObserver?.disconnect()
+  headingObserver = null
+
   if (saveStatus.value === 'unsaved') void saveNote()
 })
+
+// Tracks which heading the reader has scrolled past, so the outline panel
+// can highlight the current section (VitePress/GitBook-style "you are here").
+function setupHeadingObserver() {
+  headingObserver?.disconnect()
+  headingObserver = null
+  headingElements = []
+
+  if (!scrollContainerRef.value || props.outline.length < 2) {
+    if (activeHeadingId.value !== null) {
+      activeHeadingId.value = null
+      emit('active-heading-change', null)
+    }
+    return
+  }
+
+  headingElements = props.outline
+    .map(item => document.getElementById(`block-${item.blockId}`))
+    .filter((el): el is HTMLElement => !!el)
+
+  if (headingElements.length === 0) return
+
+  headingObserver = new IntersectionObserver(() => updateActiveHeading(), {
+    root: scrollContainerRef.value,
+    rootMargin: '0px 0px -70% 0px',
+    threshold: 0
+  })
+
+  for (const el of headingElements) headingObserver.observe(el)
+}
+
+function updateActiveHeading() {
+  if (!scrollContainerRef.value || headingElements.length === 0) return
+
+  const containerTop = scrollContainerRef.value.getBoundingClientRect().top
+  let current: HTMLElement | null = null
+
+  for (const el of headingElements) {
+    if (el.getBoundingClientRect().top - containerTop <= 80) current = el
+    else break
+  }
+
+  const nextId = (current ?? headingElements[0])?.id.replace('block-', '') ?? null
+  if (nextId !== activeHeadingId.value) {
+    activeHeadingId.value = nextId
+    emit('active-heading-change', nextId)
+  }
+}
+
+function scrollToHeading(blockId: string) {
+  const el = document.getElementById(`block-${blockId}`)
+  if (!el) return
+
+  el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  el.classList.add('kortex-block-flash')
+  window.setTimeout(() => el.classList.remove('kortex-block-flash'), 1200)
+}
 
 function resetNoteState() {
   noteDetail.value = null
@@ -373,7 +448,8 @@ function onDrop(event: DragEvent) {
 
 defineExpose({
   isUnsaved: () => saveStatus.value === 'unsaved',
-  doSave: saveNote
+  doSave: saveNote,
+  scrollToHeading
 })
 </script>
 
@@ -501,8 +577,27 @@ defineExpose({
           </div>
         </nav>
 
-        <!-- Right: share button + unified save / edited indicator -->
+        <!-- Right: outline/properties buttons + share button + unified save / edited indicator -->
         <div class="flex items-center gap-2 text-xs text-muted whitespace-nowrap shrink-0">
+          <UTooltip :text="outline.length < 2 ? 'Adicione títulos (H1/H2/H3) para gerar um sumário' : 'Sumário'">
+            <UButton
+              icon="i-lucide-list"
+              size="xs"
+              variant="ghost"
+              color="neutral"
+              :disabled="outline.length < 2"
+              @click="emit('open-panel', 'outline')"
+            />
+          </UTooltip>
+          <UTooltip text="Propriedades">
+            <UButton
+              icon="i-lucide-sliders-horizontal"
+              size="xs"
+              variant="ghost"
+              color="neutral"
+              @click="emit('open-panel', 'properties')"
+            />
+          </UTooltip>
           <UButton
             v-if="isOwner"
             :icon="noteDetail.visibility === NoteVisibility.Private ? 'i-lucide-lock' : noteDetail.visibility === NoteVisibility.Public ? 'i-lucide-globe' : 'i-lucide-users'"
@@ -599,6 +694,7 @@ defineExpose({
       </div>
 
       <div
+        ref="scrollContainerRef"
         class="flex-1 overflow-y-auto pl-16 pr-10 pb-10 cursor-text"
         @click.self="editorRef?.focus()"
       >

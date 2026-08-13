@@ -136,6 +136,21 @@ body.keyboard-open .mobile-bottom-nav {
   }
 }
 
+/* ─── Note outline: temporary highlight on scroll-to-heading ────── */
+.kortex-block-flash {
+  animation: kortex-block-flash 1.2s ease-out;
+  border-radius: 4px;
+}
+
+@keyframes kortex-block-flash {
+  from {
+    background-color: color-mix(in srgb, var(--ui-primary) 14%, transparent);
+  }
+  to {
+    background-color: transparent;
+  }
+}
+
 .kortex-guided-tour {
   background:
     radial-gradient(circle at top, color-mix(in srgb, var(--ui-primary) 18%, transparent), transparent 48%),

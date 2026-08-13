@@ -87,6 +87,7 @@ const createModalOpen = ref(false)
 const noteEditorRef = ref<{
   isUnsaved: () => boolean
   doSave: () => Promise<void>
+  scrollToHeading: (blockId: string) => void
 } | null>(null)
 
 onBeforeRouteLeave(async () => {
@@ -95,7 +96,10 @@ onBeforeRouteLeave(async () => {
   }
 })
 const sidebarTab = ref<'notes' | 'tags'>('notes')
-const rightTab = ref<'properties' | 'outline'>('properties')
+const rightPanelOpen = useStorage('notes-right-panel-open', false)
+const rightPanelView = useStorage<'outline' | 'properties' | null>('notes-right-panel-view', null)
+const activeHeadingId = ref<string | null>(null)
+const isRightPanelMobile = useMediaQuery('(max-width: 1023px)')
 const creatingQuickNote = ref(false)
 const creatingQuickFolder = ref(false)
 const searchDialogOpen = ref(false)
@@ -362,7 +366,7 @@ const outline = computed(() => {
   if (!currentContent.value) return []
   try {
     const doc = JSON.parse(currentContent.value)
-    const result: { level: number, text: string }[] = []
+    const result: { level: number, text: string, blockId: string }[] = []
     function walk(
       nodes: {
         type: string
@@ -375,8 +379,9 @@ const outline = computed(() => {
           const text = (node.content ?? [])
             .map((c: unknown) => (c as { text?: string }).text ?? '')
             .join('')
-          if (text)
-            result.push({ level: (node.attrs?.level as number) ?? 1, text })
+          const blockId = node.attrs?.blockId as string | undefined
+          if (text && blockId)
+            result.push({ level: (node.attrs?.level as number) ?? 1, text, blockId })
         }
         if (node.content) walk(node.content as typeof nodes)
       }
@@ -387,6 +392,21 @@ const outline = computed(() => {
     return []
   }
 })
+
+// ─── Right panel (Sumário / Propriedades) ─────────────────────────────────────
+
+function onOpenPanel(view: 'outline' | 'properties'): void {
+  rightPanelView.value = view
+  rightPanelOpen.value = true
+}
+
+function onOutlineItemClick(blockId: string): void {
+  noteEditorRef.value?.scrollToHeading(blockId)
+}
+
+function onActiveHeadingChange(blockId: string | null): void {
+  activeHeadingId.value = blockId
+}
 
 // ─── History (back / forward) ─────────────────────────────────────────────────
 
@@ -1011,6 +1031,7 @@ async function onRegenerateShareLink(noteId: string): Promise<Note | null> {
                     :folders="sortedVisibleFolders"
                     :available-notes="editorAvailableNotes"
                     :is-online="isOnline"
+                    :outline="outline"
                     :update-note="onUpdateNote"
                     :delete-note="onDeleteNoteById"
                     :link-notes="onLinkNotes"
@@ -1031,15 +1052,76 @@ async function onRegenerateShareLink(noteId: string): Promise<Note | null> {
                     @navigate-to-folder="onNavigateToFolder"
                     @note-loaded="onNoteLoaded"
                     @content-change="onContentChange"
+                    @open-panel="onOpenPanel"
+                    @active-heading-change="onActiveHeadingChange"
                   />
                 </motion.div>
               </AnimatePresence>
+            </div>
+
+            <!-- Right panel: Sumário / Propriedades (desktop only — mobile uses the drawer below) -->
+            <div
+              v-if="rightPanelOpen && rightPanelView && !isRightPanelMobile"
+              class="w-80 shrink-0 h-full border-l border-default flex flex-col"
+            >
+              <div class="flex items-center justify-between h-9 px-3 border-b border-default/50 shrink-0">
+                <span class="text-xs font-medium text-highlighted">
+                  {{ rightPanelView === 'outline' ? 'Sumário' : 'Propriedades' }}
+                </span>
+                <UButton
+                  icon="i-lucide-x"
+                  size="xs"
+                  variant="ghost"
+                  color="neutral"
+                  @click="rightPanelOpen = false"
+                />
+              </div>
+              <div class="flex-1 overflow-y-auto">
+                <NotesNoteRightPanelBody
+                  :view="rightPanelView"
+                  :outline="outline"
+                  :active-heading-id="activeHeadingId"
+                  :note="currentNoteDetail"
+                  :tags="tags"
+                  :note-type-options="noteTypeOptions"
+                  :update-note="onUpdateNote"
+                  @click-outline-item="onOutlineItemClick"
+                  @updated="onPropertiesUpdated"
+                  @navigate-note="onNavigateNote"
+                />
+              </div>
             </div>
           </div>
         </div>
       </div>
     </template>
   </UDashboardPanel>
+
+  <!-- Right panel: bottom sheet on mobile -->
+  <UDrawer
+    v-if="isRightPanelMobile"
+    :open="rightPanelOpen && !!rightPanelView"
+    direction="bottom"
+    :title="rightPanelView === 'outline' ? 'Sumário' : 'Propriedades'"
+    @update:open="(value: boolean) => { rightPanelOpen = value }"
+  >
+    <template #body>
+      <div class="max-h-[70vh] overflow-y-auto">
+        <NotesNoteRightPanelBody
+          :view="rightPanelView"
+          :outline="outline"
+          :active-heading-id="activeHeadingId"
+          :note="currentNoteDetail"
+          :tags="tags"
+          :note-type-options="noteTypeOptions"
+          :update-note="onUpdateNote"
+          @click-outline-item="onOutlineItemClick"
+          @updated="onPropertiesUpdated"
+          @navigate-note="onNavigateNote"
+        />
+      </div>
+    </template>
+  </UDrawer>
 
   <!-- Create Modal -->
   <NotesNoteCreateModal
