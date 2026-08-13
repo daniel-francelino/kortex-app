@@ -326,9 +326,16 @@ if (import.meta.client && route.hash.startsWith('#block-')) {
     attemptsLeft--
     if (attemptsLeft > 0) setTimeout(tryScroll, 150)
   }
-  watch(currentNoteLoading, (loading) => {
-    if (!loading) setTimeout(tryScroll, 150)
-  }, { once: true })
+  // Waits for the note itself to actually be loaded (not just for a loading
+  // flag to flip once) — a cold page load can fail its first attempt and
+  // succeed on retry (see fetchNoteDetail in useNotes.ts); tying this to
+  // `currentNoteLoading`'s single true→false transition would consume its
+  // one shot on that failed attempt and never scroll once the retry lands.
+  const stopWatchingNoteDetail = watch(currentNoteDetail, (detail) => {
+    if (!detail) return
+    stopWatchingNoteDetail()
+    setTimeout(tryScroll, 150)
+  }, { immediate: true })
 }
 
 // A note created while offline is briefly identified by a temp-* id; if it's

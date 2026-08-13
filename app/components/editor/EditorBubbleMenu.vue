@@ -436,8 +436,11 @@ watch(() => props.visible, (v) => {
   min-width: 28px;
 }
 
-/* Color / highlight swatches */
-.kortex-bubble-color-swatch {
+/* Color / highlight swatches — the extra `.kortex-menu-btn` in the selector
+ * isn't redundant: it bumps specificity above the shared `.kortex-menu-btn`
+ * background rule below (same specificity, defined later, would otherwise
+ * always win and render every swatch transparent regardless of its color). */
+.kortex-menu-btn.kortex-bubble-color-swatch {
   min-width: 22px;
   width: 22px;
   height: 22px;
@@ -446,11 +449,12 @@ watch(() => props.visible, (v) => {
   border: 1px solid color-mix(in srgb, var(--swatch-color, var(--ui-border)) 60%, transparent);
 }
 
-.kortex-bubble-color-swatch:hover {
+.kortex-menu-btn.kortex-bubble-color-swatch:hover {
+  background: var(--swatch-color, transparent);
   transform: scale(1.12);
 }
 
-.kortex-bubble-color-swatch--none {
+.kortex-menu-btn.kortex-bubble-color-swatch--none {
   background: transparent;
   border: 1px dashed var(--ui-border);
   color: var(--ui-text-dimmed);

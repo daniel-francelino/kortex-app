@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { AnimatePresence, motion } from 'motion-v'
 import type { Note, NoteFolder } from '~/types/notes'
-import { NOTE_TYPE_META, NoteType, NoteVisibility } from '~/types/notes'
+import { MAX_FOLDER_DEPTH, NOTE_TYPE_META, NoteType, NoteVisibility } from '~/types/notes'
 
 const props = defineProps<{
   notes: Note[]
@@ -78,10 +78,31 @@ function commitNoteEdit(noteId: string) {
   editingNoteId.value = null
 }
 
+/** Depth of a folder within `props.folders` — a root-level folder (no parent) is depth 1. */
+function folderDepth(folderId: string): number {
+  let depth = 1
+  let current = props.folders.find(f => f.id === folderId)
+  const seen = new Set<string>()
+
+  while (current?.parentId && !seen.has(current.id)) {
+    seen.add(current.id)
+    depth++
+    current = props.folders.find(f => f.id === current!.parentId)
+  }
+
+  return depth
+}
+
 function folderActionItems(folder: NoteFolder) {
+  const atMaxDepth = folderDepth(folder.id) >= MAX_FOLDER_DEPTH
   return [[
     { label: 'Nova nota', icon: 'i-lucide-file-plus', onSelect: () => emit('new-note-in-folder', folder.id) },
-    { label: 'Nova pasta', icon: 'i-lucide-folder-plus', onSelect: () => emit('new-subfolder', folder.id) },
+    {
+      label: 'Nova pasta',
+      icon: 'i-lucide-folder-plus',
+      disabled: atMaxDepth,
+      onSelect: () => emit('new-subfolder', folder.id)
+    },
     { label: 'Renomear', icon: 'i-lucide-pencil', onSelect: () => startEdit(folder) },
     { label: 'Excluir pasta', icon: 'i-lucide-trash-2', color: 'error' as const, onSelect: () => emit('delete-folder', folder.id) }
   ]]

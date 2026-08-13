@@ -20,7 +20,7 @@ import type {
   UpdateNoteSharePayload,
   UpdateTagPayload
 } from '~/types/notes'
-import { NoteType, NoteVisibility, NOTE_TYPE_META } from '~/types/notes'
+import { MAX_FOLDER_DEPTH, NoteType, NoteVisibility, NOTE_TYPE_META } from '~/types/notes'
 
 export function useNotes() {
   const toast = useToast()
@@ -443,14 +443,27 @@ export function useNotes() {
   }
 
   async function fetchNoteDetail(id: string): Promise<NoteDetail | null> {
-    try {
-      const detail = await $fetch<NoteDetail>(`/api/notes/${id}`)
-      notesById.set(id, { ...notesById.get(id), ...detail })
-      return detail
-    } catch {
-      toast.add({ title: 'Erro', description: 'Falha ao carregar nota.', color: 'error' })
-      return null
+    // One silent retry before surfacing an error — a cold page load (e.g.
+    // opening a "copiar link do bloco" link in a fresh browser/tab) can race
+    // the very first request against session/cookie setup; without this, that
+    // transient failure both shows a spurious error toast and leaves the
+    // deep-link scroll with nothing to scroll to, even though a follow-up
+    // request would have succeeded a moment later.
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const detail = await $fetch<NoteDetail>(`/api/notes/${id}`)
+        notesById.set(id, { ...notesById.get(id), ...detail })
+        return detail
+      } catch {
+        if (attempt === 0) {
+          await new Promise(resolve => setTimeout(resolve, 400))
+          continue
+        }
+        toast.add({ title: 'Erro', description: 'Falha ao carregar nota.', color: 'error' })
+        return null
+      }
     }
+    return null
   }
 
   async function togglePin(note: Note): Promise<boolean> {
@@ -669,7 +682,32 @@ export function useNotes() {
 
   // ─── Folders CRUD ───────────────────────────────────────────────────────────
 
+  /** Depth of an existing folder — a root-level folder (no parent) is depth 1.
+   * `seen` guards against corrupted/cyclical parent_id data looping forever. */
+  function getFolderDepth(folderId: string): number {
+    let depth = 1
+    let current = foldersById.get(folderId)
+    const seen = new Set<string>()
+
+    while (current?.parentId && !seen.has(current.id)) {
+      seen.add(current.id)
+      depth++
+      current = foldersById.get(current.parentId)
+    }
+
+    return depth
+  }
+
   async function createFolder(payload: CreateFolderPayload): Promise<NoteFolder | null> {
+    if (payload.parentId && getFolderDepth(payload.parentId) >= MAX_FOLDER_DEPTH) {
+      toast.add({
+        title: 'Limite de aninhamento atingido',
+        description: `Pastas só podem ter até ${MAX_FOLDER_DEPTH} níveis de profundidade.`,
+        color: 'warning'
+      })
+      return null
+    }
+
     const tempId = `temp-${crypto.randomUUID()}`
     const siblingPositions = Array.from(foldersById.values())
       .filter(f => (f.parentId ?? null) === (payload.parentId ?? null))
@@ -1160,6 +1198,7 @@ export function useNotes() {
     deleteFolder,
     moveNoteToFolder,
     getFolderDeletionImpact,
+    getFolderDepth,
     setFolderExpanded,
 
     // Trash

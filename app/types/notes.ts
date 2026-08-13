@@ -37,6 +37,10 @@ export interface NoteTag {
   createdAt: string
 }
 
+/** Max nesting depth for folders (a root-level folder is depth 1) — keeps the
+ * sidebar tree from growing deep enough to break the indentation layout. */
+export const MAX_FOLDER_DEPTH = 5
+
 export interface NoteFolder {
   id: string
   userId: string

@@ -7,11 +7,55 @@ const bodySchema = z.object({
   parentId: z.string().uuid().nullable().optional()
 })
 
+// Keeps the sidebar tree from growing deep enough to break the indentation
+// layout — mirrors MAX_FOLDER_DEPTH in app/types/notes.ts. Duplicated here
+// (not imported) since server routes don't share the app/ alias.
+const MAX_FOLDER_DEPTH = 5
+
+/** Depth of an existing folder — a root-level folder (no parent) is depth 1.
+ * Walks up parent_id one row at a time (bounded by MAX_FOLDER_DEPTH, so at
+ * most a handful of round trips) since folders aren't preloaded server-side. */
+async function getFolderDepth(
+  supabase: ReturnType<typeof getSupabaseAdminClient>,
+  folderId: string,
+  userId: string
+): Promise<number> {
+  let depth = 1
+  let currentId: string | null = folderId
+  const seen = new Set<string>()
+
+  while (currentId && !seen.has(currentId) && depth <= MAX_FOLDER_DEPTH) {
+    seen.add(currentId)
+    const { data } = await supabase
+      .from('note_folders')
+      .select('parent_id')
+      .eq('id', currentId)
+      .eq('user_id', userId)
+      .maybeSingle()
+
+    if (!data?.parent_id) break
+    depth++
+    currentId = data.parent_id as string
+  }
+
+  return depth
+}
+
 export default eventHandler(async (event) => {
   const user = await requireAuthUser(event)
   const body = await readBody(event)
   const payload = bodySchema.parse(body)
   const supabase = getSupabaseAdminClient()
+
+  if (payload.parentId) {
+    const parentDepth = await getFolderDepth(supabase, payload.parentId, user.id)
+    if (parentDepth >= MAX_FOLDER_DEPTH) {
+      throw createError({
+        statusCode: 400,
+        statusMessage: `Pastas só podem ter até ${MAX_FOLDER_DEPTH} níveis de profundidade`
+      })
+    }
+  }
 
   // New folders are placed at the top of the custom order among their siblings.
   let lowestQuery = supabase
