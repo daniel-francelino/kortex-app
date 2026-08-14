@@ -840,14 +840,18 @@ async function onRegenerateShareLink(noteId: string): Promise<Note | null> {
 
     <template #body>
       <!-- ── Initial load skeleton ─────────────────────────────────────────────────── -->
+      <!-- Mirrors the real mobile layout below (isNotesMobileLayout /
+           showMobileMainArea): one pane at a time on mobile, not both
+           squeezed side by side like this used to render unconditionally. -->
       <div
         v-if="notesListInitialLoading"
         class="flex h-full"
       >
         <!-- Sidebar skeleton -->
         <div
+          v-if="!isNotesMobileLayout || !showMobileMainArea"
           class="shrink-0 flex flex-col h-full border-r border-default"
-          :style="{ width: sidebarWidth + 'px' }"
+          :style="isNotesMobileLayout ? { width: '100%' } : { width: sidebarWidth + 'px' }"
         >
           <div class="px-3 h-9 border-b border-default flex items-center gap-1">
             <USkeleton v-for="i in 5" :key="i" class="size-7 rounded-md" />
@@ -857,7 +861,11 @@ async function onRegenerateShareLink(noteId: string): Promise<Note | null> {
           </div>
         </div>
         <!-- Main area skeleton -->
-        <div class="flex-1 flex flex-col px-16 py-10 gap-3 max-w-3xl">
+        <div
+          v-if="!isNotesMobileLayout || showMobileMainArea"
+          class="flex-1 flex flex-col gap-3 max-w-3xl"
+          :class="isNotesMobileLayout ? 'px-4 py-6' : 'px-16 py-10'"
+        >
           <USkeleton class="h-8 w-2/5 mb-2" />
           <USkeleton class="h-4 w-full" />
           <USkeleton class="h-4 w-full" />
