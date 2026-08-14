@@ -471,7 +471,7 @@ export function useNotes() {
           continue
         }
         console.error('[useNotes] fetchNoteDetail failed', id, err)
-        toast.add({ title: 'Erro', description: 'Falha ao carregar nota.', color: 'error' })
+        toast.add({ title: 'Erro', description: err, color: 'error' })
         return null
       }
     }
