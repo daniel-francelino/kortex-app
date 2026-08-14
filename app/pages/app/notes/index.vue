@@ -905,7 +905,7 @@ async function onRegenerateShareLink(noteId: string): Promise<Note | null> {
           <!-- Sidebar header — bigger touch targets on mobile (size="xs" is
                fine for a mouse, too small to tap reliably on a phone). -->
           <div
-            class="px-3 border-b border-default flex items-center"
+            class="px-3 border-b border-default flex items-center justify-center"
             :class="isNotesMobileLayout ? 'h-14' : 'h-9'"
           >
             <div class="flex items-center justify-center" :class="isNotesMobileLayout ? 'gap-2' : 'gap-1'">
