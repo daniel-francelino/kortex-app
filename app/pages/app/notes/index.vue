@@ -866,34 +866,28 @@ async function onRegenerateShareLink(noteId: string): Promise<Note | null> {
         <!-- Sidebar skeleton -->
         <div
           v-if="!isNotesMobileLayout || !showMobileMainArea"
-          class="shrink-0 flex flex-col h-full border-r border-default"
-          :style="isNotesMobileLayout ? { width: '100%' } : { width: sidebarWidth + 'px' }"
+          class="shrink-0 flex flex-col h-full border-r border-default w-full lg:w-(--notes-sidebar-width)"
+          :style="{ '--notes-sidebar-width': sidebarWidth + 'px' }"
         >
-          <div
-            class="px-3 border-b border-default flex items-center"
-            :class="isNotesMobileLayout ? 'h-14 gap-2' : 'h-9 gap-1'"
-          >
+          <div class="px-3 border-b border-default flex items-center h-14 gap-2 lg:h-9 lg:gap-1">
             <USkeleton
               v-for="i in 5"
               :key="i"
-              class="rounded-md"
-              :class="isNotesMobileLayout ? 'size-10' : 'size-7'"
+              class="rounded-md size-10 lg:size-7"
             />
           </div>
           <div class="flex-1 p-2 space-y-1">
             <USkeleton
               v-for="i in 10"
               :key="i"
-              class="w-full rounded-lg"
-              :class="isNotesMobileLayout ? 'h-11' : 'h-9'"
+              class="w-full rounded-lg h-11 lg:h-9"
             />
           </div>
         </div>
         <!-- Main area skeleton -->
         <div
           v-if="!isNotesMobileLayout || showMobileMainArea"
-          class="flex-1 flex flex-col gap-3 max-w-3xl"
-          :class="isNotesMobileLayout ? 'px-4 py-6' : 'px-16 py-10'"
+          class="flex-1 flex flex-col gap-3 max-w-3xl px-4 py-6 lg:px-16 lg:py-10"
         >
           <USkeleton class="h-8 w-2/5 mb-2" />
           <USkeleton class="h-4 w-full" />
@@ -915,16 +909,15 @@ async function onRegenerateShareLink(noteId: string): Promise<Note | null> {
              width for the sidebar left almost nothing for the editor on phones. -->
         <div
           v-if="!isNotesMobileLayout || !showMobileMainArea"
-          class="shrink-0 flex flex-col h-full relative"
-          :style="isNotesMobileLayout ? { width: '100%' } : { width: sidebarWidth + 'px' }"
+          class="shrink-0 flex flex-col h-full relative w-full lg:w-(--notes-sidebar-width)"
+          :style="{ '--notes-sidebar-width': sidebarWidth + 'px' }"
         >
           <!-- Sidebar header — bigger touch targets on mobile (size="xs" is
-               fine for a mouse, too small to tap reliably on a phone). -->
-          <div
-            class="px-3 border-b border-default flex items-center justify-center"
-            :class="isNotesMobileLayout ? 'h-14' : 'h-9'"
-          >
-            <div class="flex items-center justify-center" :class="isNotesMobileLayout ? 'gap-2' : 'gap-1'">
+               fine for a mouse, too small to tap reliably on a phone; the
+               UButton `size` prop itself has no CSS-only equivalent, so this
+               one still needs the JS breakpoint check). -->
+          <div class="px-3 border-b border-default flex items-center justify-center h-14 lg:h-9">
+            <div class="flex items-center justify-center gap-2 lg:gap-1">
               <UTooltip text="Nova nota">
                 <UButton
                   icon="i-lucide-square-pen"
@@ -1105,10 +1098,12 @@ async function onRegenerateShareLink(noteId: string): Promise<Note | null> {
             />
           </div>
 
-          <!-- Resize handle (desktop only — the mobile sidebar is always full-width) -->
+          <!-- Resize handle — hidden (not unmounted) on mobile, where the
+               sidebar is always full-width; a hidden element doesn't receive
+               the mousedown that would trigger startResize, so this is safe
+               without a JS guard. -->
           <div
-            v-if="!isNotesMobileLayout"
-            class="absolute right-0 top-0 h-full w-1 cursor-col-resize border-r border-default hover:border-primary transition-colors z-10"
+            class="hidden lg:block absolute right-0 top-0 h-full w-1 cursor-col-resize border-r border-default hover:border-primary transition-colors z-10"
             @mousedown.prevent="startResize"
           />
         </div>
@@ -1121,10 +1116,7 @@ async function onRegenerateShareLink(noteId: string): Promise<Note | null> {
           <!-- Mobile-only: back to the sidebar (folder tree / notes list) —
                also carries the current note's title/icon, since the
                editor's own breadcrumb is hidden on mobile (see NoteEditor.vue). -->
-          <div
-            v-if="isNotesMobileLayout"
-            class="flex items-center h-9 px-2 border-b border-default/50 shrink-0 gap-1 min-w-0"
-          >
+          <div class="flex lg:hidden items-center h-9 px-2 border-b border-default/50 shrink-0 gap-1 min-w-0">
             <UButton
               label="Notas"
               icon="i-lucide-arrow-left"

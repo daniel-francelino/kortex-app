@@ -49,11 +49,6 @@ const emit = defineEmits<{
   'active-heading-change': [blockId: string | null]
 }>()
 
-// Same breakpoint as the page-level layout split (app/pages/app/notes/index.vue)
-// — history nav, breadcrumb and the save-status text are all sized/spaced for
-// desktop and don't fit the header on a phone-width screen.
-const isMobile = useMediaQuery('(max-width: 1023px)')
-
 const editorRef = ref<NotionStyleEditorRef | null>(null)
 const titleRef = ref<HTMLTextAreaElement | null>(null)
 const scrollContainerRef = ref<HTMLElement | null>(null)
@@ -540,8 +535,10 @@ defineExpose({
         <!-- Left: nav buttons + add-icon trigger -->
         <div class="flex items-center gap-0.5 shrink-0">
           <!-- History nav — redundant on mobile with the "Notas" back button
-               that returns to the list (see index.vue's mobile header). -->
-          <template v-if="!isMobile">
+               that returns to the list (see index.vue's mobile header).
+               `contents` keeps these two as direct flex children at lg+, same
+               as the `<template>` fragment this replaces. -->
+          <div class="hidden lg:contents">
             <UTooltip text="Voltar">
               <UButton
                 icon="i-lucide-arrow-left"
@@ -562,7 +559,7 @@ defineExpose({
                 @click="emit('go-forward')"
               />
             </UTooltip>
-          </template>
+          </div>
           <UPopover v-if="!editIcon && canEdit" v-model:open="iconPickerOpen">
             <UTooltip text="Adicionar ícone">
               <UButton
@@ -594,7 +591,7 @@ defineExpose({
              itself stays as an empty flex-1 spacer so the icons on the right
              remain pinned to the edge. -->
         <nav class="flex-1 flex items-center justify-center min-w-0 overflow-hidden">
-          <div v-if="!isMobile" class="flex items-center gap-0.5 text-xs text-muted min-w-0">
+          <div class="hidden lg:flex items-center gap-0.5 text-xs text-muted min-w-0">
             <template
               v-for="(item, i) in breadcrumbItems"
               :key="i"
@@ -692,15 +689,15 @@ defineExpose({
                with a shorter label instead of disappearing. -->
           <template v-if="saveStatus === 'unsaved'">
             <span class="size-1.5 rounded-full bg-amber-400 dark:bg-amber-500 animate-pulse" />
-            <span v-if="!isMobile">Não salvo</span>
+            <span class="hidden lg:inline">Não salvo</span>
           </template>
           <template v-else-if="saveStatus === 'saved'">
             <UIcon name="i-lucide-check-circle" class="size-3 text-success" />
-            <span v-if="!isMobile">Salvo às {{ savedAtText }}</span>
+            <span class="hidden lg:inline">Salvo às {{ savedAtText }}</span>
           </template>
           <template v-else-if="saveStatus === 'offline-pending'">
             <UIcon name="i-lucide-cloud-off" class="size-3 text-warning" />
-            <span v-if="!isMobile">Salvo localmente — sincroniza ao reconectar</span>
+            <span class="hidden lg:inline">Salvo localmente — sincroniza ao reconectar</span>
           </template>
           <template v-else-if="saveStatus === 'error'">
             <UIcon name="i-lucide-alert-circle" class="size-3 text-error" />
@@ -709,20 +706,18 @@ defineExpose({
               class="text-error underline underline-offset-2 cursor-pointer"
               @click="saveNote"
             >
-              {{ isMobile ? 'Erro' : 'Erro — Tentar novamente' }}
+              <span class="lg:hidden">Erro</span>
+              <span class="hidden lg:inline">Erro — Tentar novamente</span>
             </button>
           </template>
-          <template v-else-if="!isMobile">
-            <span>Editado {{ formatDate(noteDetail.updatedAt) }}</span>
+          <template v-else>
+            <span class="hidden lg:inline">Editado {{ formatDate(noteDetail.updatedAt) }}</span>
           </template>
         </div>
       </div>
 
       <!-- Content: emoji icon + title + save status -->
-      <div
-        class="pt-8 pb-2 shrink-0"
-        :class="isMobile ? 'px-4' : 'pl-16 pr-10'"
-      >
+      <div class="pt-8 pb-2 shrink-0 px-4 lg:pl-16 lg:pr-10">
         <div class="flex items-center gap-2.5">
           <UPopover
             v-if="editIcon && canEdit"
@@ -754,8 +749,7 @@ defineExpose({
             ref="titleRef"
             v-model="editTitle"
             rows="1"
-            class="flex-1 font-bold bg-transparent border-none outline-none resize-none overflow-hidden placeholder:text-muted/30 text-highlighted leading-tight"
-            :class="isMobile ? 'text-2xl' : 'text-3xl'"
+            class="flex-1 font-bold bg-transparent border-none outline-none resize-none overflow-hidden placeholder:text-muted/30 text-highlighted leading-tight text-2xl lg:text-3xl"
             placeholder="Sem titulo..."
             :readonly="!canEdit"
             @input="autoGrowTitle"
@@ -767,8 +761,7 @@ defineExpose({
 
       <div
         ref="scrollContainerRef"
-        class="flex-1 overflow-y-auto pb-10 cursor-text"
-        :class="isMobile ? 'px-4' : 'pl-16 pr-10'"
+        class="flex-1 overflow-y-auto pb-10 cursor-text px-4 lg:pl-16 lg:pr-10"
         @click.self="editorRef?.focus()"
       >
         <EditorNotionStyleEditor

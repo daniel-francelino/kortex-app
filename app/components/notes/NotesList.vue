@@ -33,11 +33,6 @@ const emit = defineEmits<{
   'reorder-folder': [folderId: string, beforePosition: number | null, afterPosition: number | null]
 }>()
 
-// Rows sized for mouse+hover (dense text-xs rows, "..." actions only shown on
-// hover) are too small/undiscoverable as touch targets — there's no hover on
-// a phone, so a hover-gated button is effectively unreachable there.
-const isMobile = useMediaQuery('(max-width: 1023px)')
-
 // ─── Folder state ──────────────────────────────────────────────────────────────
 
 const editingFolderId = ref<string | null>(null)
@@ -589,7 +584,7 @@ const rowTransition = { duration: 0.12, ease: 'easeOut' }
                     class="group/folder-row relative flex items-center w-full gap-1 rounded-lg mx-1 transition-colors cursor-pointer select-none"
                     :style="{ paddingLeft: `${0.25 + row.depth * 0.75}rem` }"
                     :class="[
-                      isMobile ? 'py-2.5 pr-3' : 'py-1.5 pr-1',
+                      'py-2.5 pr-3 lg:py-1.5 lg:pr-1',
                       dragOverFolderId === row.folder.id
                         ? 'bg-primary/15 ring-1 ring-primary/40'
                         : 'hover:bg-elevated/80'
@@ -620,7 +615,7 @@ const rowTransition = { duration: 0.12, ease: 'easeOut' }
                       :animate="{ rotate: row.folder.isExpanded ? 90 : 0 }"
                       :transition="{ duration: 0.15 }"
                     >
-                      <UIcon name="i-lucide-chevron-right" class="text-muted" :class="isMobile ? 'size-4' : 'size-3'" />
+                      <UIcon name="i-lucide-chevron-right" class="text-muted size-4 lg:size-3" />
                     </motion.div>
                     <motion.div
                       class="shrink-0 flex items-center"
@@ -629,8 +624,8 @@ const rowTransition = { duration: 0.12, ease: 'easeOut' }
                     >
                       <UIcon
                         :name="row.folder.isExpanded ? 'i-lucide-folder-open' : 'i-lucide-folder'"
-                        class="shrink-0"
-                        :class="[isMobile ? 'size-4' : 'size-3.5', dragOverFolderId === row.folder.id ? 'text-primary' : 'text-amber-500']"
+                        class="shrink-0 size-4 lg:size-3.5"
+                        :class="dragOverFolderId === row.folder.id ? 'text-primary' : 'text-amber-500'"
                       />
                     </motion.div>
 
@@ -638,15 +633,14 @@ const rowTransition = { duration: 0.12, ease: 'easeOut' }
                       v-if="editingFolderId === row.folder.id"
                       ref="editInput"
                       v-model="editingName"
-                      class="flex-1 font-medium bg-transparent outline-none border-b border-primary"
-                      :class="isMobile ? 'text-sm' : 'text-xs'"
+                      class="flex-1 font-medium bg-transparent outline-none border-b border-primary text-sm lg:text-xs"
                       @blur="commitEdit(row.folder.id)"
                       @keydown.enter.prevent="commitEdit(row.folder.id)"
                       @keydown.escape.prevent="editingFolderId = null"
                       @click.stop
                       @dblclick.stop
                     >
-                    <span v-else class="flex-1 font-medium text-highlighted truncate" :class="isMobile ? 'text-sm' : 'text-xs'">
+                    <span v-else class="flex-1 font-medium text-highlighted truncate text-sm lg:text-xs">
                       {{ row.folder.name }}
                     </span>
 
@@ -656,8 +650,7 @@ const rowTransition = { duration: 0.12, ease: 'easeOut' }
                         color="neutral"
                         variant="ghost"
                         size="xs"
-                        class="transition-opacity shrink-0"
-                        :class="isMobile ? 'opacity-100' : 'opacity-0 group-hover/folder-row:opacity-100'"
+                        class="transition-opacity shrink-0 opacity-100 lg:opacity-0 lg:group-hover/folder-row:opacity-100"
                         @click.stop
                       />
                     </UDropdownMenu>
@@ -681,7 +674,7 @@ const rowTransition = { duration: 0.12, ease: 'easeOut' }
                     class="group/note relative w-full rounded-lg text-left transition-colors hover:bg-elevated/80 flex items-center gap-1"
                     :style="{ paddingLeft: `${0.25 + row.depth * 0.75}rem` }"
                     :class="[
-                      isMobile ? 'py-2.5 pr-3' : 'py-1.5 pr-1',
+                      'py-2.5 pr-3 lg:py-1.5 lg:pr-1',
                       { 'bg-elevated ring-1 ring-primary/30': selectedId === row.note.id },
                       row.note.pinned ? 'cursor-default' : 'cursor-grab active:cursor-grabbing'
                     ]"
@@ -707,29 +700,28 @@ const rowTransition = { duration: 0.12, ease: 'easeOut' }
                     </AnimatePresence>
 
                     <!-- Chevron-width spacer so the note icon lines up with folder icons at the same depth -->
-                    <span class="shrink-0" :class="isMobile ? 'size-4' : 'size-3'" />
+                    <span class="shrink-0 size-4 lg:size-3" />
 
                     <div class="flex items-center gap-2 min-w-0 flex-1">
                       <span v-if="row.note.icon" class="text-sm leading-none shrink-0">{{ row.note.icon }}</span>
                       <UIcon
                         v-else
                         :name="getTypeMeta(row.note.type).icon"
-                        class="shrink-0"
-                        :class="[isMobile ? 'size-4' : 'size-3.5', `text-${getTypeMeta(row.note.type).color}-500`]"
+                        class="shrink-0 size-4 lg:size-3.5"
+                        :class="`text-${getTypeMeta(row.note.type).color}-500`"
                       />
                       <input
                         v-if="editingNoteId === row.note.id"
                         ref="noteEditInput"
                         v-model="editingNoteTitle"
-                        class="min-w-0 flex-1 bg-transparent font-medium text-highlighted outline-none border-b border-primary"
-                        :class="isMobile ? 'text-sm' : 'text-xs'"
+                        class="min-w-0 flex-1 bg-transparent font-medium text-highlighted outline-none border-b border-primary text-sm lg:text-xs"
                         @blur="commitNoteEdit(row.note.id)"
                         @keydown.enter.prevent="commitNoteEdit(row.note.id)"
                         @keydown.escape.prevent="editingNoteId = null"
                         @click.stop
                         @dblclick.stop
                       >
-                      <p v-else class="font-medium truncate flex-1 text-highlighted" :class="isMobile ? 'text-sm' : 'text-xs'">
+                      <p v-else class="font-medium truncate flex-1 text-highlighted text-sm lg:text-xs">
                         {{ row.note.title || 'Sem título' }}
                       </p>
                       <AnimatePresence>
@@ -761,8 +753,7 @@ const rowTransition = { duration: 0.12, ease: 'easeOut' }
                           color="neutral"
                           variant="ghost"
                           size="xs"
-                          class="transition-opacity shrink-0"
-                          :class="isMobile ? 'opacity-100' : 'opacity-0 group-hover/note:opacity-100'"
+                          class="transition-opacity shrink-0 opacity-100 lg:opacity-0 lg:group-hover/note:opacity-100"
                           @click.stop
                         />
                       </UDropdownMenu>
