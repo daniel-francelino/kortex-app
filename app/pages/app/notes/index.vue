@@ -109,7 +109,18 @@ const sidebarTab = ref<'notes' | 'tags'>('notes')
 const rightPanelOpen = useStorage('notes-right-panel-open', false)
 const rightPanelView = useStorage<'outline' | 'properties' | null>('notes-right-panel-view', null)
 const activeHeadingId = ref<string | null>(null)
-const isRightPanelMobile = useMediaQuery('(max-width: 1023px)')
+// Shared breakpoint for the whole page's mobile layout — below it, the left
+// sidebar and the main area (editor/graph/trash) take turns occupying the
+// full width instead of squeezing side by side (which used to crush the
+// editor down to a sliver on phone-width screens), and the right panel
+// becomes a bottom sheet instead of a fixed-width column.
+const isNotesMobileLayout = useMediaQuery('(max-width: 1023px)')
+const showMobileMainArea = computed(() => activeView.value !== 'editor' || !!selectedNoteId.value)
+
+function backToNotesListMobile() {
+  selectedNoteId.value = null
+  activeView.value = 'editor'
+}
 const creatingQuickNote = ref(false)
 const creatingQuickFolder = ref(false)
 const searchDialogOpen = ref(false)
@@ -862,9 +873,13 @@ async function onRegenerateShareLink(noteId: string): Promise<Note | null> {
 
       <div v-else class="flex h-full">
         <!-- ── Left sidebar (notes list + tags) ──────────────────────────────────── -->
+        <!-- Below isNotesMobileLayout, the sidebar and the main area take turns at
+             full width instead of splitting the screen — a fixed/resizable pixel
+             width for the sidebar left almost nothing for the editor on phones. -->
         <div
+          v-if="!isNotesMobileLayout || !showMobileMainArea"
           class="shrink-0 flex flex-col h-full relative"
-          :style="{ width: sidebarWidth + 'px' }"
+          :style="isNotesMobileLayout ? { width: '100%' } : { width: sidebarWidth + 'px' }"
         >
           <!-- Sidebar header -->
           <div class="px-3 h-9 border-b border-default flex items-center">
@@ -1049,15 +1064,34 @@ async function onRegenerateShareLink(noteId: string): Promise<Note | null> {
             />
           </div>
 
-          <!-- Resize handle -->
+          <!-- Resize handle (desktop only — the mobile sidebar is always full-width) -->
           <div
+            v-if="!isNotesMobileLayout"
             class="absolute right-0 top-0 h-full w-1 cursor-col-resize border-r border-default hover:border-primary transition-colors z-10"
             @mousedown.prevent="startResize"
           />
         </div>
 
         <!-- ── Main area (navbar + editor + right panel) ──────────────────────────── -->
-        <div class="flex-1 flex flex-col h-full min-w-0">
+        <div
+          v-if="!isNotesMobileLayout || showMobileMainArea"
+          class="flex-1 flex flex-col h-full min-w-0"
+        >
+          <!-- Mobile-only: back to the sidebar (folder tree / notes list) -->
+          <div
+            v-if="isNotesMobileLayout"
+            class="flex items-center h-9 px-2 border-b border-default/50 shrink-0"
+          >
+            <UButton
+              label="Notas"
+              icon="i-lucide-arrow-left"
+              size="xs"
+              variant="ghost"
+              color="neutral"
+              @click="backToNotesListMobile"
+            />
+          </div>
+
           <!-- Content: editor + right panel -->
           <div class="flex-1 flex overflow-hidden">
             <!-- Graph or Editor -->
@@ -1128,7 +1162,7 @@ async function onRegenerateShareLink(noteId: string): Promise<Note | null> {
             <!-- Right panel: Sumário / Propriedades (desktop only — mobile uses the drawer below) -->
             <AnimatePresence>
               <motion.div
-                v-if="rightPanelOpen && rightPanelView && !isRightPanelMobile"
+                v-if="rightPanelOpen && rightPanelView && !isNotesMobileLayout"
                 :key="rightPanelView"
                 class="w-80 shrink-0 h-full border-l border-default flex flex-col overflow-hidden"
                 :initial="{ opacity: 0, x: 16 }"
@@ -1175,7 +1209,7 @@ async function onRegenerateShareLink(noteId: string): Promise<Note | null> {
 
   <!-- Right panel: bottom sheet on mobile -->
   <UDrawer
-    v-if="isRightPanelMobile"
+    v-if="isNotesMobileLayout"
     :open="rightPanelOpen && !!rightPanelView"
     direction="bottom"
     :title="rightPanelView === 'outline' ? 'Sumário' : 'Propriedades'"
