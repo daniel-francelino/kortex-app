@@ -853,11 +853,24 @@ async function onRegenerateShareLink(noteId: string): Promise<Note | null> {
           class="shrink-0 flex flex-col h-full border-r border-default"
           :style="isNotesMobileLayout ? { width: '100%' } : { width: sidebarWidth + 'px' }"
         >
-          <div class="px-3 h-9 border-b border-default flex items-center gap-1">
-            <USkeleton v-for="i in 5" :key="i" class="size-7 rounded-md" />
+          <div
+            class="px-3 border-b border-default flex items-center"
+            :class="isNotesMobileLayout ? 'h-14 gap-2' : 'h-9 gap-1'"
+          >
+            <USkeleton
+              v-for="i in 5"
+              :key="i"
+              class="rounded-md"
+              :class="isNotesMobileLayout ? 'size-10' : 'size-7'"
+            />
           </div>
           <div class="flex-1 p-2 space-y-1">
-            <USkeleton v-for="i in 10" :key="i" class="h-9 w-full rounded-lg" />
+            <USkeleton
+              v-for="i in 10"
+              :key="i"
+              class="w-full rounded-lg"
+              :class="isNotesMobileLayout ? 'h-11' : 'h-9'"
+            />
           </div>
         </div>
         <!-- Main area skeleton -->
@@ -889,13 +902,17 @@ async function onRegenerateShareLink(noteId: string): Promise<Note | null> {
           class="shrink-0 flex flex-col h-full relative"
           :style="isNotesMobileLayout ? { width: '100%' } : { width: sidebarWidth + 'px' }"
         >
-          <!-- Sidebar header -->
-          <div class="px-3 h-9 border-b border-default flex items-center">
-            <div class="flex items-center justify-center gap-1">
+          <!-- Sidebar header — bigger touch targets on mobile (size="xs" is
+               fine for a mouse, too small to tap reliably on a phone). -->
+          <div
+            class="px-3 border-b border-default flex items-center"
+            :class="isNotesMobileLayout ? 'h-14' : 'h-9'"
+          >
+            <div class="flex items-center justify-center" :class="isNotesMobileLayout ? 'gap-2' : 'gap-1'">
               <UTooltip text="Nova nota">
                 <UButton
                   icon="i-lucide-square-pen"
-                  size="xs"
+                  :size="isNotesMobileLayout ? 'lg' : 'xs'"
                   variant="ghost"
                   color="neutral"
                   :loading="creatingQuickNote"
@@ -906,7 +923,7 @@ async function onRegenerateShareLink(noteId: string): Promise<Note | null> {
               <UTooltip text="Nova pasta">
                 <UButton
                   icon="i-lucide-folder-plus"
-                  size="xs"
+                  :size="isNotesMobileLayout ? 'lg' : 'xs'"
                   variant="ghost"
                   color="neutral"
                   :loading="creatingQuickFolder"
@@ -918,7 +935,7 @@ async function onRegenerateShareLink(noteId: string): Promise<Note | null> {
                 <UTooltip :text="`Ordenar: ${activeSortOption.label}`">
                   <UButton
                     :icon="activeSortOption.icon"
-                    size="xs"
+                    :size="isNotesMobileLayout ? 'lg' : 'xs'"
                     variant="ghost"
                     color="neutral"
                   />
@@ -928,7 +945,7 @@ async function onRegenerateShareLink(noteId: string): Promise<Note | null> {
               <UTooltip text="Buscar">
                 <UButton
                   icon="i-lucide-search"
-                  size="xs"
+                  :size="isNotesMobileLayout ? 'lg' : 'xs'"
                   variant="ghost"
                   color="neutral"
                   @click="openNotesSearch"
@@ -944,7 +961,7 @@ async function onRegenerateShareLink(noteId: string): Promise<Note | null> {
                       ? 'i-lucide-file-text'
                       : 'i-lucide-network'
                   "
-                  size="xs"
+                  :size="isNotesMobileLayout ? 'lg' : 'xs'"
                   variant="ghost"
                   :color="activeView === 'graph' ? 'primary' : 'neutral'"
                   @click="
@@ -960,7 +977,7 @@ async function onRegenerateShareLink(noteId: string): Promise<Note | null> {
               >
                 <UButton
                   icon="i-lucide-trash-2"
-                  size="xs"
+                  :size="isNotesMobileLayout ? 'lg' : 'xs'"
                   variant="ghost"
                   :color="activeView === 'trash' ? 'primary' : 'neutral'"
                   @click="

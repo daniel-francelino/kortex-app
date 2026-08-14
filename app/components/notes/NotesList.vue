@@ -586,7 +586,7 @@ const rowTransition = { duration: 0.12, ease: 'easeOut' }
                     :exit="rowExit"
                     :transition="rowTransition"
                     :draggable="isCustomSort"
-                    class="group/folder-row relative flex items-center gap-1 pr-1 rounded-lg mx-1 transition-colors cursor-pointer select-none"
+                    class="group/folder-row relative flex items-center w-full gap-1 pr-1 rounded-lg mx-1 transition-colors cursor-pointer select-none"
                     :style="{ paddingLeft: `${0.25 + row.depth * 0.75}rem` }"
                     :class="[
                       isMobile ? 'py-2.5' : 'py-1.5',
