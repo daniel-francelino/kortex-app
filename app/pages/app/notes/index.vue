@@ -1077,10 +1077,12 @@ async function onRegenerateShareLink(noteId: string): Promise<Note | null> {
           v-if="!isNotesMobileLayout || showMobileMainArea"
           class="flex-1 flex flex-col h-full min-w-0"
         >
-          <!-- Mobile-only: back to the sidebar (folder tree / notes list) -->
+          <!-- Mobile-only: back to the sidebar (folder tree / notes list) —
+               also carries the current note's title/icon, since the
+               editor's own breadcrumb is hidden on mobile (see NoteEditor.vue). -->
           <div
             v-if="isNotesMobileLayout"
-            class="flex items-center h-9 px-2 border-b border-default/50 shrink-0"
+            class="flex items-center h-9 px-2 border-b border-default/50 shrink-0 gap-1 min-w-0"
           >
             <UButton
               label="Notas"
@@ -1088,8 +1090,16 @@ async function onRegenerateShareLink(noteId: string): Promise<Note | null> {
               size="xs"
               variant="ghost"
               color="neutral"
+              class="shrink-0"
               @click="backToNotesListMobile"
             />
+            <template v-if="activeView === 'editor' && currentNoteDetail">
+              <UIcon name="i-lucide-chevron-right" class="size-3 text-dimmed shrink-0" />
+              <span class="flex items-center gap-1 text-xs font-medium text-highlighted min-w-0 truncate">
+                <span v-if="currentNoteDetail.icon" class="leading-none shrink-0">{{ currentNoteDetail.icon }}</span>
+                <span class="truncate">{{ currentNoteDetail.title || 'Sem título' }}</span>
+              </span>
+            </template>
           </div>
 
           <!-- Content: editor + right panel -->

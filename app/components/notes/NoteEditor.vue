@@ -49,6 +49,11 @@ const emit = defineEmits<{
   'active-heading-change': [blockId: string | null]
 }>()
 
+// Same breakpoint as the page-level layout split (app/pages/app/notes/index.vue)
+// — history nav, breadcrumb and the save-status text are all sized/spaced for
+// desktop and don't fit the header on a phone-width screen.
+const isMobile = useMediaQuery('(max-width: 1023px)')
+
 const editorRef = ref<NotionStyleEditorRef | null>(null)
 const scrollContainerRef = ref<HTMLElement | null>(null)
 const activeHeadingId = ref<string | null>(null)
@@ -515,26 +520,30 @@ defineExpose({
       <div class="flex items-center h-9 px-3 border-b border-default/50 shrink-0 gap-2">
         <!-- Left: nav buttons + add-icon trigger -->
         <div class="flex items-center gap-0.5 shrink-0">
-          <UTooltip text="Voltar">
-            <UButton
-              icon="i-lucide-arrow-left"
-              size="xs"
-              variant="ghost"
-              color="neutral"
-              :disabled="!canGoBack"
-              @click="emit('go-back')"
-            />
-          </UTooltip>
-          <UTooltip text="Avançar">
-            <UButton
-              icon="i-lucide-arrow-right"
-              size="xs"
-              variant="ghost"
-              color="neutral"
-              :disabled="!canGoForward"
-              @click="emit('go-forward')"
-            />
-          </UTooltip>
+          <!-- History nav — redundant on mobile with the "Notas" back button
+               that returns to the list (see index.vue's mobile header). -->
+          <template v-if="!isMobile">
+            <UTooltip text="Voltar">
+              <UButton
+                icon="i-lucide-arrow-left"
+                size="xs"
+                variant="ghost"
+                color="neutral"
+                :disabled="!canGoBack"
+                @click="emit('go-back')"
+              />
+            </UTooltip>
+            <UTooltip text="Avançar">
+              <UButton
+                icon="i-lucide-arrow-right"
+                size="xs"
+                variant="ghost"
+                color="neutral"
+                :disabled="!canGoForward"
+                @click="emit('go-forward')"
+              />
+            </UTooltip>
+          </template>
           <UPopover v-if="!editIcon && canEdit" v-model:open="iconPickerOpen">
             <UTooltip text="Adicionar ícone">
               <UButton
@@ -561,9 +570,12 @@ defineExpose({
           </UDropdownMenu>
         </div>
 
-        <!-- Center: breadcrumb -->
+        <!-- Center: breadcrumb — hidden on mobile (the note title already
+             shows next to the "Notas" back button, see index.vue); the <nav>
+             itself stays as an empty flex-1 spacer so the icons on the right
+             remain pinned to the edge. -->
         <nav class="flex-1 flex items-center justify-center min-w-0 overflow-hidden">
-          <div class="flex items-center gap-0.5 text-xs text-muted min-w-0">
+          <div v-if="!isMobile" class="flex items-center gap-0.5 text-xs text-muted min-w-0">
             <template
               v-for="(item, i) in breadcrumbItems"
               :key="i"
@@ -656,17 +668,20 @@ defineExpose({
           >
             Compartilhada com você
           </UBadge>
+          <!-- Save status: icons only on mobile (no room for the descriptive
+               text), except the error state, which stays actionable/tappable
+               with a shorter label instead of disappearing. -->
           <template v-if="saveStatus === 'unsaved'">
             <span class="size-1.5 rounded-full bg-amber-400 dark:bg-amber-500 animate-pulse" />
-            <span>Não salvo</span>
+            <span v-if="!isMobile">Não salvo</span>
           </template>
           <template v-else-if="saveStatus === 'saved'">
             <UIcon name="i-lucide-check-circle" class="size-3 text-success" />
-            <span>Salvo às {{ savedAtText }}</span>
+            <span v-if="!isMobile">Salvo às {{ savedAtText }}</span>
           </template>
           <template v-else-if="saveStatus === 'offline-pending'">
             <UIcon name="i-lucide-cloud-off" class="size-3 text-warning" />
-            <span>Salvo localmente — sincroniza ao reconectar</span>
+            <span v-if="!isMobile">Salvo localmente — sincroniza ao reconectar</span>
           </template>
           <template v-else-if="saveStatus === 'error'">
             <UIcon name="i-lucide-alert-circle" class="size-3 text-error" />
@@ -675,10 +690,10 @@ defineExpose({
               class="text-error underline underline-offset-2 cursor-pointer"
               @click="saveNote"
             >
-              Erro — Tentar novamente
+              {{ isMobile ? 'Erro' : 'Erro — Tentar novamente' }}
             </button>
           </template>
-          <template v-else>
+          <template v-else-if="!isMobile">
             <span>Editado {{ formatDate(noteDetail.updatedAt) }}</span>
           </template>
         </div>
