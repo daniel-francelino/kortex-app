@@ -173,6 +173,22 @@ const noteSortOptions = [
     icon: 'i-lucide-grip-vertical'
   }
 ]
+// Diagnostic only (see docs/notes/BUGS_AND_IMPROVEMENTS.md, item 11): reported
+// as reproducing on a hard reload — the code here looks correct (noteSortOptions
+// already has 'custom', useStorage's string serializer doesn't round-trip
+// through JSON) and couldn't be confirmed by reading the code alone. If the
+// persisted value ever doesn't match a known option, activeSortOption below
+// silently falls back to the first one — wrong icon, no visible error. This
+// logs the actual raw value so a real repro leaves evidence instead of just
+// "the icon is wrong".
+if (import.meta.client) {
+  watch(noteSortMode, (value) => {
+    if (!noteSortOptions.some(option => option.value === value)) {
+      console.warn('[notes] notes-sort-mode value does not match any known option', JSON.stringify(value))
+    }
+  }, { immediate: true })
+}
+
 const activeSortOption = computed(
   () =>
     noteSortOptions.find(option => option.value === noteSortMode.value)
