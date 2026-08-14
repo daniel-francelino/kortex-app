@@ -156,6 +156,12 @@ defineExpose({ focus, el: menuRef })
   flex-shrink: 0;
 }
 
+@media (max-width: 1023px) {
+  .kortex-mention-item {
+    padding: 0.6rem 0.5rem;
+  }
+}
+
 .kortex-mention-copy {
   display: flex;
   min-width: 0;

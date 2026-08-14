@@ -541,4 +541,43 @@ defineExpose({ el: bubbleRef })
   margin: 0 2px;
   flex-shrink: 0;
 }
+
+/* ─── Mobile: bigger touch targets, wrap instead of overflowing the screen ───
+ * At ~15 buttons wide, the toolbar view alone is easily wider than a phone
+ * viewport — `white-space: nowrap` (desktop) meant it just ran off both
+ * edges there, with no way to reach whatever fell outside. Wrapping is safe
+ * with the position clamp already in place (NotionStyleEditor.vue): it
+ * measures the real, already-wrapped rect after render, so a taller/wrapped
+ * menu still ends up positioned on screen. */
+@media (max-width: 1023px) {
+  .kortex-bubble {
+    max-width: calc(100vw - 24px);
+    flex-wrap: wrap;
+    white-space: normal;
+    justify-content: center;
+  }
+
+  .kortex-bubble--link {
+    min-width: min(280px, calc(100vw - 24px));
+  }
+
+  .kortex-menu-btn {
+    min-width: 40px;
+    height: 40px;
+  }
+
+  .kortex-menu-btn.kortex-bubble-color-swatch {
+    min-width: 32px;
+    width: 32px;
+    height: 32px;
+  }
+
+  .kortex-bubble-color-swatches {
+    gap: 8px;
+  }
+
+  .kortex-menu-sep {
+    height: 22px;
+  }
+}
 </style>

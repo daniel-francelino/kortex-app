@@ -2063,6 +2063,12 @@ defineExpose({
   min-width: 0;
 }
 
+@media (max-width: 1023px) {
+  .kortex-wiki-item {
+    padding: 9px 8px;
+  }
+}
+
 .kortex-command-item:hover,
 .kortex-command-item.selected,
 .kortex-wiki-item:hover,
