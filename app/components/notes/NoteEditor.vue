@@ -55,6 +55,7 @@ const emit = defineEmits<{
 const isMobile = useMediaQuery('(max-width: 1023px)')
 
 const editorRef = ref<NotionStyleEditorRef | null>(null)
+const titleRef = ref<HTMLTextAreaElement | null>(null)
 const scrollContainerRef = ref<HTMLElement | null>(null)
 const activeHeadingId = ref<string | null>(null)
 let headingObserver: IntersectionObserver | null = null
@@ -242,6 +243,7 @@ async function syncNote(detail: NoteDetail | null) {
 
   await nextTick()
   editorRef.value?.setContent(content.value)
+  autoGrowTitle()
   syncingContent.value = false
 }
 
@@ -249,6 +251,23 @@ function markDirty() {
   if (!noteDetail.value || syncingContent.value) return
   lastChangeAt.value = Date.now()
   saveStatus.value = 'unsaved'
+}
+
+// The title is a <textarea>, not an <input>, specifically so long titles
+// wrap instead of overflowing/clipping horizontally (an <input> never wraps,
+// no matter the CSS — that's what was cutting titles off on narrow screens).
+// It grows with content instead of scrolling internally.
+function autoGrowTitle() {
+  const el = titleRef.value
+  if (!el) return
+  el.style.height = 'auto'
+  el.style.height = `${el.scrollHeight}px`
+}
+
+function onTitleEnter() {
+  // Titles aren't multi-line content — Enter moves on to the body instead
+  // of inserting a line break, same as pressing Enter after a Notion title.
+  editorRef.value?.focus()
 }
 
 async function setIcon(icon: string | null) {
@@ -700,7 +719,10 @@ defineExpose({
       </div>
 
       <!-- Content: emoji icon + title + save status -->
-      <div class="pl-16 pr-10 pt-8 pb-2 shrink-0">
+      <div
+        class="pt-8 pb-2 shrink-0"
+        :class="isMobile ? 'px-4' : 'pl-16 pr-10'"
+      >
         <div class="flex items-center gap-2.5">
           <UPopover
             v-if="editIcon && canEdit"
@@ -728,19 +750,25 @@ defineExpose({
             class="text-4xl leading-none shrink-0 select-none -mt-0.5"
           >{{ editIcon }}</span>
 
-          <input
+          <textarea
+            ref="titleRef"
             v-model="editTitle"
-            class="flex-1 text-3xl font-bold bg-transparent border-none outline-none placeholder:text-muted/30 text-highlighted leading-tight"
+            rows="1"
+            class="flex-1 font-bold bg-transparent border-none outline-none resize-none overflow-hidden placeholder:text-muted/30 text-highlighted leading-tight"
+            :class="isMobile ? 'text-2xl' : 'text-3xl'"
             placeholder="Sem titulo..."
             :readonly="!canEdit"
+            @input="autoGrowTitle"
+            @keydown.enter.prevent="onTitleEnter"
             @blur="saveNote"
-          >
+          />
         </div>
       </div>
 
       <div
         ref="scrollContainerRef"
-        class="flex-1 overflow-y-auto pl-16 pr-10 pb-10 cursor-text"
+        class="flex-1 overflow-y-auto pb-10 cursor-text"
+        :class="isMobile ? 'px-4' : 'pl-16 pr-10'"
         @click.self="editorRef?.focus()"
       >
         <EditorNotionStyleEditor
