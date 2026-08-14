@@ -586,10 +586,10 @@ const rowTransition = { duration: 0.12, ease: 'easeOut' }
                     :exit="rowExit"
                     :transition="rowTransition"
                     :draggable="isCustomSort"
-                    class="group/folder-row relative flex items-center w-full gap-1 pr-1 rounded-lg mx-1 transition-colors cursor-pointer select-none"
+                    class="group/folder-row relative flex items-center w-full gap-1 rounded-lg mx-1 transition-colors cursor-pointer select-none"
                     :style="{ paddingLeft: `${0.25 + row.depth * 0.75}rem` }"
                     :class="[
-                      isMobile ? 'py-2.5' : 'py-1.5',
+                      isMobile ? 'py-2.5 pr-3' : 'py-1.5 pr-1',
                       dragOverFolderId === row.folder.id
                         ? 'bg-primary/15 ring-1 ring-primary/40'
                         : 'hover:bg-elevated/80'
@@ -678,10 +678,10 @@ const rowTransition = { duration: 0.12, ease: 'easeOut' }
                     :exit="rowExit"
                     :transition="rowTransition"
                     :draggable="!row.note.pinned"
-                    class="group/note relative w-full rounded-lg pr-1 text-left transition-colors hover:bg-elevated/80 flex items-center gap-1"
+                    class="group/note relative w-full rounded-lg text-left transition-colors hover:bg-elevated/80 flex items-center gap-1"
                     :style="{ paddingLeft: `${0.25 + row.depth * 0.75}rem` }"
                     :class="[
-                      isMobile ? 'py-2.5' : 'py-1.5',
+                      isMobile ? 'py-2.5 pr-3' : 'py-1.5 pr-1',
                       { 'bg-elevated ring-1 ring-primary/30': selectedId === row.note.id },
                       row.note.pinned ? 'cursor-default' : 'cursor-grab active:cursor-grabbing'
                     ]"
