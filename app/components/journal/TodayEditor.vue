@@ -46,6 +46,43 @@ const savedMood = ref<string | null>(null)
 // Timestamp of the last user-initiated change (0 = no pending change)
 const lastChangeAt = ref(0)
 
+// The editor assigns a stable blockId to any node that doesn't have one yet
+// (BlockIdExtension, useNotionEditor.ts) — needed for older entries saved
+// before that existed. That assignment fires through the same
+// `update:modelValue` channel as real typing, right after the editor mounts
+// with freshly-loaded content, before the user could have touched anything.
+// Left unhandled, `content` would diverge from `savedContent` immediately on
+// load, permanently showing "Não salvo" and the unsaved-changes prompt on
+// every visit until the next autosave happened to fix it. This absorbs that
+// one automatic correction into the saved baseline instead of flagging it.
+//
+// Armed right after a fresh load, consumed by the first content change that
+// follows (whether that's the editor's own correction or, less commonly, a
+// genuinely very fast user edit). If nothing changes the content at all —
+// the common case once every entry has stable ids — there's no event to
+// consume it, so a short timeout disarms it on its own; otherwise a real
+// edit made minutes later could get silently absorbed as "already saved"
+// without ever reaching the server.
+const suppressNextContentChange = ref(false)
+let suppressTimer: ReturnType<typeof setTimeout> | null = null
+
+function armContentSuppression() {
+  suppressNextContentChange.value = true
+  if (suppressTimer) clearTimeout(suppressTimer)
+  suppressTimer = setTimeout(() => {
+    suppressNextContentChange.value = false
+    suppressTimer = null
+  }, 500)
+}
+
+function disarmContentSuppression() {
+  suppressNextContentChange.value = false
+  if (suppressTimer) {
+    clearTimeout(suppressTimer)
+    suppressTimer = null
+  }
+}
+
 // ── Auto-save state ────────────────────────────────────────────────────────────
 type SaveStatus = 'idle' | 'unsaved' | 'saved' | 'error'
 const saveStatus = ref<SaveStatus>('idle')
@@ -92,6 +129,7 @@ watch(
       }
       savedMood.value = m
       entryTags.value = (entry.tags ?? []).map(t => t.name)
+      armContentSuppression()
       initialized.value = true
     } else if (!props.loading) {
       // Only reset when truly no entry and not mid-fetch
@@ -102,6 +140,7 @@ watch(
       entryTags.value = []
       lastChangeAt.value = 0
       saveStatus.value = 'idle'
+      armContentSuppression()
       initialized.value = true
     }
   },
@@ -199,6 +238,10 @@ onBeforeUnmount(() => {
     clearInterval(pollTimer)
     pollTimer = null
   }
+  if (suppressTimer) {
+    clearTimeout(suppressTimer)
+    suppressTimer = null
+  }
   // Best-effort immediate save on unmount
   if (saveStatus.value === 'unsaved') doSave()
 })
@@ -206,6 +249,11 @@ onBeforeUnmount(() => {
 // ── Watch for user changes ─────────────────────────────────────────────────────
 watch(content, (val) => {
   if (val === savedContent.value) return
+  if (suppressNextContentChange.value) {
+    disarmContentSuppression()
+    savedContent.value = val
+    return
+  }
   if (isContentEmpty.value) {
     saveStatus.value = 'idle'
     lastChangeAt.value = 0
