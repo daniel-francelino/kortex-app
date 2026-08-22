@@ -59,10 +59,26 @@ const savedAtText = computed(() =>
   savedAt.value?.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) ?? ''
 )
 
+// ── Empty content check ────────────────────────────────────────────────────────
+const isContentEmpty = computed(() => isEditorContentEmpty(content.value))
+
+// True when editor has unsaved changes
+const hasChanges = computed(() =>
+  content.value !== savedContent.value || mood.value !== savedMood.value
+)
+
 // ── Sync entry from props ──────────────────────────────────────────────────────
+// `todayEntry` also changes right after OUR OWN save resolves — upsertEntry()
+// refetches /api/journal/today, and that echo can land here while the user
+// kept typing during the round trip. Re-syncing at that point would blow
+// away those newer keystrokes with what the server had a moment ago. Only
+// pull from props when there's nothing unsaved locally (initial load, or a
+// genuinely external change made elsewhere, e.g. via EntryDetailModal).
 watch(
   [() => props.todayEntry, () => props.loading],
   ([entry]) => {
+    if (hasChanges.value) return
+
     if (entry) {
       const c = entry.content ?? ''
       if (c !== content.value) {
@@ -92,30 +108,34 @@ watch(
   { immediate: true }
 )
 
-// ── Empty content check ────────────────────────────────────────────────────────
-const isContentEmpty = computed(() => isEditorContentEmpty(content.value))
-
-// True when editor has unsaved changes
-const hasChanges = computed(() =>
-  content.value !== savedContent.value || mood.value !== savedMood.value
-)
-
 // ── Save logic ─────────────────────────────────────────────────────────────────
 async function doSave() {
   if (isContentEmpty.value || !hasChanges.value) return
+
+  // Snapshot what's actually being sent — the save is a multi-step async
+  // round trip (POST, then the composable refetches today/list/calendar),
+  // during which the user can keep typing. If we marked "saved" using the
+  // *live* content/mood after the await, those newer keystrokes would be
+  // flagged as already-saved even though the server never got them — the
+  // next poll would see no diff and never retry, silently losing that text.
+  // Comparing against this snapshot on completion keeps them correctly
+  // marked unsaved so the next poll cycle picks them up.
+  const savingContent = content.value
+  const savingMood = mood.value
+
   try {
     const result = await props.onUpsertEntry({
       entryDate: today,
       title: null,
-      content: content.value,
-      mood: mood.value,
+      content: savingContent,
+      mood: savingMood,
       tags: entryTags.value
     }, { silent: true })
     if (result) {
-      savedContent.value = content.value
-      savedMood.value = mood.value
-      lastChangeAt.value = 0
-      saveStatus.value = 'saved'
+      if (savedContent.value !== savingContent) savedContent.value = savingContent
+      if (savedMood.value !== savingMood) savedMood.value = savingMood
+      if (content.value === savingContent && mood.value === savingMood) lastChangeAt.value = 0
+      saveStatus.value = hasChanges.value ? 'unsaved' : 'saved'
       savedAt.value = new Date()
     } else {
       saveStatus.value = 'error'
@@ -133,20 +153,24 @@ const savingTags = ref(false)
 async function onTagsUpdate(newTags: string[]) {
   entryTags.value = newTags
   if (isContentEmpty.value) return
+
+  const savingContent = content.value
+  const savingMood = mood.value
+
   savingTags.value = true
   try {
     const result = await props.onUpsertEntry({
       entryDate: today,
       title: null,
-      content: content.value,
-      mood: mood.value,
+      content: savingContent,
+      mood: savingMood,
       tags: newTags
     })
     if (result) {
-      savedContent.value = content.value
-      savedMood.value = mood.value
-      lastChangeAt.value = 0
-      saveStatus.value = 'saved'
+      if (savedContent.value !== savingContent) savedContent.value = savingContent
+      if (savedMood.value !== savingMood) savedMood.value = savingMood
+      if (content.value === savingContent && mood.value === savingMood) lastChangeAt.value = 0
+      saveStatus.value = hasChanges.value ? 'unsaved' : 'saved'
       savedAt.value = new Date()
     }
   } finally {

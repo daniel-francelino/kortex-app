@@ -139,9 +139,15 @@ export function useJournal() {
       if (!options?.silent) {
         toast.add({ title: 'Entrada salva', description: 'Sua entrada foi salva com sucesso.', color: 'success' })
       }
-      await refreshList()
-      await refreshToday()
-      await refreshCalendar()
+      // Background autosaves only need `today` refreshed (TodayEditor mirrors
+      // it locally) — the list/calendar aren't visible mid-typing and just
+      // widen the round trip the user can keep editing during. They still
+      // refresh on their own when the user switches to those tabs.
+      if (options?.silent) {
+        await refreshToday()
+      } else {
+        await Promise.all([refreshList(), refreshToday(), refreshCalendar()])
+      }
       return entry
     } catch {
       if (!options?.silent) {
