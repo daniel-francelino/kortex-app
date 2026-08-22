@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { getSupabaseAdminClient } from '../../../utils/supabase'
 import { requireAuthUser } from '../../../utils/require-auth'
+import { mapJournalEntry, mapJournalTag, mapMetricValue } from '../../../utils/journal-mappers'
 
 const paramSchema = z.object({
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/)
@@ -44,7 +45,10 @@ export default eventHandler(async (event) => {
     .select('tag:journal_tags(*)')
     .eq('entry_id', entryId)
 
-  const tags = (tagLinks ?? []).map((l: Record<string, unknown>) => l.tag).filter(Boolean)
+  const tags = (tagLinks ?? [])
+    .map((l: Record<string, unknown>) => l.tag as Record<string, unknown> | null)
+    .filter((t): t is Record<string, unknown> => Boolean(t))
+    .map(mapJournalTag)
 
   // Fetch metric values with definitions
   const { data: metricValues } = await supabase
@@ -55,7 +59,8 @@ export default eventHandler(async (event) => {
 
   return {
     entryDate: params.date,
-    entry: { ...entryObj, tags },
-    metrics: metricValues ?? []
+    entry: { ...mapJournalEntry(entryObj), tags },
+    tags,
+    metrics: (metricValues ?? []).map(mapMetricValue)
   }
 })

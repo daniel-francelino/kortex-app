@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { getSupabaseAdminClient } from '../../utils/supabase'
 import { requireAuthUser } from '../../utils/require-auth'
+import { mapJournalTag } from '../../utils/journal-mappers'
 
 const bodySchema = z.object({
   name: z.string().min(1).max(50)
@@ -26,5 +27,5 @@ export default eventHandler(async (event) => {
     throw createError({ statusCode: 500, statusMessage: error.message })
   }
 
-  return data
+  return mapJournalTag(data)
 })

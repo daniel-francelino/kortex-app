@@ -18,6 +18,7 @@ interface TodayResponse {
   entryDate: string
   entry: JournalEntry | null
   metrics: MetricValueWithDefinition[]
+  streak: number
 }
 
 interface DateEntryResponse {
@@ -159,6 +160,20 @@ export function useJournal() {
     }
   }
 
+  async function deleteEntry(date: string): Promise<boolean> {
+    try {
+      await $fetch(`/api/journal/entries/${date}`, { method: 'DELETE' })
+      toast.add({ title: 'Entrada excluída', description: 'A entrada foi removida do diário.', color: 'success' })
+      await refreshList()
+      await refreshToday()
+      await refreshCalendar()
+      return true
+    } catch {
+      toast.add({ title: 'Erro', description: 'Não foi possível excluir a entrada.', color: 'error' })
+      return false
+    }
+  }
+
   // ─── Tag Actions ──────────────────────────────────────────────────────────
 
   async function createTag(payload: CreateJournalTagPayload): Promise<JournalTag | null> {
@@ -276,6 +291,7 @@ export function useJournal() {
     // Actions
     upsertEntry,
     fetchEntryByDate,
+    deleteEntry,
     createTag,
     createMetricDefinition,
     updateMetricDefinition,

@@ -49,10 +49,10 @@ async function onSave() {
   if (saving.value) return
   saving.value = true
   try {
-    const values = activeDefinitions.value.map(def => ({
-      metricKey: def.key,
-      ...localValues.value[def.key]
-    }))
+    const values = activeDefinitions.value.map((def) => {
+      const val = localValues.value[def.key] ?? { numberValue: null, booleanValue: null, textValue: null, selectValue: null }
+      return { metricKey: def.key, ...val }
+    })
 
     const ok = await props.onUpsertMetricValues({
       entryDate: props.entryDate,

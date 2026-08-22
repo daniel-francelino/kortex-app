@@ -17,16 +17,33 @@ const {
   calendarFrom,
   calendarTo,
   refreshCalendar,
-  upsertEntry
+  upsertEntry,
+  listData,
+  listFetchStatus,
+  listPage,
+  listSearch,
+  listTag,
+  refreshList,
+  tags,
+  refreshTags,
+  insights,
+  insightsStatus,
+  insightsRange,
+  refreshInsights
 } = useJournal()
 
 // ─── View mode ────────────────────────────────────────────────────────────────
-type JournalView = 'editor' | 'calendar'
+type JournalView = 'editor' | 'calendar' | 'list' | 'insights'
 const activeView = ref<JournalView>('editor')
 
 watch(activeView, (view) => {
   if (view === 'editor') refreshToday()
   if (view === 'calendar') refreshCalendar()
+  if (view === 'list') {
+    refreshList()
+    refreshTags()
+  }
+  if (view === 'insights') refreshInsights()
 })
 
 // ─── Editor ref (for unsaved-changes check) ───────────────────────────────────
@@ -82,8 +99,25 @@ function onCalendarMonthChange(from: string, to: string) {
 // ─── View options ─────────────────────────────────────────────────────────────
 const viewOptions: { value: JournalView, icon: string, tooltip: string }[] = [
   { value: 'editor', icon: 'i-lucide-pen-line', tooltip: 'Editor de hoje' },
-  { value: 'calendar', icon: 'i-lucide-calendar-days', tooltip: 'Calendário' }
+  { value: 'calendar', icon: 'i-lucide-calendar-days', tooltip: 'Calendário' },
+  { value: 'list', icon: 'i-lucide-list', tooltip: 'Lista de entradas' },
+  { value: 'insights', icon: 'i-lucide-bar-chart-3', tooltip: 'Insights' }
 ]
+
+// ─── Entry list view ────────────────────────────────────────────────────────────
+const tagFilterOptions = computed(() => [
+  { label: 'Todas as tags', value: '' },
+  ...(tags.value ?? []).map(t => ({ label: t.name, value: t.name }))
+])
+
+function onListEntrySelect(date: string) {
+  onSelectDate(date)
+}
+
+// ─── Insights view ────────────────────────────────────────────────────────────
+function onInsightsRangeChange(range: '7d' | '30d' | '90d') {
+  insightsRange.value = range
+}
 </script>
 
 <template>
@@ -124,6 +158,8 @@ const viewOptions: { value: JournalView, icon: string, tooltip: string }[] = [
           <JournalTodayEditor
             ref="editorRef"
             :today-entry="todayData?.entry ?? null"
+            :metrics="todayData?.metrics ?? []"
+            :streak="todayData?.streak ?? 0"
             :loading="todayStatus === 'pending'"
             :on-upsert-entry="upsertEntry"
           />
@@ -136,6 +172,53 @@ const viewOptions: { value: JournalView, icon: string, tooltip: string }[] = [
             :loading="calendarStatus === 'pending'"
             @select-date="onSelectDate"
             @month-change="onCalendarMonthChange"
+          />
+        </div>
+
+        <!-- LIST VIEW -->
+        <div v-else-if="activeView === 'list'" class="space-y-4">
+          <div class="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <UInput
+              v-model="listSearch"
+              icon="i-lucide-search"
+              placeholder="Buscar no diário..."
+              class="flex-1"
+            />
+            <USelect
+              v-model="listTag"
+              :items="tagFilterOptions"
+              value-key="value"
+              class="w-full sm:w-44"
+            />
+          </div>
+
+          <JournalEntryList
+            :entries="listData?.data ?? []"
+            :total="listData?.total ?? 0"
+            :page="listPage"
+            :page-size="listData?.pageSize ?? 20"
+            :loading="listFetchStatus === 'pending'"
+            @update:page="listPage = $event"
+            @select="onListEntrySelect"
+          />
+        </div>
+
+        <!-- INSIGHTS VIEW -->
+        <div v-else-if="activeView === 'insights'" class="space-y-4">
+          <div
+            v-if="(todayData?.streak ?? 0) > 0"
+            class="flex items-center gap-2 rounded-lg border border-default bg-elevated/30 px-4 py-3"
+          >
+            <span class="text-xl leading-none">🔥</span>
+            <span class="text-sm text-highlighted">
+              <strong>{{ todayData?.streak }}</strong> {{ todayData?.streak === 1 ? 'dia seguido' : 'dias seguidos' }} escrevendo no diário
+            </span>
+          </div>
+
+          <JournalInsightsPanel
+            :insights="insights ?? null"
+            :loading="insightsStatus === 'pending'"
+            @range-change="onInsightsRangeChange"
           />
         </div>
       </div>
@@ -192,6 +275,6 @@ const viewOptions: { value: JournalView, icon: string, tooltip: string }[] = [
     :open="detailModalOpen"
     :date="selectedDate"
     @update:open="detailModalOpen = $event"
-    @updated="refreshToday(); refreshCalendar()"
+    @updated="refreshToday(); refreshCalendar(); refreshList()"
   />
 </template>

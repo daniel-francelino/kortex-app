@@ -6,6 +6,8 @@ Este documento compara o módulo Diário de Bordo do Kortex (`app/pages/app/jour
 
 **Escopo**: este roadmap é priorizado pelas necessidades do módulo **Diário**, que tem arquitetura própria (schema, composable, padrão de salvamento) independente de Notas, apesar de reaproveitar o mesmo motor de edição de blocos — ver `1.JOURNAL.md`, seção 12, para o que é compartilhado e o que não é.
 
+> **Status de implementação (atualizado)**: todo o **P0** (métricas, insights, exclusão/arquivamento de entrada, correção do bug de limpar tags) e os itens do **P1** que dependiam apenas de conectar peças já construídas (streak no próprio módulo, busca/listagem de entradas, gestão de tags) foram implementados — ver `1.JOURNAL.md` para o estado atual dessas telas. Ao conectar o painel de métricas foi descoberto e corrigido um bug estrutural que teria impedido a P0/1 de funcionar mesmo conectada: os endpoints devolviam as linhas do Supabase em `snake_case` (`is_active`, `entry_date`, etc.) mas o frontend espera `camelCase` — corrigido via `server/utils/journal-mappers.ts`. O restante do P1 (lembrete/notificação) e todo o P2/P3 (prompts guiados, notas de voz, correlação humor×métricas, notas periódicas, PIN/biometria, E2E, exportação, geotag/clima) segue **não implementado**, como descrito no roadmap abaixo.
+
 ---
 
 ## 1. O que já existe (baseline)

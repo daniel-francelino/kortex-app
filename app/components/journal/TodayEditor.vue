@@ -1,21 +1,41 @@
 <script setup lang="ts">
-import type { JournalEntry } from '~/types/journal'
+import type { JournalEntry, MetricValueWithDefinition } from '~/types/journal'
 import { isEditorContentEmpty } from '~/utils/editor/content'
 
 const props = defineProps<{
   todayEntry: JournalEntry | null
+  metrics?: MetricValueWithDefinition[]
   loading: boolean
+  streak?: number
   onUpsertEntry: (payload: {
     entryDate: string
     title?: string | null
     content: string
     mood?: string | null
+    tags?: string[]
   }, options?: { silent?: boolean }) => Promise<JournalEntry | null>
 }>()
+
+const {
+  tags: availableTags,
+  refreshTags,
+  metricDefinitions,
+  refreshMetricDefinitions,
+  createMetricDefinition,
+  upsertMetricValues,
+  metricTypeOptions
+} = useJournal()
+
+onMounted(() => {
+  refreshTags()
+  refreshMetricDefinitions()
+})
 
 const today = new Date().toISOString().split('T')[0] ?? ''
 const content = ref('')
 const mood = ref<string | null>(null)
+const entryTags = ref<string[]>([])
+const metricCreateOpen = ref(false)
 
 // Last saved snapshot — what the server currently has
 const savedContent = ref('')
@@ -53,6 +73,7 @@ watch(
         mood.value = m
       }
       savedMood.value = m
+      entryTags.value = (entry.tags ?? []).map(t => t.name)
       initialized.value = true
     } else if (!props.loading) {
       // Only reset when truly no entry and not mid-fetch
@@ -60,6 +81,7 @@ watch(
       savedContent.value = ''
       mood.value = null
       savedMood.value = null
+      entryTags.value = []
       lastChangeAt.value = 0
       saveStatus.value = 'idle'
       initialized.value = true
@@ -84,7 +106,8 @@ async function doSave() {
       entryDate: today,
       title: null,
       content: content.value,
-      mood: mood.value
+      mood: mood.value,
+      tags: entryTags.value
     }, { silent: true })
     if (result) {
       savedContent.value = content.value
@@ -97,6 +120,35 @@ async function doSave() {
     }
   } catch {
     saveStatus.value = 'error'
+  }
+}
+
+// ── Tags ───────────────────────────────────────────────────────────────────────
+// Tag edits are an explicit action, so they save immediately (content must
+// already exist — the entry schema requires non-empty content).
+const savingTags = ref(false)
+
+async function onTagsUpdate(newTags: string[]) {
+  entryTags.value = newTags
+  if (isContentEmpty.value) return
+  savingTags.value = true
+  try {
+    const result = await props.onUpsertEntry({
+      entryDate: today,
+      title: null,
+      content: content.value,
+      mood: mood.value,
+      tags: newTags
+    })
+    if (result) {
+      savedContent.value = content.value
+      savedMood.value = mood.value
+      lastChangeAt.value = 0
+      saveStatus.value = 'saved'
+      savedAt.value = new Date()
+    }
+  } finally {
+    savingTags.value = false
   }
 }
 
@@ -171,9 +223,20 @@ defineExpose({ isUnsaved: () => hasChanges.value, doSave })
       <!-- Header: date + mood selector na mesma linha -->
       <div class="flex items-center justify-between gap-4">
         <div class="min-w-0">
-          <h3 class="text-lg font-semibold text-highlighted capitalize">
-            {{ formatToday() }}
-          </h3>
+          <div class="flex items-center gap-2">
+            <h3 class="text-lg font-semibold text-highlighted capitalize">
+              {{ formatToday() }}
+            </h3>
+            <UBadge
+              v-if="streak && streak > 0"
+              color="warning"
+              variant="subtle"
+              size="sm"
+              class="gap-1"
+            >
+              🔥 {{ streak }} {{ streak === 1 ? 'dia' : 'dias' }}
+            </UBadge>
+          </div>
           <div class="flex items-center gap-2 mt-0.5">
             <p class="text-sm text-muted">
               Seu diário de bordo de hoje.
@@ -219,6 +282,72 @@ defineExpose({ isUnsaved: () => hasChanges.value, doSave })
           <USkeleton class="h-56 w-full rounded-lg" />
         </template>
       </ClientOnly>
+
+      <!-- Tags -->
+      <div class="rounded-lg border border-default p-3">
+        <div class="flex items-center justify-between mb-2">
+          <h4 class="text-sm font-medium text-highlighted">
+            Tags
+          </h4>
+          <UIcon
+            v-if="savingTags"
+            name="i-lucide-loader-2"
+            class="size-3.5 animate-spin text-muted"
+          />
+        </div>
+        <p
+          v-if="isContentEmpty"
+          class="text-xs text-dimmed"
+        >
+          Escreva algo antes de adicionar tags.
+        </p>
+        <JournalTagEditor
+          v-else
+          :model-value="entryTags"
+          :available-tags="availableTags ?? []"
+          @update:model-value="onTagsUpdate"
+        />
+      </div>
+
+      <!-- Metrics -->
+      <UCollapsible>
+        <UButton
+          label="Métricas do dia"
+          icon="i-lucide-gauge"
+          color="neutral"
+          variant="outline"
+          trailing-icon="i-lucide-chevron-down"
+          block
+        />
+
+        <template #content>
+          <div class="mt-3 space-y-3 rounded-lg border border-default p-3">
+            <div class="flex justify-end">
+              <UButton
+                label="Nova métrica"
+                icon="i-lucide-plus"
+                size="xs"
+                color="neutral"
+                variant="ghost"
+                @click="metricCreateOpen = true"
+              />
+            </div>
+            <JournalMetricsPanel
+              :definitions="metricDefinitions ?? []"
+              :existing-values="metrics ?? []"
+              :entry-date="today"
+              :on-upsert-metric-values="upsertMetricValues"
+            />
+          </div>
+        </template>
+      </UCollapsible>
     </template>
   </div>
+
+  <JournalMetricCreateModal
+    :open="metricCreateOpen"
+    :metric-type-options="metricTypeOptions"
+    :on-create-metric-definition="createMetricDefinition"
+    @update:open="metricCreateOpen = $event"
+  />
 </template>

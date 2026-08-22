@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { getSupabaseAdminClient } from '../../utils/supabase'
 import { requireAuthUser } from '../../utils/require-auth'
+import { mapJournalEntry } from '../../utils/journal-mappers'
 
 const bodySchema = z.object({
   entryDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
@@ -35,8 +36,8 @@ export default eventHandler(async (event) => {
     throw createError({ statusCode: 500, statusMessage: error.message })
   }
 
-  // Handle tags if provided
-  if (parsed.tags && parsed.tags.length > 0) {
+  // Handle tags if provided — an explicit empty array clears all tags
+  if (parsed.tags !== undefined) {
     const entryId = (data as Record<string, unknown>).id as string
 
     // Remove existing tag links
@@ -63,5 +64,5 @@ export default eventHandler(async (event) => {
     }
   }
 
-  return data
+  return mapJournalEntry(data)
 })

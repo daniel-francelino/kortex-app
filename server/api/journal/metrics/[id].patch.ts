@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { getSupabaseAdminClient } from '../../../utils/supabase'
 import { requireAuthUser } from '../../../utils/require-auth'
+import { mapMetricDefinition } from '../../../utils/journal-mappers'
 
 const paramSchema = z.object({
   id: z.string().uuid()
@@ -60,5 +61,5 @@ export default eventHandler(async (event) => {
     throw createError({ statusCode: 500, statusMessage: error.message })
   }
 
-  return data
+  return mapMetricDefinition(data)
 })
