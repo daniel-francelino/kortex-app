@@ -19,6 +19,7 @@ const {
   deleteEntry,
   tags: availableTags,
   refreshTags,
+  deleteTag,
   metricDefinitions,
   refreshMetricDefinitions,
   createMetricDefinition,
@@ -298,6 +299,7 @@ function onOpenChange(value: boolean) {
             <JournalTagEditor
               v-model="entryTags"
               :available-tags="availableTags ?? []"
+              :on-delete-tag="deleteTag"
             />
           </div>
 
