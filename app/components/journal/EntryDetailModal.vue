@@ -19,9 +19,11 @@ const {
   deleteEntry,
   tags: availableTags,
   refreshTags,
+  deleteTag,
   metricDefinitions,
   refreshMetricDefinitions,
   createMetricDefinition,
+  deleteMetricDefinition,
   upsertMetricValues,
   metricTypeOptions
 } = useJournal()
@@ -298,6 +300,7 @@ function onOpenChange(value: boolean) {
             <JournalTagEditor
               v-model="entryTags"
               :available-tags="availableTags ?? []"
+              :on-delete-tag="deleteTag"
             />
           </div>
 
@@ -318,6 +321,7 @@ function onOpenChange(value: boolean) {
               :existing-values="entryMetrics"
               :entry-date="props.date"
               :on-upsert-metric-values="upsertMetricValues"
+              :on-delete-metric-definition="deleteMetricDefinition"
               @saved="loadEntry"
             />
           </div>

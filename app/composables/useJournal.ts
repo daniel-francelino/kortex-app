@@ -423,6 +423,56 @@ export function useJournal() {
     return result
   }
 
+  async function deleteTag(id: string): Promise<boolean> {
+    const previous = tagsById.get(id)
+    if (!previous) return false
+
+    // journal_entry_tags cascades server-side — any already-loaded entry
+    // still carrying this tag in its local `.tags` needs the same removal,
+    // or it'd keep showing a tag that no longer exists until a refetch.
+    const affectedDates: string[] = []
+    for (const entry of entriesByDate.values()) {
+      if (entry.tags?.some(t => t.id === id)) affectedDates.push(entry.entryDate)
+    }
+
+    const result = await runOptimisticAction({
+      apply: () => {
+        tagsById.delete(id)
+        tagIds.value = tagIds.value.filter(tid => tid !== id)
+        for (const date of affectedDates) {
+          const entry = entriesByDate.get(date)
+          if (entry) upsertEntryInStore({ ...entry, tags: entry.tags?.filter(t => t.id !== id) })
+        }
+      },
+      rollback: () => {
+        upsertTagInStore(previous)
+        if (!tagIds.value.includes(id)) tagIds.value = [...tagIds.value, id]
+        for (const date of affectedDates) {
+          const entry = entriesByDate.get(date)
+          if (entry && !entry.tags?.some(t => t.id === id)) {
+            upsertEntryInStore({ ...entry, tags: [...(entry.tags ?? []), previous] })
+          }
+        }
+      },
+      request: () => $fetch<{ success: boolean }>(`/api/journal/tags/${id}`, { method: 'DELETE' }),
+      errorMessage: 'Não foi possível excluir a tag.',
+      offline: {
+        entity: 'journal_tag',
+        action: 'delete',
+        method: 'DELETE',
+        url: `/api/journal/tags/${id}`,
+        tempId: id.startsWith('temp-') ? id : undefined,
+        optimisticResult: { success: true }
+      }
+    })
+
+    if (result !== null) {
+      toast.add({ title: 'Tag excluída', description: `"${previous.name}" foi removida.`, color: 'success' })
+      refreshList()
+    }
+    return result !== null
+  }
+
   // ─── Metric Definition Actions ────────────────────────────────────────────
 
   async function createMetricDefinition(payload: CreateMetricDefinitionPayload): Promise<MetricDefinition | null> {
@@ -515,6 +565,45 @@ export function useJournal() {
       toast.add({ title: 'Métrica atualizada', description: `"${result.name}" salva com sucesso.`, color: 'success' })
     }
     return result
+  }
+
+  // Deleting a definition cascades server-side and permanently erases every
+  // value ever recorded for it (metric_values.metric_definition_id has
+  // ON DELETE CASCADE) — callers must confirm with the user before calling
+  // this, it does not ask again itself.
+  async function deleteMetricDefinition(id: string): Promise<boolean> {
+    const previousDef = metricDefinitionsById.get(id)
+    if (!previousDef) return false
+
+    const previousValues = Array.from(metricValuesByKey.entries()).filter(([, v]) => v.metricDefinitionId === id)
+
+    const result = await runOptimisticAction({
+      apply: () => {
+        metricDefinitionsById.delete(id)
+        metricDefinitionIds.value = metricDefinitionIds.value.filter(did => did !== id)
+        for (const [key] of previousValues) metricValuesByKey.delete(key)
+      },
+      rollback: () => {
+        upsertMetricDefinitionInStore(previousDef)
+        if (!metricDefinitionIds.value.includes(id)) metricDefinitionIds.value = [...metricDefinitionIds.value, id]
+        for (const [key, value] of previousValues) metricValuesByKey.set(key, value)
+      },
+      request: () => $fetch<{ success: boolean }>(`/api/journal/metrics/${id}`, { method: 'DELETE' }),
+      errorMessage: 'Não foi possível excluir a métrica.',
+      offline: {
+        entity: 'metric_definition',
+        action: 'delete',
+        method: 'DELETE',
+        url: `/api/journal/metrics/${id}`,
+        tempId: id.startsWith('temp-') ? id : undefined,
+        optimisticResult: { success: true }
+      }
+    })
+
+    if (result !== null) {
+      toast.add({ title: 'Métrica excluída', description: `"${previousDef.name}" e seus valores registrados foram removidos.`, color: 'success' })
+    }
+    return result !== null
   }
 
   // ─── Metric Values Actions ────────────────────────────────────────────────
@@ -694,8 +783,10 @@ export function useJournal() {
     fetchEntryByDate,
     deleteEntry,
     createTag,
+    deleteTag,
     createMetricDefinition,
     updateMetricDefinition,
+    deleteMetricDefinition,
     upsertMetricValues,
     // Offline
     isOnline,
