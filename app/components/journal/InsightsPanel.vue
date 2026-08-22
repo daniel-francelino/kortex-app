@@ -22,6 +22,8 @@ watch(selectedRange, (val) => {
   emit('rangeChange', val as '7d' | '30d' | '90d')
 })
 
+const isMobile = useIsMobile()
+
 const _props = props
 </script>
 
@@ -36,7 +38,7 @@ const _props = props
         v-model="selectedRange"
         :items="rangeOptions"
         value-key="value"
-        size="sm"
+        :size="isMobile ? 'lg' : 'sm'"
         class="min-w-28"
       />
     </div>

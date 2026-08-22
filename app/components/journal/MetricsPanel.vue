@@ -23,6 +23,8 @@ const emit = defineEmits<{
   saved: []
 }>()
 
+const isMobile = useIsMobile()
+
 // Build local state from existing values
 const localValues = ref<Record<string, { numberValue: number | null, booleanValue: boolean | null, textValue: string | null, selectValue: string | null }>>({})
 
@@ -113,7 +115,7 @@ function setSelectValue(key: string, val: string) {
       </h4>
       <UButton
         label="Salvar métricas"
-        size="sm"
+        :size="isMobile ? 'md' : 'sm'"
         :loading="saving"
         :disabled="saving || activeDefinitions.length === 0"
         @click="onSave"
@@ -171,7 +173,7 @@ function setSelectValue(key: string, val: string) {
           :max="def.maxValue ?? undefined"
           :step="def.step ?? 1"
           placeholder="0"
-          size="sm"
+          :size="isMobile ? 'lg' : 'sm'"
           @update:model-value="setNumberValue(def.key, $event)"
         />
 
@@ -180,7 +182,7 @@ function setSelectValue(key: string, val: string) {
           v-else-if="def.type === MetricType.Boolean"
           :model-value="getBooleanValue(def.key)"
           label="Sim"
-          size="sm"
+          :size="isMobile ? 'lg' : 'sm'"
           @update:model-value="setBooleanValue(def.key, Boolean($event))"
         />
 
@@ -191,7 +193,7 @@ function setSelectValue(key: string, val: string) {
           :items="def.options.map(o => ({ label: o, value: o }))"
           value-key="value"
           placeholder="Selecione..."
-          size="sm"
+          :size="isMobile ? 'lg' : 'sm'"
           @update:model-value="setSelectValue(def.key, $event)"
         />
 
@@ -200,7 +202,7 @@ function setSelectValue(key: string, val: string) {
           v-else-if="def.type === MetricType.Text"
           :model-value="getTextValue(def.key)"
           placeholder="Escreva..."
-          size="sm"
+          :size="isMobile ? 'lg' : 'sm'"
           @update:model-value="setTextValue(def.key, $event)"
         />
       </div>

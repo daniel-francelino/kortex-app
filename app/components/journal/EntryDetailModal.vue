@@ -31,6 +31,8 @@ onMounted(() => {
   refreshMetricDefinitions()
 })
 
+const isMobile = useIsMobile()
+
 const loading = ref(false)
 const entry = ref<JournalEntry | null>(null)
 const entryTags = ref<string[]>([])
@@ -201,7 +203,7 @@ function onOpenChange(value: boolean) {
                 label="Excluir"
                 color="error"
                 variant="ghost"
-                size="sm"
+                :size="isMobile ? 'md' : 'sm'"
                 @click="confirmDeleteOpen = true"
               />
               <UButton
@@ -209,7 +211,7 @@ function onOpenChange(value: boolean) {
                 label="Editar"
                 color="neutral"
                 variant="ghost"
-                size="sm"
+                :size="isMobile ? 'md' : 'sm'"
                 @click="editing = true"
               />
             </div>
@@ -305,7 +307,7 @@ function onOpenChange(value: boolean) {
               <UButton
                 label="Nova métrica"
                 icon="i-lucide-plus"
-                size="xs"
+                :size="isMobile ? 'md' : 'xs'"
                 color="neutral"
                 variant="ghost"
                 @click="metricCreateOpen = true"
@@ -378,14 +380,14 @@ function onOpenChange(value: boolean) {
           label="Cancelar"
           variant="ghost"
           color="neutral"
-          size="sm"
+          :size="isMobile ? 'md' : 'sm'"
           @click="confirmDeleteOpen = false"
         />
         <UButton
           label="Excluir"
           color="error"
           icon="i-lucide-trash-2"
-          size="sm"
+          :size="isMobile ? 'md' : 'sm'"
           :loading="deleting"
           @click="onDeleteEntry"
         />

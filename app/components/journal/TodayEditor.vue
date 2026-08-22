@@ -26,6 +26,8 @@ const {
   metricTypeOptions
 } = useJournal()
 
+const isMobile = useIsMobile()
+
 onMounted(() => {
   refreshTags()
   refreshMetricDefinitions()
@@ -301,12 +303,23 @@ defineExpose({ isUnsaved: () => hasChanges.value, doSave })
         >
           Escreva algo antes de adicionar tags.
         </p>
-        <JournalTagEditor
-          v-else
-          :model-value="entryTags"
-          :available-tags="availableTags ?? []"
-          @update:model-value="onTagsUpdate"
-        />
+        <!-- JournalTagEditor picks its button/input sizes from the viewport
+             width (bigger on mobile, compact on desktop) — client-only info
+             that doesn't exist during SSR. Rendering it there would bake in
+             the desktop size, and Vue's hydration intentionally never
+             corrects a mismatched class afterwards, so it'd stay wrong on
+             mobile until the user resizes the window. ClientOnly sidesteps
+             that entirely by skipping the SSR pass for it. -->
+        <ClientOnly v-else>
+          <JournalTagEditor
+            :model-value="entryTags"
+            :available-tags="availableTags ?? []"
+            @update:model-value="onTagsUpdate"
+          />
+          <template #fallback>
+            <USkeleton class="h-8 w-40" />
+          </template>
+        </ClientOnly>
       </div>
 
       <!-- Metrics -->
@@ -326,7 +339,7 @@ defineExpose({ isUnsaved: () => hasChanges.value, doSave })
               <UButton
                 label="Nova métrica"
                 icon="i-lucide-plus"
-                size="xs"
+                :size="isMobile ? 'md' : 'xs'"
                 color="neutral"
                 variant="ghost"
                 @click="metricCreateOpen = true"

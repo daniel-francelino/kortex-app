@@ -32,6 +32,8 @@ const {
   refreshInsights
 } = useJournal()
 
+const isMobile = useIsMobile()
+
 // ─── View mode ────────────────────────────────────────────────────────────────
 type JournalView = 'editor' | 'calendar' | 'list' | 'insights'
 const activeView = ref<JournalView>('editor')
@@ -245,25 +247,25 @@ function onInsightsRangeChange(range: '7d' | '30d' | '90d') {
     </template>
 
     <template #footer>
-      <div class="flex w-full items-center justify-end gap-2">
+      <div class="flex w-full flex-wrap items-center justify-end gap-2">
         <UButton
           label="Cancelar"
           variant="ghost"
           color="neutral"
-          size="sm"
+          :size="isMobile ? 'md' : 'sm'"
           @click="onConfirmCancel"
         />
         <UButton
           label="Descartar"
           variant="outline"
           color="error"
-          size="sm"
+          :size="isMobile ? 'md' : 'sm'"
           @click="onConfirmDiscardAndLeave"
         />
         <UButton
           label="Salvar e sair"
           icon="i-lucide-check"
-          size="sm"
+          :size="isMobile ? 'md' : 'sm'"
           @click="onConfirmSaveAndLeave"
         />
       </div>
