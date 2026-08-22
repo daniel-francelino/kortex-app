@@ -24,7 +24,6 @@ const {
   metricDefinitions,
   refreshMetricDefinitions,
   createMetricDefinition,
-  deleteMetricDefinition,
   upsertMetricValues,
   metricTypeOptions
 } = useJournal()
@@ -484,7 +483,6 @@ defineExpose({ isUnsaved: () => hasChanges.value, doSave })
               :existing-values="metrics ?? []"
               :entry-date="today"
               :on-upsert-metric-values="upsertMetricValues"
-              :on-delete-metric-definition="deleteMetricDefinition"
             />
           </div>
         </template>

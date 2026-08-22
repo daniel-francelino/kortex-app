@@ -567,45 +567,6 @@ export function useJournal() {
     return result
   }
 
-  // Deleting a definition cascades server-side and permanently erases every
-  // value ever recorded for it (metric_values.metric_definition_id has
-  // ON DELETE CASCADE) — callers must confirm with the user before calling
-  // this, it does not ask again itself.
-  async function deleteMetricDefinition(id: string): Promise<boolean> {
-    const previousDef = metricDefinitionsById.get(id)
-    if (!previousDef) return false
-
-    const previousValues = Array.from(metricValuesByKey.entries()).filter(([, v]) => v.metricDefinitionId === id)
-
-    const result = await runOptimisticAction({
-      apply: () => {
-        metricDefinitionsById.delete(id)
-        metricDefinitionIds.value = metricDefinitionIds.value.filter(did => did !== id)
-        for (const [key] of previousValues) metricValuesByKey.delete(key)
-      },
-      rollback: () => {
-        upsertMetricDefinitionInStore(previousDef)
-        if (!metricDefinitionIds.value.includes(id)) metricDefinitionIds.value = [...metricDefinitionIds.value, id]
-        for (const [key, value] of previousValues) metricValuesByKey.set(key, value)
-      },
-      request: () => $fetch<{ success: boolean }>(`/api/journal/metrics/${id}`, { method: 'DELETE' }),
-      errorMessage: 'Não foi possível excluir a métrica.',
-      offline: {
-        entity: 'metric_definition',
-        action: 'delete',
-        method: 'DELETE',
-        url: `/api/journal/metrics/${id}`,
-        tempId: id.startsWith('temp-') ? id : undefined,
-        optimisticResult: { success: true }
-      }
-    })
-
-    if (result !== null) {
-      toast.add({ title: 'Métrica excluída', description: `"${previousDef.name}" e seus valores registrados foram removidos.`, color: 'success' })
-    }
-    return result !== null
-  }
-
   // ─── Metric Values Actions ────────────────────────────────────────────────
 
   async function upsertMetricValues(payload: UpsertMetricValuesPayload): Promise<boolean> {
@@ -786,7 +747,6 @@ export function useJournal() {
     deleteTag,
     createMetricDefinition,
     updateMetricDefinition,
-    deleteMetricDefinition,
     upsertMetricValues,
     // Offline
     isOnline,

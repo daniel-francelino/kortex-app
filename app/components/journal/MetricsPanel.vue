@@ -17,7 +17,6 @@ const props = defineProps<{
       selectValue: string | null
     }>
   }) => Promise<boolean>
-  onDeleteMetricDefinition?: (id: string) => Promise<boolean>
 }>()
 
 const emit = defineEmits<{
@@ -106,23 +105,6 @@ function setSelectValue(key: string, val: string) {
   if (!localValues.value[key]) return
   localValues.value[key].selectValue = val || null
 }
-
-// Deleting a definition permanently erases every value ever recorded for
-// it (server-side cascade), not just today's — worth a heavier warning
-// than the usual "excluir?" confirmation.
-const confirmDeleteTarget = ref<MetricDefinition | null>(null)
-const deletingDefinition = ref(false)
-
-async function confirmDeleteDefinition() {
-  if (!confirmDeleteTarget.value || !props.onDeleteMetricDefinition || deletingDefinition.value) return
-  deletingDefinition.value = true
-  try {
-    const ok = await props.onDeleteMetricDefinition(confirmDeleteTarget.value.id)
-    if (ok) confirmDeleteTarget.value = null
-  } finally {
-    deletingDefinition.value = false
-  }
-}
 </script>
 
 <template>
@@ -174,23 +156,12 @@ async function confirmDeleteDefinition() {
           <label class="text-sm font-medium text-highlighted">
             {{ def.name }}
           </label>
-          <div class="flex items-center gap-2">
-            <span
-              v-if="def.unit"
-              class="text-xs text-muted"
-            >
-              {{ def.unit }}
-            </span>
-            <UButton
-              v-if="onDeleteMetricDefinition"
-              icon="i-lucide-trash-2"
-              color="neutral"
-              variant="ghost"
-              :size="isMobile ? 'md' : 'xs'"
-              square
-              @click="confirmDeleteTarget = def"
-            />
-          </div>
+          <span
+            v-if="def.unit"
+            class="text-xs text-muted"
+          >
+            {{ def.unit }}
+          </span>
         </div>
 
         <!-- Number input -->
@@ -236,44 +207,5 @@ async function confirmDeleteDefinition() {
         />
       </div>
     </div>
-
-    <UModal
-      :open="!!confirmDeleteTarget"
-      :ui="{ overlay: 'z-[240]', content: 'z-[250]' }"
-      @update:open="confirmDeleteTarget = null"
-    >
-      <template #header>
-        <div class="flex items-center gap-2">
-          <UIcon name="i-lucide-trash-2" class="size-4 text-error" />
-          <span class="text-sm font-semibold text-highlighted">Excluir métrica</span>
-        </div>
-      </template>
-
-      <template #body>
-        <p class="text-sm text-muted">
-          Excluir "{{ confirmDeleteTarget?.name }}" apaga a métrica <strong>e todos os valores já registrados</strong> com ela, em qualquer data — não só os de hoje. Essa ação não pode ser desfeita.
-        </p>
-      </template>
-
-      <template #footer>
-        <div class="flex w-full items-center justify-end gap-2">
-          <UButton
-            label="Cancelar"
-            variant="ghost"
-            color="neutral"
-            :size="isMobile ? 'md' : 'sm'"
-            @click="confirmDeleteTarget = null"
-          />
-          <UButton
-            label="Excluir"
-            color="error"
-            icon="i-lucide-trash-2"
-            :size="isMobile ? 'md' : 'sm'"
-            :loading="deletingDefinition"
-            @click="confirmDeleteDefinition"
-          />
-        </div>
-      </template>
-    </UModal>
   </div>
 </template>
