@@ -284,13 +284,17 @@ watch(mood, (val) => {
 })
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
+// pt-BR gives this back fully lowercase ("sábado, 22 de agosto de 2026") — a
+// CSS `capitalize` class would title-case every word ("De Agosto De 2026"),
+// so this only uppercases the leading letter instead.
 function formatToday(): string {
-  return new Date(today + 'T12:00:00').toLocaleDateString('pt-BR', {
+  const raw = new Date(today + 'T12:00:00').toLocaleDateString('pt-BR', {
     weekday: 'long',
     day: '2-digit',
     month: 'long',
     year: 'numeric'
   })
+  return raw.charAt(0).toUpperCase() + raw.slice(1)
 }
 
 // ── Entry prompts ──────────────────────────────────────────────────────────────
@@ -326,11 +330,14 @@ defineExpose({ isUnsaved: () => hasChanges.value, doSave })
     </template>
 
     <template v-else>
-      <!-- Header: date + mood selector na mesma linha -->
-      <div class="flex items-center justify-between gap-4">
+      <!-- Header: date + mood selector — stacked on mobile (the mood
+           selector's five 48px touch targets squeeze the date column down
+           to almost nothing side-by-side on a phone, wrapping the date
+           across 2-3 lines), side-by-side from lg up. -->
+      <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between lg:gap-4">
         <div class="min-w-0">
           <div class="flex items-center gap-2">
-            <h3 class="text-lg font-semibold text-highlighted capitalize">
+            <h3 class="text-lg font-semibold text-highlighted">
               {{ formatToday() }}
             </h3>
             <UBadge
@@ -386,8 +393,12 @@ defineExpose({ isUnsaved: () => hasChanges.value, doSave })
            which starts collapsed), so an isMobile-driven size here would be
            just as exposed to the hydration-mismatch issue. -->
       <ClientOnly v-if="isContentEmpty">
-        <div class="flex flex-wrap items-center gap-2">
-          <span class="text-xs text-dimmed">Não sabe por onde começar?</span>
+        <!-- Ragged flex-wrap left each row a different length on a phone
+             (one button alone, then two, then one) — a single horizontally
+             scrollable row reads cleaner there. From lg up there's enough
+             width that wrapping looks fine, so it switches back. -->
+        <div class="flex items-center gap-2 overflow-x-auto pb-1 -mx-1 px-1 lg:flex-wrap lg:overflow-visible lg:pb-0 lg:mx-0 lg:px-0">
+          <span class="shrink-0 text-xs text-dimmed">Não sabe por onde começar?</span>
           <UButton
             v-for="p in ENTRY_PROMPTS"
             :key="p.label"
@@ -396,6 +407,7 @@ defineExpose({ isUnsaved: () => hasChanges.value, doSave })
             :size="isMobile ? 'md' : 'xs'"
             color="neutral"
             variant="outline"
+            class="shrink-0"
             @click="applyPrompt(p.prompt)"
           />
         </div>
