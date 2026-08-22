@@ -1,13 +1,13 @@
 import { get, set } from 'idb-keyval'
 
-export type PendingMutationEntity = 'note' | 'folder'
+export type PendingMutationEntity = 'note' | 'folder' | 'journal_entry' | 'journal_tag' | 'metric_definition' | 'metric_value'
 export type PendingMutationAction = 'create' | 'update' | 'delete'
 
 export interface PendingMutation {
   id: string
   entity: PendingMutationEntity
   action: PendingMutationAction
-  method: 'POST' | 'PUT' | 'DELETE'
+  method: 'POST' | 'PUT' | 'PATCH' | 'DELETE'
   url: string
   body?: unknown
   /** Present for 'create' mutations — the temp-id the optimistic create used,
@@ -17,12 +17,17 @@ export interface PendingMutation {
   retryCount: number
 }
 
+// Kept as-is (not renamed to something entity-neutral) even though the queue
+// now also carries journal mutations — this is IndexedDB, so changing the key
+// would orphan anything a user had genuinely pending offline at deploy time.
 const QUEUE_KEY = 'kortex-notes-pending-mutations'
 
 // Module-level so every useMutationQueue() caller reads/writes the same queue
 // (mirrors the useConnectionStatus singleton pattern) — this is enqueued from
-// deep inside useNotes.ts actions and drained by the sync engine elsewhere,
-// both need to see the same list.
+// deep inside useNotes.ts/useJournal.ts actions and drained by each
+// composable's own sync engine, both need to see the same list. Each drain
+// loop filters to its own entity types (see drainMutationQueue in either
+// composable) so they don't race to replay each other's mutations.
 const pendingMutations = ref<PendingMutation[]>([])
 let loadPromise: Promise<void> | null = null
 

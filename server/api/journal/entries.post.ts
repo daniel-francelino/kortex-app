@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { getSupabaseAdminClient } from '../../utils/supabase'
 import { requireAuthUser } from '../../utils/require-auth'
-import { mapJournalEntry } from '../../utils/journal-mappers'
+import { mapJournalEntry, mapJournalTag } from '../../utils/journal-mappers'
 
 const bodySchema = z.object({
   entryDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
@@ -36,10 +36,10 @@ export default eventHandler(async (event) => {
     throw createError({ statusCode: 500, statusMessage: error.message })
   }
 
+  const entryId = (data as Record<string, unknown>).id as string
+
   // Handle tags if provided — an explicit empty array clears all tags
   if (parsed.tags !== undefined) {
-    const entryId = (data as Record<string, unknown>).id as string
-
     // Remove existing tag links
     await supabase
       .from('journal_entry_tags')
@@ -64,5 +64,18 @@ export default eventHandler(async (event) => {
     }
   }
 
-  return mapJournalEntry(data)
+  // Always return the entry's current tags (not just when they were just
+  // touched) — the client's optimistic store reconciles on this response,
+  // and a partial shape here would make it drop tags it already had.
+  const { data: tagLinks } = await supabase
+    .from('journal_entry_tags')
+    .select('tag:journal_tags(*)')
+    .eq('entry_id', entryId)
+
+  const tags = (tagLinks ?? [])
+    .map((l: Record<string, unknown>) => l.tag as Record<string, unknown> | null)
+    .filter((t): t is Record<string, unknown> => Boolean(t))
+    .map(mapJournalTag)
+
+  return { ...mapJournalEntry(data), tags }
 })

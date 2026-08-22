@@ -7,6 +7,7 @@ const props = defineProps<{
   metrics?: MetricValueWithDefinition[]
   loading: boolean
   streak?: number
+  isOnline?: boolean
   onUpsertEntry: (payload: {
     entryDate: string
     title?: string | null
@@ -84,7 +85,7 @@ function disarmContentSuppression() {
 }
 
 // ── Auto-save state ────────────────────────────────────────────────────────────
-type SaveStatus = 'idle' | 'unsaved' | 'saved' | 'error'
+type SaveStatus = 'idle' | 'unsaved' | 'saved' | 'offline-pending' | 'error'
 const saveStatus = ref<SaveStatus>('idle')
 const savedAt = ref<Date | null>(null)
 
@@ -147,18 +148,28 @@ watch(
   { immediate: true }
 )
 
+// A truthy save result while offline means the composable just queued the
+// mutation for later (useOptimisticAction's offline path) — worth telling
+// the user apart from an actual round trip, same distinction NoteEditor
+// already makes for notes.
+function resolveSavedStatus(): SaveStatus {
+  if (hasChanges.value) return 'unsaved'
+  return props.isOnline === false ? 'offline-pending' : 'saved'
+}
+
 // ── Save logic ─────────────────────────────────────────────────────────────────
 async function doSave() {
   if (isContentEmpty.value || !hasChanges.value) return
 
-  // Snapshot what's actually being sent — the save is a multi-step async
-  // round trip (POST, then the composable refetches today/list/calendar),
-  // during which the user can keep typing. If we marked "saved" using the
-  // *live* content/mood after the await, those newer keystrokes would be
-  // flagged as already-saved even though the server never got them — the
-  // next poll would see no diff and never retry, silently losing that text.
-  // Comparing against this snapshot on completion keeps them correctly
-  // marked unsaved so the next poll cycle picks them up.
+  // Snapshot what's actually being sent — the save is asynchronous (the
+  // composable's optimistic apply happens immediately, but doSave only
+  // resolves once the real request settles), during which the user can keep
+  // typing. If we marked "saved" using the *live* content/mood after the
+  // await, those newer keystrokes would be flagged as already-saved even
+  // though the server never got them — the next poll would see no diff and
+  // never retry, silently losing that text. Comparing against this snapshot
+  // on completion keeps them correctly marked unsaved so the next poll
+  // cycle picks them up.
   const savingContent = content.value
   const savingMood = mood.value
 
@@ -174,7 +185,7 @@ async function doSave() {
       if (savedContent.value !== savingContent) savedContent.value = savingContent
       if (savedMood.value !== savingMood) savedMood.value = savingMood
       if (content.value === savingContent && mood.value === savingMood) lastChangeAt.value = 0
-      saveStatus.value = hasChanges.value ? 'unsaved' : 'saved'
+      saveStatus.value = resolveSavedStatus()
       savedAt.value = new Date()
     } else {
       saveStatus.value = 'error'
@@ -209,7 +220,7 @@ async function onTagsUpdate(newTags: string[]) {
       if (savedContent.value !== savingContent) savedContent.value = savingContent
       if (savedMood.value !== savingMood) savedMood.value = savingMood
       if (content.value === savingContent && mood.value === savingMood) lastChangeAt.value = 0
-      saveStatus.value = hasChanges.value ? 'unsaved' : 'saved'
+      saveStatus.value = resolveSavedStatus()
       savedAt.value = new Date()
     }
   } finally {
@@ -344,6 +355,10 @@ defineExpose({ isUnsaved: () => hasChanges.value, doSave })
               <template v-else-if="saveStatus === 'saved'">
                 <UIcon name="i-lucide-check-circle" class="size-3 text-success" />
                 <span class="text-muted">Salvo às {{ savedAtText }}</span>
+              </template>
+              <template v-else-if="saveStatus === 'offline-pending'">
+                <UIcon name="i-lucide-cloud-off" class="size-3 text-warning" />
+                <span class="text-muted">Salvo localmente — sincroniza ao reconectar</span>
               </template>
               <template v-else-if="saveStatus === 'error'">
                 <UIcon name="i-lucide-alert-circle" class="size-3 text-error" />

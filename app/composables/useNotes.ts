@@ -1130,13 +1130,17 @@ export function useNotes() {
   async function drainMutationQueue(): Promise<void> {
     if (syncingOffline.value) return
     await ensureQueueLoaded()
-    if (pendingMutations.value.length === 0) return
+    // The queue is shared with useJournal.ts — only replay this composable's
+    // own entities, or the two drain loops (one per mounted page) could race
+    // to dequeue and replay the same journal mutation twice.
+    const relevant = pendingMutations.value.filter(m => m.entity === 'note' || m.entity === 'folder')
+    if (relevant.length === 0) return
 
     syncingOffline.value = true
     let replayedAny = false
 
     try {
-      const queue = [...pendingMutations.value]
+      const queue = [...relevant]
 
       for (const mutation of queue) {
         // Coalesced/cancelled by a later action since the snapshot was taken.

@@ -29,7 +29,10 @@ const {
   insights,
   insightsStatus,
   insightsRange,
-  refreshInsights
+  refreshInsights,
+  isOnline,
+  pendingSyncCount,
+  syncingOffline
 } = useJournal()
 
 const isMobile = useIsMobile()
@@ -155,6 +158,22 @@ function onInsightsRangeChange(range: '7d' | '30d' | '90d') {
 
     <template #body>
       <div class="space-y-4">
+        <!-- Offline / pending sync indicator -->
+        <div
+          v-if="!isOnline || pendingSyncCount > 0"
+          class="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs"
+          :class="!isOnline ? 'text-warning bg-warning/5' : 'text-muted bg-elevated/40'"
+        >
+          <UIcon
+            :name="!isOnline ? 'i-lucide-cloud-off' : syncingOffline ? 'i-lucide-loader-2' : 'i-lucide-cloud-upload'"
+            class="size-3.5 shrink-0"
+            :class="syncingOffline ? 'animate-spin' : ''"
+          />
+          <span v-if="!isOnline">Offline — as alterações serão sincronizadas ao reconectar</span>
+          <span v-else-if="syncingOffline">Sincronizando alterações offline...</span>
+          <span v-else>{{ pendingSyncCount }} alteração(ões) pendente(s) de sincronização</span>
+        </div>
+
         <!-- EDITOR VIEW -->
         <div v-if="activeView === 'editor'">
           <JournalTodayEditor
@@ -163,6 +182,7 @@ function onInsightsRangeChange(range: '7d' | '30d' | '90d') {
             :metrics="todayData?.metrics ?? []"
             :streak="todayData?.streak ?? 0"
             :loading="todayStatus === 'pending'"
+            :is-online="isOnline"
             :on-upsert-entry="upsertEntry"
           />
         </div>
