@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { JournalInsights } from '~/types/journal'
+import { getMoodOptionByScore } from '~/types/journal'
 
 const props = defineProps<{
   insights: JournalInsights | null
@@ -129,6 +130,43 @@ const _props = props
             <span class="text-muted tabular-nums w-8 text-right">
               {{ day.count }}
             </span>
+          </div>
+        </div>
+      </UCard>
+
+      <!-- Mood × metric correlation -->
+      <UCard v-if="_props.insights.moodCorrelations.length > 0">
+        <template #header>
+          <h4 class="text-sm font-medium text-highlighted">
+            Humor × métricas
+          </h4>
+        </template>
+
+        <div class="space-y-4">
+          <div
+            v-for="corr in _props.insights.moodCorrelations"
+            :key="corr.key"
+          >
+            <p class="text-xs font-medium text-highlighted mb-1.5">
+              {{ corr.name }}
+            </p>
+            <div class="flex flex-wrap gap-2">
+              <div
+                v-for="g in corr.groups"
+                :key="g.label"
+                class="flex items-center gap-1.5 rounded-lg bg-elevated/40 px-2.5 py-1.5"
+              >
+                <span class="text-base leading-none">{{ getMoodOptionByScore(g.avgMood)?.emoji }}</span>
+                <div class="text-xs">
+                  <p class="text-highlighted font-medium">
+                    {{ g.label }}
+                  </p>
+                  <p class="text-dimmed">
+                    {{ g.avgMood }}/5 · {{ g.count }} {{ g.count === 1 ? 'dia' : 'dias' }}
+                  </p>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </UCard>

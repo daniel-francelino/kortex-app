@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { JournalEntry, MetricValueWithDefinition } from '~/types/journal'
-import { isEditorContentEmpty } from '~/utils/editor/content'
+import { isEditorContentEmpty, serializeEditorContent } from '~/utils/editor/content'
 
 const props = defineProps<{
   todayEntry: JournalEntry | null
@@ -233,6 +233,26 @@ function formatToday(): string {
   })
 }
 
+// ── Entry prompts ──────────────────────────────────────────────────────────────
+// A blank page is the #1 thing that keeps people from journaling — these are
+// just a starting nudge, shown only while there's nothing written yet.
+const ENTRY_PROMPTS = [
+  { label: 'Gratidão', icon: 'i-lucide-heart', prompt: 'Três coisas pelas quais eu sou grato hoje...' },
+  { label: 'Reflexão do dia', icon: 'i-lucide-sparkles', prompt: 'Como foi o meu dia? O que mais me marcou?' },
+  { label: 'Revisão da semana', icon: 'i-lucide-calendar-range', prompt: 'O que funcionou bem essa semana? O que eu quero mudar?' },
+  { label: 'Foco de amanhã', icon: 'i-lucide-target', prompt: 'O que eu quero priorizar amanhã?' }
+]
+
+function applyPrompt(prompt: string) {
+  content.value = serializeEditorContent({
+    type: 'doc',
+    content: [
+      { type: 'heading', attrs: { level: 3 }, content: [{ type: 'text', text: prompt }] },
+      { type: 'paragraph' }
+    ]
+  })
+}
+
 defineExpose({ isUnsaved: () => hasChanges.value, doSave })
 </script>
 
@@ -295,6 +315,30 @@ defineExpose({ isUnsaved: () => hasChanges.value, doSave })
           <JournalMoodSelector v-model="mood" />
         </div>
       </div>
+
+      <!-- Entry prompts — a nudge to get past the blank page, gone once there's content.
+           ClientOnly for the same reason as the tag editor above: this is
+           part of the always-visible initial view (unlike the metrics panel,
+           which starts collapsed), so an isMobile-driven size here would be
+           just as exposed to the hydration-mismatch issue. -->
+      <ClientOnly v-if="isContentEmpty">
+        <div class="flex flex-wrap items-center gap-2">
+          <span class="text-xs text-dimmed">Não sabe por onde começar?</span>
+          <UButton
+            v-for="p in ENTRY_PROMPTS"
+            :key="p.label"
+            :label="p.label"
+            :icon="p.icon"
+            :size="isMobile ? 'md' : 'xs'"
+            color="neutral"
+            variant="outline"
+            @click="applyPrompt(p.prompt)"
+          />
+        </div>
+        <template #fallback>
+          <USkeleton class="h-7 w-full max-w-sm" />
+        </template>
+      </ClientOnly>
 
       <!-- Notion editor -->
       <ClientOnly>
