@@ -148,9 +148,30 @@ export interface JournalInsightMetric {
   count: number
 }
 
+export interface JournalMoodCorrelationGroup {
+  label: string
+  avgMood: number
+  count: number
+}
+
+export interface JournalMoodCorrelation {
+  key: string
+  name: string
+  type: string
+  groups: JournalMoodCorrelationGroup[]
+}
+
 export interface JournalInsights {
   range: string
   totalEntries: number
   metrics: JournalInsightMetric[]
   entriesByDayOfWeek: { day: string, count: number }[]
+  moodCorrelations: JournalMoodCorrelation[]
+}
+
+// A mood correlation's `avgMood` is a 1–5 score (matches MOOD_OPTIONS order:
+// very_bad=1 … very_good=5) — round it to find the closest emoji/label.
+export function getMoodOptionByScore(score: number) {
+  const index = Math.min(Math.max(Math.round(score) - 1, 0), MOOD_OPTIONS.length - 1)
+  return MOOD_OPTIONS[index]
 }

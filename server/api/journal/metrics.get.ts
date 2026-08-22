@@ -1,5 +1,6 @@
 import { getSupabaseAdminClient } from '../../utils/supabase'
 import { requireAuthUser } from '../../utils/require-auth'
+import { mapMetricDefinition } from '../../utils/journal-mappers'
 
 export default eventHandler(async (event) => {
   const user = await requireAuthUser(event)
@@ -15,5 +16,5 @@ export default eventHandler(async (event) => {
     throw createError({ statusCode: 500, statusMessage: error.message })
   }
 
-  return data ?? []
+  return (data ?? []).map(mapMetricDefinition)
 })

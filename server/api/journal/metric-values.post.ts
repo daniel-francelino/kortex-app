@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { getSupabaseAdminClient } from '../../utils/supabase'
 import { requireAuthUser } from '../../utils/require-auth'
+import { mapMetricValue } from '../../utils/journal-mappers'
 
 const valueSchema = z.object({
   metricKey: z.string().min(1),
@@ -56,7 +57,7 @@ export default eventHandler(async (event) => {
       .single()
 
     if (!error && data) {
-      results.push(data)
+      results.push(mapMetricValue(data))
     }
   }
 

@@ -1,21 +1,44 @@
 <script setup lang="ts">
-import type { JournalEntry } from '~/types/journal'
-import { isEditorContentEmpty } from '~/utils/editor/content'
+import type { JournalEntry, MetricValueWithDefinition } from '~/types/journal'
+import { isEditorContentEmpty, serializeEditorContent } from '~/utils/editor/content'
 
 const props = defineProps<{
   todayEntry: JournalEntry | null
+  metrics?: MetricValueWithDefinition[]
   loading: boolean
+  streak?: number
+  isOnline?: boolean
   onUpsertEntry: (payload: {
     entryDate: string
     title?: string | null
     content: string
     mood?: string | null
+    tags?: string[]
   }, options?: { silent?: boolean }) => Promise<JournalEntry | null>
 }>()
+
+const {
+  tags: availableTags,
+  refreshTags,
+  metricDefinitions,
+  refreshMetricDefinitions,
+  createMetricDefinition,
+  upsertMetricValues,
+  metricTypeOptions
+} = useJournal()
+
+const isMobile = useIsMobile()
+
+onMounted(() => {
+  refreshTags()
+  refreshMetricDefinitions()
+})
 
 const today = new Date().toISOString().split('T')[0] ?? ''
 const content = ref('')
 const mood = ref<string | null>(null)
+const entryTags = ref<string[]>([])
+const metricCreateOpen = ref(false)
 
 // Last saved snapshot — what the server currently has
 const savedContent = ref('')
@@ -24,8 +47,45 @@ const savedMood = ref<string | null>(null)
 // Timestamp of the last user-initiated change (0 = no pending change)
 const lastChangeAt = ref(0)
 
+// The editor assigns a stable blockId to any node that doesn't have one yet
+// (BlockIdExtension, useNotionEditor.ts) — needed for older entries saved
+// before that existed. That assignment fires through the same
+// `update:modelValue` channel as real typing, right after the editor mounts
+// with freshly-loaded content, before the user could have touched anything.
+// Left unhandled, `content` would diverge from `savedContent` immediately on
+// load, permanently showing "Não salvo" and the unsaved-changes prompt on
+// every visit until the next autosave happened to fix it. This absorbs that
+// one automatic correction into the saved baseline instead of flagging it.
+//
+// Armed right after a fresh load, consumed by the first content change that
+// follows (whether that's the editor's own correction or, less commonly, a
+// genuinely very fast user edit). If nothing changes the content at all —
+// the common case once every entry has stable ids — there's no event to
+// consume it, so a short timeout disarms it on its own; otherwise a real
+// edit made minutes later could get silently absorbed as "already saved"
+// without ever reaching the server.
+const suppressNextContentChange = ref(false)
+let suppressTimer: ReturnType<typeof setTimeout> | null = null
+
+function armContentSuppression() {
+  suppressNextContentChange.value = true
+  if (suppressTimer) clearTimeout(suppressTimer)
+  suppressTimer = setTimeout(() => {
+    suppressNextContentChange.value = false
+    suppressTimer = null
+  }, 500)
+}
+
+function disarmContentSuppression() {
+  suppressNextContentChange.value = false
+  if (suppressTimer) {
+    clearTimeout(suppressTimer)
+    suppressTimer = null
+  }
+}
+
 // ── Auto-save state ────────────────────────────────────────────────────────────
-type SaveStatus = 'idle' | 'unsaved' | 'saved' | 'error'
+type SaveStatus = 'idle' | 'unsaved' | 'saved' | 'offline-pending' | 'error'
 const saveStatus = ref<SaveStatus>('idle')
 const savedAt = ref<Date | null>(null)
 
@@ -37,10 +97,26 @@ const savedAtText = computed(() =>
   savedAt.value?.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) ?? ''
 )
 
+// ── Empty content check ────────────────────────────────────────────────────────
+const isContentEmpty = computed(() => isEditorContentEmpty(content.value))
+
+// True when editor has unsaved changes
+const hasChanges = computed(() =>
+  content.value !== savedContent.value || mood.value !== savedMood.value
+)
+
 // ── Sync entry from props ──────────────────────────────────────────────────────
+// `todayEntry` also changes right after OUR OWN save resolves — upsertEntry()
+// refetches /api/journal/today, and that echo can land here while the user
+// kept typing during the round trip. Re-syncing at that point would blow
+// away those newer keystrokes with what the server had a moment ago. Only
+// pull from props when there's nothing unsaved locally (initial load, or a
+// genuinely external change made elsewhere, e.g. via EntryDetailModal).
 watch(
   [() => props.todayEntry, () => props.loading],
   ([entry]) => {
+    if (hasChanges.value) return
+
     if (entry) {
       const c = entry.content ?? ''
       if (c !== content.value) {
@@ -53,6 +129,8 @@ watch(
         mood.value = m
       }
       savedMood.value = m
+      entryTags.value = (entry.tags ?? []).map(t => t.name)
+      armContentSuppression()
       initialized.value = true
     } else if (!props.loading) {
       // Only reset when truly no entry and not mid-fetch
@@ -60,43 +138,93 @@ watch(
       savedContent.value = ''
       mood.value = null
       savedMood.value = null
+      entryTags.value = []
       lastChangeAt.value = 0
       saveStatus.value = 'idle'
+      armContentSuppression()
       initialized.value = true
     }
   },
   { immediate: true }
 )
 
-// ── Empty content check ────────────────────────────────────────────────────────
-const isContentEmpty = computed(() => isEditorContentEmpty(content.value))
-
-// True when editor has unsaved changes
-const hasChanges = computed(() =>
-  content.value !== savedContent.value || mood.value !== savedMood.value
-)
+// A truthy save result while offline means the composable just queued the
+// mutation for later (useOptimisticAction's offline path) — worth telling
+// the user apart from an actual round trip, same distinction NoteEditor
+// already makes for notes.
+function resolveSavedStatus(): SaveStatus {
+  if (hasChanges.value) return 'unsaved'
+  return props.isOnline === false ? 'offline-pending' : 'saved'
+}
 
 // ── Save logic ─────────────────────────────────────────────────────────────────
 async function doSave() {
   if (isContentEmpty.value || !hasChanges.value) return
+
+  // Snapshot what's actually being sent — the save is asynchronous (the
+  // composable's optimistic apply happens immediately, but doSave only
+  // resolves once the real request settles), during which the user can keep
+  // typing. If we marked "saved" using the *live* content/mood after the
+  // await, those newer keystrokes would be flagged as already-saved even
+  // though the server never got them — the next poll would see no diff and
+  // never retry, silently losing that text. Comparing against this snapshot
+  // on completion keeps them correctly marked unsaved so the next poll
+  // cycle picks them up.
+  const savingContent = content.value
+  const savingMood = mood.value
+
   try {
     const result = await props.onUpsertEntry({
       entryDate: today,
       title: null,
-      content: content.value,
-      mood: mood.value
+      content: savingContent,
+      mood: savingMood,
+      tags: entryTags.value
     }, { silent: true })
     if (result) {
-      savedContent.value = content.value
-      savedMood.value = mood.value
-      lastChangeAt.value = 0
-      saveStatus.value = 'saved'
+      if (savedContent.value !== savingContent) savedContent.value = savingContent
+      if (savedMood.value !== savingMood) savedMood.value = savingMood
+      if (content.value === savingContent && mood.value === savingMood) lastChangeAt.value = 0
+      saveStatus.value = resolveSavedStatus()
       savedAt.value = new Date()
     } else {
       saveStatus.value = 'error'
     }
   } catch {
     saveStatus.value = 'error'
+  }
+}
+
+// ── Tags ───────────────────────────────────────────────────────────────────────
+// Tag edits are an explicit action, so they save immediately (content must
+// already exist — the entry schema requires non-empty content).
+const savingTags = ref(false)
+
+async function onTagsUpdate(newTags: string[]) {
+  entryTags.value = newTags
+  if (isContentEmpty.value) return
+
+  const savingContent = content.value
+  const savingMood = mood.value
+
+  savingTags.value = true
+  try {
+    const result = await props.onUpsertEntry({
+      entryDate: today,
+      title: null,
+      content: savingContent,
+      mood: savingMood,
+      tags: newTags
+    })
+    if (result) {
+      if (savedContent.value !== savingContent) savedContent.value = savingContent
+      if (savedMood.value !== savingMood) savedMood.value = savingMood
+      if (content.value === savingContent && mood.value === savingMood) lastChangeAt.value = 0
+      saveStatus.value = resolveSavedStatus()
+      savedAt.value = new Date()
+    }
+  } finally {
+    savingTags.value = false
   }
 }
 
@@ -121,6 +249,10 @@ onBeforeUnmount(() => {
     clearInterval(pollTimer)
     pollTimer = null
   }
+  if (suppressTimer) {
+    clearTimeout(suppressTimer)
+    suppressTimer = null
+  }
   // Best-effort immediate save on unmount
   if (saveStatus.value === 'unsaved') doSave()
 })
@@ -128,6 +260,11 @@ onBeforeUnmount(() => {
 // ── Watch for user changes ─────────────────────────────────────────────────────
 watch(content, (val) => {
   if (val === savedContent.value) return
+  if (suppressNextContentChange.value) {
+    disarmContentSuppression()
+    savedContent.value = val
+    return
+  }
   if (isContentEmpty.value) {
     saveStatus.value = 'idle'
     lastChangeAt.value = 0
@@ -155,6 +292,26 @@ function formatToday(): string {
   })
 }
 
+// ── Entry prompts ──────────────────────────────────────────────────────────────
+// A blank page is the #1 thing that keeps people from journaling — these are
+// just a starting nudge, shown only while there's nothing written yet.
+const ENTRY_PROMPTS = [
+  { label: 'Gratidão', icon: 'i-lucide-heart', prompt: 'Três coisas pelas quais eu sou grato hoje...' },
+  { label: 'Reflexão do dia', icon: 'i-lucide-sparkles', prompt: 'Como foi o meu dia? O que mais me marcou?' },
+  { label: 'Revisão da semana', icon: 'i-lucide-calendar-range', prompt: 'O que funcionou bem essa semana? O que eu quero mudar?' },
+  { label: 'Foco de amanhã', icon: 'i-lucide-target', prompt: 'O que eu quero priorizar amanhã?' }
+]
+
+function applyPrompt(prompt: string) {
+  content.value = serializeEditorContent({
+    type: 'doc',
+    content: [
+      { type: 'heading', attrs: { level: 3 }, content: [{ type: 'text', text: prompt }] },
+      { type: 'paragraph' }
+    ]
+  })
+}
+
 defineExpose({ isUnsaved: () => hasChanges.value, doSave })
 </script>
 
@@ -171,9 +328,20 @@ defineExpose({ isUnsaved: () => hasChanges.value, doSave })
       <!-- Header: date + mood selector na mesma linha -->
       <div class="flex items-center justify-between gap-4">
         <div class="min-w-0">
-          <h3 class="text-lg font-semibold text-highlighted capitalize">
-            {{ formatToday() }}
-          </h3>
+          <div class="flex items-center gap-2">
+            <h3 class="text-lg font-semibold text-highlighted capitalize">
+              {{ formatToday() }}
+            </h3>
+            <UBadge
+              v-if="streak && streak > 0"
+              color="warning"
+              variant="subtle"
+              size="sm"
+              class="gap-1"
+            >
+              🔥 {{ streak }} {{ streak === 1 ? 'dia' : 'dias' }}
+            </UBadge>
+          </div>
           <div class="flex items-center gap-2 mt-0.5">
             <p class="text-sm text-muted">
               Seu diário de bordo de hoje.
@@ -187,6 +355,10 @@ defineExpose({ isUnsaved: () => hasChanges.value, doSave })
               <template v-else-if="saveStatus === 'saved'">
                 <UIcon name="i-lucide-check-circle" class="size-3 text-success" />
                 <span class="text-muted">Salvo às {{ savedAtText }}</span>
+              </template>
+              <template v-else-if="saveStatus === 'offline-pending'">
+                <UIcon name="i-lucide-cloud-off" class="size-3 text-warning" />
+                <span class="text-muted">Salvo localmente — sincroniza ao reconectar</span>
               </template>
               <template v-else-if="saveStatus === 'error'">
                 <UIcon name="i-lucide-alert-circle" class="size-3 text-error" />
@@ -207,6 +379,30 @@ defineExpose({ isUnsaved: () => hasChanges.value, doSave })
         </div>
       </div>
 
+      <!-- Entry prompts — a nudge to get past the blank page, gone once there's content.
+           ClientOnly for the same reason as the tag editor above: this is
+           part of the always-visible initial view (unlike the metrics panel,
+           which starts collapsed), so an isMobile-driven size here would be
+           just as exposed to the hydration-mismatch issue. -->
+      <ClientOnly v-if="isContentEmpty">
+        <div class="flex flex-wrap items-center gap-2">
+          <span class="text-xs text-dimmed">Não sabe por onde começar?</span>
+          <UButton
+            v-for="p in ENTRY_PROMPTS"
+            :key="p.label"
+            :label="p.label"
+            :icon="p.icon"
+            :size="isMobile ? 'md' : 'xs'"
+            color="neutral"
+            variant="outline"
+            @click="applyPrompt(p.prompt)"
+          />
+        </div>
+        <template #fallback>
+          <USkeleton class="h-7 w-full max-w-sm" />
+        </template>
+      </ClientOnly>
+
       <!-- Notion editor -->
       <ClientOnly>
         <NotionEditor
@@ -219,6 +415,83 @@ defineExpose({ isUnsaved: () => hasChanges.value, doSave })
           <USkeleton class="h-56 w-full rounded-lg" />
         </template>
       </ClientOnly>
+
+      <!-- Tags -->
+      <div class="rounded-lg border border-default p-3">
+        <div class="flex items-center justify-between mb-2">
+          <h4 class="text-sm font-medium text-highlighted">
+            Tags
+          </h4>
+          <UIcon
+            v-if="savingTags"
+            name="i-lucide-loader-2"
+            class="size-3.5 animate-spin text-muted"
+          />
+        </div>
+        <p
+          v-if="isContentEmpty"
+          class="text-xs text-dimmed"
+        >
+          Escreva algo antes de adicionar tags.
+        </p>
+        <!-- JournalTagEditor picks its button/input sizes from the viewport
+             width (bigger on mobile, compact on desktop) — client-only info
+             that doesn't exist during SSR. Rendering it there would bake in
+             the desktop size, and Vue's hydration intentionally never
+             corrects a mismatched class afterwards, so it'd stay wrong on
+             mobile until the user resizes the window. ClientOnly sidesteps
+             that entirely by skipping the SSR pass for it. -->
+        <ClientOnly v-else>
+          <JournalTagEditor
+            :model-value="entryTags"
+            :available-tags="availableTags ?? []"
+            @update:model-value="onTagsUpdate"
+          />
+          <template #fallback>
+            <USkeleton class="h-8 w-40" />
+          </template>
+        </ClientOnly>
+      </div>
+
+      <!-- Metrics -->
+      <UCollapsible>
+        <UButton
+          label="Métricas do dia"
+          icon="i-lucide-gauge"
+          color="neutral"
+          variant="outline"
+          trailing-icon="i-lucide-chevron-down"
+          block
+        />
+
+        <template #content>
+          <div class="mt-3 space-y-3 rounded-lg border border-default p-3">
+            <div class="flex justify-end">
+              <UButton
+                label="Nova métrica"
+                icon="i-lucide-plus"
+                :size="isMobile ? 'md' : 'xs'"
+                color="neutral"
+                variant="ghost"
+                @click="metricCreateOpen = true"
+              />
+            </div>
+            <JournalMetricsPanel
+              :definitions="metricDefinitions ?? []"
+              :existing-values="metrics ?? []"
+              :entry-date="today"
+              :on-upsert-metric-values="upsertMetricValues"
+            />
+          </div>
+        </template>
+      </UCollapsible>
     </template>
   </div>
+
+  <JournalMetricCreateModal
+    :open="metricCreateOpen"
+    :metric-type-options="metricTypeOptions"
+    :on-create-metric-definition="createMetricDefinition"
+    @update:open="metricCreateOpen = $event"
+  />
 </template>

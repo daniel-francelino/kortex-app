@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { getSupabaseAdminClient } from '../../utils/supabase'
 import { requireAuthUser } from '../../utils/require-auth'
+import { mapJournalEntry, mapJournalTag } from '../../utils/journal-mappers'
 
 const querySchema = z.object({
   from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
@@ -64,8 +65,32 @@ export default eventHandler(async (event) => {
     }
   }
 
+  // Attach tags for the entries on this page
+  const pageEntryIds = filtered.map((e: Record<string, unknown>) => e.id as string)
+  const tagsByEntry = new Map<string, ReturnType<typeof mapJournalTag>[]>()
+  if (pageEntryIds.length > 0) {
+    const { data: allTagLinks } = await supabase
+      .from('journal_entry_tags')
+      .select('entry_id, tag:journal_tags(*)')
+      .in('entry_id', pageEntryIds)
+
+    for (const link of (allTagLinks ?? []) as Array<Record<string, unknown>>) {
+      const entryId = link.entry_id as string
+      const tag = link.tag as Record<string, unknown> | null
+      if (!tag) continue
+      const list = tagsByEntry.get(entryId) ?? []
+      list.push(mapJournalTag(tag))
+      tagsByEntry.set(entryId, list)
+    }
+  }
+
+  const mapped = filtered.map((e: Record<string, unknown>) => ({
+    ...mapJournalEntry(e),
+    tags: tagsByEntry.get(e.id as string) ?? []
+  }))
+
   return {
-    data: filtered,
+    data: mapped,
     total: count ?? 0,
     page,
     pageSize

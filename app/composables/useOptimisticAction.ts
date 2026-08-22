@@ -22,7 +22,7 @@ export interface OptimisticActionOptions<T> {
   offline?: {
     entity: PendingMutationEntity
     action: PendingMutationAction
-    method: 'POST' | 'PUT' | 'DELETE'
+    method: 'POST' | 'PUT' | 'PATCH' | 'DELETE'
     url: string
     body?: unknown
     tempId?: string

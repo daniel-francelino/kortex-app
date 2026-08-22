@@ -28,7 +28,7 @@ const dayHeaders = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
 
 // Map date → mood for O(1) lookup
 const entryMoodMap = computed(() => {
-  const map = new Map<string, number | null>()
+  const map = new Map<string, string | null>()
   props.entryDates.forEach(e => map.set(e.date, e.mood))
   return map
 })

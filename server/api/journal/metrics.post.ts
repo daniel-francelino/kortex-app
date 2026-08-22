@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { getSupabaseAdminClient } from '../../utils/supabase'
 import { requireAuthUser } from '../../utils/require-auth'
+import { mapMetricDefinition } from '../../utils/journal-mappers'
 
 const bodySchema = z.object({
   key: z.string().min(1).max(50).regex(/^[a-z0-9_]+$/),
@@ -45,5 +46,5 @@ export default eventHandler(async (event) => {
     throw createError({ statusCode: 500, statusMessage: error.message })
   }
 
-  return data
+  return mapMetricDefinition(data)
 })

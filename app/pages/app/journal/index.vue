@@ -17,16 +17,38 @@ const {
   calendarFrom,
   calendarTo,
   refreshCalendar,
-  upsertEntry
+  upsertEntry,
+  listData,
+  listFetchStatus,
+  listPage,
+  listSearch,
+  listTag,
+  refreshList,
+  tags,
+  refreshTags,
+  insights,
+  insightsStatus,
+  insightsRange,
+  refreshInsights,
+  isOnline,
+  pendingSyncCount,
+  syncingOffline
 } = useJournal()
 
+const isMobile = useIsMobile()
+
 // ─── View mode ────────────────────────────────────────────────────────────────
-type JournalView = 'editor' | 'calendar'
+type JournalView = 'editor' | 'calendar' | 'list' | 'insights'
 const activeView = ref<JournalView>('editor')
 
 watch(activeView, (view) => {
   if (view === 'editor') refreshToday()
   if (view === 'calendar') refreshCalendar()
+  if (view === 'list') {
+    refreshList()
+    refreshTags()
+  }
+  if (view === 'insights') refreshInsights()
 })
 
 // ─── Editor ref (for unsaved-changes check) ───────────────────────────────────
@@ -82,8 +104,25 @@ function onCalendarMonthChange(from: string, to: string) {
 // ─── View options ─────────────────────────────────────────────────────────────
 const viewOptions: { value: JournalView, icon: string, tooltip: string }[] = [
   { value: 'editor', icon: 'i-lucide-pen-line', tooltip: 'Editor de hoje' },
-  { value: 'calendar', icon: 'i-lucide-calendar-days', tooltip: 'Calendário' }
+  { value: 'calendar', icon: 'i-lucide-calendar-days', tooltip: 'Calendário' },
+  { value: 'list', icon: 'i-lucide-list', tooltip: 'Lista de entradas' },
+  { value: 'insights', icon: 'i-lucide-bar-chart-3', tooltip: 'Insights' }
 ]
+
+// ─── Entry list view ────────────────────────────────────────────────────────────
+const tagFilterOptions = computed(() => [
+  { label: 'Todas as tags', value: '' },
+  ...(tags.value ?? []).map(t => ({ label: t.name, value: t.name }))
+])
+
+function onListEntrySelect(date: string) {
+  onSelectDate(date)
+}
+
+// ─── Insights view ────────────────────────────────────────────────────────────
+function onInsightsRangeChange(range: '7d' | '30d' | '90d') {
+  insightsRange.value = range
+}
 </script>
 
 <template>
@@ -119,12 +158,31 @@ const viewOptions: { value: JournalView, icon: string, tooltip: string }[] = [
 
     <template #body>
       <div class="space-y-4">
+        <!-- Offline / pending sync indicator -->
+        <div
+          v-if="!isOnline || pendingSyncCount > 0"
+          class="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs"
+          :class="!isOnline ? 'text-warning bg-warning/5' : 'text-muted bg-elevated/40'"
+        >
+          <UIcon
+            :name="!isOnline ? 'i-lucide-cloud-off' : syncingOffline ? 'i-lucide-loader-2' : 'i-lucide-cloud-upload'"
+            class="size-3.5 shrink-0"
+            :class="syncingOffline ? 'animate-spin' : ''"
+          />
+          <span v-if="!isOnline">Offline — as alterações serão sincronizadas ao reconectar</span>
+          <span v-else-if="syncingOffline">Sincronizando alterações offline...</span>
+          <span v-else>{{ pendingSyncCount }} alteração(ões) pendente(s) de sincronização</span>
+        </div>
+
         <!-- EDITOR VIEW -->
         <div v-if="activeView === 'editor'">
           <JournalTodayEditor
             ref="editorRef"
             :today-entry="todayData?.entry ?? null"
+            :metrics="todayData?.metrics ?? []"
+            :streak="todayData?.streak ?? 0"
             :loading="todayStatus === 'pending'"
+            :is-online="isOnline"
             :on-upsert-entry="upsertEntry"
           />
         </div>
@@ -136,6 +194,53 @@ const viewOptions: { value: JournalView, icon: string, tooltip: string }[] = [
             :loading="calendarStatus === 'pending'"
             @select-date="onSelectDate"
             @month-change="onCalendarMonthChange"
+          />
+        </div>
+
+        <!-- LIST VIEW -->
+        <div v-else-if="activeView === 'list'" class="space-y-4">
+          <div class="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <UInput
+              v-model="listSearch"
+              icon="i-lucide-search"
+              placeholder="Buscar no diário..."
+              class="flex-1"
+            />
+            <USelect
+              v-model="listTag"
+              :items="tagFilterOptions"
+              value-key="value"
+              class="w-full sm:w-44"
+            />
+          </div>
+
+          <JournalEntryList
+            :entries="listData?.data ?? []"
+            :total="listData?.total ?? 0"
+            :page="listPage"
+            :page-size="listData?.pageSize ?? 20"
+            :loading="listFetchStatus === 'pending'"
+            @update:page="listPage = $event"
+            @select="onListEntrySelect"
+          />
+        </div>
+
+        <!-- INSIGHTS VIEW -->
+        <div v-else-if="activeView === 'insights'" class="space-y-4">
+          <div
+            v-if="(todayData?.streak ?? 0) > 0"
+            class="flex items-center gap-2 rounded-lg border border-default bg-elevated/30 px-4 py-3"
+          >
+            <span class="text-xl leading-none">🔥</span>
+            <span class="text-sm text-highlighted">
+              <strong>{{ todayData?.streak }}</strong> {{ todayData?.streak === 1 ? 'dia seguido' : 'dias seguidos' }} escrevendo no diário
+            </span>
+          </div>
+
+          <JournalInsightsPanel
+            :insights="insights ?? null"
+            :loading="insightsStatus === 'pending'"
+            @range-change="onInsightsRangeChange"
           />
         </div>
       </div>
@@ -162,25 +267,25 @@ const viewOptions: { value: JournalView, icon: string, tooltip: string }[] = [
     </template>
 
     <template #footer>
-      <div class="flex w-full items-center justify-end gap-2">
+      <div class="flex w-full flex-wrap items-center justify-end gap-2">
         <UButton
           label="Cancelar"
           variant="ghost"
           color="neutral"
-          size="sm"
+          :size="isMobile ? 'md' : 'sm'"
           @click="onConfirmCancel"
         />
         <UButton
           label="Descartar"
           variant="outline"
           color="error"
-          size="sm"
+          :size="isMobile ? 'md' : 'sm'"
           @click="onConfirmDiscardAndLeave"
         />
         <UButton
           label="Salvar e sair"
           icon="i-lucide-check"
-          size="sm"
+          :size="isMobile ? 'md' : 'sm'"
           @click="onConfirmSaveAndLeave"
         />
       </div>
@@ -192,6 +297,6 @@ const viewOptions: { value: JournalView, icon: string, tooltip: string }[] = [
     :open="detailModalOpen"
     :date="selectedDate"
     @update:open="detailModalOpen = $event"
-    @updated="refreshToday(); refreshCalendar()"
+    @updated="refreshToday(); refreshCalendar(); refreshList()"
   />
 </template>
