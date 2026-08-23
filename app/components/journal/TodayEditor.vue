@@ -244,12 +244,54 @@ function formatToday(): string {
 // ── Entry prompts ──────────────────────────────────────────────────────────────
 // A blank page is the #1 thing that keeps people from journaling — these are
 // just a starting nudge, shown only while there's nothing written yet.
-const ENTRY_PROMPTS = [
+// A pool larger than what's shown at once (see PROMPTS_VISIBLE below) keeps
+// the row from feeling repetitive across days.
+const ENTRY_PROMPT_POOL = [
   { label: 'Gratidão', icon: 'i-lucide-heart', prompt: 'Três coisas pelas quais eu sou grato hoje...' },
   { label: 'Reflexão do dia', icon: 'i-lucide-sparkles', prompt: 'Como foi o meu dia? O que mais me marcou?' },
   { label: 'Revisão da semana', icon: 'i-lucide-calendar-range', prompt: 'O que funcionou bem essa semana? O que eu quero mudar?' },
-  { label: 'Foco de amanhã', icon: 'i-lucide-target', prompt: 'O que eu quero priorizar amanhã?' }
+  { label: 'Foco de amanhã', icon: 'i-lucide-target', prompt: 'O que eu quero priorizar amanhã?' },
+  { label: 'Desabafo', icon: 'i-lucide-cloud-rain', prompt: 'O que está pesando na minha cabeça agora?' },
+  { label: 'Conquista', icon: 'i-lucide-trophy', prompt: 'Do que eu me orgulho de ter feito hoje?' },
+  { label: 'Aprendizado', icon: 'i-lucide-lightbulb', prompt: 'O que eu aprendi hoje, sobre mim ou sobre o mundo?' },
+  { label: 'Pessoas', icon: 'i-lucide-users', prompt: 'Quem fez diferença no meu dia, e por quê?' },
+  { label: 'Energia', icon: 'i-lucide-battery', prompt: 'O que me deu energia hoje? O que me esgotou?' },
+  { label: 'Carta ao futuro', icon: 'i-lucide-mail', prompt: 'O que eu quero lembrar desse momento daqui a um ano?' }
 ]
+const PROMPTS_VISIBLE = 4
+
+// Deterministic PRNG (mulberry32) seeded from a string — same seed always
+// produces the same shuffle order, so reloading the page mid-day keeps
+// showing the same 4 prompts instead of reshuffling on every render, while
+// a new seed (new day, or the "Outras ideias" button) picks a new set.
+function seededShuffle<T>(items: T[], seed: string): T[] {
+  let h = 0
+  for (let i = 0; i < seed.length; i++) {
+    h = (Math.imul(31, h) + seed.charCodeAt(i)) | 0
+  }
+  let state = h >>> 0
+  function rand() {
+    state = (state + 0x6D2B79F5) | 0
+    let t = Math.imul(state ^ (state >>> 15), 1 | state)
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
+  }
+  const arr = [...items]
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(rand() * (i + 1))
+    ;[arr[i], arr[j]] = [arr[j], arr[i]]
+  }
+  return arr
+}
+
+// Seeded by the date, so the visible set changes daily but stays stable
+// across reloads on the same day; "Outras ideias" reseeds on demand.
+const promptSeed = ref(today)
+const visiblePrompts = computed(() => seededShuffle(ENTRY_PROMPT_POOL, promptSeed.value).slice(0, PROMPTS_VISIBLE))
+
+function reshufflePrompts() {
+  promptSeed.value = `${today}-${Date.now()}`
+}
 
 function applyPrompt(prompt: string) {
   content.value = serializeEditorContent({
@@ -333,23 +375,36 @@ defineExpose({ isUnsaved: () => hasChanges.value, doSave })
 
       <!-- Entry prompts — a nudge to get past the blank page, gone once there's content. -->
       <ClientOnly v-if="isContentEmpty">
-        <!-- Ragged flex-wrap left each row a different length on a phone
-             (one button alone, then two, then one) — a single horizontally
-             scrollable row reads cleaner there. From lg up there's enough
-             width that wrapping looks fine, so it switches back. -->
-        <div class="flex items-center gap-2 overflow-x-auto pb-1 -mx-1 px-1 lg:flex-wrap lg:overflow-visible lg:pb-0 lg:mx-0 lg:px-0">
-          <span class="shrink-0 text-xs text-dimmed">Não sabe por onde começar?</span>
-          <UButton
-            v-for="p in ENTRY_PROMPTS"
-            :key="p.label"
-            :label="p.label"
-            :icon="p.icon"
-            :size="isMobile ? 'md' : 'xs'"
-            color="neutral"
-            variant="outline"
-            class="shrink-0"
-            @click="applyPrompt(p.prompt)"
-          />
+        <div class="space-y-1.5">
+          <div class="flex items-center justify-between gap-2">
+            <span class="text-xs text-dimmed">Não sabe por onde começar?</span>
+            <UButton
+              label="Outras ideias"
+              icon="i-lucide-shuffle"
+              :size="isMobile ? 'sm' : 'xs'"
+              color="neutral"
+              variant="ghost"
+              class="shrink-0 -my-1"
+              @click="reshufflePrompts"
+            />
+          </div>
+          <!-- Ragged flex-wrap left each row a different length on a phone
+               (one button alone, then two, then one) — a single horizontally
+               scrollable row reads cleaner there. From lg up there's enough
+               width that wrapping looks fine, so it switches back. -->
+          <div class="flex items-center gap-2 overflow-x-auto pb-1 -mx-1 px-1 lg:flex-wrap lg:overflow-visible lg:pb-0 lg:mx-0 lg:px-0">
+            <UButton
+              v-for="p in visiblePrompts"
+              :key="p.label"
+              :label="p.label"
+              :icon="p.icon"
+              :size="isMobile ? 'md' : 'xs'"
+              color="neutral"
+              variant="outline"
+              class="shrink-0 rounded-full"
+              @click="applyPrompt(p.prompt)"
+            />
+          </div>
         </div>
         <template #fallback>
           <USkeleton class="h-7 w-full max-w-sm" />
