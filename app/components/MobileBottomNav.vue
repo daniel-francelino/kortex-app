@@ -53,10 +53,7 @@ function navigateTo(to: string) {
 watchEffect(() => {
   if (!import.meta.client) return
 
-  document.documentElement.style.setProperty(
-    '--mobile-bottom-nav-height',
-    hasContextItems.value ? '8.75rem' : '4.75rem'
-  )
+  document.documentElement.style.setProperty('--mobile-bottom-nav-height', '4.75rem')
 })
 
 onUnmounted(() => {
@@ -99,26 +96,27 @@ onUnmounted(() => {
       </Transition>
     </Teleport>
 
-    <!-- Contextual view switcher -->
-    <AnimatePresence>
-      <motion.div
-        v-if="hasContextItems"
-        class="border-b border-default px-2 py-2"
-        :initial="{ opacity: 0, y: 12 }"
-        :animate="{ opacity: 1, y: 0 }"
-        :exit="{ opacity: 0, y: 10 }"
-        :transition="{ duration: 0.18, ease: 'easeOut' }"
-      >
-        <div class="mobile-context-nav flex gap-2 overflow-x-auto px-1">
+    <!-- Bottom nav bar -->
+    <nav class="px-2 py-1.5">
+      <AnimatePresence mode="wait">
+        <motion.div
+          v-if="hasContextItems"
+          key="context"
+          class="mobile-context-nav flex items-center justify-around overflow-x-auto"
+          :initial="{ opacity: 0, y: 8 }"
+          :animate="{ opacity: 1, y: 0 }"
+          :exit="{ opacity: 0, y: -6 }"
+          :transition="{ duration: 0.18, ease: 'easeOut' }"
+        >
           <motion.button
             v-for="(item, index) in contextItems"
             :key="item.value"
             type="button"
-            class="relative flex h-12 min-w-28 items-center justify-center gap-2 overflow-hidden rounded-xl border px-3 text-sm font-medium transition-colors"
+            class="flex min-h-14 min-w-[4.25rem] flex-col items-center justify-center gap-0.5 rounded-xl px-3 text-center transition-colors"
             :class="
               active === item.value
-                ? 'border-primary/40 text-primary'
-                : 'border-default text-muted active:bg-elevated/80'
+                ? 'text-primary'
+                : 'text-muted active:bg-elevated/80'
             "
             :initial="{ opacity: 0, y: 8 }"
             :animate="{ opacity: 1, y: 0 }"
@@ -127,43 +125,44 @@ onUnmounted(() => {
             :aria-pressed="active === item.value"
             @click="selectMobileContextNav(item.value)"
           >
-            <motion.span
-              v-if="active === item.value"
-              class="absolute inset-0 rounded-xl bg-primary/15"
-              layout-id="mobile-context-active"
-              :transition="{ duration: 0.18, ease: 'easeOut' }"
-            />
-            <UIcon :name="item.icon" class="relative size-5 shrink-0" />
-            <span class="relative whitespace-nowrap">{{ item.label }}</span>
+            <UIcon :name="item.icon" class="size-5 shrink-0" />
+            <span class="max-w-full truncate text-[10px] font-medium leading-tight">{{ item.label }}</span>
           </motion.button>
-        </div>
-      </motion.div>
-    </AnimatePresence>
+        </motion.div>
 
-    <!-- Bottom nav bar -->
-    <nav class="flex items-center justify-around px-2 py-1.5">
-      <template v-for="item in items" :key="item.label">
-        <NuxtLink
-          v-if="item.to"
-          :to="item.to"
-          class="flex flex-col items-center gap-0.5 rounded-lg px-3 py-1.5 transition-colors"
-          :class="isActive(item.to) ? 'text-primary' : 'text-muted'"
-          @click="showMoreMenu = false"
-        >
-          <UIcon :name="item.icon" class="size-5" />
-          <span class="text-[10px] font-medium leading-tight">{{ item.label }}</span>
-        </NuxtLink>
-
-        <button
+        <motion.div
           v-else
-          class="flex flex-col items-center gap-0.5 rounded-lg px-3 py-1.5 transition-colors"
-          :class="isMoreActive() || showMoreMenu ? 'text-primary' : 'text-muted'"
-          @click="handleMoreClick"
+          key="global"
+          class="flex items-center justify-around"
+          :initial="{ opacity: 0, y: 8 }"
+          :animate="{ opacity: 1, y: 0 }"
+          :exit="{ opacity: 0, y: -6 }"
+          :transition="{ duration: 0.18, ease: 'easeOut' }"
         >
-          <UIcon :name="item.icon" class="size-5" />
-          <span class="text-[10px] font-medium leading-tight">{{ item.label }}</span>
-        </button>
-      </template>
+          <template v-for="item in items" :key="item.label">
+            <NuxtLink
+              v-if="item.to"
+              :to="item.to"
+              class="flex min-h-14 flex-col items-center justify-center gap-0.5 rounded-xl px-3 transition-colors"
+              :class="isActive(item.to) ? 'text-primary' : 'text-muted'"
+              @click="showMoreMenu = false"
+            >
+              <UIcon :name="item.icon" class="size-5" />
+              <span class="text-[10px] font-medium leading-tight">{{ item.label }}</span>
+            </NuxtLink>
+
+            <button
+              v-else
+              class="flex min-h-14 flex-col items-center justify-center gap-0.5 rounded-xl px-3 transition-colors"
+              :class="isMoreActive() || showMoreMenu ? 'text-primary' : 'text-muted'"
+              @click="handleMoreClick"
+            >
+              <UIcon :name="item.icon" class="size-5" />
+              <span class="text-[10px] font-medium leading-tight">{{ item.label }}</span>
+            </button>
+          </template>
+        </motion.div>
+      </AnimatePresence>
     </nav>
   </div>
 </template>
