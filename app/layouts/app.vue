@@ -206,7 +206,7 @@ watch(
       v-model:collapsed="sidebarCollapsed"
       :collapsible="!isMobile"
       :resizable="!isMobile"
-      class="bg-elevated/25"
+      class="kortex-app-sidebar bg-elevated/25 max-lg:pt-[var(--safe-area-top)] max-lg:pr-[var(--safe-area-right)] max-lg:pb-[var(--safe-area-bottom)] max-lg:pl-[var(--safe-area-left)]"
       :ui="{ footer: 'max-lg:border-t max-lg:border-default max-lg:p-3 lg:border-t lg:border-default' }"
     >
       <template #header="{ collapsed }">

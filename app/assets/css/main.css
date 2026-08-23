@@ -96,6 +96,12 @@ html {
     padding-top: var(--safe-area-top);
     overflow: hidden;
   }
+
+  .kortex-app-sidebar {
+    height: 100dvh;
+    max-height: 100dvh;
+    box-sizing: border-box;
+  }
 }
 
 /* ─── Mobile touch & interaction improvements ───────────────────── */
