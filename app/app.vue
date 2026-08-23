@@ -33,8 +33,8 @@ const appleSplashLinks = [
   const landscape = `(device-width: ${item.height}px) and (device-height: ${item.width}px) and (-webkit-device-pixel-ratio: ${item.ratio}) and (orientation: landscape)`
 
   return [
-    { rel: 'apple-touch-startup-image', href: item.href, media: portrait },
-    { rel: 'apple-touch-startup-image', href: item.href, media: landscape }
+    { rel: 'apple-touch-startup-image' as const, href: item.href, media: portrait },
+    { rel: 'apple-touch-startup-image' as const, href: item.href, media: landscape }
   ]
 })
 
