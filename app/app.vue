@@ -11,11 +11,16 @@ const isAppRoute = computed(() => route.path.startsWith('/app'))
 const siteUrl = runtimeConfig.public.siteUrl?.replace(/\/$/, '') || 'https://kortex.app'
 const defaultOgImage = `${siteUrl}/icons/icon-512x512.png`
 const appleSplashLinks = [
+  { width: 440, height: 956, ratio: 3, href: '/splash/apple-splash-1320x2868.png' },
   { width: 430, height: 932, ratio: 3, href: '/splash/apple-splash-1290x2796.png' },
+  { width: 428, height: 926, ratio: 3, href: '/splash/apple-splash-1284x2778.png' },
+  { width: 402, height: 874, ratio: 3, href: '/splash/apple-splash-1206x2622.png' },
   { width: 393, height: 852, ratio: 3, href: '/splash/apple-splash-1179x2556.png' },
   { width: 390, height: 844, ratio: 3, href: '/splash/apple-splash-1170x2532.png' },
   { width: 375, height: 812, ratio: 3, href: '/splash/apple-splash-1125x2436.png' },
+  { width: 360, height: 780, ratio: 3, href: '/splash/apple-splash-1080x2340.png' },
   { width: 414, height: 896, ratio: 3, href: '/splash/apple-splash-1242x2688.png' },
+  { width: 414, height: 736, ratio: 3, href: '/splash/apple-splash-1242x2208.png' },
   { width: 414, height: 896, ratio: 2, href: '/splash/apple-splash-828x1792.png' },
   { width: 375, height: 667, ratio: 2, href: '/splash/apple-splash-750x1334.png' },
   { width: 320, height: 568, ratio: 2, href: '/splash/apple-splash-640x1136.png' },
@@ -123,6 +128,8 @@ provide('navigation', navigation)
 
 <template>
   <UApp :locale="pt_br">
+    <AppLaunchSplash />
+
     <NuxtLoadingIndicator
       color="linear-gradient(90deg, #12E39A 0%, #5EF2BF 45%, #12E39A 100%)"
       error-color="#fb7185"
@@ -130,6 +137,7 @@ provide('navigation', navigation)
     />
 
     <ClientOnly>
+      <ViewportMetrics />
       <CapacitorInit />
     </ClientOnly>
 
