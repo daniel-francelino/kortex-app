@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { JournalEntry, MetricValueWithDefinition } from '~/types/journal'
+import type { JournalEntry } from '~/types/journal'
 import { getMoodOption } from '~/types/journal'
 import { isEditorContentEmpty } from '~/utils/editor/content'
 
@@ -13,31 +13,12 @@ const emit = defineEmits<{
   'updated': []
 }>()
 
-const {
-  fetchEntryByDate,
-  upsertEntry,
-  deleteEntry,
-  tags: availableTags,
-  refreshTags,
-  deleteTag,
-  metricDefinitions,
-  refreshMetricDefinitions,
-  createMetricDefinition,
-  upsertMetricValues,
-  metricTypeOptions
-} = useJournal()
-
-onMounted(() => {
-  refreshTags()
-  refreshMetricDefinitions()
-})
+const { fetchEntryByDate, upsertEntry, deleteEntry } = useJournal()
 
 const isMobile = useIsMobile()
 
 const loading = ref(false)
 const entry = ref<JournalEntry | null>(null)
-const entryTags = ref<string[]>([])
-const entryMetrics = ref<MetricValueWithDefinition[]>([])
 
 const content = ref('')
 const mood = ref<string | null>(null)
@@ -45,7 +26,6 @@ const editing = ref(false)
 const saving = ref(false)
 const deleting = ref(false)
 const confirmDeleteOpen = ref(false)
-const metricCreateOpen = ref(false)
 
 watch(() => props.open, async (isOpen) => {
   if (isOpen && props.date) await loadEntry()
@@ -63,8 +43,6 @@ async function loadEntry() {
   try {
     const data = await fetchEntryByDate(props.date)
     entry.value = data?.entry ?? null
-    entryTags.value = (data?.tags ?? []).map((t: unknown) => (t as { name: string }).name)
-    entryMetrics.value = data?.metrics ?? []
     content.value = data?.entry?.content ?? ''
     mood.value = data?.entry?.mood ?? null
   } finally {
@@ -95,7 +73,6 @@ function cancelEditing() {
   editing.value = false
   content.value = entry.value?.content ?? ''
   mood.value = entry.value?.mood ?? null
-  entryTags.value = (entry.value?.tags ?? []).map(t => t.name)
 }
 
 async function onSave() {
@@ -106,8 +83,7 @@ async function onSave() {
       entryDate: props.date,
       title: null,
       content: content.value,
-      mood: mood.value,
-      tags: entryTags.value
+      mood: mood.value
     })
     if (result) {
       editing.value = false
@@ -230,49 +206,6 @@ function onOpenChange(value: boolean) {
               <USkeleton class="h-32 w-full" />
             </template>
           </ClientOnly>
-
-          <!-- Tags -->
-          <div
-            v-if="entry.tags && entry.tags.length > 0"
-            class="flex flex-wrap gap-1.5"
-          >
-            <UBadge
-              v-for="tag in entry.tags"
-              :key="tag.id"
-              :label="tag.name"
-              variant="subtle"
-              color="neutral"
-              size="xs"
-            />
-          </div>
-
-          <!-- Metrics (read-only) -->
-          <div
-            v-if="entryMetrics.length > 0"
-            class="rounded-lg border border-default p-3"
-          >
-            <h4 class="text-sm font-medium text-highlighted mb-2">
-              Métricas do dia
-            </h4>
-            <div class="grid grid-cols-2 gap-2 sm:grid-cols-3">
-              <div
-                v-for="mv in entryMetrics"
-                :key="mv.id"
-                class="rounded-md bg-elevated/40 p-2"
-              >
-                <p class="text-xs text-muted">
-                  {{ mv.definition?.name }}
-                </p>
-                <p class="text-sm font-medium text-highlighted">
-                  {{ mv.numberValue ?? (mv.booleanValue !== null ? (mv.booleanValue ? 'Sim' : 'Não') : (mv.selectValue ?? mv.textValue ?? '—')) }}
-                  <span
-                    v-if="mv.definition?.unit"
-                    class="text-xs text-muted"
-                  >{{ mv.definition.unit }}</span>
-                </p>
-              </div>
-            </div>
-          </div>
         </template>
 
         <!-- Edit mode -->
@@ -290,39 +223,6 @@ function onOpenChange(value: boolean) {
               <USkeleton class="h-40 w-full" />
             </template>
           </ClientOnly>
-
-          <!-- Tags -->
-          <div class="rounded-lg border border-default p-3">
-            <h4 class="text-sm font-medium text-highlighted mb-2">
-              Tags
-            </h4>
-            <JournalTagEditor
-              v-model="entryTags"
-              :available-tags="availableTags ?? []"
-              :on-delete-tag="deleteTag"
-            />
-          </div>
-
-          <!-- Metrics (editable) -->
-          <div class="rounded-lg border border-default p-3">
-            <div class="flex justify-end mb-2">
-              <UButton
-                label="Nova métrica"
-                icon="i-lucide-plus"
-                :size="isMobile ? 'md' : 'xs'"
-                color="neutral"
-                variant="ghost"
-                @click="metricCreateOpen = true"
-              />
-            </div>
-            <JournalMetricsPanel
-              :definitions="metricDefinitions ?? []"
-              :existing-values="entryMetrics"
-              :entry-date="props.date"
-              :on-upsert-metric-values="upsertMetricValues"
-              @saved="loadEntry"
-            />
-          </div>
         </template>
       </div>
     </template>
@@ -396,11 +296,4 @@ function onOpenChange(value: boolean) {
       </div>
     </template>
   </UModal>
-
-  <JournalMetricCreateModal
-    :open="metricCreateOpen"
-    :metric-type-options="metricTypeOptions"
-    :on-create-metric-definition="createMetricDefinition"
-    @update:open="metricCreateOpen = $event"
-  />
 </template>

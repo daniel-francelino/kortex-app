@@ -1,10 +1,9 @@
 <script setup lang="ts">
-import type { JournalEntry, MetricValueWithDefinition } from '~/types/journal'
+import type { JournalEntry } from '~/types/journal'
 import { isEditorContentEmpty, serializeEditorContent } from '~/utils/editor/content'
 
 const props = defineProps<{
   todayEntry: JournalEntry | null
-  metrics?: MetricValueWithDefinition[]
   loading: boolean
   streak?: number
   isOnline?: boolean
@@ -13,33 +12,14 @@ const props = defineProps<{
     title?: string | null
     content: string
     mood?: string | null
-    tags?: string[]
   }, options?: { silent?: boolean }) => Promise<JournalEntry | null>
 }>()
 
-const {
-  tags: availableTags,
-  refreshTags,
-  deleteTag,
-  metricDefinitions,
-  refreshMetricDefinitions,
-  createMetricDefinition,
-  upsertMetricValues,
-  metricTypeOptions
-} = useJournal()
-
 const isMobile = useIsMobile()
-
-onMounted(() => {
-  refreshTags()
-  refreshMetricDefinitions()
-})
 
 const today = new Date().toISOString().split('T')[0] ?? ''
 const content = ref('')
 const mood = ref<string | null>(null)
-const entryTags = ref<string[]>([])
-const metricCreateOpen = ref(false)
 
 // Last saved snapshot — what the server currently has
 const savedContent = ref('')
@@ -130,7 +110,6 @@ watch(
         mood.value = m
       }
       savedMood.value = m
-      entryTags.value = (entry.tags ?? []).map(t => t.name)
       armContentSuppression()
       initialized.value = true
     } else if (!props.loading) {
@@ -139,7 +118,6 @@ watch(
       savedContent.value = ''
       mood.value = null
       savedMood.value = null
-      entryTags.value = []
       lastChangeAt.value = 0
       saveStatus.value = 'idle'
       armContentSuppression()
@@ -179,8 +157,7 @@ async function doSave() {
       entryDate: today,
       title: null,
       content: savingContent,
-      mood: savingMood,
-      tags: entryTags.value
+      mood: savingMood
     }, { silent: true })
     if (result) {
       if (savedContent.value !== savingContent) savedContent.value = savingContent
@@ -193,39 +170,6 @@ async function doSave() {
     }
   } catch {
     saveStatus.value = 'error'
-  }
-}
-
-// ── Tags ───────────────────────────────────────────────────────────────────────
-// Tag edits are an explicit action, so they save immediately (content must
-// already exist — the entry schema requires non-empty content).
-const savingTags = ref(false)
-
-async function onTagsUpdate(newTags: string[]) {
-  entryTags.value = newTags
-  if (isContentEmpty.value) return
-
-  const savingContent = content.value
-  const savingMood = mood.value
-
-  savingTags.value = true
-  try {
-    const result = await props.onUpsertEntry({
-      entryDate: today,
-      title: null,
-      content: savingContent,
-      mood: savingMood,
-      tags: newTags
-    })
-    if (result) {
-      if (savedContent.value !== savingContent) savedContent.value = savingContent
-      if (savedMood.value !== savingMood) savedMood.value = savingMood
-      if (content.value === savingContent && mood.value === savingMood) lastChangeAt.value = 0
-      saveStatus.value = resolveSavedStatus()
-      savedAt.value = new Date()
-    }
-  } finally {
-    savingTags.value = false
   }
 }
 
@@ -387,11 +331,7 @@ defineExpose({ isUnsaved: () => hasChanges.value, doSave })
         </div>
       </div>
 
-      <!-- Entry prompts — a nudge to get past the blank page, gone once there's content.
-           ClientOnly for the same reason as the tag editor above: this is
-           part of the always-visible initial view (unlike the metrics panel,
-           which starts collapsed), so an isMobile-driven size here would be
-           just as exposed to the hydration-mismatch issue. -->
+      <!-- Entry prompts — a nudge to get past the blank page, gone once there's content. -->
       <ClientOnly v-if="isContentEmpty">
         <!-- Ragged flex-wrap left each row a different length on a phone
              (one button alone, then two, then one) — a single horizontally
@@ -428,84 +368,6 @@ defineExpose({ isUnsaved: () => hasChanges.value, doSave })
           <USkeleton class="h-56 w-full rounded-lg" />
         </template>
       </ClientOnly>
-
-      <!-- Tags -->
-      <div class="rounded-lg border border-default p-3">
-        <div class="flex items-center justify-between mb-2">
-          <h4 class="text-sm font-medium text-highlighted">
-            Tags
-          </h4>
-          <UIcon
-            v-if="savingTags"
-            name="i-lucide-loader-2"
-            class="size-3.5 animate-spin text-muted"
-          />
-        </div>
-        <p
-          v-if="isContentEmpty"
-          class="text-xs text-dimmed"
-        >
-          Escreva algo antes de adicionar tags.
-        </p>
-        <!-- JournalTagEditor picks its button/input sizes from the viewport
-             width (bigger on mobile, compact on desktop) — client-only info
-             that doesn't exist during SSR. Rendering it there would bake in
-             the desktop size, and Vue's hydration intentionally never
-             corrects a mismatched class afterwards, so it'd stay wrong on
-             mobile until the user resizes the window. ClientOnly sidesteps
-             that entirely by skipping the SSR pass for it. -->
-        <ClientOnly v-else>
-          <JournalTagEditor
-            :model-value="entryTags"
-            :available-tags="availableTags ?? []"
-            :on-delete-tag="deleteTag"
-            @update:model-value="onTagsUpdate"
-          />
-          <template #fallback>
-            <USkeleton class="h-8 w-40" />
-          </template>
-        </ClientOnly>
-      </div>
-
-      <!-- Metrics -->
-      <UCollapsible>
-        <UButton
-          label="Métricas do dia"
-          icon="i-lucide-gauge"
-          color="neutral"
-          variant="outline"
-          trailing-icon="i-lucide-chevron-down"
-          block
-        />
-
-        <template #content>
-          <div class="mt-3 space-y-3 rounded-lg border border-default p-3">
-            <div class="flex justify-end">
-              <UButton
-                label="Nova métrica"
-                icon="i-lucide-plus"
-                :size="isMobile ? 'md' : 'xs'"
-                color="neutral"
-                variant="ghost"
-                @click="metricCreateOpen = true"
-              />
-            </div>
-            <JournalMetricsPanel
-              :definitions="metricDefinitions ?? []"
-              :existing-values="metrics ?? []"
-              :entry-date="today"
-              :on-upsert-metric-values="upsertMetricValues"
-            />
-          </div>
-        </template>
-      </UCollapsible>
     </template>
   </div>
-
-  <JournalMetricCreateModal
-    :open="metricCreateOpen"
-    :metric-type-options="metricTypeOptions"
-    :on-create-metric-definition="createMetricDefinition"
-    @update:open="metricCreateOpen = $event"
-  />
 </template>

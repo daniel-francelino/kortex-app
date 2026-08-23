@@ -14,16 +14,6 @@ export function getMoodOption(mood: MoodValue | string | null | undefined) {
   return MOOD_OPTIONS.find(m => m.value === mood) ?? null
 }
 
-// ─── Enums ────────────────────────────────────────────────────────────────────
-
-export enum MetricType {
-  Number = 'number',
-  Scale = 'scale',
-  Boolean = 'boolean',
-  Select = 'select',
-  Text = 'text'
-}
-
 // ─── Interfaces ───────────────────────────────────────────────────────────────
 
 export interface JournalEntry {
@@ -36,49 +26,6 @@ export interface JournalEntry {
   createdAt: string
   updatedAt: string
   archivedAt: string | null
-  tags?: JournalTag[]
-  metrics?: MetricValueWithDefinition[]
-}
-
-export interface JournalTag {
-  id: string
-  userId: string
-  name: string
-  createdAt: string
-}
-
-export interface MetricDefinition {
-  id: string
-  userId: string
-  key: string
-  name: string
-  description: string | null
-  type: MetricType
-  unit: string | null
-  minValue: number | null
-  maxValue: number | null
-  step: number | null
-  options: string[] | null
-  isActive: boolean
-  createdAt: string
-  updatedAt: string
-}
-
-export interface MetricValue {
-  id: string
-  userId: string
-  entryDate: string
-  metricDefinitionId: string
-  numberValue: number | null
-  booleanValue: boolean | null
-  textValue: string | null
-  selectValue: string | null
-  createdAt: string
-  updatedAt: string
-}
-
-export interface MetricValueWithDefinition extends MetricValue {
-  definition?: MetricDefinition
 }
 
 // ─── Payloads ─────────────────────────────────────────────────────────────────
@@ -88,46 +35,6 @@ export interface UpsertEntryPayload {
   title?: string | null
   content: string
   mood?: string | null
-  tags?: string[]
-}
-
-export interface CreateJournalTagPayload {
-  name: string
-}
-
-export interface CreateMetricDefinitionPayload {
-  key: string
-  name: string
-  description?: string | null
-  type: MetricType
-  unit?: string | null
-  minValue?: number | null
-  maxValue?: number | null
-  step?: number | null
-  options?: string[] | null
-}
-
-export interface UpdateMetricDefinitionPayload {
-  name?: string
-  description?: string | null
-  isActive?: boolean
-  minValue?: number | null
-  maxValue?: number | null
-  step?: number | null
-  options?: string[] | null
-}
-
-export interface MetricValueInput {
-  metricKey: string
-  numberValue?: number | null
-  booleanValue?: boolean | null
-  textValue?: string | null
-  selectValue?: string | null
-}
-
-export interface UpsertMetricValuesPayload {
-  entryDate: string
-  values: MetricValueInput[]
 }
 
 // ─── Responses ────────────────────────────────────────────────────────────────
@@ -139,39 +46,8 @@ export interface JournalListResponse {
   pageSize: number
 }
 
-export interface JournalInsightMetric {
-  key: string
-  name: string
-  avg: number
-  min: number
-  max: number
-  count: number
-}
-
-export interface JournalMoodCorrelationGroup {
-  label: string
-  avgMood: number
-  count: number
-}
-
-export interface JournalMoodCorrelation {
-  key: string
-  name: string
-  type: string
-  groups: JournalMoodCorrelationGroup[]
-}
-
 export interface JournalInsights {
   range: string
   totalEntries: number
-  metrics: JournalInsightMetric[]
   entriesByDayOfWeek: { day: string, count: number }[]
-  moodCorrelations: JournalMoodCorrelation[]
-}
-
-// A mood correlation's `avgMood` is a 1–5 score (matches MOOD_OPTIONS order:
-// very_bad=1 … very_good=5) — round it to find the closest emoji/label.
-export function getMoodOptionByScore(score: number) {
-  const index = Math.min(Math.max(Math.round(score) - 1, 0), MOOD_OPTIONS.length - 1)
-  return MOOD_OPTIONS[index]
 }

@@ -115,21 +115,6 @@ function extractPreview(jsonContent: string): string {
         >
           Sem conteúdo
         </p>
-
-        <!-- Tags -->
-        <div
-          v-if="entry.tags && entry.tags.length > 0"
-          class="flex flex-wrap gap-1 pt-1"
-        >
-          <UBadge
-            v-for="tag in entry.tags"
-            :key="tag.id"
-            :label="tag.name"
-            variant="subtle"
-            color="neutral"
-            size="xs"
-          />
-        </div>
       </div>
     </UCard>
 

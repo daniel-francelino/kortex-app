@@ -1,31 +1,20 @@
 import { useDebounceFn } from '@vueuse/core'
 import type {
-  CreateJournalTagPayload,
-  CreateMetricDefinitionPayload,
   JournalEntry,
   JournalInsights,
   JournalListResponse,
-  JournalTag,
-  MetricDefinition,
-  MetricValueWithDefinition,
-  UpdateMetricDefinitionPayload,
-  UpsertEntryPayload,
-  UpsertMetricValuesPayload
+  UpsertEntryPayload
 } from '~/types/journal'
-import { MetricType } from '~/types/journal'
 
 interface TodayResponse {
   entryDate: string
   entry: JournalEntry | null
-  metrics: MetricValueWithDefinition[]
   streak: number
 }
 
 interface DateEntryResponse {
   entryDate: string
   entry: JournalEntry | null
-  tags: JournalTag[]
-  metrics: MetricValueWithDefinition[]
 }
 
 interface CalendarDay {
@@ -33,7 +22,7 @@ interface CalendarDay {
   mood: string | null
 }
 
-const JOURNAL_ENTITIES = ['journal_entry', 'journal_tag', 'metric_definition', 'metric_value'] as const
+const JOURNAL_ENTITIES = ['journal_entry'] as const
 
 export function useJournal() {
   const toast = useToast()
@@ -47,39 +36,9 @@ export function useJournal() {
   // an optimistic mutation shows up instantly and a background refetch never
   // flashes a view back to empty/loading or clobbers an in-flight edit.
   const entriesByDate = reactive(new Map<string, JournalEntry>())
-  const tagsById = reactive(new Map<string, JournalTag>())
-  const metricDefinitionsById = reactive(new Map<string, MetricDefinition>())
-  const metricValuesByKey = reactive(new Map<string, MetricValueWithDefinition>())
-
-  function metricValueKey(entryDate: string, metricDefinitionId: string): string {
-    return `${entryDate}:${metricDefinitionId}`
-  }
 
   function upsertEntryInStore(entry: JournalEntry) {
     entriesByDate.set(entry.entryDate, { ...entriesByDate.get(entry.entryDate), ...entry })
-  }
-  function upsertTagInStore(tag: JournalTag) {
-    tagsById.set(tag.id, { ...tagsById.get(tag.id), ...tag })
-  }
-  function upsertMetricDefinitionInStore(def: MetricDefinition) {
-    metricDefinitionsById.set(def.id, { ...metricDefinitionsById.get(def.id), ...def })
-  }
-  function upsertMetricValueInStore(value: MetricValueWithDefinition) {
-    const key = metricValueKey(value.entryDate, value.metricDefinitionId)
-    metricValuesByKey.set(key, { ...metricValuesByKey.get(key), ...value })
-  }
-
-  // The entries API works with tag *names*, not ids (POST /api/journal/entries
-  // accepts `tags: string[]`) — this resolves each name against what's known
-  // locally, synthesizing a placeholder for a brand-new name so the badge
-  // shows immediately; reconcile() below replaces it with the server's tags.
-  function resolveTagsByName(names: string[]): JournalTag[] {
-    const known = Array.from(tagsById.values())
-    return names.map((name) => {
-      const existing = known.find(t => t.name === name)
-      if (existing) return existing
-      return { id: `temp-${name}`, userId: '', name, createdAt: new Date().toISOString() }
-    })
   }
 
   function patchCalendarDate(date: string, mood: string | null) {
@@ -107,7 +66,6 @@ export function useJournal() {
   watch(todayFetchResult, (res) => {
     if (!res) return
     if (res.entry) upsertEntryInStore(res.entry)
-    for (const mv of res.metrics) upsertMetricValueInStore(mv)
     todayStreak.value = res.streak
     todayLoadedOnce.value = true
   }, { immediate: true })
@@ -115,8 +73,7 @@ export function useJournal() {
   const todayData = computed<TodayResponse | null>(() => {
     if (!todayLoadedOnce.value) return null
     const entry = entriesByDate.get(todayDate) ?? null
-    const metrics = Array.from(metricValuesByKey.values()).filter(v => v.entryDate === todayDate)
-    return { entryDate: todayDate, entry, metrics, streak: todayStreak.value }
+    return { entryDate: todayDate, entry, streak: todayStreak.value }
   })
 
   async function refreshToday() {
@@ -129,7 +86,6 @@ export function useJournal() {
   const listSearch = ref('')
   const listFrom = ref('')
   const listTo = ref('')
-  const listTag = ref('')
 
   const {
     data: listFetchResult,
@@ -141,12 +97,11 @@ export function useJournal() {
       pageSize: listPageSize.value,
       q: listSearch.value || undefined,
       from: listFrom.value || undefined,
-      to: listTo.value || undefined,
-      tag: listTag.value || undefined
+      to: listTo.value || undefined
     })),
     lazy: true,
     key: 'journal-entries-list',
-    watch: [listPage, listPageSize, listFrom, listTo, listTag]
+    watch: [listPage, listPageSize, listFrom, listTo]
   })
 
   const paginatedEntryDates = ref<string[]>([])
@@ -191,50 +146,6 @@ export function useJournal() {
     listPage.value = 1
     debouncedRefreshList()
   })
-
-  // ─── Tags ───────────────────────────────────────────────────────────────────
-  const {
-    data: tagsFetchResult,
-    status: tagsStatus,
-    refresh: refreshTagsFetch
-  } = useFetch<JournalTag[]>('/api/journal/tags', { lazy: true, key: 'journal-tags' })
-
-  const tagIds = ref<string[]>([])
-
-  watch(tagsFetchResult, (list) => {
-    if (!Array.isArray(list)) return
-    for (const t of list) upsertTagInStore(t)
-    tagIds.value = list.map(t => t.id)
-  }, { immediate: true })
-
-  const tags = computed(() => tagIds.value.map(id => tagsById.get(id)).filter((t): t is JournalTag => !!t))
-
-  async function refreshTags() {
-    await refreshTagsFetch()
-  }
-
-  // ─── Metric definitions ─────────────────────────────────────────────────────
-  const {
-    data: metricDefinitionsFetchResult,
-    status: metricDefinitionsStatus,
-    refresh: refreshMetricDefinitionsFetch
-  } = useFetch<MetricDefinition[]>('/api/journal/metrics', { lazy: true, key: 'journal-metric-definitions' })
-
-  const metricDefinitionIds = ref<string[]>([])
-
-  watch(metricDefinitionsFetchResult, (list) => {
-    if (!Array.isArray(list)) return
-    for (const d of list) upsertMetricDefinitionInStore(d)
-    metricDefinitionIds.value = list.map(d => d.id)
-  }, { immediate: true })
-
-  const metricDefinitions = computed(() =>
-    metricDefinitionIds.value.map(id => metricDefinitionsById.get(id)).filter((d): d is MetricDefinition => !!d)
-  )
-
-  async function refreshMetricDefinitions() {
-    await refreshMetricDefinitionsFetch()
-  }
 
   // ─── Insights ───────────────────────────────────────────────────────────────
   // Read-only server-computed aggregate — not part of the optimistic store
@@ -296,8 +207,7 @@ export function useJournal() {
       mood: payload.mood !== undefined ? payload.mood : (previous?.mood ?? null),
       createdAt: previous?.createdAt ?? now,
       updatedAt: now,
-      archivedAt: null,
-      tags: payload.tags !== undefined ? resolveTagsByName(payload.tags) : previous?.tags
+      archivedAt: null
     }
 
     const result = await runOptimisticAction({
@@ -312,7 +222,7 @@ export function useJournal() {
       },
       request: () => $fetch<JournalEntry>('/api/journal/entries', { method: 'POST', body: payload }),
       reconcile: (serverEntry) => {
-        upsertEntryInStore({ ...serverEntry, tags: serverEntry.tags ?? optimisticEntry.tags })
+        upsertEntryInStore(serverEntry)
         patchCalendarDate(payload.entryDate, serverEntry.mood ?? null)
       },
       errorMessage: 'Não foi possível salvar a entrada.',
@@ -342,9 +252,7 @@ export function useJournal() {
   async function fetchEntryByDate(date: string): Promise<DateEntryResponse | null> {
     try {
       const result = await $fetch<DateEntryResponse>(`/api/journal/entries/${date}`)
-      if (result.entry) upsertEntryInStore({ ...result.entry, tags: result.tags })
-      for (const tag of result.tags) upsertTagInStore(tag)
-      for (const mv of result.metrics) upsertMetricValueInStore(mv)
+      if (result.entry) upsertEntryInStore(result.entry)
       return result
     } catch {
       toast.add({ title: 'Erro', description: 'Não foi possível carregar a entrada.', color: 'error' })
@@ -384,247 +292,6 @@ export function useJournal() {
     return result !== null
   }
 
-  // ─── Tag Actions ──────────────────────────────────────────────────────────
-
-  async function createTag(payload: CreateJournalTagPayload): Promise<JournalTag | null> {
-    const tempId = `temp-${crypto.randomUUID()}`
-    const optimisticTag: JournalTag = { id: tempId, userId: '', name: payload.name, createdAt: new Date().toISOString() }
-
-    const result = await runOptimisticAction({
-      apply: () => {
-        upsertTagInStore(optimisticTag)
-        tagIds.value = [...tagIds.value, tempId]
-      },
-      rollback: () => {
-        tagsById.delete(tempId)
-        tagIds.value = tagIds.value.filter(id => id !== tempId)
-      },
-      request: () => $fetch<JournalTag>('/api/journal/tags', { method: 'POST', body: payload }),
-      reconcile: (serverTag) => {
-        tagsById.delete(tempId)
-        upsertTagInStore(serverTag)
-        tagIds.value = tagIds.value.map(id => (id === tempId ? serverTag.id : id))
-      },
-      errorMessage: 'Não foi possível criar a tag.',
-      offline: {
-        entity: 'journal_tag',
-        action: 'create',
-        method: 'POST',
-        url: '/api/journal/tags',
-        body: payload,
-        tempId,
-        optimisticResult: optimisticTag
-      }
-    })
-
-    if (result) {
-      toast.add({ title: 'Tag criada', description: `"${result.name}" criada com sucesso.`, color: 'success' })
-    }
-    return result
-  }
-
-  async function deleteTag(id: string): Promise<boolean> {
-    const previous = tagsById.get(id)
-    if (!previous) return false
-
-    // journal_entry_tags cascades server-side — any already-loaded entry
-    // still carrying this tag in its local `.tags` needs the same removal,
-    // or it'd keep showing a tag that no longer exists until a refetch.
-    const affectedDates: string[] = []
-    for (const entry of entriesByDate.values()) {
-      if (entry.tags?.some(t => t.id === id)) affectedDates.push(entry.entryDate)
-    }
-
-    const result = await runOptimisticAction({
-      apply: () => {
-        tagsById.delete(id)
-        tagIds.value = tagIds.value.filter(tid => tid !== id)
-        for (const date of affectedDates) {
-          const entry = entriesByDate.get(date)
-          if (entry) upsertEntryInStore({ ...entry, tags: entry.tags?.filter(t => t.id !== id) })
-        }
-      },
-      rollback: () => {
-        upsertTagInStore(previous)
-        if (!tagIds.value.includes(id)) tagIds.value = [...tagIds.value, id]
-        for (const date of affectedDates) {
-          const entry = entriesByDate.get(date)
-          if (entry && !entry.tags?.some(t => t.id === id)) {
-            upsertEntryInStore({ ...entry, tags: [...(entry.tags ?? []), previous] })
-          }
-        }
-      },
-      request: () => $fetch<{ success: boolean }>(`/api/journal/tags/${id}`, { method: 'DELETE' }),
-      errorMessage: 'Não foi possível excluir a tag.',
-      offline: {
-        entity: 'journal_tag',
-        action: 'delete',
-        method: 'DELETE',
-        url: `/api/journal/tags/${id}`,
-        tempId: id.startsWith('temp-') ? id : undefined,
-        optimisticResult: { success: true }
-      }
-    })
-
-    if (result !== null) {
-      toast.add({ title: 'Tag excluída', description: `"${previous.name}" foi removida.`, color: 'success' })
-      refreshList()
-    }
-    return result !== null
-  }
-
-  // ─── Metric Definition Actions ────────────────────────────────────────────
-
-  async function createMetricDefinition(payload: CreateMetricDefinitionPayload): Promise<MetricDefinition | null> {
-    const tempId = `temp-${crypto.randomUUID()}`
-    const now = new Date().toISOString()
-    const optimisticDef: MetricDefinition = {
-      id: tempId,
-      userId: '',
-      key: payload.key,
-      name: payload.name,
-      description: payload.description ?? null,
-      type: payload.type,
-      unit: payload.unit ?? null,
-      minValue: payload.minValue ?? null,
-      maxValue: payload.maxValue ?? null,
-      step: payload.step ?? null,
-      options: payload.options ?? null,
-      isActive: true,
-      createdAt: now,
-      updatedAt: now
-    }
-
-    const result = await runOptimisticAction({
-      apply: () => {
-        upsertMetricDefinitionInStore(optimisticDef)
-        metricDefinitionIds.value = [...metricDefinitionIds.value, tempId]
-      },
-      rollback: () => {
-        metricDefinitionsById.delete(tempId)
-        metricDefinitionIds.value = metricDefinitionIds.value.filter(id => id !== tempId)
-      },
-      request: () => $fetch<MetricDefinition>('/api/journal/metrics', { method: 'POST', body: payload }),
-      reconcile: (serverDef) => {
-        metricDefinitionsById.delete(tempId)
-        upsertMetricDefinitionInStore(serverDef)
-        metricDefinitionIds.value = metricDefinitionIds.value.map(id => (id === tempId ? serverDef.id : id))
-      },
-      errorMessage: 'Não foi possível criar a métrica.',
-      offline: {
-        entity: 'metric_definition',
-        action: 'create',
-        method: 'POST',
-        url: '/api/journal/metrics',
-        body: payload,
-        tempId,
-        optimisticResult: optimisticDef
-      }
-    })
-
-    if (result) {
-      toast.add({ title: 'Métrica criada', description: `"${result.name}" criada com sucesso.`, color: 'success' })
-    }
-    return result
-  }
-
-  async function updateMetricDefinition(id: string, payload: UpdateMetricDefinitionPayload): Promise<MetricDefinition | null> {
-    const previous = metricDefinitionsById.get(id)
-    if (!previous) return null
-
-    const optimisticDef: MetricDefinition = {
-      ...previous,
-      ...(payload.name !== undefined ? { name: payload.name } : {}),
-      ...(payload.description !== undefined ? { description: payload.description } : {}),
-      ...(payload.isActive !== undefined ? { isActive: payload.isActive } : {}),
-      ...(payload.minValue !== undefined ? { minValue: payload.minValue } : {}),
-      ...(payload.maxValue !== undefined ? { maxValue: payload.maxValue } : {}),
-      ...(payload.step !== undefined ? { step: payload.step } : {}),
-      ...(payload.options !== undefined ? { options: payload.options } : {}),
-      updatedAt: new Date().toISOString()
-    }
-
-    const result = await runOptimisticAction({
-      apply: () => upsertMetricDefinitionInStore(optimisticDef),
-      rollback: () => upsertMetricDefinitionInStore(previous),
-      request: () => $fetch<MetricDefinition>(`/api/journal/metrics/${id}`, { method: 'PATCH', body: payload }),
-      reconcile: updated => upsertMetricDefinitionInStore(updated),
-      errorMessage: 'Não foi possível atualizar a métrica.',
-      offline: {
-        entity: 'metric_definition',
-        action: 'update',
-        method: 'PATCH',
-        url: `/api/journal/metrics/${id}`,
-        body: payload,
-        tempId: id.startsWith('temp-') ? id : undefined,
-        optimisticResult: optimisticDef
-      }
-    })
-
-    if (result) {
-      toast.add({ title: 'Métrica atualizada', description: `"${result.name}" salva com sucesso.`, color: 'success' })
-    }
-    return result
-  }
-
-  // ─── Metric Values Actions ────────────────────────────────────────────────
-
-  async function upsertMetricValues(payload: UpsertMetricValuesPayload): Promise<boolean> {
-    const previousValues = new Map<string, MetricValueWithDefinition | undefined>()
-    const optimisticValues: MetricValueWithDefinition[] = []
-
-    for (const v of payload.values) {
-      const def = Array.from(metricDefinitionsById.values()).find(d => d.key === v.metricKey)
-      if (!def) continue
-      const key = metricValueKey(payload.entryDate, def.id)
-      const existing = metricValuesByKey.get(key)
-      previousValues.set(key, existing)
-      optimisticValues.push({
-        id: existing?.id ?? `temp-${key}`,
-        userId: existing?.userId ?? '',
-        entryDate: payload.entryDate,
-        metricDefinitionId: def.id,
-        numberValue: v.numberValue ?? null,
-        booleanValue: v.booleanValue ?? null,
-        textValue: v.textValue ?? null,
-        selectValue: v.selectValue ?? null,
-        createdAt: existing?.createdAt ?? new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        definition: def
-      })
-    }
-
-    const result = await runOptimisticAction({
-      apply: () => {
-        for (const val of optimisticValues) upsertMetricValueInStore(val)
-      },
-      rollback: () => {
-        for (const [key, prev] of previousValues.entries()) {
-          if (prev) metricValuesByKey.set(key, prev)
-          else metricValuesByKey.delete(key)
-        }
-      },
-      request: () => $fetch<MetricValueWithDefinition[]>('/api/journal/metric-values', { method: 'POST', body: payload }),
-      reconcile: (serverValues) => {
-        for (const val of serverValues) upsertMetricValueInStore(val)
-      },
-      errorMessage: 'Não foi possível salvar as métricas.',
-      offline: {
-        entity: 'metric_value',
-        action: 'update',
-        method: 'POST',
-        url: '/api/journal/metric-values',
-        body: payload,
-        optimisticResult: optimisticValues
-      }
-    })
-
-    if (result) {
-      toast.add({ title: 'Métricas salvas', description: 'Os valores foram salvos com sucesso.', color: 'success' })
-    }
-    return result !== null
-  }
-
   // ─── Offline sync ───────────────────────────────────────────────────────────
   // Same drain-and-converge approach as useNotes.ts: replay each queued
   // request in order, then let a full refetch (rather than fine-grained
@@ -643,7 +310,6 @@ export function useJournal() {
 
     syncingOffline.value = true
     let replayedAny = false
-    const reconciledTempIds: string[] = []
 
     try {
       const queue = [...relevant]
@@ -658,7 +324,6 @@ export function useJournal() {
             method: mutation.method,
             body: mutation.body as Record<string, unknown> | undefined
           })
-          if (mutation.action === 'create' && mutation.tempId) reconciledTempIds.push(mutation.tempId)
           await dequeueMutation(mutation.id)
           replayedAny = true
         } catch (err) {
@@ -670,15 +335,7 @@ export function useJournal() {
     } finally {
       syncingOffline.value = false
       if (replayedAny) {
-        // Drop the placeholders now that a real create replayed — the
-        // refetch below adds the real entity in its place.
-        for (const tempId of reconciledTempIds) {
-          tagsById.delete(tempId)
-          tagIds.value = tagIds.value.filter(id => id !== tempId)
-          metricDefinitionsById.delete(tempId)
-          metricDefinitionIds.value = metricDefinitionIds.value.filter(id => id !== tempId)
-        }
-        await Promise.all([refreshToday(), refreshList(), refreshCalendar(), refreshTags(), refreshMetricDefinitions()])
+        await Promise.all([refreshToday(), refreshList(), refreshCalendar()])
         toast.add({ title: 'Sincronizado', description: 'Suas alterações offline no diário foram salvas.', color: 'success' })
       }
     }
@@ -690,20 +347,6 @@ export function useJournal() {
   onMounted(() => {
     if (isOnline.value) void drainMutationQueue()
   })
-
-  // ─── Helpers ────────────────────────────────────────────────────────────────
-
-  const metricTypeOptions = [
-    { label: 'Numérico', value: MetricType.Number },
-    { label: 'Escala', value: MetricType.Scale },
-    { label: 'Sim/Não', value: MetricType.Boolean },
-    { label: 'Seleção', value: MetricType.Select },
-    { label: 'Texto', value: MetricType.Text }
-  ]
-
-  function getMetricTypeLabel(type: string): string {
-    return metricTypeOptions.find(o => o.value === type)?.label ?? type
-  }
 
   return {
     // Today
@@ -718,16 +361,7 @@ export function useJournal() {
     listSearch,
     listFrom,
     listTo,
-    listTag,
     refreshList,
-    // Tags
-    tags,
-    tagsStatus,
-    refreshTags,
-    // Metric definitions
-    metricDefinitions,
-    metricDefinitionsStatus,
-    refreshMetricDefinitions,
     // Insights
     insights,
     insightsStatus,
@@ -743,17 +377,9 @@ export function useJournal() {
     upsertEntry,
     fetchEntryByDate,
     deleteEntry,
-    createTag,
-    deleteTag,
-    createMetricDefinition,
-    updateMetricDefinition,
-    upsertMetricValues,
     // Offline
     isOnline,
     pendingSyncCount: pendingCount,
-    syncingOffline,
-    // Helpers
-    metricTypeOptions,
-    getMetricTypeLabel
+    syncingOffline
   }
 }

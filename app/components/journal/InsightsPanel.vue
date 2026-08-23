@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import type { JournalInsights } from '~/types/journal'
-import { getMoodOptionByScore } from '~/types/journal'
 
 const props = defineProps<{
   insights: JournalInsights | null
@@ -46,17 +45,12 @@ const _props = props
 
     <!-- Loading -->
     <template v-if="_props.loading">
-      <div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
-        <UCard
-          v-for="i in 3"
-          :key="i"
-        >
-          <div class="text-center space-y-2">
-            <USkeleton class="h-8 w-12 mx-auto" />
-            <USkeleton class="h-3 w-16 mx-auto" />
-          </div>
-        </UCard>
-      </div>
+      <UCard>
+        <div class="text-center space-y-2">
+          <USkeleton class="h-8 w-12 mx-auto" />
+          <USkeleton class="h-3 w-16 mx-auto" />
+        </div>
+      </UCard>
       <UCard>
         <div class="space-y-3">
           <USkeleton class="h-4 w-32" />
@@ -81,29 +75,6 @@ const _props = props
           </p>
         </div>
       </UCard>
-
-      <!-- Metric averages -->
-      <div
-        v-if="_props.insights.metrics.length > 0"
-        class="grid grid-cols-2 gap-3 sm:grid-cols-3"
-      >
-        <UCard
-          v-for="metric in _props.insights.metrics"
-          :key="metric.key"
-        >
-          <div class="text-center">
-            <p class="text-2xl font-bold text-highlighted">
-              {{ metric.avg }}
-            </p>
-            <p class="text-xs text-muted">
-              {{ metric.name }} (média)
-            </p>
-            <p class="text-xs text-dimmed">
-              {{ metric.min }}–{{ metric.max }} · {{ metric.count }} registros
-            </p>
-          </div>
-        </UCard>
-      </div>
 
       <!-- Entries by day of week -->
       <UCard v-if="_props.insights.entriesByDayOfWeek.length > 0">
@@ -130,43 +101,6 @@ const _props = props
             <span class="text-muted tabular-nums w-8 text-right">
               {{ day.count }}
             </span>
-          </div>
-        </div>
-      </UCard>
-
-      <!-- Mood × metric correlation -->
-      <UCard v-if="_props.insights.moodCorrelations.length > 0">
-        <template #header>
-          <h4 class="text-sm font-medium text-highlighted">
-            Humor × métricas
-          </h4>
-        </template>
-
-        <div class="space-y-4">
-          <div
-            v-for="corr in _props.insights.moodCorrelations"
-            :key="corr.key"
-          >
-            <p class="text-xs font-medium text-highlighted mb-1.5">
-              {{ corr.name }}
-            </p>
-            <div class="flex flex-wrap gap-2">
-              <div
-                v-for="g in corr.groups"
-                :key="g.label"
-                class="flex items-center gap-1.5 rounded-lg bg-elevated/40 px-2.5 py-1.5"
-              >
-                <span class="text-base leading-none">{{ getMoodOptionByScore(g.avgMood)?.emoji }}</span>
-                <div class="text-xs">
-                  <p class="text-highlighted font-medium">
-                    {{ g.label }}
-                  </p>
-                  <p class="text-dimmed">
-                    {{ g.avgMood }}/5 · {{ g.count }} {{ g.count === 1 ? 'dia' : 'dias' }}
-                  </p>
-                </div>
-              </div>
-            </div>
           </div>
         </div>
       </UCard>

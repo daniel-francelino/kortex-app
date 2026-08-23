@@ -1,5 +1,7 @@
 # Análise de mercado — Diário de Bordo
 
+> **Nota (2026-08-23)**: este documento é uma análise histórica de mercado/roadmap. As menções a "tags" e "métricas do dia" abaixo descrevem um estado que **não existe mais** — ambas foram removidas da UI e da API do módulo em 2026-08-23, com o plano de reintroduzi-las como geração automática por IA (resumo por pessoa, não preenchimento manual). Ver `1.JOURNAL.md`, seção 7, para o estado atual.
+
 Este documento compara o módulo Diário de Bordo do Kortex (`app/pages/app/journal/index.vue` + `useJournal.ts`, documentado em [`1.JOURNAL.md`](./1.JOURNAL.md)) com o que hoje é padrão em apps de diário/journaling — **Day One** (referência de mercado, o app mais maduro da categoria), **Daylio** (referência em humor + micro-journaling + correlações), **Journey** e **Diarium** (multiplataforma, guiados por templates), a nova onda de **diários com IA** (Rosebud, Reflectly, Stoic) e o padrão de **daily notes** do Obsidian (a alternativa "texto livre em Markdown" mais próxima da filosofia do Kortex).
 
 > Segue o mesmo formato de [`docs/notes/ANALISE_EDITOR_MERCADO.md`](../notes/ANALISE_EDITOR_MERCADO.md): todo item "❌ Faltando"/"⚠️ Parcial" foi conferido no código antes de entrar aqui (via `1.JOURNAL.md`, que por sua vez foi levantado lendo `useJournal.ts`, as migrations e todos os componentes/endpoints do módulo) — não é suposição. A pesquisa de mercado (seção 6) usa fontes públicas de 2026, listadas ao final.

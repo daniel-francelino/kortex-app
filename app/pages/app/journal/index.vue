@@ -22,10 +22,7 @@ const {
   listFetchStatus,
   listPage,
   listSearch,
-  listTag,
   refreshList,
-  tags,
-  refreshTags,
   insights,
   insightsStatus,
   insightsRange,
@@ -46,7 +43,6 @@ watch(activeView, (view) => {
   if (view === 'calendar') refreshCalendar()
   if (view === 'list') {
     refreshList()
-    refreshTags()
   }
   if (view === 'insights') refreshInsights()
 })
@@ -110,11 +106,6 @@ const viewOptions: { value: JournalView, icon: string, tooltip: string }[] = [
 ]
 
 // ─── Entry list view ────────────────────────────────────────────────────────────
-const tagFilterOptions = computed(() => [
-  { label: 'Todas as tags', value: '' },
-  ...(tags.value ?? []).map(t => ({ label: t.name, value: t.name }))
-])
-
 function onListEntrySelect(date: string) {
   onSelectDate(date)
 }
@@ -179,7 +170,6 @@ function onInsightsRangeChange(range: '7d' | '30d' | '90d') {
           <JournalTodayEditor
             ref="editorRef"
             :today-entry="todayData?.entry ?? null"
-            :metrics="todayData?.metrics ?? []"
             :streak="todayData?.streak ?? 0"
             :loading="todayStatus === 'pending'"
             :is-online="isOnline"
@@ -199,20 +189,11 @@ function onInsightsRangeChange(range: '7d' | '30d' | '90d') {
 
         <!-- LIST VIEW -->
         <div v-else-if="activeView === 'list'" class="space-y-4">
-          <div class="flex flex-col gap-2 sm:flex-row sm:items-center">
-            <UInput
-              v-model="listSearch"
-              icon="i-lucide-search"
-              placeholder="Buscar no diário..."
-              class="flex-1"
-            />
-            <USelect
-              v-model="listTag"
-              :items="tagFilterOptions"
-              value-key="value"
-              class="w-full sm:w-44"
-            />
-          </div>
+          <UInput
+            v-model="listSearch"
+            icon="i-lucide-search"
+            placeholder="Buscar no diário..."
+          />
 
           <JournalEntryList
             :entries="listData?.data ?? []"
