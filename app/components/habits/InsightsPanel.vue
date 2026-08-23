@@ -1,10 +1,29 @@
 <script setup lang="ts">
-import type { HabitInsights as InsightsType, HeatmapData, IdentityProgress } from '~/types/habits'
+import type { HabitInsights as InsightsType, HeatmapData, IdentityProgress, MoodCorrelationData } from '~/types/habits'
+import { MOOD_OPTIONS } from '~/types/journal'
 
 const props = defineProps<{
   insights: InsightsType | null
   loading: boolean
 }>()
+
+const { data: moodCorrelation, status: moodCorrelationStatus } = useFetch<MoodCorrelationData>(
+  '/api/habits/insights/mood-correlation',
+  { lazy: true, key: 'habits-mood-correlation' }
+)
+
+const moodCorrelationBars = computed(() => {
+  const buckets = moodCorrelation.value?.buckets ?? []
+
+  return MOOD_OPTIONS.map((option) => {
+    const bucket = buckets.find(b => b.mood === option.value)
+    return {
+      ...option,
+      avgCompletionRate: bucket?.avgCompletionRate ?? 0,
+      sampleDays: bucket?.sampleDays ?? 0
+    }
+  })
+})
 
 const currentYear = new Date().getFullYear()
 const selectedHeatmapYear = ref(currentYear)
@@ -388,6 +407,57 @@ function navigateHeatmapYear(direction: 'older' | 'newer') {
         </div>
       </UCard>
     </div>
+
+    <UCard class="overflow-hidden">
+      <template #header>
+        <div class="flex items-center gap-2">
+          <UIcon name="i-lucide-smile" class="size-5 text-primary" />
+          <div>
+            <p class="font-medium text-highlighted">
+              Humor e consistência
+            </p>
+            <p class="text-sm text-muted">
+              Taxa média de conclusão de hábitos em dias com cada humor registrado no diário (últimos 90 dias).
+            </p>
+          </div>
+        </div>
+      </template>
+
+      <template v-if="moodCorrelationStatus === 'pending'">
+        <div class="space-y-2">
+          <USkeleton v-for="i in 5" :key="i" class="h-8 w-full" />
+        </div>
+      </template>
+
+      <template v-else-if="moodCorrelation?.insufficientData">
+        <div class="py-8 text-center text-sm text-muted">
+          Registre humor no diário e conclua hábitos nos mesmos dias para ver essa correlação.
+        </div>
+      </template>
+
+      <template v-else>
+        <div class="space-y-3">
+          <div
+            v-for="bar in moodCorrelationBars"
+            :key="bar.value"
+            class="flex items-center gap-3"
+          >
+            <span class="w-28 shrink-0 text-sm text-muted">
+              {{ bar.emoji }} {{ bar.label }}
+            </span>
+            <div class="h-2.5 flex-1 overflow-hidden rounded-full bg-muted/40">
+              <div
+                class="h-full rounded-full bg-primary"
+                :style="{ width: `${bar.avgCompletionRate}%` }"
+              />
+            </div>
+            <span class="w-24 shrink-0 text-right text-sm text-highlighted">
+              {{ bar.sampleDays > 0 ? `${bar.avgCompletionRate}%` : '—' }}
+            </span>
+          </div>
+        </div>
+      </template>
+    </UCard>
 
     <div
       v-if="!loading && !hasAnyInsightData"

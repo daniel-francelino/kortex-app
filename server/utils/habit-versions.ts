@@ -20,6 +20,7 @@ type HabitVersionShape = {
   calendar_id: string | null
   scheduled_time: string | null
   scheduled_end_time: string | null
+  emergency_version: string | null
 }
 
 type HabitVersionRow = HabitVersionShape & {
@@ -70,7 +71,8 @@ export function toHabitVersionShape(row: Record<string, unknown>): HabitVersionS
     timezone: (row.timezone ?? null) as string | null,
     calendar_id: (row.calendar_id ?? row.calendarId ?? null) as string | null,
     scheduled_time: (row.scheduled_time ?? row.scheduledTime ?? null) as string | null,
-    scheduled_end_time: (row.scheduled_end_time ?? row.scheduledEndTime ?? null) as string | null
+    scheduled_end_time: (row.scheduled_end_time ?? row.scheduledEndTime ?? null) as string | null,
+    emergency_version: (row.emergency_version ?? row.emergencyVersion ?? null) as string | null
   }
 }
 
@@ -95,6 +97,7 @@ export function hasVersionedHabitChanges(current: Record<string, unknown>, next:
     || currentVersion.calendar_id !== nextVersion.calendar_id
     || currentVersion.scheduled_time !== nextVersion.scheduled_time
     || currentVersion.scheduled_end_time !== nextVersion.scheduled_end_time
+    || currentVersion.emergency_version !== nextVersion.emergency_version
 }
 
 export async function createInitialHabitVersion(

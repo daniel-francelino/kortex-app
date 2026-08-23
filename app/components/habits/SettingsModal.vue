@@ -10,10 +10,12 @@ const emit = defineEmits<{
 }>()
 
 const { fetchHabitSettings, updateHabitSettings } = useHabits()
+const toast = useToast()
 
 const settings = ref<HabitUserSettings | null>(null)
 const loading = ref(true)
 const saving = ref(false)
+const shareImageModalOpen = ref(false)
 
 const dayOptions = [
   { label: 'Dom', value: 0 },
@@ -51,6 +53,27 @@ function onToggleReminder() {
 function onChangeReminderTime(event: Event) {
   const target = event.target as HTMLInputElement
   if (target.value) save({ reviewReminderTime: target.value })
+}
+
+function onToggleShare() {
+  if (!settings.value) return
+  save({ shareEnabled: !settings.value.shareEnabled })
+}
+
+const shareUrl = computed(() => {
+  if (!settings.value?.shareToken || !settings.value.shareEnabled) return null
+  const base = window.location.origin
+  return `${base}/api/habits/share?token=${encodeURIComponent(settings.value.shareToken)}`
+})
+
+async function copyShareLink() {
+  if (!shareUrl.value) return
+  try {
+    await navigator.clipboard.writeText(shareUrl.value)
+    toast.add({ title: 'Link copiado!', description: 'Cole onde quiser compartilhar.', color: 'success' })
+  } catch {
+    toast.add({ title: 'Erro', description: 'Não foi possível copiar o link.', color: 'error' })
+  }
 }
 </script>
 
@@ -121,6 +144,47 @@ function onChangeReminderTime(event: Event) {
               <span class="text-xs text-muted">Horário do lembrete</span>
             </div>
           </div>
+
+          <!-- Share -->
+          <div class="space-y-2">
+            <div class="flex items-center gap-3">
+              <UCheckbox
+                :model-value="settings.shareEnabled"
+                label="Compartilhar progresso"
+                :disabled="saving"
+                @update:model-value="onToggleShare"
+              />
+            </div>
+            <p class="pl-7 text-xs text-muted">
+              Gere um link público para compartilhar seus hábitos e estatísticas.
+            </p>
+            <div v-if="settings.shareEnabled && shareUrl" class="flex items-center gap-2 pl-7">
+              <UInput
+                :model-value="shareUrl"
+                readonly
+                class="flex-1"
+                size="sm"
+              />
+              <UButton
+                icon="i-lucide-copy"
+                color="neutral"
+                variant="subtle"
+                size="sm"
+                aria-label="Copiar link"
+                @click="copyShareLink"
+              />
+            </div>
+            <div v-if="settings.shareEnabled" class="pl-7 pt-1">
+              <UButton
+                icon="i-lucide-image"
+                label="Gerar imagem para redes sociais"
+                color="primary"
+                variant="subtle"
+                size="sm"
+                @click="shareImageModalOpen = true"
+              />
+            </div>
+          </div>
         </div>
       </template>
     </template>
@@ -137,4 +201,9 @@ function onChangeReminderTime(event: Event) {
       </div>
     </template>
   </UModal>
+
+  <HabitsShareImageModal
+    :open="shareImageModalOpen"
+    @update:open="shareImageModalOpen = $event"
+  />
 </template>

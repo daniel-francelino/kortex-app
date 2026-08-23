@@ -3,7 +3,9 @@ import type { Calendar } from '~/types/appointments'
 
 const props = defineProps<{
   calendars: Calendar[] | null | undefined
+  archivedCalendars?: Calendar[] | null | undefined
   loading: boolean
+  archivedLoading?: boolean
   activeCalendarId?: string
 }>()
 
@@ -11,11 +13,12 @@ const emit = defineEmits<{
   create: []
   edit: [calendar: Calendar]
   archive: [calendar: Calendar]
+  restore: [calendar: Calendar]
   toggle: [calendarId: string]
 }>()
 
 function getColor(cal: Calendar, index: number): string {
-  const defaultColors = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899']
+  const defaultColors = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16']
   return cal.color ?? defaultColors[index % defaultColors.length] ?? '#10b981'
 }
 
@@ -114,6 +117,61 @@ void props
             class="opacity-0 group-hover:opacity-100"
           />
         </UDropdownMenu>
+      </div>
+    </div>
+
+    <div
+      v-if="archivedLoading || archivedCalendars?.length"
+      class="space-y-2 border-t border-default pt-3"
+    >
+      <div class="flex items-center gap-2 px-1">
+        <UIcon
+          name="i-lucide-archive"
+          class="size-4 text-muted"
+        />
+        <h4 class="text-xs font-semibold uppercase tracking-wide text-muted">
+          Arquivados
+        </h4>
+      </div>
+
+      <div
+        v-if="archivedLoading"
+        class="space-y-2"
+      >
+        <USkeleton
+          v-for="i in 2"
+          :key="i"
+          class="h-8 w-full"
+        />
+      </div>
+
+      <div
+        v-else
+        class="space-y-1"
+      >
+        <div
+          v-for="(cal, index) in archivedCalendars"
+          :key="cal.id"
+          class="group flex items-center gap-2 rounded-md px-2 py-1.5 text-muted transition-colors hover:bg-elevated/40"
+        >
+          <span
+            class="size-3 shrink-0 rounded-full opacity-60"
+            :style="{ backgroundColor: getColor(cal, index) }"
+          />
+          <span class="min-w-0 flex-1 truncate text-sm">
+            {{ cal.name }}
+          </span>
+
+          <UTooltip text="Restaurar calendário">
+            <UButton
+              icon="i-lucide-rotate-ccw"
+              size="xs"
+              variant="ghost"
+              class="opacity-100 sm:opacity-0 sm:group-hover:opacity-100"
+              @click="emit('restore', cal)"
+            />
+          </UTooltip>
+        </div>
       </div>
     </div>
   </div>

@@ -100,6 +100,15 @@ const triggerStacks = computed(() =>
 const incomingStacks = computed(() =>
   (props.stacks ?? []).filter(stack => stack.newHabitId === props.habit.id)
 )
+
+const historyOpen = ref(false)
+const changeHistoryRef = ref<{ loadMore: () => Promise<void>, loaded: boolean } | null>(null)
+
+watch(historyOpen, (open) => {
+  if (open && !changeHistoryRef.value?.loaded) {
+    void changeHistoryRef.value?.loadMore()
+  }
+})
 </script>
 
 <template>
@@ -468,6 +477,32 @@ const incomingStacks = computed(() =>
 
         <!-- Calendar (always visible, no tab needed) -->
         <HabitsCalendar :habit-id="habit.id" />
+
+        <!-- Change history -->
+        <UCollapsible v-model:open="historyOpen">
+          <button
+            type="button"
+            class="flex w-full items-center justify-between gap-2 rounded-lg py-1 text-left"
+          >
+            <div class="flex items-center gap-2">
+              <UIcon name="i-lucide-history" class="size-4 text-primary" />
+              <h4 class="text-sm font-semibold text-highlighted">
+                Histórico de alterações
+              </h4>
+            </div>
+            <UIcon
+              name="i-lucide-chevron-down"
+              class="size-4 text-muted transition-transform"
+              :class="{ 'rotate-180': historyOpen }"
+            />
+          </button>
+
+          <template #content>
+            <div class="pt-3">
+              <HabitsChangeHistoryList ref="changeHistoryRef" :habit-id="habit.id" />
+            </div>
+          </template>
+        </UCollapsible>
       </div>
     </template>
   </USlideover>

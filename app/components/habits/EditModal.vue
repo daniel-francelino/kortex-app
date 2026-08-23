@@ -72,6 +72,7 @@ const schema = z
     attractiveStrategy: z.string().max(RICH_TEXT_MAX_LENGTH).optional(),
     easyStrategy: z.string().max(RICH_TEXT_MAX_LENGTH).optional(),
     satisfyingStrategy: z.string().max(RICH_TEXT_MAX_LENGTH).optional(),
+    emergencyVersion: z.string().max(500).optional(),
     difficulty: z.nativeEnum(HabitDifficulty),
     habitType: z.nativeEnum(HabitType),
     identityId: z.string().uuid().optional(),
@@ -91,6 +92,7 @@ const state = reactive<Partial<Schema>>({
   attractiveStrategy: '',
   easyStrategy: '',
   satisfyingStrategy: '',
+  emergencyVersion: '',
   difficulty: HabitDifficulty.Normal,
   habitType: HabitType.Positive,
   identityId: undefined,
@@ -116,6 +118,7 @@ watch(
       state.attractiveStrategy = habit.attractiveStrategy ?? ''
       state.easyStrategy = habit.easyStrategy ?? ''
       state.satisfyingStrategy = habit.satisfyingStrategy ?? ''
+      state.emergencyVersion = habit.emergencyVersion ?? ''
       state.difficulty = habit.difficulty
       state.habitType = habit.habitType ?? HabitType.Positive
       state.identityId = habit.identityId ?? undefined
@@ -211,6 +214,7 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
       attractiveStrategy: normalizeRichText(event.data.attractiveStrategy) ?? null,
       easyStrategy: normalizeRichText(event.data.easyStrategy) ?? null,
       satisfyingStrategy: normalizeRichText(event.data.satisfyingStrategy) ?? null,
+      emergencyVersion: event.data.emergencyVersion?.trim() || null,
       difficulty: event.data.difficulty,
       habitType: event.data.habitType,
       identityId: event.data.identityId ?? null,
@@ -590,6 +594,18 @@ function getHabitTypeIcon(habitType: HabitType) {
                 <RichTextEditor
                   v-model="state.satisfyingStrategy"
                   placeholder="Qual recompensa imediata vai reforçar a repetição desse hábito?"
+                  class="w-full"
+                />
+              </UFormField>
+
+              <UFormField
+                label="Versão de emergência"
+                name="emergencyVersion"
+                description="Uma versão mínima para dias difíceis — ainda conta como feito."
+              >
+                <UInput
+                  v-model="state.emergencyVersion"
+                  placeholder="Ex: 1 flexão em vez de 20 minutos de treino"
                   class="w-full"
                 />
               </UFormField>

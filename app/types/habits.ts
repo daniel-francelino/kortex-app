@@ -19,12 +19,16 @@ export enum HabitType {
 
 export enum HabitLogStatus {
   Done = 'done',
-  Skipped = 'skipped'
+  DoneLater = 'done_later',
+  Skipped = 'skipped',
+  Frozen = 'frozen'
 }
 
-export const LOG_STATUS_META: Record<HabitLogStatus, { label: string, icon: string, color: 'success' | 'warning' | 'error' }> = {
+export const LOG_STATUS_META: Record<HabitLogStatus, { label: string, icon: string, color: 'success' | 'warning' | 'error' | 'primary' }> = {
   [HabitLogStatus.Done]: { label: 'Feito', icon: 'i-lucide-check-circle', color: 'success' },
-  [HabitLogStatus.Skipped]: { label: 'Não feito', icon: 'i-lucide-x-circle', color: 'error' }
+  [HabitLogStatus.DoneLater]: { label: 'Feito mais tarde', icon: 'i-lucide-clock-4', color: 'warning' },
+  [HabitLogStatus.Skipped]: { label: 'Não feito', icon: 'i-lucide-x-circle', color: 'error' },
+  [HabitLogStatus.Frozen]: { label: 'Congelado', icon: 'i-lucide-snowflake', color: 'primary' }
 }
 
 export enum CueType {
@@ -96,6 +100,7 @@ export interface Habit {
   attractiveStrategy: string | null
   easyStrategy: string | null
   satisfyingStrategy: string | null
+  emergencyVersion: string | null
   frequency: HabitFrequency
   difficulty: HabitDifficulty
   habitType: HabitType
@@ -253,6 +258,7 @@ export interface CreateHabitPayload {
   attractiveStrategy?: string
   easyStrategy?: string
   satisfyingStrategy?: string
+  emergencyVersion?: string
   frequency: HabitFrequency
   difficulty: HabitDifficulty
   habitType?: HabitType
@@ -272,6 +278,7 @@ export interface UpdateHabitPayload {
   attractiveStrategy?: string | null
   easyStrategy?: string | null
   satisfyingStrategy?: string | null
+  emergencyVersion?: string | null
   frequency?: HabitFrequency
   difficulty?: HabitDifficulty
   habitType?: HabitType
@@ -432,4 +439,15 @@ export interface HeatmapData {
   totalHabits: number
   selectedYear: number
   availableYears: number[]
+}
+
+export interface MoodCorrelationBucket {
+  mood: string
+  avgCompletionRate: number
+  sampleDays: number
+}
+
+export interface MoodCorrelationData {
+  buckets: MoodCorrelationBucket[]
+  insufficientData: boolean
 }

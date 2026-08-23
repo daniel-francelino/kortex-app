@@ -18,6 +18,7 @@ const bodySchema = z.object({
   attractiveStrategy: z.string().max(5000).nullable().optional(),
   easyStrategy: z.string().max(5000).nullable().optional(),
   satisfyingStrategy: z.string().max(5000).nullable().optional(),
+  emergencyVersion: z.string().max(500).nullable().optional(),
   frequency: z.enum(['daily', 'weekly', 'custom']).optional(),
   difficulty: z.enum(['tiny', 'normal', 'hard']).optional(),
   habitType: z.enum(['positive', 'negative']).optional(),
@@ -58,7 +59,7 @@ export default eventHandler(async (event) => {
   // Fetch current habit to compare tracked fields
   const { data: current, error: fetchError } = await supabase
     .from('habits')
-    .select('id, user_id, identity_id, name, avatar_emoji, description, obvious_strategy, attractive_strategy, easy_strategy, satisfying_strategy, frequency, difficulty, habit_type, custom_days, sort_order, timezone, calendar_id, scheduled_time, scheduled_end_time')
+    .select('id, user_id, identity_id, name, avatar_emoji, description, obvious_strategy, attractive_strategy, easy_strategy, satisfying_strategy, emergency_version, frequency, difficulty, habit_type, custom_days, sort_order, timezone, calendar_id, scheduled_time, scheduled_end_time')
     .eq('id', id)
     .eq('user_id', user.id)
     .single()
@@ -76,6 +77,7 @@ export default eventHandler(async (event) => {
   if (parsed.attractiveStrategy !== undefined) updateData.attractive_strategy = sanitizeRichTextHtml(parsed.attractiveStrategy)
   if (parsed.easyStrategy !== undefined) updateData.easy_strategy = sanitizeRichTextHtml(parsed.easyStrategy)
   if (parsed.satisfyingStrategy !== undefined) updateData.satisfying_strategy = sanitizeRichTextHtml(parsed.satisfyingStrategy)
+  if (parsed.emergencyVersion !== undefined) updateData.emergency_version = parsed.emergencyVersion?.trim() || null
   if (parsed.frequency !== undefined) updateData.frequency = parsed.frequency
   if (parsed.difficulty !== undefined) updateData.difficulty = parsed.difficulty
   if (parsed.habitType !== undefined) updateData.habit_type = parsed.habitType

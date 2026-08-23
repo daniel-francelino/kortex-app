@@ -9,7 +9,7 @@ const querySchema = z.object({
   to: z.string().regex(/^\d{4}-\d{2}-\d{2}/).optional(),
   q: z.string().max(200).optional(),
   page: z.coerce.number().int().min(1).default(1),
-  pageSize: z.coerce.number().int().min(1).max(100).default(50)
+  pageSize: z.coerce.number().int().min(1).max(500).default(100)
 })
 
 export default eventHandler(async (event) => {
@@ -20,6 +20,7 @@ export default eventHandler(async (event) => {
   const rangeEnd = params.to ? new Date(`${params.to}T23:59:59.999`) : null
   const rangeStartIso = rangeStart?.toISOString()
   const rangeEndIso = rangeEnd?.toISOString()
+  const shouldExpandRange = Boolean(rangeStart && rangeEnd)
 
   const supabase = getSupabaseAdminClient()
 
@@ -41,18 +42,28 @@ export default eventHandler(async (event) => {
     return { data: [], total: 0, page: params.page, pageSize: params.pageSize }
   }
 
-  // Fetch non-recurring events in range
+  // Fetch events that can produce occurrences in the requested range.
   let queryBuilder = supabase
     .from('events')
-    .select('*, calendars!inner(id, name, color)', { count: 'exact' })
+    .select('*, calendars!inner(id, name, color)', { count: shouldExpandRange ? undefined : 'exact' })
     .in('calendar_id', calendarIds)
     .is('archived_at', null)
 
-  if (rangeStartIso) {
-    queryBuilder = queryBuilder.gte('end_at', rangeStartIso)
-  }
-  if (rangeEndIso) {
-    queryBuilder = queryBuilder.lte('start_at', rangeEndIso)
+  if (rangeStartIso && rangeEndIso) {
+    queryBuilder = queryBuilder.or([
+      `and(rrule.is.null,end_at.gte.${rangeStartIso},start_at.lte.${rangeEndIso})`,
+      `and(rrule.not.is.null,start_at.lte.${rangeEndIso})`
+    ].join(','))
+  } else if (rangeStartIso) {
+    queryBuilder = queryBuilder.or([
+      `and(rrule.is.null,end_at.gte.${rangeStartIso})`,
+      'rrule.not.is.null'
+    ].join(','))
+  } else if (rangeEndIso) {
+    queryBuilder = queryBuilder.or([
+      `and(rrule.is.null,start_at.lte.${rangeEndIso})`,
+      `and(rrule.not.is.null,start_at.lte.${rangeEndIso})`
+    ].join(','))
   }
   if (params.q) {
     queryBuilder = queryBuilder.or(`title.ilike.%${params.q}%,description.ilike.%${params.q}%,location.ilike.%${params.q}%`)
@@ -61,9 +72,12 @@ export default eventHandler(async (event) => {
   queryBuilder = queryBuilder.order('start_at', { ascending: true })
 
   const { page, pageSize } = params
-  const from = (page - 1) * pageSize
-  const to = from + pageSize - 1
-  queryBuilder = queryBuilder.range(from, to)
+  const pageFrom = (page - 1) * pageSize
+  const pageTo = pageFrom + pageSize - 1
+
+  if (!shouldExpandRange) {
+    queryBuilder = queryBuilder.range(pageFrom, pageTo)
+  }
 
   const { data, count, error } = await queryBuilder
 
@@ -119,11 +133,12 @@ export default eventHandler(async (event) => {
       })
     } else if (e.rrule && rangeStart && rangeEnd) {
       const duration = new Date(e.end_at as string).getTime() - new Date(e.start_at as string).getTime()
+      const recurrenceRangeStart = new Date(rangeStart.getTime() - duration)
 
       const occurrences = expandRecurrence(
         e.start_at as string,
         e.rrule as string,
-        rangeStart,
+        recurrenceRangeStart,
         rangeEnd
       )
 
@@ -143,6 +158,10 @@ export default eventHandler(async (event) => {
 
         if (!isCancelled) {
           const occEnd = new Date(occ.getTime() + duration)
+          if (occEnd < rangeStart || occ > rangeEnd) {
+            continue
+          }
+
           expandedEvents.push({
             id: e.id as string,
             calendar_id: e.calendar_id as string,
@@ -187,9 +206,13 @@ export default eventHandler(async (event) => {
     new Date(a.start_at).getTime() - new Date(b.start_at).getTime()
   )
 
+  const paginatedEvents = shouldExpandRange
+    ? expandedEvents.slice(pageFrom, pageFrom + pageSize)
+    : expandedEvents
+
   return {
-    data: expandedEvents,
-    total: count ?? 0,
+    data: paginatedEvents,
+    total: shouldExpandRange ? expandedEvents.length : count ?? 0,
     page,
     pageSize
   }

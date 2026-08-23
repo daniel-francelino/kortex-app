@@ -28,7 +28,7 @@ export default eventHandler(async (event) => {
   // Get active habits with streaks
   const { data: habits } = await supabase
     .from('habits')
-    .select('name, frequency, difficulty, streak:habit_streaks(current_streak)')
+    .select('id, name, frequency, difficulty, streak:habit_streaks(current_streak)')
     .eq('user_id', userId)
     .is('archived_at', null)
     .order('sort_order', { ascending: true })

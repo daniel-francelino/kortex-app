@@ -7,7 +7,7 @@ const bodySchema = z.object({
   habitId: z.string().uuid(),
   logDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data deve estar no formato YYYY-MM-DD'),
   completed: z.boolean(),
-  status: z.enum(['done', 'done_later', 'skipped']).optional(),
+  status: z.enum(['done', 'done_later', 'skipped', 'frozen']).optional(),
   note: z.string().max(500).optional()
 })
 
@@ -44,6 +44,35 @@ export default eventHandler(async (event) => {
 
   const logStatus = parsed.status ?? (parsed.completed ? 'done' : 'skipped')
   const isCompleted = logStatus === 'done' || logStatus === 'done_later'
+
+  if (logStatus === 'frozen') {
+    const { data: existingLog } = await supabase
+      .from('habit_logs')
+      .select('status')
+      .eq('habit_id', parsed.habitId)
+      .eq('log_date', parsed.logDate)
+      .maybeSingle()
+
+    if (existingLog?.status !== 'frozen') {
+      const monthStart = `${parsed.logDate.slice(0, 7)}-01`
+      const nextMonthDate = new Date(`${monthStart}T00:00:00Z`)
+      nextMonthDate.setUTCMonth(nextMonthDate.getUTCMonth() + 1)
+      const nextMonthStart = nextMonthDate.toISOString().split('T')[0]!
+
+      const FREEZE_MONTHLY_CAP = 3
+      const { count: frozenThisMonth } = await supabase
+        .from('habit_logs')
+        .select('id', { count: 'exact', head: true })
+        .eq('habit_id', parsed.habitId)
+        .eq('status', 'frozen')
+        .gte('log_date', monthStart)
+        .lt('log_date', nextMonthStart)
+
+      if ((frozenThisMonth ?? 0) >= FREEZE_MONTHLY_CAP) {
+        throw createError({ statusCode: 409, statusMessage: 'Limite de congelamentos do mês atingido' })
+      }
+    }
+  }
 
   // Upsert log (idempotent per habit+date)
   const { data: log, error: logError } = await supabase
@@ -87,15 +116,15 @@ async function updateStreakCache(
   userId: string,
   habitId: string
 ): Promise<void> {
-  // Get recent logs ordered by date desc
+  // Get recent logs (completed or frozen) ordered by date desc
   const { data: logs } = await supabase
     .from('habit_logs')
-    .select('log_date, completed')
+    .select('log_date, status')
     .eq('habit_id', habitId)
     .eq('user_id', userId)
-    .eq('completed', true)
+    .in('status', ['done', 'done_later', 'frozen'])
     .order('log_date', { ascending: false })
-    .limit(365)
+    .limit(400)
 
   if (!logs || logs.length === 0) {
     await supabase.from('habit_streaks').upsert({
@@ -104,54 +133,72 @@ async function updateStreakCache(
       current_streak: 0,
       longest_streak: 0,
       last_completed_date: null,
+      status: 'active',
       updated_at: new Date().toISOString()
     }, { onConflict: 'habit_id' })
     return
   }
 
-  // Calculate current streak
-  let currentStreak = 0
+  const completedDates = new Set(
+    logs
+      .filter((l: Record<string, unknown>) => l.status === 'done' || l.status === 'done_later')
+      .map((l: Record<string, unknown>) => l.log_date as string)
+  )
+  const frozenDates = new Set(
+    logs
+      .filter((l: Record<string, unknown>) => l.status === 'frozen')
+      .map((l: Record<string, unknown>) => l.log_date as string)
+  )
+
   const today = new Date()
   today.setHours(0, 0, 0, 0)
-
-  const dates = logs.map((l: Record<string, unknown>) => l.log_date as string).sort().reverse()
-
-  // Determine streak start: today or yesterday (if today has no log yet)
-  const firstLogDate = new Date(dates[0] + 'T00:00:00')
   const yesterday = new Date(today)
   yesterday.setDate(yesterday.getDate() - 1)
 
+  // Determine streak start: today or yesterday (if today has no log yet).
+  // A frozen day counts as "activity" for anchoring, same as a real completion.
+  const mostRecentDateStr = [...completedDates, ...frozenDates].sort().reverse()[0]
+  const mostRecentDate = mostRecentDateStr ? new Date(`${mostRecentDateStr}T00:00:00`) : null
+
   let streakAnchor: Date
-  if (firstLogDate.getTime() === today.getTime()) {
+  if (mostRecentDate && mostRecentDate.getTime() === today.getTime()) {
     streakAnchor = today
-  } else if (firstLogDate.getTime() === yesterday.getTime()) {
+  } else if (mostRecentDate && mostRecentDate.getTime() === yesterday.getTime()) {
     streakAnchor = yesterday
   } else {
-    // Last completion was before yesterday — streak is 0
+    // Last activity was before yesterday — streak is 0
     streakAnchor = today
   }
 
-  for (let i = 0; i < dates.length; i++) {
-    const logDate = new Date(dates[i] + 'T00:00:00')
+  // Walk backward day by day from the anchor. A completed day increments the
+  // streak; a frozen day preserves it (doesn't increment, doesn't break it);
+  // any other day breaks the walk.
+  let currentStreak = 0
+  let anchorIsFrozen = false
+  const cursor = new Date(streakAnchor)
 
-    const expectedDate = new Date(streakAnchor)
-    expectedDate.setDate(expectedDate.getDate() - i)
+  for (let i = 0; ; i++) {
+    const dateStr = cursor.toISOString().split('T')[0]!
 
-    if (logDate.getTime() === expectedDate.getTime()) {
+    if (completedDates.has(dateStr)) {
       currentStreak++
+    } else if (frozenDates.has(dateStr)) {
+      if (i === 0) anchorIsFrozen = true
     } else {
       break
     }
+
+    cursor.setDate(cursor.getDate() - 1)
   }
 
-  // Calculate longest streak
+  // Calculate longest streak — real completions only, freezes don't inflate it.
   let longestStreak = 0
   let tempStreak = 1
-  const sortedDates = [...dates].sort()
+  const sortedCompletedDates = [...completedDates].sort()
 
-  for (let i = 1; i < sortedDates.length; i++) {
-    const prev = new Date(sortedDates[i - 1] + 'T00:00:00')
-    const curr = new Date(sortedDates[i] + 'T00:00:00')
+  for (let i = 1; i < sortedCompletedDates.length; i++) {
+    const prev = new Date(`${sortedCompletedDates[i - 1]}T00:00:00`)
+    const curr = new Date(`${sortedCompletedDates[i]}T00:00:00`)
     const diff = (curr.getTime() - prev.getTime()) / (1000 * 60 * 60 * 24)
 
     if (diff === 1) {
@@ -161,14 +208,19 @@ async function updateStreakCache(
       tempStreak = 1
     }
   }
-  longestStreak = Math.max(longestStreak, tempStreak, currentStreak)
+  if (sortedCompletedDates.length > 0) {
+    longestStreak = Math.max(longestStreak, tempStreak, currentStreak)
+  }
+
+  const lastCompletedDate = sortedCompletedDates.at(-1) ?? null
 
   await supabase.from('habit_streaks').upsert({
     habit_id: habitId,
     user_id: userId,
     current_streak: currentStreak,
     longest_streak: longestStreak,
-    last_completed_date: dates[0] ?? null,
+    last_completed_date: lastCompletedDate,
+    status: anchorIsFrozen ? 'frozen' : 'active',
     updated_at: new Date().toISOString()
   }, { onConflict: 'habit_id' })
 }

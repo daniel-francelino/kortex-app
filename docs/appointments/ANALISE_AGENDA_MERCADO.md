@@ -55,8 +55,8 @@ Múltiplos calendários coloridos por usuário, eventos com recorrência (RRULE,
 ## 3. Roadmap sugerido (por esforço x impacto)
 
 ### P0 — Corrigir o que já está confirmado como quebrado antes de competir em recursos
-1. **Consertar o bug de eventos recorrentes antigos sumindo em visões futuras** e a **paginação inconsistente para calendários com muita recorrência** (`1.APPOINTMENTS.md`, seção 6) — problemas de correção de dados, não de posicionamento; nenhum concorrente teria esse tipo de falha básica.
-2. **Consertar editar/arquivar calendário** (hoje conectado a funções vazias na UI) e **adicionar restauração de calendário arquivado** — hoje é uma armadilha sem volta.
+1. ✅ **Concluído em 2026-08-23:** consertado o bug de eventos recorrentes antigos sumindo em visões futuras e a paginação inconsistente para calendários com muita recorrência (`1.APPOINTMENTS.md`, seção 6). `GET /api/appointments/events` agora inclui séries recorrentes iniciadas antes do intervalo visível, expande ocorrências antes de paginar quando há `from`/`to`, e retorna `total` baseado nas ocorrências exibíveis.
+2. ✅ **Concluído em 2026-08-23:** edição, arquivamento e restauração de calendários foram conectados na UI. O painel de calendários agora abre o modal de edição, confirma antes de arquivar e exibe calendários arquivados com ação de restaurar.
 3. **Entregar lembretes de verdade** (pelo menos um canal — e-mail ou push do navegador) — é a lacuna mais citada como "básico absoluto" em qualquer fonte pesquisada sobre calendários.
 
 ### P1 — Fecha o gap estrutural nº1: calendário deixa de ser de uma pessoa só

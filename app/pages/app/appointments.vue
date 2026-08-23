@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { CalendarEvent, CreateEventPayload } from '~/types/appointments'
+import type { Calendar, CalendarEvent, CreateEventPayload } from '~/types/appointments'
 
 definePageMeta({
   layout: 'app'
@@ -12,16 +12,21 @@ useSeoMeta({
 const {
   calendars,
   calendarsStatus,
+  archivedCalendars,
+  archivedCalendarsStatus,
   eventsData,
   eventsStatus,
   activeCalendarIds,
   setViewRange,
   fetchEventDetail,
   refreshCalendars,
+  refreshArchivedCalendars,
   refreshEvents,
   createEvent,
   updateEvent,
-  archiveEvent
+  archiveEvent,
+  archiveCalendar,
+  restoreCalendar
 } = useAppointments()
 
 // ─── View mode (Day / Week / Month) ─────────────────────────────────────
@@ -128,6 +133,8 @@ function goToday() {
 
 // ─── Modals / Popovers ─────────────────────────────────────────────────
 const calendarCreateOpen = ref(false)
+const calendarToEdit = ref<Calendar | null>(null)
+const calendarToArchive = ref<Calendar | null>(null)
 const eventCreateOpen = ref(false)
 const eventDetailOpen = ref(false)
 const eventDetailLoading = ref(false)
@@ -278,6 +285,44 @@ function onToggleCalendar(calendarId: string) {
 
 const eventsList = computed(() => eventsData.value?.data ?? [])
 
+function onCreateCalendar() {
+  calendarToEdit.value = null
+  calendarCreateOpen.value = true
+}
+
+function onEditCalendar(calendar: Calendar) {
+  calendarToEdit.value = calendar
+  calendarCreateOpen.value = true
+}
+
+function onArchiveCalendar(calendar: Calendar) {
+  calendarToArchive.value = calendar
+}
+
+function onArchiveModalOpenUpdate(value: boolean) {
+  if (!value) {
+    calendarToArchive.value = null
+  }
+}
+
+async function confirmArchiveCalendar() {
+  if (!calendarToArchive.value) return
+
+  const calendarId = calendarToArchive.value.id
+  const success = await archiveCalendar(calendarId)
+
+  if (success) {
+    if (selectedCalendarId.value === calendarId) {
+      activeCalendarIds.value = []
+    }
+    calendarToArchive.value = null
+  }
+}
+
+async function onRestoreCalendar(calendar: Calendar) {
+  await restoreCalendar(calendar.id)
+}
+
 async function onEventDrop(eventId: string, newStartAt: string, newEndAt: string) {
   const success = await updateEvent(eventId, { startAt: newStartAt, endAt: newEndAt })
   if (success) refreshEvents()
@@ -298,6 +343,7 @@ async function onMonthEventDrop(eventId: string, newDate: string) {
 
 onMounted(() => {
   refreshCalendars()
+  refreshArchivedCalendars()
 })
 </script>
 
@@ -394,12 +440,15 @@ onMounted(() => {
         >
           <AppointmentsCalendarList
             :calendars="calendars"
+            :archived-calendars="archivedCalendars"
             :loading="calendarsStatus === 'pending'"
+            :archived-loading="archivedCalendarsStatus === 'pending'"
             :active-calendar-id="selectedCalendarId"
-            @create="calendarCreateOpen = true"
+            @create="onCreateCalendar"
             @toggle="onToggleCalendar"
-            @archive="() => {}"
-            @edit="() => {}"
+            @archive="onArchiveCalendar"
+            @edit="onEditCalendar"
+            @restore="onRestoreCalendar"
           />
         </div>
 
@@ -473,9 +522,35 @@ onMounted(() => {
   <AppointmentsCalendarCreateModal
     :open="calendarCreateOpen"
     :calendars="calendars"
+    :calendar="calendarToEdit"
     @update:open="calendarCreateOpen = $event"
     @created="refreshCalendars"
+    @updated="refreshCalendars"
   />
+
+  <UModal
+    :open="Boolean(calendarToArchive)"
+    title="Arquivar calendário"
+    description="Os eventos deste calendário ficarão ocultos até que o calendário seja restaurado."
+    @update:open="onArchiveModalOpenUpdate"
+  >
+    <template #footer>
+      <div class="flex w-full justify-end gap-2">
+        <UButton
+          label="Cancelar"
+          color="neutral"
+          variant="outline"
+          @click="calendarToArchive = null"
+        />
+        <UButton
+          label="Arquivar"
+          color="error"
+          icon="i-lucide-archive"
+          @click="confirmArchiveCalendar"
+        />
+      </div>
+    </template>
+  </UModal>
 
   <AppointmentsEventCreateModal
     :open="eventCreateOpen"

@@ -114,6 +114,19 @@ export function useAppointments() {
     transform: data => (data ?? []).map(normalizeCalendar)
   })
 
+  const {
+    data: archivedCalendars,
+    status: archivedCalendarsStatus,
+    refresh: refreshArchivedCalendars
+  } = useFetch<Calendar[]>('/api/appointments/calendars', {
+    query: { archived: true },
+    lazy: true,
+    immediate: false,
+    key: 'appointments-archived-calendars',
+    default: () => [],
+    transform: data => (data ?? []).map(normalizeCalendar)
+  })
+
   // ─── Date range state ─────────────────────────────────────────────────────
   const viewFrom = ref('')
   const viewTo = ref('')
@@ -122,7 +135,7 @@ export function useAppointments() {
 
   // ─── Events (paginated, filtered by date range) ───────────────────────────
   const eventsPage = ref(1)
-  const eventsPageSize = ref(100)
+  const eventsPageSize = ref(500)
 
   const {
     data: eventsData,
@@ -209,6 +222,7 @@ export function useAppointments() {
       })
       toast.add({ title: 'Calendário atualizado', color: 'success' })
       await refreshCalendars()
+      await refreshArchivedCalendars()
       return true
     } catch {
       toast.add({ title: 'Erro', description: 'Não foi possível atualizar o calendário', color: 'error' })
@@ -223,10 +237,27 @@ export function useAppointments() {
       })
       toast.add({ title: 'Calendário arquivado', color: 'success' })
       await refreshCalendars()
+      await refreshArchivedCalendars()
       await refreshEvents()
       return true
     } catch {
       toast.add({ title: 'Erro', description: 'Não foi possível arquivar o calendário', color: 'error' })
+      return false
+    }
+  }
+
+  async function restoreCalendar(id: string): Promise<boolean> {
+    try {
+      await $fetch(`/api/appointments/calendars/${id}/restore`, {
+        method: 'POST'
+      })
+      toast.add({ title: 'Calendário restaurado', color: 'success' })
+      await refreshCalendars()
+      await refreshArchivedCalendars()
+      await refreshEvents()
+      return true
+    } catch {
+      toast.add({ title: 'Erro', description: 'Não foi possível restaurar o calendário', color: 'error' })
       return false
     }
   }
@@ -368,10 +399,14 @@ export function useAppointments() {
     // Calendars
     calendars,
     calendarsStatus,
+    archivedCalendars,
+    archivedCalendarsStatus,
     refreshCalendars,
+    refreshArchivedCalendars,
     createCalendar,
     updateCalendar,
     archiveCalendar,
+    restoreCalendar,
     getCalendarColor,
 
     // Events

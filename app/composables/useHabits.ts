@@ -17,13 +17,14 @@ import type {
   Identity,
   LogHabitPayload,
   SharedHabitsProgress,
+  TodayHabit,
   TodayHabitsResponse,
   UpdateHabitPayload,
   UpdateIdentityPayload,
   UpdateHabitUserSettingsPayload,
   Habit
 } from '~/types/habits'
-import { HabitDifficulty, HabitFrequency, HabitType } from '~/types/habits'
+import { HabitDifficulty, HabitFrequency, HabitLogStatus, HabitType } from '~/types/habits'
 import { PostHogEvent } from '~/types/analytics'
 
 export function useHabits() {
@@ -237,25 +238,59 @@ export function useHabits() {
   }
 
   async function logHabit(payload: LogHabitPayload): Promise<boolean> {
+    const isCompleted = payload.status ? payload.status !== HabitLogStatus.Skipped : payload.completed
+    const status: HabitLogStatus = payload.status ?? (payload.completed ? HabitLogStatus.Done : HabitLogStatus.Skipped)
+
+    const habitIndex = todayData.value?.habits.findIndex(h => h.id === payload.habitId) ?? -1
+    const previousHabit: TodayHabit | null
+      = habitIndex >= 0 ? { ...todayData.value!.habits[habitIndex]! } : null
+    const previousCompletedCount = todayData.value?.completedCount ?? 0
+
+    if (habitIndex >= 0 && todayData.value && previousHabit) {
+      const wasCompleted = previousHabit.log?.completed ?? false
+      todayData.value.habits[habitIndex] = {
+        ...previousHabit,
+        log: {
+          id: previousHabit.log?.id ?? '',
+          userId: previousHabit.log?.userId ?? previousHabit.userId,
+          habitId: payload.habitId,
+          habitVersionId: previousHabit.log?.habitVersionId ?? '',
+          logDate: payload.logDate,
+          completed: payload.completed,
+          status,
+          note: payload.note ?? previousHabit.log?.note ?? null,
+          createdAt: previousHabit.log?.createdAt ?? new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        }
+      }
+      if (payload.completed !== wasCompleted) {
+        todayData.value.completedCount += payload.completed ? 1 : -1
+      }
+    }
+
     try {
       await $fetch('/api/habits/log', {
         method: 'POST',
         body: payload
       })
-      const isCompleted = payload.status ? payload.status !== 'skipped' : payload.completed
       trackHabitsEvent(PostHogEvent.HabitLogged, {
         completed: isCompleted,
         habit_id: payload.habitId,
         has_note: Boolean(payload.note?.trim()),
-        status: payload.status ?? (payload.completed ? 'done' : 'skipped')
+        status
       })
       if (isCompleted) {
         toast.add({ title: 'Muito bem!', description: 'Você está construindo consistência.', color: 'success' })
       }
       await refreshToday()
       return true
-    } catch {
-      toast.add({ title: 'Erro', description: 'Não foi possível registrar o hábito.', color: 'error' })
+    } catch (err: unknown) {
+      if (habitIndex >= 0 && todayData.value && previousHabit) {
+        todayData.value.habits[habitIndex] = previousHabit
+        todayData.value.completedCount = previousCompletedCount
+      }
+      const message = (err as { data?: { statusMessage?: string } })?.data?.statusMessage
+      toast.add({ title: 'Erro', description: message ?? 'Não foi possível registrar o hábito.', color: 'error' })
       return false
     }
   }

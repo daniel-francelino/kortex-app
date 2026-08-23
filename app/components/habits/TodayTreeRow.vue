@@ -324,6 +324,24 @@ function onRowKeydown(event: KeyboardEvent) {
           </UTooltip>
 
           <UTooltip
+            v-if="node.habit.emergencyVersion && !node.habit.log?.completed"
+            :content="{ side: 'top', align: 'center' }"
+          >
+            <span
+              class="inline-flex size-6 items-center justify-center rounded-md border border-default/60 bg-default/40 text-muted"
+              :aria-label="`Versão de emergência: ${node.habit.emergencyVersion}`"
+            >
+              <UIcon name="i-lucide-life-buoy" class="size-3.5" />
+            </span>
+
+            <template #content>
+              <div class="max-w-64 whitespace-normal break-words rounded-lg border border-default/70 bg-default px-3 py-2 text-sm leading-5 text-toned shadow-lg">
+                Dia difícil? {{ node.habit.emergencyVersion }} já conta.
+              </div>
+            </template>
+          </UTooltip>
+
+          <UTooltip
             v-for="hint in lawHints"
             :key="hint.key"
             :content="{ side: 'top', align: 'center' }"

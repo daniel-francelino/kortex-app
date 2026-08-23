@@ -5,17 +5,19 @@ import type { Calendar, CalendarVisibility } from '~/types/appointments'
 const props = defineProps<{
   open: boolean
   calendars: Calendar[] | null | undefined
+  calendar?: Calendar | null
 }>()
 
 const emit = defineEmits<{
   'update:open': [value: boolean]
   'created': []
+  'updated': []
 }>()
 
-const { createCalendar } = useAppointments()
+const { createCalendar, updateCalendar } = useAppointments()
 
 const schema = z.object({
-  name: z.string().min(1, 'Nome é obrigatório').max(100),
+  name: z.string().min(1, 'Nome Ã© obrigatÃ³rio').max(100),
   description: z.string().max(500).optional(),
   color: z.string().max(20).optional(),
   visibility: z.enum(['private', 'shared', 'public']).default('private')
@@ -31,6 +33,7 @@ const state = reactive<FormState>({
 })
 
 const loading = ref(false)
+const isEditing = computed(() => Boolean(props.calendar))
 
 const colorOptions = [
   { label: 'Verde', value: '#10b981' },
@@ -45,6 +48,22 @@ async function onSubmit() {
   if (loading.value) return
   loading.value = true
   try {
+    if (props.calendar) {
+      const success = await updateCalendar(props.calendar.id, {
+        name: state.name,
+        description: state.description || null,
+        color: state.color || null,
+        visibility: state.visibility as CalendarVisibility
+      })
+
+      if (success) {
+        emit('update:open', false)
+        emit('updated')
+      }
+
+      return
+    }
+
     const result = await createCalendar({
       name: state.name,
       description: state.description || undefined,
@@ -65,13 +84,24 @@ async function onSubmit() {
   }
 }
 
-void props
+watch(
+  () => [props.open, props.calendar] as const,
+  ([open, calendar]) => {
+    if (!open) return
+
+    state.name = calendar?.name ?? ''
+    state.description = calendar?.description ?? ''
+    state.color = calendar?.color ?? '#10b981'
+    state.visibility = calendar?.visibility ?? 'private'
+  },
+  { immediate: true }
+)
 </script>
 
 <template>
   <UModal
     :open="open"
-    title="Novo calendário"
+    :title="isEditing ? 'Editar calendário' : 'Novo calendário'"
     @update:open="emit('update:open', $event)"
   >
     <template #body>
@@ -93,12 +123,12 @@ void props
         </UFormField>
 
         <UFormField
-          label="Descrição"
+          label="DescriÃ§Ã£o"
           name="description"
         >
           <UTextarea
             v-model="state.description"
-            placeholder="Descrição opcional"
+            placeholder="DescriÃ§Ã£o opcional"
             :rows="2"
             class="w-full"
           />
@@ -130,7 +160,7 @@ void props
           />
           <UButton
             type="submit"
-            label="Criar"
+            :label="isEditing ? 'Salvar' : 'Criar'"
             :loading="loading"
             :disabled="loading"
           />

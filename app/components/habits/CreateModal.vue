@@ -6,6 +6,7 @@ import type { Calendar } from '~/types/appointments'
 import type { Goal } from '~/types/goals'
 import { HabitFrequency, HabitDifficulty, HabitType } from '~/types/habits'
 import { GuidedTourKey } from '~/types/guided-tour'
+import { HABIT_TEMPLATES, type HabitTemplate } from '~/utils/habit-templates'
 
 const RICH_TEXT_MAX_LENGTH = 10000
 
@@ -80,6 +81,7 @@ const schema = z.object({
   attractiveStrategy: z.string().max(RICH_TEXT_MAX_LENGTH).optional(),
   easyStrategy: z.string().max(RICH_TEXT_MAX_LENGTH).optional(),
   satisfyingStrategy: z.string().max(RICH_TEXT_MAX_LENGTH).optional(),
+  emergencyVersion: z.string().max(500).optional(),
   difficulty: z.nativeEnum(HabitDifficulty).default(HabitDifficulty.Normal),
   habitType: z.nativeEnum(HabitType).default(HabitType.Positive),
   identityId: z.string().uuid().optional(),
@@ -107,6 +109,7 @@ const state = reactive<Partial<Schema>>({
   attractiveStrategy: '',
   easyStrategy: '',
   satisfyingStrategy: '',
+  emergencyVersion: '',
   difficulty: HabitDifficulty.Normal,
   habitType: HabitType.Positive,
   identityId: undefined,
@@ -121,6 +124,46 @@ const activeFormTab = ref<string | undefined>(undefined)
 const selectedTagIds = ref<string[]>([])
 const avatarPopoverOpen = ref(false)
 let createHabitTour: Driver | null = null
+
+// ─── Templates ────────────────────────────────────────────────────────────────
+const modalMode = ref<'custom' | 'template'>('custom')
+const templateFilter = ref<string | undefined>(undefined)
+
+const modeItems = [
+  { label: 'Personalizado', value: 'custom' },
+  { label: 'Começar de um template', value: 'template' }
+]
+
+const templateCategories = computed(() => [...new Set(HABIT_TEMPLATES.map(t => t.category))])
+
+const templateFilterOptions = computed(() => [
+  { label: 'Todas as áreas', value: undefined },
+  ...templateCategories.value.map(category => ({ label: category, value: category }))
+])
+
+const filteredTemplates = computed(() =>
+  templateFilter.value
+    ? HABIT_TEMPLATES.filter(t => t.category === templateFilter.value)
+    : HABIT_TEMPLATES
+)
+
+function applyTemplate(template: HabitTemplate) {
+  state.name = template.name
+  state.description = template.description
+  state.difficulty = template.difficulty
+  state.habitType = template.habitType ?? HabitType.Positive
+  state.obviousStrategy = template.obviousStrategy ?? ''
+  state.attractiveStrategy = template.attractiveStrategy ?? ''
+  state.easyStrategy = template.easyStrategy ?? ''
+  state.satisfyingStrategy = template.satisfyingStrategy ?? ''
+  state.avatarEmoji = template.emoji
+  state.customDays = template.frequency === HabitFrequency.Weekly
+    ? [1]
+    : template.frequency === HabitFrequency.Custom
+      ? [...(template.customDays ?? [1, 2, 3, 4, 5])]
+      : [...ALL_WEEK_DAYS]
+  modalMode.value = 'custom'
+}
 
 watch(
   () => props.open,
@@ -219,6 +262,7 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
       attractiveStrategy: normalizeRichText(event.data.attractiveStrategy),
       easyStrategy: normalizeRichText(event.data.easyStrategy),
       satisfyingStrategy: normalizeRichText(event.data.satisfyingStrategy),
+      emergencyVersion: event.data.emergencyVersion?.trim() || undefined,
       name: event.data.name,
       avatarEmoji: event.data.avatarEmoji,
       difficulty: event.data.difficulty,
@@ -254,6 +298,7 @@ function resetForm() {
   state.attractiveStrategy = ''
   state.easyStrategy = ''
   state.satisfyingStrategy = ''
+  state.emergencyVersion = ''
   state.difficulty = HabitDifficulty.Normal
   state.habitType = HabitType.Positive
   state.identityId = undefined
@@ -264,6 +309,8 @@ function resetForm() {
   selectedTagIds.value = []
   activeFormTab.value = undefined
   avatarPopoverOpen.value = false
+  modalMode.value = 'custom'
+  templateFilter.value = undefined
 }
 
 function onClose() {
@@ -516,7 +563,43 @@ onBeforeUnmount(() => {
     @update:open="onClose"
   >
     <template #body>
+      <UTabs
+        :items="modeItems"
+        :model-value="modalMode"
+        class="mb-4"
+        @update:model-value="modalMode = $event as 'custom' | 'template'"
+      />
+
+      <!-- Template gallery -->
+      <div v-if="modalMode === 'template'" class="space-y-3">
+        <USelect
+          v-model="templateFilter"
+          :items="templateFilterOptions"
+          value-key="value"
+          placeholder="Filtrar por área"
+          class="w-full"
+        />
+        <div class="grid max-h-96 gap-2 overflow-y-auto sm:grid-cols-2">
+          <button
+            v-for="template in filteredTemplates"
+            :key="template.id"
+            type="button"
+            class="flex flex-col items-start gap-1 rounded-xl border border-default p-3 text-left transition-colors hover:bg-elevated"
+            @click="applyTemplate(template)"
+          >
+            <span class="text-2xl">{{ template.emoji }}</span>
+            <p class="text-sm font-medium text-highlighted">
+              {{ template.name }}
+            </p>
+            <p class="text-xs text-muted">
+              {{ template.category }}
+            </p>
+          </button>
+        </div>
+      </div>
+
       <UForm
+        v-else
         :id="FORM_ID"
         :schema="schema"
         :state="state"
@@ -788,6 +871,18 @@ onBeforeUnmount(() => {
                   class="w-full"
                 />
               </UFormField>
+
+              <UFormField
+                label="Versão de emergência"
+                name="emergencyVersion"
+                description="Uma versão mínima para dias difíceis — ainda conta como feito."
+              >
+                <UInput
+                  v-model="state.emergencyVersion"
+                  placeholder="Ex: 1 flexão em vez de 20 minutos de treino"
+                  class="w-full"
+                />
+              </UFormField>
             </div>
           </template>
         </UAccordion>
@@ -805,6 +900,7 @@ onBeforeUnmount(() => {
           @click="onClose"
         />
         <UButton
+          v-if="modalMode === 'custom'"
           icon="i-lucide-check"
           label="Salvar"
           data-tour="habit-create-submit"
