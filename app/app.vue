@@ -32,9 +32,15 @@ const appleSplashLinks = [
   const portrait = `(device-width: ${item.width}px) and (device-height: ${item.height}px) and (-webkit-device-pixel-ratio: ${item.ratio}) and (orientation: portrait)`
   const landscape = `(device-width: ${item.height}px) and (device-height: ${item.width}px) and (-webkit-device-pixel-ratio: ${item.ratio}) and (orientation: landscape)`
 
+  // Nuxt's head manager (unhead) dedupes <link> tags that share the same
+  // rel+href by default — since portrait and landscape here both point at
+  // the same image, only the last-registered one (landscape) was ever
+  // surviving into the rendered HTML. Phones launch in portrait, so in
+  // practice NONE of these splash images ever matched and iOS fell back to
+  // a blank background. An explicit unique `key` per tag stops the dedupe.
   return [
-    { rel: 'apple-touch-startup-image' as const, href: item.href, media: portrait },
-    { rel: 'apple-touch-startup-image' as const, href: item.href, media: landscape }
+    { rel: 'apple-touch-startup-image' as const, href: item.href, media: portrait, key: `apple-splash-${item.width}x${item.height}-${item.ratio}x-portrait` },
+    { rel: 'apple-touch-startup-image' as const, href: item.href, media: landscape, key: `apple-splash-${item.width}x${item.height}-${item.ratio}x-landscape` }
   ]
 })
 
