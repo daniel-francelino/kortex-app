@@ -8,27 +8,21 @@ const emit = defineEmits<{
   submit: [pin: string]
 }>()
 
-const digits = ref('')
-const inputRef = ref<HTMLInputElement | null>(null)
+const digits = ref<string[]>([])
+const pinInputRef = ref<{ inputsRef?: Array<{ $el?: HTMLInputElement }> } | null>(null)
 
 function focus() {
-  inputRef.value?.focus()
-}
-
-function onInput(event: Event) {
-  const target = event.target as HTMLInputElement
-  const next = target.value.replace(/\D/g, '').slice(0, 4)
-  digits.value = next
-  target.value = next
-  if (next.length === 4 && !props.loading) {
-    emit('submit', next)
-  }
+  pinInputRef.value?.inputsRef?.[0]?.$el?.focus()
 }
 
 function clear() {
-  digits.value = ''
-  if (inputRef.value) inputRef.value.value = ''
-  focus()
+  digits.value = []
+  nextTick(focus)
+}
+
+function onComplete(value: string[]) {
+  const pin = value.join('').replace(/\D/g, '').slice(0, 4)
+  if (pin.length === 4 && !props.loading) emit('submit', pin)
 }
 
 defineExpose({ clear, focus })
@@ -37,29 +31,28 @@ onMounted(() => focus())
 </script>
 
 <template>
-  <div class="flex flex-col items-center gap-4">
-    <div
-      class="flex items-center gap-3"
-      :class="shake ? 'kortex-pin-shake' : ''"
-      @click="focus"
-    >
-      <span
-        v-for="i in 4"
-        :key="i"
-        class="size-3.5 rounded-full border-2 transition-colors"
-        :class="digits.length >= i ? 'border-primary bg-primary' : 'border-default bg-transparent'"
-      />
-    </div>
-    <input
-      ref="inputRef"
-      type="tel"
-      inputmode="numeric"
-      autocomplete="off"
-      maxlength="4"
-      aria-label="PIN de 4 dígitos"
-      class="sr-only"
+  <div
+    class="flex flex-col items-center gap-3"
+    :class="shake ? 'kortex-pin-shake' : ''"
+  >
+    <UPinInput
+      ref="pinInputRef"
+      v-model="digits"
+      length="4"
+      mask
+      otp
+      autofocus
+      type="number"
+      size="xl"
       :disabled="loading"
-      @input="onInput"
-    >
+      :color="shake ? 'error' : 'primary'"
+      :highlight="shake"
+      aria-label="PIN de 4 digitos"
+      :ui="{
+        root: 'gap-2',
+        base: 'size-11 rounded-lg text-lg font-semibold shadow-sm'
+      }"
+      @complete="onComplete"
+    />
   </div>
 </template>

@@ -19,6 +19,13 @@ const now = ref(Date.now())
 
 let tickTimer: ReturnType<typeof setInterval> | null = null
 
+const title = computed(() => props.entryDate ? 'Entrada protegida' : 'Diário protegido')
+const description = computed(() =>
+  props.entryDate
+    ? 'Digite o PIN para abrir esta entrada.'
+    : 'Digite o PIN para acessar o Diário de Bordo.'
+)
+
 const remainingSeconds = computed(() => {
   if (!lockedUntil.value) return 0
   return Math.max(0, Math.ceil((lockedUntil.value.getTime() - now.value) / 1000))
@@ -28,7 +35,9 @@ const isLockedOut = computed(() => remainingSeconds.value > 0)
 
 watch(isLockedOut, (locked) => {
   if (locked && !tickTimer) {
-    tickTimer = setInterval(() => { now.value = Date.now() }, 1000)
+    tickTimer = setInterval(() => {
+      now.value = Date.now()
+    }, 1000)
   } else if (!locked && tickTimer) {
     clearInterval(tickTimer)
     tickTimer = null
@@ -58,7 +67,9 @@ async function onSubmit(pin: string) {
     }
     shake.value = true
     pinPadRef.value?.clear()
-    setTimeout(() => { shake.value = false }, 400)
+    setTimeout(() => {
+      shake.value = false
+    }, 400)
   } catch {
     errorMessage.value = 'Não foi possível verificar o PIN.'
   } finally {
@@ -69,41 +80,66 @@ async function onSubmit(pin: string) {
 
 <template>
   <div
-    class="flex flex-col items-center justify-center gap-4 text-center"
-    :class="compact ? 'py-10' : 'py-24'"
+    class="flex items-center justify-center px-4"
+    :class="compact ? 'py-8' : 'min-h-[60vh] py-16'"
   >
-    <UIcon
-      name="i-lucide-lock"
-      class="text-dimmed"
-      :class="compact ? 'size-8' : 'size-10'"
-    />
-    <div>
-      <p class="text-sm font-medium text-highlighted">
-        {{ entryDate ? 'Entrada protegida' : 'Diário protegido' }}
-      </p>
-      <p class="text-xs text-muted">
-        Digite o PIN para continuar.
-      </p>
-    </div>
-
-    <JournalPinPad
-      ref="pinPadRef"
-      :loading="loading || isLockedOut"
-      :shake="shake"
-      @submit="onSubmit"
-    />
-
-    <p
-      v-if="isLockedOut"
-      class="text-xs text-warning"
+    <UCard
+      class="w-full max-w-sm"
+      :ui="{ body: 'p-6 sm:p-7' }"
     >
-      Muitas tentativas. Tente novamente em {{ remainingSeconds }}s.
-    </p>
-    <p
-      v-else-if="errorMessage"
-      class="text-xs text-error"
-    >
-      {{ errorMessage }}
-    </p>
+      <div class="flex flex-col items-center gap-5 text-center">
+        <div class="flex size-14 items-center justify-center rounded-full border border-primary/20 bg-primary/10">
+          <UIcon name="i-lucide-lock-keyhole" class="size-7 text-primary" />
+        </div>
+
+        <div class="space-y-1">
+          <div class="flex items-center justify-center gap-2">
+            <h3 class="text-base font-semibold text-highlighted">
+              {{ title }}
+            </h3>
+            <UBadge
+              v-if="entryDate"
+              color="neutral"
+              variant="subtle"
+              size="sm"
+            >
+              entrada
+            </UBadge>
+          </div>
+          <p class="text-sm text-muted">
+            {{ description }}
+          </p>
+        </div>
+
+        <JournalPinPad
+          ref="pinPadRef"
+          :loading="loading || isLockedOut"
+          :shake="shake"
+          @submit="onSubmit"
+        />
+
+        <div class="min-h-10 w-full">
+          <UAlert
+            v-if="isLockedOut"
+            color="warning"
+            variant="soft"
+            icon="i-lucide-timer"
+            :description="`Muitas tentativas. Tente novamente em ${remainingSeconds}s.`"
+            :ui="{ description: 'text-xs' }"
+          />
+          <UAlert
+            v-else-if="errorMessage"
+            color="error"
+            variant="soft"
+            icon="i-lucide-circle-alert"
+            :description="errorMessage"
+            :ui="{ description: 'text-xs' }"
+          />
+          <p v-else class="text-xs text-dimmed">
+            O acesso será solicitado novamente após recarregar a página.
+          </p>
+        </div>
+      </div>
+    </UCard>
   </div>
 </template>

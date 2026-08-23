@@ -12,7 +12,13 @@
       "Bash(curl -s -o /dev/null -w \"api/journal/encryption/status: %{http_code}\\\\n\" http://localhost:3000/api/journal/encryption/status)",
       "Bash(curl -s -o /dev/null -w \"api/life/dashboard: %{http_code}\\\\n\" http://localhost:3000/api/life/dashboard)",
       "Bash(curl -s -o /dev/null -w \"app \\(dashboard\\): %{http_code}\\\\n\" http://localhost:3000/app)",
-      "Bash(curl -s -o /dev/null -w \"api/journal/entries: %{http_code}\\\\n\" http://localhost:3000/api/journal/entries)"
+      "Bash(curl -s -o /dev/null -w \"api/journal/entries: %{http_code}\\\\n\" http://localhost:3000/api/journal/entries)",
+      "Bash(dir \"c:\\\\Users\\\\daniel.francelino\\\\Desktop\\\\projects_study\\\\kortex-app\\\\docs\\\\goals\")",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:3000/app/goals --max-time 20)",
+      "Bash(npm run *)",
+      "Bash(netstat -ano)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://[::1]:3000/app/goals --max-time 25)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://[::1]:3000/ --max-time 25)"
     ]
   }
 }

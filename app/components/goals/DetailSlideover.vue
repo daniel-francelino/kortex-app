@@ -91,7 +91,7 @@ const progressDescription = computed(() => {
   return `${completedTaskCount.value} de ${tasks.value.length} ${taskWord} ${completedWord}. Restam ${remainingTaskCount.value}.`
 })
 const canCompleteGoal = computed(() =>
-  currentGoal.value?.status === GoalStatus.Active && progressValue.value >= 100
+  currentGoal.value?.status === GoalStatus.Active
 )
 
 // ─── New task form ───────────────────────────────────────────────────────────

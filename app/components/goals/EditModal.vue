@@ -11,6 +11,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   'update:open': [value: boolean]
+  'saved': []
 }>()
 
 const { updateGoal, timeCategoryOptions, lifeCategoryOptions } = useGoalActions()
@@ -52,6 +53,7 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
   try {
     const result = await updateGoal(props.goal.id, { ...event.data, emoji: selectedEmoji.value })
     if (result) {
+      emit('saved')
       emit('update:open', false)
     }
   } finally {

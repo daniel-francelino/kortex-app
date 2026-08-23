@@ -24,8 +24,26 @@ const {
   fetchGoal,
   timeCategoryOptions,
   lifeCategoryOptions,
-  statusOptions
+  statusOptions,
+  insights,
+  insightsStatus,
+  refreshInsights
 } = useGoals()
+
+// ─── Tabs ─────────────────────────────────────────────────────────────────────
+const activeTab = ref('list')
+const tabs = [
+  { label: 'Lista', value: 'list', icon: 'i-lucide-list' },
+  { label: 'Insights', value: 'insights', icon: 'i-lucide-bar-chart-3' }
+]
+
+function ensureLoaded(status: Ref<'idle' | 'pending' | 'success' | 'error'>, refresh: () => Promise<unknown>) {
+  if (status.value === 'idle') void refresh()
+}
+
+watch(activeTab, (tab) => {
+  if (tab === 'insights') ensureLoaded(insightsStatus, refreshInsights)
+})
 
 // ─── Modals ───────────────────────────────────────────────────────────────────
 const createModalOpen = ref(false)
@@ -82,16 +100,19 @@ function onArchiveGoal(goal: Goal) {
 }
 
 async function onCompleteGoal(goal: Goal) {
-  await completeGoal(goal.id, goal.title)
+  const ok = await completeGoal(goal.id, goal.title)
+  if (ok) refreshList()
 }
 
 async function onRestoreGoal(goal: Goal) {
-  await restoreGoal(goal.id)
+  const ok = await restoreGoal(goal.id)
+  if (ok) refreshList()
 }
 
 function onGoalArchived() {
   detailSlideoverOpen.value = false
   selectedGoal.value = null
+  refreshList()
 }
 
 function onGoalUpdated() {
@@ -138,50 +159,64 @@ const statusFilterOptions = computed(() => [
 
     <template #body>
       <div class="space-y-4">
-        <!-- Filters -->
-        <div class="flex flex-wrap items-center gap-2">
-          <UInput
-            v-model="listSearch"
-            icon="i-lucide-search"
-            placeholder="Buscar metas..."
-            class="max-w-xs"
-          />
-          <USelect
-            v-model="listTimeCategoryModel"
-            :items="timeCategoryFilterOptions"
-            value-key="value"
-            placeholder="Prazo"
-            class="min-w-32"
-          />
-          <USelect
-            v-model="listLifeCategoryModel"
-            :items="lifeCategoryFilterOptions"
-            value-key="value"
-            placeholder="Área"
-            class="min-w-32"
-          />
-          <USelect
-            v-model="listStatusModel"
-            :items="statusFilterOptions"
-            value-key="value"
-            placeholder="Status"
-            class="min-w-32"
-          />
-        </div>
+        <UTabs
+          :items="tabs"
+          :model-value="activeTab"
+          @update:model-value="activeTab = $event as string"
+        />
 
-        <!-- List -->
-        <GoalsList
-          :goals="listData?.data ?? []"
-          :total="listData?.total ?? 0"
-          :page="listPage"
-          :page-size="listPageSize"
-          :loading="listFetchStatus === 'pending'"
-          @update:page="listPage = $event"
-          @select="onSelectGoal"
-          @edit="onEditGoal"
-          @archive="onArchiveGoal"
-          @complete="onCompleteGoal"
-          @restore="onRestoreGoal"
+        <template v-if="activeTab === 'list'">
+          <!-- Filters -->
+          <div class="flex flex-wrap items-center gap-2">
+            <UInput
+              v-model="listSearch"
+              icon="i-lucide-search"
+              placeholder="Buscar metas..."
+              class="max-w-xs"
+            />
+            <USelect
+              v-model="listTimeCategoryModel"
+              :items="timeCategoryFilterOptions"
+              value-key="value"
+              placeholder="Prazo"
+              class="min-w-32"
+            />
+            <USelect
+              v-model="listLifeCategoryModel"
+              :items="lifeCategoryFilterOptions"
+              value-key="value"
+              placeholder="Área"
+              class="min-w-32"
+            />
+            <USelect
+              v-model="listStatusModel"
+              :items="statusFilterOptions"
+              value-key="value"
+              placeholder="Status"
+              class="min-w-32"
+            />
+          </div>
+
+          <!-- List -->
+          <GoalsList
+            :goals="listData?.data ?? []"
+            :total="listData?.total ?? 0"
+            :page="listPage"
+            :page-size="listPageSize"
+            :loading="listFetchStatus === 'pending'"
+            @update:page="listPage = $event"
+            @select="onSelectGoal"
+            @edit="onEditGoal"
+            @archive="onArchiveGoal"
+            @complete="onCompleteGoal"
+            @restore="onRestoreGoal"
+          />
+        </template>
+
+        <GoalsInsightsPanel
+          v-else-if="activeTab === 'insights'"
+          :insights="insights ?? null"
+          :loading="insightsStatus === 'pending'"
         />
       </div>
     </template>
@@ -191,6 +226,7 @@ const statusFilterOptions = computed(() => [
   <GoalsCreateModal
     :open="createModalOpen"
     @update:open="createModalOpen = $event"
+    @saved="refreshList"
   />
 
   <GoalsEditModal
@@ -198,6 +234,7 @@ const statusFilterOptions = computed(() => [
     :open="editModalOpen"
     :goal="selectedGoal"
     @update:open="editModalOpen = $event"
+    @saved="refreshList"
   />
 
   <GoalsArchiveModal
