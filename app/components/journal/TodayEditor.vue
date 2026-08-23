@@ -448,7 +448,7 @@ defineExpose({ isUnsaved: () => hasChanges.value, doSave })
           <USkeleton class="size-9 rounded-full" />
         </div>
       </div>
-      <USkeleton class="h-64 w-full rounded-lg" />
+      <USkeleton class="h-[max(16rem,calc(100dvh-14rem))] w-full rounded-lg" />
     </motion.div>
 
     <template v-else>
@@ -638,7 +638,7 @@ defineExpose({ isUnsaved: () => hasChanges.value, doSave })
               :key="today"
               v-model="content"
               placeholder="Escreva livremente sobre o seu dia... use '/' para inserir blocos."
-              :min-height="'14rem'"
+              min-height="max(14rem, calc(100dvh - 14rem))"
             />
             <template #fallback>
               <USkeleton class="h-56 w-full rounded-lg" />
