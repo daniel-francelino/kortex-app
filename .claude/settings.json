@@ -18,7 +18,10 @@
       "Bash(npm run *)",
       "Bash(netstat -ano)",
       "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://[::1]:3000/app/goals --max-time 25)",
-      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://[::1]:3000/ --max-time 25)"
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://[::1]:3000/ --max-time 25)",
+      "Bash(node -e \"console.log\\(require\\('./package.json'\\).dependencies['date-fns']\\)\")",
+      "Bash(pnpm add *)",
+      "Bash(npx --no-install tsx --version)"
     ]
   }
 }

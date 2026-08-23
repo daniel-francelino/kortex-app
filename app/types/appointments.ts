@@ -23,6 +23,13 @@ export enum RecurrenceFrequency {
   Monthly = 'MONTHLY'
 }
 
+export enum RsvpStatus {
+  Pending = 'pending',
+  Accepted = 'accepted',
+  Declined = 'declined',
+  Tentative = 'tentative'
+}
+
 // ─── Interfaces ───────────────────────────────────────────────────────────────
 
 export interface Calendar {
@@ -73,6 +80,25 @@ export interface EventException {
   overrideEndAt: string | null
   createdAt: string
   updatedAt: string
+}
+
+export interface EventParticipant {
+  id: string
+  eventId: string
+  ownerId: string
+  invitedUserId: string | null
+  invitedEmail: string
+  rsvpStatus: RsvpStatus
+  createdAt: string
+  updatedAt: string
+}
+
+export interface InviteParticipantPayload {
+  email: string
+}
+
+export interface UpdateRsvpPayload {
+  rsvpStatus: RsvpStatus.Accepted | RsvpStatus.Declined | RsvpStatus.Tentative
 }
 
 export interface EventReminder {
@@ -152,6 +178,24 @@ export interface ReminderInput {
 
 export interface CancelOccurrencePayload {
   recurrenceId: string
+}
+
+export interface ModifyOccurrencePayload {
+  recurrenceId: string
+  title?: string
+  description?: string | null
+  location?: string | null
+  startAt?: string
+  endAt?: string
+}
+
+export interface SplitSeriesPayload {
+  recurrenceId: string
+  title?: string
+  description?: string | null
+  location?: string | null
+  startAt?: string
+  endAt?: string
 }
 
 // ─── Responses ────────────────────────────────────────────────────────────────

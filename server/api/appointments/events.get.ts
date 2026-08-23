@@ -38,55 +38,121 @@ export default eventHandler(async (event) => {
     calendarIds = (cals ?? []).map((c: Record<string, unknown>) => c.id as string)
   }
 
-  if (calendarIds.length === 0) {
+  // Events the user was invited to (as a participant, not an owner) also show
+  // up in the unfiltered "all calendars" view — but not when the user asked
+  // to see one specific calendar of their own, since an invited event isn't
+  // "in" any calendar they own.
+  let invitedEventIds: string[] = []
+  if (!params.calendarId) {
+    const { data: participations } = await supabase
+      .from('event_participants')
+      .select('event_id')
+      .eq('invited_user_id', user.id)
+
+    invitedEventIds = [...new Set((participations ?? []).map((p: Record<string, unknown>) => p.event_id as string))]
+  }
+
+  if (calendarIds.length === 0 && invitedEventIds.length === 0) {
     return { data: [], total: 0, page: params.page, pageSize: params.pageSize }
   }
-
-  // Fetch events that can produce occurrences in the requested range.
-  let queryBuilder = supabase
-    .from('events')
-    .select('*, calendars!inner(id, name, color)', { count: shouldExpandRange ? undefined : 'exact' })
-    .in('calendar_id', calendarIds)
-    .is('archived_at', null)
-
-  if (rangeStartIso && rangeEndIso) {
-    queryBuilder = queryBuilder.or([
-      `and(rrule.is.null,end_at.gte.${rangeStartIso},start_at.lte.${rangeEndIso})`,
-      `and(rrule.not.is.null,start_at.lte.${rangeEndIso})`
-    ].join(','))
-  } else if (rangeStartIso) {
-    queryBuilder = queryBuilder.or([
-      `and(rrule.is.null,end_at.gte.${rangeStartIso})`,
-      'rrule.not.is.null'
-    ].join(','))
-  } else if (rangeEndIso) {
-    queryBuilder = queryBuilder.or([
-      `and(rrule.is.null,start_at.lte.${rangeEndIso})`,
-      `and(rrule.not.is.null,start_at.lte.${rangeEndIso})`
-    ].join(','))
-  }
-  if (params.q) {
-    queryBuilder = queryBuilder.or(`title.ilike.%${params.q}%,description.ilike.%${params.q}%,location.ilike.%${params.q}%`)
-  }
-
-  queryBuilder = queryBuilder.order('start_at', { ascending: true })
 
   const { page, pageSize } = params
   const pageFrom = (page - 1) * pageSize
   const pageTo = pageFrom + pageSize - 1
 
-  if (!shouldExpandRange) {
-    queryBuilder = queryBuilder.range(pageFrom, pageTo)
+  let ownedData: Record<string, unknown>[] = []
+  let count: number | null = null
+
+  if (calendarIds.length > 0) {
+    let queryBuilder = supabase
+      .from('events')
+      .select('*, calendars!inner(id, name, color)', { count: shouldExpandRange ? undefined : 'exact' })
+      .in('calendar_id', calendarIds)
+      .is('archived_at', null)
+
+    if (rangeStartIso && rangeEndIso) {
+      queryBuilder = queryBuilder.or([
+        `and(rrule.is.null,end_at.gte.${rangeStartIso},start_at.lte.${rangeEndIso})`,
+        `and(rrule.not.is.null,start_at.lte.${rangeEndIso})`
+      ].join(','))
+    } else if (rangeStartIso) {
+      queryBuilder = queryBuilder.or([
+        `and(rrule.is.null,end_at.gte.${rangeStartIso})`,
+        'rrule.not.is.null'
+      ].join(','))
+    } else if (rangeEndIso) {
+      queryBuilder = queryBuilder.or([
+        `and(rrule.is.null,start_at.lte.${rangeEndIso})`,
+        `and(rrule.not.is.null,start_at.lte.${rangeEndIso})`
+      ].join(','))
+    }
+    if (params.q) {
+      queryBuilder = queryBuilder.or(`title.ilike.%${params.q}%,description.ilike.%${params.q}%,location.ilike.%${params.q}%`)
+    }
+
+    queryBuilder = queryBuilder.order('start_at', { ascending: true })
+
+    if (!shouldExpandRange) {
+      queryBuilder = queryBuilder.range(pageFrom, pageTo)
+    }
+
+    const { data, count: ownedCount, error } = await queryBuilder
+
+    if (error) {
+      throw createError({ statusCode: 500, statusMessage: error.message })
+    }
+
+    ownedData = data ?? []
+    count = ownedCount
   }
 
-  const { data, count, error } = await queryBuilder
+  let invitedData: Record<string, unknown>[] = []
+  if (invitedEventIds.length > 0) {
+    let invitedQueryBuilder = supabase
+      .from('events')
+      .select('*, calendars(id, name, color)')
+      .in('id', invitedEventIds)
+      .is('archived_at', null)
 
-  if (error) {
-    throw createError({ statusCode: 500, statusMessage: error.message })
+    if (rangeStartIso && rangeEndIso) {
+      invitedQueryBuilder = invitedQueryBuilder.or([
+        `and(rrule.is.null,end_at.gte.${rangeStartIso},start_at.lte.${rangeEndIso})`,
+        `and(rrule.not.is.null,start_at.lte.${rangeEndIso})`
+      ].join(','))
+    } else if (rangeStartIso) {
+      invitedQueryBuilder = invitedQueryBuilder.or([
+        `and(rrule.is.null,end_at.gte.${rangeStartIso})`,
+        'rrule.not.is.null'
+      ].join(','))
+    } else if (rangeEndIso) {
+      invitedQueryBuilder = invitedQueryBuilder.or([
+        `and(rrule.is.null,start_at.lte.${rangeEndIso})`,
+        `and(rrule.not.is.null,start_at.lte.${rangeEndIso})`
+      ].join(','))
+    }
+    if (params.q) {
+      invitedQueryBuilder = invitedQueryBuilder.or(`title.ilike.%${params.q}%,description.ilike.%${params.q}%,location.ilike.%${params.q}%`)
+    }
+
+    invitedQueryBuilder = invitedQueryBuilder.order('start_at', { ascending: true })
+
+    const { data, error } = await invitedQueryBuilder
+
+    if (error) {
+      throw createError({ statusCode: 500, statusMessage: error.message })
+    }
+
+    invitedData = data ?? []
   }
 
-  // For recurring events, also fetch exceptions
-  const events = data ?? []
+  const seenIds = new Set<string>()
+  const events: Record<string, unknown>[] = []
+  for (const row of [...ownedData, ...invitedData]) {
+    const id = row.id as string
+    if (seenIds.has(id)) continue
+    seenIds.add(id)
+    events.push(row)
+  }
   const recurringEventIds = events
     .filter((e: Record<string, unknown>) => e.rrule)
     .map((e: Record<string, unknown>) => e.id as string)
@@ -139,7 +205,8 @@ export default eventHandler(async (event) => {
         e.start_at as string,
         e.rrule as string,
         recurrenceRangeStart,
-        rangeEnd
+        rangeEnd,
+        e.event_timezone as string
       )
 
       const eventExceptions = exceptions.filter(

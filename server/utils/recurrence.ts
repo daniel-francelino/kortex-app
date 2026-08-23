@@ -3,6 +3,7 @@
  * Supports: FREQ=DAILY|WEEKLY|MONTHLY, INTERVAL, COUNT, UNTIL, BYDAY
  * Generates occurrence start dates within a given range.
  */
+import { fromZonedTime, toZonedTime } from 'date-fns-tz'
 
 interface ParsedRRule {
   freq: 'DAILY' | 'WEEKLY' | 'MONTHLY'
@@ -55,6 +56,15 @@ export function parseRRule(rrule: string): ParsedRRule {
   return result
 }
 
+/**
+ * Formats a UTC instant as an iCalendar UNTIL value (`YYYYMMDDTHHMMSSZ`) —
+ * the counterpart of `parseRRuleDate`'s full-datetime branch.
+ */
+export function formatRRuleUntil(date: Date): string {
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${date.getUTCFullYear()}${pad(date.getUTCMonth() + 1)}${pad(date.getUTCDate())}T${pad(date.getUTCHours())}${pad(date.getUTCMinutes())}${pad(date.getUTCSeconds())}Z`
+}
+
 function parseRRuleDate(value: string): Date {
   // Format: 20260315T120000Z or 20260315
   if (value.length === 8) {
@@ -73,6 +83,14 @@ function parseRRuleDate(value: string): Date {
   return new Date(`${y}-${m}-${d}T${h}:${min}:${s}Z`)
 }
 
+/**
+ * These operate on "zoned" Date objects (as produced by `toZonedTime`), whose
+ * UTC-getters/setters represent wall-clock components in the target timezone
+ * rather than a real UTC instant — same convention date-fns-tz uses. Adding a
+ * calendar day/month this way means "same wall-clock time the next day/month",
+ * which is what a recurring event actually means to a user, and stays correct
+ * across DST transitions.
+ */
 function addDays(date: Date, days: number): Date {
   const result = new Date(date)
   result.setUTCDate(result.getUTCDate() + days)
@@ -85,22 +103,42 @@ function addMonths(date: Date, months: number): Date {
   return result
 }
 
+function getWeekStart(date: Date): Date {
+  const result = new Date(date)
+  const day = result.getUTCDay()
+  // Sunday = 0, so week start is Sunday
+  result.setUTCDate(result.getUTCDate() - day)
+  result.setUTCHours(0, 0, 0, 0)
+  return result
+}
+
 /**
  * Expand a recurring event into occurrence start dates within [rangeStart, rangeEnd].
- * Returns ISO date strings of each occurrence start.
+ * Returns real UTC instants (as Date objects) of each occurrence start.
+ *
+ * `timezone` is the event's IANA timezone (`events.event_timezone`). All the
+ * interval math (DAILY/WEEKLY/MONTHLY/BYDAY) is done on the wall-clock
+ * representation of the dates in that timezone, then converted back to a real
+ * UTC instant before being returned/compared against range bounds — this is
+ * what keeps a "9am every day" series landing on 9am local time across DST
+ * transitions instead of drifting by an hour.
  */
 export function expandRecurrence(
   eventStartAt: string,
   rrule: string,
   rangeStart: Date,
   rangeEnd: Date,
+  timezone: string,
   maxOccurrences: number = 500
 ): Date[] {
   const parsed = parseRRule(rrule)
   const eventStart = new Date(eventStartAt)
+  const eventStartZoned = toZonedTime(eventStart, timezone)
+  const rangeStartZoned = toZonedTime(rangeStart, timezone)
+  const rangeEndZoned = toZonedTime(rangeEnd, timezone)
   const occurrences: Date[] = []
 
-  let current = new Date(eventStart)
+  let current = new Date(eventStartZoned)
   let count = 0
   const limit = parsed.count ?? maxOccurrences
 
@@ -108,13 +146,24 @@ export function expandRecurrence(
   const absoluteMax = 1000
   let iterations = 0
 
+  function tryPush(candidateZoned: Date) {
+    if (count >= limit) return
+    const candidateUtc = fromZonedTime(candidateZoned, timezone)
+    if (parsed.until && candidateUtc > parsed.until) return
+    if (candidateUtc < rangeStart || candidateUtc > rangeEnd) return
+    occurrences.push(candidateUtc)
+    count++
+  }
+
   while (iterations < absoluteMax) {
     iterations++
 
-    // Check termination conditions
-    if (parsed.until && current > parsed.until) break
+    // Check termination conditions (all comparisons here happen in the
+    // zoned/wall-clock space, consistent with how `current` advances).
+    const currentUtc = fromZonedTime(current, timezone)
+    if (parsed.until && currentUtc > parsed.until) break
     if (count >= limit) break
-    if (current > rangeEnd) break
+    if (current > rangeEndZoned) break
 
     if (parsed.freq === 'WEEKLY' && parsed.byday && parsed.byday.length > 0) {
       // For WEEKLY with BYDAY, iterate through the week
@@ -123,22 +172,15 @@ export function expandRecurrence(
         const dayNum = DAY_MAP[dayCode]
         if (dayNum === undefined) continue
         const candidate = addDays(weekStart, dayNum)
-        // Preserve time from event start
+        // Preserve wall-clock time from event start
         candidate.setUTCHours(
-          eventStart.getUTCHours(),
-          eventStart.getUTCMinutes(),
-          eventStart.getUTCSeconds()
+          eventStartZoned.getUTCHours(),
+          eventStartZoned.getUTCMinutes(),
+          eventStartZoned.getUTCSeconds()
         )
 
-        if (candidate >= eventStart && candidate >= rangeStart && candidate <= rangeEnd) {
-          if (!parsed.until || candidate <= parsed.until) {
-            if (count < limit) {
-              occurrences.push(new Date(candidate))
-              count++
-            }
-          }
-        } else if (candidate >= eventStart && candidate > rangeEnd) {
-          // Past range, will break outer loop
+        if (candidate >= eventStartZoned && candidate >= rangeStartZoned && candidate <= rangeEndZoned) {
+          tryPush(candidate)
         }
 
         if (count >= limit) break
@@ -148,9 +190,8 @@ export function expandRecurrence(
       current = addDays(weekStart, 7 * parsed.interval)
     } else {
       // DAILY or MONTHLY or WEEKLY without BYDAY
-      if (current >= rangeStart && current <= rangeEnd && current >= eventStart) {
-        occurrences.push(new Date(current))
-        count++
+      if (current >= rangeStartZoned && current <= rangeEndZoned && current >= eventStartZoned) {
+        tryPush(current)
       }
 
       switch (parsed.freq) {
@@ -167,14 +208,7 @@ export function expandRecurrence(
     }
   }
 
-  return occurrences
-}
+  occurrences.sort((a, b) => a.getTime() - b.getTime())
 
-function getWeekStart(date: Date): Date {
-  const result = new Date(date)
-  const day = result.getUTCDay()
-  // Sunday = 0, so week start is Sunday
-  result.setUTCDate(result.getUTCDate() - day)
-  result.setUTCHours(0, 0, 0, 0)
-  return result
+  return occurrences
 }

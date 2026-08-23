@@ -3,6 +3,7 @@ import type {
   Calendar,
   CalendarEvent,
   EventException,
+  EventParticipant,
   EventReminder,
   ExceptionType,
   CalendarVisibility,
@@ -11,7 +12,10 @@ import type {
   UpdateCalendarPayload,
   UpdateEventPayload,
   CancelOccurrencePayload,
-  ReminderInput
+  ModifyOccurrencePayload,
+  SplitSeriesPayload,
+  ReminderInput,
+  RsvpStatus
 } from '~/types/appointments'
 
 interface EventsResponse {
@@ -66,6 +70,21 @@ function normalizeException(input: unknown): EventException {
     overrideEndAt: (exception.overrideEndAt as string | null) ?? (exception.override_end_at as string | null) ?? null,
     createdAt: String(exception.createdAt ?? exception.created_at ?? ''),
     updatedAt: String(exception.updatedAt ?? exception.updated_at ?? '')
+  }
+}
+
+function normalizeParticipant(input: unknown): EventParticipant {
+  const participant = (input ?? {}) as Record<string, unknown>
+
+  return {
+    id: String(participant.id ?? ''),
+    eventId: String(participant.eventId ?? participant.event_id ?? ''),
+    ownerId: String(participant.ownerId ?? participant.owner_id ?? ''),
+    invitedUserId: (participant.invitedUserId as string | null) ?? (participant.invited_user_id as string | null) ?? null,
+    invitedEmail: String(participant.invitedEmail ?? participant.invited_email ?? ''),
+    rsvpStatus: (participant.rsvpStatus ?? participant.rsvp_status ?? 'pending') as RsvpStatus,
+    createdAt: String(participant.createdAt ?? participant.created_at ?? ''),
+    updatedAt: String(participant.updatedAt ?? participant.updated_at ?? '')
   }
 }
 
@@ -342,6 +361,87 @@ export function useAppointments() {
     }
   }
 
+  async function modifyOccurrence(eventId: string, payload: ModifyOccurrencePayload): Promise<boolean> {
+    try {
+      await $fetch(`/api/appointments/events/${eventId}/modify-occurrence`, {
+        method: 'POST',
+        body: payload
+      })
+      toast.add({ title: 'Ocorrência atualizada', color: 'success' })
+      return true
+    } catch {
+      toast.add({ title: 'Erro', description: 'Não foi possível atualizar a ocorrência', color: 'error' })
+      return false
+    }
+  }
+
+  async function splitSeries(eventId: string, payload: SplitSeriesPayload): Promise<boolean> {
+    try {
+      await $fetch(`/api/appointments/events/${eventId}/split-series`, {
+        method: 'POST',
+        body: payload
+      })
+      toast.add({ title: 'Série dividida', description: 'Esta e as próximas ocorrências foram atualizadas.', color: 'success' })
+      return true
+    } catch {
+      toast.add({ title: 'Erro', description: 'Não foi possível dividir a série', color: 'error' })
+      return false
+    }
+  }
+
+  // ─── Participants ─────────────────────────────────────────────────────────
+  async function fetchParticipants(eventId: string): Promise<EventParticipant[]> {
+    try {
+      const data = await $fetch<unknown[]>(`/api/appointments/events/${eventId}/participants`)
+      return (data ?? []).map(normalizeParticipant)
+    } catch {
+      return []
+    }
+  }
+
+  async function inviteParticipant(eventId: string, email: string): Promise<EventParticipant | null> {
+    try {
+      const data = await $fetch(`/api/appointments/events/${eventId}/participants`, {
+        method: 'POST',
+        body: { email }
+      })
+      toast.add({ title: 'Convite enviado', color: 'success' })
+      return normalizeParticipant(data)
+    } catch (err: unknown) {
+      const message = (err as { data?: { statusMessage?: string } })?.data?.statusMessage
+      toast.add({ title: 'Erro', description: message ?? 'Não foi possível convidar essa pessoa.', color: 'error' })
+      return null
+    }
+  }
+
+  async function removeParticipant(eventId: string, participantId: string): Promise<boolean> {
+    try {
+      await $fetch(`/api/appointments/events/${eventId}/participants/${participantId}`, {
+        method: 'DELETE'
+      })
+      toast.add({ title: 'Convidado removido', color: 'success' })
+      return true
+    } catch {
+      toast.add({ title: 'Erro', description: 'Não foi possível remover o convidado.', color: 'error' })
+      return false
+    }
+  }
+
+  async function respondRsvp(eventId: string, participantId: string, rsvpStatus: RsvpStatus.Accepted | RsvpStatus.Declined | RsvpStatus.Tentative): Promise<boolean> {
+    try {
+      await $fetch(`/api/appointments/events/${eventId}/participants/${participantId}/rsvp`, {
+        method: 'PUT',
+        body: { rsvpStatus }
+      })
+      toast.add({ title: 'Resposta enviada', color: 'success' })
+      await refreshEvents()
+      return true
+    } catch {
+      toast.add({ title: 'Erro', description: 'Não foi possível enviar sua resposta.', color: 'error' })
+      return false
+    }
+  }
+
   // ─── View helpers ─────────────────────────────────────────────────────────
   function setViewRange(from: string, to: string) {
     if (viewFrom.value === from && viewTo.value === to) {
@@ -421,6 +521,14 @@ export function useAppointments() {
     fetchEventDetail,
     cancelOccurrence,
     upsertReminders,
+    modifyOccurrence,
+    splitSeries,
+
+    // Participants
+    fetchParticipants,
+    inviteParticipant,
+    removeParticipant,
+    respondRsvp,
 
     // View
     viewFrom,
