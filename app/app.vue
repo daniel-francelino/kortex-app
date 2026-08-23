@@ -10,6 +10,28 @@ const color = computed(() => colorMode.value === 'dark' ? '#020618' : 'white')
 const isAppRoute = computed(() => route.path.startsWith('/app'))
 const siteUrl = runtimeConfig.public.siteUrl?.replace(/\/$/, '') || 'https://kortex.app'
 const defaultOgImage = `${siteUrl}/icons/icon-512x512.png`
+const appleSplashLinks = [
+  { width: 430, height: 932, ratio: 3, href: '/splash/apple-splash-1290x2796.png' },
+  { width: 393, height: 852, ratio: 3, href: '/splash/apple-splash-1179x2556.png' },
+  { width: 390, height: 844, ratio: 3, href: '/splash/apple-splash-1170x2532.png' },
+  { width: 375, height: 812, ratio: 3, href: '/splash/apple-splash-1125x2436.png' },
+  { width: 414, height: 896, ratio: 3, href: '/splash/apple-splash-1242x2688.png' },
+  { width: 414, height: 896, ratio: 2, href: '/splash/apple-splash-828x1792.png' },
+  { width: 375, height: 667, ratio: 2, href: '/splash/apple-splash-750x1334.png' },
+  { width: 320, height: 568, ratio: 2, href: '/splash/apple-splash-640x1136.png' },
+  { width: 768, height: 1024, ratio: 2, href: '/splash/apple-splash-1536x2048.png' },
+  { width: 834, height: 1112, ratio: 2, href: '/splash/apple-splash-1668x2224.png' },
+  { width: 834, height: 1194, ratio: 2, href: '/splash/apple-splash-1668x2388.png' },
+  { width: 1024, height: 1366, ratio: 2, href: '/splash/apple-splash-2048x2732.png' }
+].flatMap((item) => {
+  const portrait = `(device-width: ${item.width}px) and (device-height: ${item.height}px) and (-webkit-device-pixel-ratio: ${item.ratio}) and (orientation: portrait)`
+  const landscape = `(device-width: ${item.height}px) and (device-height: ${item.width}px) and (-webkit-device-pixel-ratio: ${item.ratio}) and (orientation: landscape)`
+
+  return [
+    { rel: 'apple-touch-startup-image', href: item.href, media: portrait },
+    { rel: 'apple-touch-startup-image', href: item.href, media: landscape }
+  ]
+})
 
 watch(
   () => [
@@ -51,7 +73,8 @@ useHead({
     { rel: 'alternate icon', type: 'image/png', href: '/icons/icon-192x192.png' },
     { rel: 'shortcut icon', href: '/favicon.ico' },
     { rel: 'apple-touch-icon', href: '/icons/apple-touch-icon.png' },
-    { rel: 'mask-icon', href: '/icons/kortex-mono.svg', color: '#12E39A' }
+    { rel: 'mask-icon', href: '/icons/kortex-mono.svg', color: '#12E39A' },
+    ...appleSplashLinks
   ],
   htmlAttrs: {
     lang: 'pt-BR'

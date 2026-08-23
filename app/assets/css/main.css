@@ -40,6 +40,13 @@ html {
   scrollbar-width: thin;
 }
 
+html,
+body,
+#__nuxt {
+  min-height: 100%;
+  background: #020618;
+}
+
 * {
   scrollbar-color: color-mix(in srgb, var(--ui-primary) 55%, transparent) color-mix(in srgb, var(--ui-bg-elevated) 72%, transparent);
   scrollbar-width: thin;
