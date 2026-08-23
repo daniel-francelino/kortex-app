@@ -429,13 +429,25 @@ defineExpose({ isUnsaved: () => hasChanges.value, doSave })
     <!-- Loading skeleton — only on initial load, not on background saves -->
     <motion.div
       v-if="!initialized"
+      class="space-y-5"
       :initial="{ opacity: 0 }"
       :animate="{ opacity: 1 }"
       :exit="{ opacity: 0 }"
       :transition="{ duration: 0.18 }"
     >
-      <USkeleton class="h-6 w-48" />
-      <USkeleton class="h-8 w-40" />
+      <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between lg:gap-4">
+        <div class="space-y-2">
+          <USkeleton class="h-6 w-56" />
+          <USkeleton class="h-4 w-72 max-w-full" />
+        </div>
+        <div class="flex items-center gap-2">
+          <USkeleton class="size-9 rounded-full" />
+          <USkeleton class="size-9 rounded-full" />
+          <USkeleton class="size-9 rounded-full" />
+          <USkeleton class="size-9 rounded-full" />
+          <USkeleton class="size-9 rounded-full" />
+        </div>
+      </div>
       <USkeleton class="h-64 w-full rounded-lg" />
     </motion.div>
 
@@ -568,71 +580,71 @@ defineExpose({ isUnsaved: () => hasChanges.value, doSave })
       </motion.div>
 
       <template v-else>
-      <!-- Entry prompts — a nudge to get past the blank page, gone once there's content. -->
-      <AnimatePresence>
-        <ClientOnly v-if="isContentEmpty">
-          <motion.div
-            class="space-y-1.5"
-            :initial="{ opacity: 0, y: 8, scale: 0.99 }"
-            :animate="{ opacity: 1, y: 0, scale: 1 }"
-            :exit="{ opacity: 0, y: -6, scale: 0.99 }"
-            :transition="{ duration: 0.18 }"
-          >
-          <div class="flex items-center justify-between gap-2">
-            <span class="text-xs text-dimmed">Não sabe por onde começar?</span>
-            <UButton
-              label="Outras ideias"
-              icon="i-lucide-shuffle"
-              :size="isMobile ? 'sm' : 'xs'"
-              color="neutral"
-              variant="ghost"
-              class="shrink-0 -my-1"
-              @click="reshufflePrompts"
-            />
-          </div>
-          <!-- Ragged flex-wrap left each row a different length on a phone
+        <!-- Entry prompts — a nudge to get past the blank page, gone once there's content. -->
+        <AnimatePresence>
+          <ClientOnly v-if="isContentEmpty">
+            <motion.div
+              class="space-y-1.5"
+              :initial="{ opacity: 0, y: 8, scale: 0.99 }"
+              :animate="{ opacity: 1, y: 0, scale: 1 }"
+              :exit="{ opacity: 0, y: -6, scale: 0.99 }"
+              :transition="{ duration: 0.18 }"
+            >
+              <div class="flex items-center justify-between gap-2">
+                <span class="text-xs text-dimmed">Não sabe por onde começar?</span>
+                <UButton
+                  label="Outras ideias"
+                  icon="i-lucide-shuffle"
+                  :size="isMobile ? 'sm' : 'xs'"
+                  color="neutral"
+                  variant="ghost"
+                  class="shrink-0 -my-1"
+                  @click="reshufflePrompts"
+                />
+              </div>
+              <!-- Ragged flex-wrap left each row a different length on a phone
                (one button alone, then two, then one) — a single horizontally
                scrollable row reads cleaner there. From lg up there's enough
                width that wrapping looks fine, so it switches back. -->
-          <div class="flex items-center gap-2 overflow-x-auto pb-1 -mx-1 px-1 lg:flex-wrap lg:overflow-visible lg:pb-0 lg:mx-0 lg:px-0">
-            <UButton
-              v-for="p in visiblePrompts"
-              :key="p.label"
-              :label="p.label"
-              :icon="p.icon"
-              :size="isMobile ? 'md' : 'xs'"
-              color="neutral"
-              variant="outline"
-              class="shrink-0 rounded-full"
-              @click="applyPrompt(p.prompt)"
-            />
-          </div>
-          </motion.div>
-          <template #fallback>
-            <USkeleton class="h-7 w-full max-w-sm" />
-          </template>
-        </ClientOnly>
-      </AnimatePresence>
+              <div class="flex items-center gap-2 overflow-x-auto pb-1 -mx-1 px-1 lg:flex-wrap lg:overflow-visible lg:pb-0 lg:mx-0 lg:px-0">
+                <UButton
+                  v-for="p in visiblePrompts"
+                  :key="p.label"
+                  :label="p.label"
+                  :icon="p.icon"
+                  :size="isMobile ? 'md' : 'xs'"
+                  color="neutral"
+                  variant="outline"
+                  class="shrink-0 rounded-full"
+                  @click="applyPrompt(p.prompt)"
+                />
+              </div>
+            </motion.div>
+            <template #fallback>
+              <USkeleton class="h-7 w-full max-w-sm" />
+            </template>
+          </ClientOnly>
+        </AnimatePresence>
 
-      <!-- Notion editor -->
-      <motion.div
-        :initial="{ opacity: 0, y: 10 }"
-        :animate="{ opacity: 1, y: 0 }"
-        :transition="{ duration: 0.2, delay: 0.04 }"
-      >
-        <ClientOnly>
-          <NotionEditor
-            ref="editorRef"
-            :key="today"
-            v-model="content"
-            placeholder="Escreva livremente sobre o seu dia... use '/' para inserir blocos."
-            :min-height="'14rem'"
-          />
-          <template #fallback>
-            <USkeleton class="h-56 w-full rounded-lg" />
-          </template>
-        </ClientOnly>
-      </motion.div>
+        <!-- Notion editor -->
+        <motion.div
+          :initial="{ opacity: 0, y: 10 }"
+          :animate="{ opacity: 1, y: 0 }"
+          :transition="{ duration: 0.2, delay: 0.04 }"
+        >
+          <ClientOnly>
+            <NotionEditor
+              ref="editorRef"
+              :key="today"
+              v-model="content"
+              placeholder="Escreva livremente sobre o seu dia... use '/' para inserir blocos."
+              :min-height="'14rem'"
+            />
+            <template #fallback>
+              <USkeleton class="h-56 w-full rounded-lg" />
+            </template>
+          </ClientOnly>
+        </motion.div>
       </template>
     </template>
   </div>
