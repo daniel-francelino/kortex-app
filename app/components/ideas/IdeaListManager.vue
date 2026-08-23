@@ -117,7 +117,7 @@ function getColorClass(color: string | null | undefined): string {
             {{ list.ideaCount ?? 0 }}
           </UBadge>
         </button>
-        <div class="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+        <div class="flex items-center gap-0.5 opacity-100 transition-opacity lg:opacity-0 lg:group-hover:opacity-100">
           <UButton
             icon="i-lucide-pencil"
             size="xs"

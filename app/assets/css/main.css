@@ -136,7 +136,12 @@ body,
 
 /* ─── Mobile touch & interaction improvements ───────────────────── */
 @media (max-width: 768px) {
-  /* Smaller icon-only buttons keep 40px minimum */
+  /* Smaller icon-only buttons keep 40px minimum.
+     Nuxt UI's Icon renders as `<span data-slot="leadingIcon">` (CSS-sprite
+     mode), never an inline <svg>, so a `:has(> svg:only-child)` selector
+     never matches real UButton markup — target the actual data-slot instead. */
+  button[data-slot="base"]:has(> [data-slot="leadingIcon"]:only-child),
+  a[data-slot="base"]:has(> [data-slot="leadingIcon"]:only-child),
   button[data-square],
   button:has(> svg:only-child) {
     min-height: 40px;

@@ -150,6 +150,7 @@ function onQuickAddParsed(result: { title: string, startAt: Date | null, locatio
 }
 const eventDetailLoading = ref(false)
 const calendarsExpanded = ref(false)
+const isMobile = useMediaQuery('(max-width: 1023px)')
 const selectedEvent = ref<CalendarEvent | null>(null)
 
 // Event popover state
@@ -443,7 +444,18 @@ onMounted(() => {
 
         <template #default>
           <!-- Navigation: today + arrows + period label -->
-          <div class="flex items-center gap-1">
+          <div class="flex min-w-0 items-center gap-1">
+            <!-- "Hoje": icon-only on mobile so it's always reachable, labeled from sm: up -->
+            <UTooltip text="Hoje" class="sm:hidden">
+              <UButton
+                square
+                variant="outline"
+                size="sm"
+                icon="i-lucide-calendar-1"
+                aria-label="Ir para hoje"
+                @click="goToday"
+              />
+            </UTooltip>
             <UButton
               label="Hoje"
               variant="outline"
@@ -463,7 +475,7 @@ onMounted(() => {
               size="sm"
               @click="goNext"
             />
-            <h2 class="ml-1 min-w-36 text-sm font-semibold capitalize text-highlighted">
+            <h2 class="ml-1 min-w-0 truncate text-sm font-semibold capitalize text-highlighted sm:min-w-36">
               {{ headerLabel }}
             </h2>
           </div>
@@ -489,7 +501,7 @@ onMounted(() => {
           </div>
 
           <!-- Public scheduling pages -->
-          <UTooltip text="Link de agendamento">
+          <UTooltip text="Link de agendamento" class="hidden lg:flex">
             <UButton
               square
               color="neutral"
@@ -500,7 +512,7 @@ onMounted(() => {
           </UTooltip>
 
           <!-- Calendar sidebar toggle -->
-          <UTooltip text="Calendários">
+          <UTooltip text="Calendários" class="hidden lg:flex">
             <UButton
               color="neutral"
               variant="ghost"
@@ -511,6 +523,24 @@ onMounted(() => {
               <UIcon name="i-lucide-calendar-range" class="size-5 shrink-0" />
             </UButton>
           </UTooltip>
+
+          <!-- Mobile: overflow menu for less-frequent actions -->
+          <UDropdownMenu
+            class="lg:hidden"
+            :items="[[
+              { label: 'Calendários', icon: 'i-lucide-calendar-range', onSelect: () => toggleCalendarsPanel() },
+              { label: 'Link de agendamento', icon: 'i-lucide-calendar-clock', to: '/app/scheduling' }
+            ]]"
+            :content="{ align: 'end' }"
+          >
+            <UButton
+              square
+              color="neutral"
+              variant="ghost"
+              icon="i-lucide-ellipsis-vertical"
+              aria-label="Mais opções"
+            />
+          </UDropdownMenu>
 
           <!-- Quick add (natural language) -->
           <AppointmentsQuickAddPopover @parsed="onQuickAddParsed" />
@@ -533,9 +563,9 @@ onMounted(() => {
 
     <template #body>
       <div class="flex h-full">
-        <!-- Sidebar: Calendar list -->
+        <!-- Sidebar: Calendar list (desktop only — a bottom drawer takes over on mobile below) -->
         <div
-          v-if="calendarsExpanded"
+          v-if="calendarsExpanded && !isMobile"
           class="w-56 shrink-0 border-r border-default p-3 overflow-y-auto"
         >
           <AppointmentsCalendarList
@@ -595,6 +625,32 @@ onMounted(() => {
       </div>
     </template>
   </UDashboardPanel>
+
+  <!-- Calendar list: bottom drawer on mobile (mirrors the desktop sidebar above) -->
+  <UDrawer
+    v-if="isMobile"
+    :open="calendarsExpanded"
+    direction="bottom"
+    title="Calendários"
+    @update:open="(value: boolean) => { calendarsExpanded = value }"
+  >
+    <template #body>
+      <div class="max-h-[70vh] overflow-y-auto">
+        <AppointmentsCalendarList
+          :calendars="calendars"
+          :archived-calendars="archivedCalendars"
+          :loading="calendarsStatus === 'pending'"
+          :archived-loading="archivedCalendarsStatus === 'pending'"
+          :active-calendar-id="selectedCalendarId"
+          @create="onCreateCalendar"
+          @toggle="onToggleCalendar"
+          @archive="onArchiveCalendar"
+          @edit="onEditCalendar"
+          @restore="onRestoreCalendar"
+        />
+      </div>
+    </template>
+  </UDrawer>
 
   <!-- Event popover (Google Calendar style) -->
   <AppointmentsEventPopover
