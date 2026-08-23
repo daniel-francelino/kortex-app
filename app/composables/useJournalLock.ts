@@ -1,38 +1,14 @@
 import type { JournalEntry, JournalPinMode } from '~/types/journal'
 
-const MODULE_UNLOCK_KEY = 'journal-pin-unlocked'
-const ENTRY_UNLOCK_KEY = 'journal-pin-unlocked-entries'
-
-function readModuleUnlocked(): boolean {
-  if (typeof window === 'undefined') return false
-  try {
-    return sessionStorage.getItem(MODULE_UNLOCK_KEY) === '1'
-  } catch {
-    return false
-  }
-}
-
-function readUnlockedEntries(): Set<string> {
-  if (typeof window === 'undefined') return new Set()
-  try {
-    const raw = sessionStorage.getItem(ENTRY_UNLOCK_KEY)
-    return new Set(raw ? (JSON.parse(raw) as string[]) : [])
-  } catch {
-    return new Set()
-  }
-}
-
-// Module-level singleton state — the unlocked-this-session flag must be
-// shared across every consumer (journal/index.vue, TodayEditor.vue,
-// EntryDetailModal.vue), same reasoning DashboardQuickJournal-style widgets
-// don't apply here: unlike useJournal()'s per-call entity store, this is
-// pure client-side UI state (no SSR data-leak risk), so a singleton is safe
-// and is exactly what keeps "unlocked in one place" visible everywhere else.
+// Module-level singleton state shared across every consumer
+// (journal/index.vue, TodayEditor.vue, EntryDetailModal.vue).
+// The unlocked flags deliberately live only in memory: refreshing the page,
+// restoring the tab, or reopening the browser must require the PIN again.
 const enabled = ref(false)
 const mode = ref<JournalPinMode | null>(null)
 const statusLoaded = ref(false)
-const unlockedModule = ref(readModuleUnlocked())
-const unlockedEntryDates = reactive(readUnlockedEntries())
+const unlockedModule = ref(false)
+const unlockedEntryDates = reactive(new Set<string>())
 
 export function useJournalLock() {
   const toast = useToast()
@@ -66,10 +42,8 @@ export function useJournalLock() {
     if (result.valid) {
       if (entryDate) {
         unlockedEntryDates.add(entryDate)
-        persistEntries()
       } else {
         unlockedModule.value = true
-        persistModule()
       }
     }
 
@@ -94,10 +68,8 @@ export function useJournalLock() {
       await $fetch('/api/journal/lock', { method: 'DELETE' })
       enabled.value = false
       mode.value = null
-      unlockedModule.value = true
+      unlockedModule.value = false
       unlockedEntryDates.clear()
-      persistModule()
-      persistEntries()
       toast.add({ title: 'PIN desativado', description: 'O bloqueio do Diário foi removido.', color: 'success' })
       return true
     } catch {
@@ -112,36 +84,15 @@ export function useJournalLock() {
         method: 'PATCH',
         body: { locked }
       })
-      // Locking an entry the user is currently viewing shouldn't immediately
-      // re-hide it out from under them — only unlocking-then-relocking later
-      // (a fresh visit) should prompt the PIN again.
+      // Locking an entry the user is currently viewing should not immediately
+      // hide it under them; a fresh page load will ask for the PIN again.
       if (locked) {
         unlockedEntryDates.add(entryDate)
-        persistEntries()
       }
       return result
     } catch {
       toast.add({ title: 'Erro', description: 'Não foi possível atualizar o bloqueio da entrada.', color: 'error' })
       return null
-    }
-  }
-
-  function persistModule() {
-    if (typeof window === 'undefined') return
-    try {
-      sessionStorage.setItem(MODULE_UNLOCK_KEY, unlockedModule.value ? '1' : '0')
-    } catch {
-      // Best-effort — private browsing / storage disabled just means the
-      // PIN prompt reappears next reload, not a functional failure.
-    }
-  }
-
-  function persistEntries() {
-    if (typeof window === 'undefined') return
-    try {
-      sessionStorage.setItem(ENTRY_UNLOCK_KEY, JSON.stringify([...unlockedEntryDates]))
-    } catch {
-      // Same best-effort reasoning as persistModule().
     }
   }
 
