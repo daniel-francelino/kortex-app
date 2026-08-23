@@ -864,4 +864,3 @@ onBeforeUnmount(() => {
     @update:open="settingsModalOpen = $event"
   />
 </template>
-

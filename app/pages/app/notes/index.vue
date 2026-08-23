@@ -88,6 +88,26 @@ const selectedNoteId = ref<string | null>(
   typeof route.query.note === 'string' ? route.query.note : null
 )
 const activeView = ref<'editor' | 'graph' | 'trash'>('editor')
+const noteViewOptions = [
+  { label: 'Notas', value: 'editor', icon: 'i-lucide-file-text' },
+  { label: 'Grafo', value: 'graph', icon: 'i-lucide-network' },
+  { label: 'Lixeira', value: 'trash', icon: 'i-lucide-trash-2' }
+]
+
+useMobileContextNav().registerMobileContextNav('notes', noteViewOptions, activeView)
+
+watch(activeView, (view) => {
+  if (view === 'graph') {
+    selectedNoteId.value = null
+    refreshGraph()
+  }
+
+  if (view === 'trash') {
+    selectedNoteId.value = null
+    void fetchTrash()
+  }
+})
+
 const createModalOpen = ref(false)
 const noteEditorRef = ref<{
   isUnsaved: () => boolean
@@ -105,7 +125,7 @@ onBeforeRouteLeave(() => {
     void noteEditorRef.value.doSave({ notifyOnFailure: true })
   }
 })
-const sidebarTab = ref<'notes' | 'tags'>('notes')
+const _sidebarTab = ref<'notes' | 'tags'>('notes')
 const rightPanelOpen = useStorage('notes-right-panel-open', false)
 const rightPanelView = useStorage<'outline' | 'properties' | null>('notes-right-panel-view', null)
 const activeHeadingId = ref<string | null>(null)
@@ -207,13 +227,13 @@ const sortMenuItems = computed(() => [
 ])
 
 const ALL_TYPE_VALUE = '__all__'
-const typeFilterModel = computed({
+const _typeFilterModel = computed({
   get: () => filters.type || ALL_TYPE_VALUE,
   set: (v: string) => {
     filters.type = v === ALL_TYPE_VALUE ? '' : v
   }
 })
-const typeFilterOptions = computed(() => [
+const _typeFilterOptions = computed(() => [
   { label: 'Todos tipos', value: ALL_TYPE_VALUE },
   ...noteTypeOptions
 ])
@@ -961,41 +981,43 @@ async function onRegenerateShareLink(noteId: string): Promise<Note | null> {
                 />
               </UTooltip>
 
-              <UTooltip
-                :text="activeView === 'graph' ? 'Abrir editor' : 'Abrir grafo'"
-              >
-                <UButton
-                  :icon="
-                    activeView === 'graph'
-                      ? 'i-lucide-file-text'
-                      : 'i-lucide-network'
-                  "
-                  :size="isNotesMobileLayout ? 'lg' : 'xs'"
-                  variant="ghost"
-                  :color="activeView === 'graph' ? 'primary' : 'neutral'"
-                  @click="
-                    activeView === 'graph'
-                      ? (activeView = 'editor')
-                      : switchToGraph()
-                  "
-                />
-              </UTooltip>
+              <div class="hidden lg:contents">
+                <UTooltip
+                  :text="activeView === 'graph' ? 'Abrir editor' : 'Abrir grafo'"
+                >
+                  <UButton
+                    :icon="
+                      activeView === 'graph'
+                        ? 'i-lucide-file-text'
+                        : 'i-lucide-network'
+                    "
+                    :size="isNotesMobileLayout ? 'lg' : 'xs'"
+                    variant="ghost"
+                    :color="activeView === 'graph' ? 'primary' : 'neutral'"
+                    @click="
+                      activeView === 'graph'
+                        ? (activeView = 'editor')
+                        : switchToGraph()
+                    "
+                  />
+                </UTooltip>
 
-              <UTooltip
-                :text="activeView === 'trash' ? 'Abrir editor' : 'Lixeira'"
-              >
-                <UButton
-                  icon="i-lucide-trash-2"
-                  :size="isNotesMobileLayout ? 'lg' : 'xs'"
-                  variant="ghost"
-                  :color="activeView === 'trash' ? 'primary' : 'neutral'"
-                  @click="
-                    activeView === 'trash'
-                      ? (activeView = 'editor')
-                      : switchToTrash()
-                  "
-                />
-              </UTooltip>
+                <UTooltip
+                  :text="activeView === 'trash' ? 'Abrir editor' : 'Lixeira'"
+                >
+                  <UButton
+                    icon="i-lucide-trash-2"
+                    :size="isNotesMobileLayout ? 'lg' : 'xs'"
+                    variant="ghost"
+                    :color="activeView === 'trash' ? 'primary' : 'neutral'"
+                    @click="
+                      activeView === 'trash'
+                        ? (activeView = 'editor')
+                        : switchToTrash()
+                    "
+                  />
+                </UTooltip>
+              </div>
             </div>
           </div>
 
