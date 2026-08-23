@@ -17,7 +17,7 @@ export default defineAppConfig({
     // on the element that actually scrolls, is what makes it effective.
     dashboardPanel: {
       slots: {
-        body: 'max-lg:pb-[calc(var(--mobile-bottom-nav-height,4.75rem)+var(--safe-area-bottom,0px)+1rem)]'
+        body: 'max-lg:pb-[calc(var(--mobile-bottom-nav-height,4.75rem)+1rem)]'
       }
     },
     popover: {

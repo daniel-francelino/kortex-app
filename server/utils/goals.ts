@@ -22,6 +22,7 @@ export function mapGoalTask(row: Record<string, unknown>): Record<string, unknow
     completed: Boolean(row.completed),
     sortOrder: row.sortOrder ?? row.sort_order ?? 0,
     milestoneId: row.milestoneId ?? row.milestone_id ?? null,
+    dueDate: row.dueDate ?? row.due_date ?? null,
     createdAt: row.createdAt ?? row.created_at,
     updatedAt: row.updatedAt ?? row.updated_at
   }

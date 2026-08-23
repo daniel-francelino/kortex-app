@@ -321,6 +321,14 @@ async function onToggleTask(task: GoalTask) {
   }
 }
 
+async function onSetTaskDueDate(task: GoalTask, dueDate: string | null) {
+  const updatedTask = await updateTask(task.id, { dueDate })
+  if (updatedTask) {
+    await loadDetail()
+    emit('updated')
+  }
+}
+
 async function onDeleteTask(taskId: string) {
   const ok = await deleteTask(taskId)
   if (ok) {
@@ -754,6 +762,7 @@ function getStatusIcon(status: GoalStatus): string {
                 :task="task"
                 @toggle="onToggleTask"
                 @delete="onDeleteTask"
+                @due-date="onSetTaskDueDate"
               />
               <p v-if="tasksForMilestone(milestone.id).length === 0" class="text-xs text-muted">
                 Nenhuma tarefa neste marco ainda.
@@ -769,6 +778,7 @@ function getStatusIcon(status: GoalStatus): string {
               :task="task"
               @toggle="onToggleTask"
               @delete="onDeleteTask"
+              @due-date="onSetTaskDueDate"
             />
           </div>
 

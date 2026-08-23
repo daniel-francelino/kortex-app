@@ -70,6 +70,7 @@ export interface GoalTask {
   completed: boolean
   sortOrder: number
   milestoneId: string | null
+  dueDate: string | null
   createdAt: string
   updatedAt: string
 }
@@ -138,6 +139,7 @@ export interface CreateGoalTaskPayload {
   title: string
   description?: string
   milestoneId?: string | null
+  dueDate?: string
 }
 
 export interface UpdateGoalTaskPayload {
@@ -145,6 +147,7 @@ export interface UpdateGoalTaskPayload {
   description?: string | null
   completed?: boolean
   milestoneId?: string | null
+  dueDate?: string | null
 }
 
 export interface CreateGoalMilestonePayload {

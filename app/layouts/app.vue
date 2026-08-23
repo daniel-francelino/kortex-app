@@ -199,7 +199,7 @@ watch(
 </script>
 
 <template>
-  <UDashboardGroup unit="rem">
+  <UDashboardGroup unit="rem" class="kortex-app-shell">
     <UDashboardSidebar
       id="default"
       v-model:open="open"

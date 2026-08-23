@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { getSupabaseAdminClient } from '../../../utils/supabase'
 import { requireAuthUser } from '../../../utils/require-auth'
+import { archiveGoalTaskLinkedEvent } from '../../../utils/goal-task-event-sync'
 
 const paramsSchema = z.object({
   id: z.string().uuid()
@@ -36,6 +37,8 @@ export default eventHandler(async (event) => {
   if (error) {
     throw createError({ statusCode: 500, statusMessage: 'Falha ao excluir tarefa', data: error.message })
   }
+
+  await archiveGoalTaskLinkedEvent(supabase, user.id, taskId)
 
   return { success: true }
 })

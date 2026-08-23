@@ -1,5 +1,8 @@
 <script setup lang="ts">
 import type { Calendar, CalendarEvent, CreateEventPayload } from '~/types/appointments'
+import { CalendarVisibility } from '~/types/appointments'
+import { getMoodOption } from '~/types/journal'
+import type { JournalEntry } from '~/types/journal'
 
 definePageMeta({
   layout: 'app'
@@ -17,6 +20,8 @@ const {
   eventsData,
   eventsStatus,
   activeCalendarIds,
+  viewFrom,
+  viewTo,
   setViewRange,
   fetchEventDetail,
   refreshCalendars,
@@ -136,7 +141,13 @@ const calendarCreateOpen = ref(false)
 const calendarToEdit = ref<Calendar | null>(null)
 const calendarToArchive = ref<Calendar | null>(null)
 const eventCreateOpen = ref(false)
+const eventCreatePrefill = ref<{ title: string, startAt: Date | null, location: string | null } | null>(null)
 const eventDetailOpen = ref(false)
+
+function onQuickAddParsed(result: { title: string, startAt: Date | null, location: string | null }) {
+  eventCreatePrefill.value = result
+  eventCreateOpen.value = true
+}
 const eventDetailLoading = ref(false)
 const calendarsExpanded = ref(false)
 const selectedEvent = ref<CalendarEvent | null>(null)
@@ -154,6 +165,11 @@ const quickCreatePosition = ref({ x: 0, y: 0 })
 const selectedCalendarId = computed(() => activeCalendarIds.value[0] ?? '')
 
 function onSelectEvent(evt: CalendarEvent, mouseEvent: MouseEvent) {
+  if (evt.calendarId === JOURNAL_MARKER_CALENDAR_ID) {
+    navigateTo('/app/journal')
+    return
+  }
+
   // Close quick create if open
   quickCreateVisible.value = false
 
@@ -283,7 +299,72 @@ function onToggleCalendar(calendarId: string) {
   activeCalendarIds.value = selectedCalendarId.value === calendarId ? [] : [calendarId]
 }
 
-const eventsList = computed(() => eventsData.value?.data ?? [])
+// ─── Journal entries as read-only markers ──────────────────────────────────
+// Not synced into `events` (would require touching the E2EE journal flow) —
+// just fetched and rendered as lightweight all-day markers reusing the same
+// CalendarEvent-shaped list the views already render. Never shows title or
+// content (may be encrypted ciphertext) — only the mood, which is a plain,
+// unencrypted column.
+const JOURNAL_MARKER_CALENDAR_ID = '__journal__'
+
+const { data: journalEntriesData, refresh: refreshJournalEntries } = useFetch<{ data: JournalEntry[] }>('/api/journal/entries', {
+  query: computed(() => ({
+    from: viewFrom.value || undefined,
+    to: viewTo.value || undefined,
+    pageSize: 100
+  })),
+  lazy: true,
+  immediate: false,
+  key: 'appointments-journal-entries',
+  watch: false,
+  default: () => ({ data: [] })
+})
+
+watch([viewFrom, viewTo], () => {
+  if (!viewFrom.value && !viewTo.value) return
+  refreshJournalEntries()
+})
+
+function journalEntryToMarker(entry: JournalEntry): CalendarEvent {
+  const moodOption = getMoodOption(entry.mood)
+  const startAt = `${entry.entryDate}T00:00:00.000Z`
+  const endAt = `${entry.entryDate}T23:59:59.000Z`
+
+  return {
+    id: `journal-${entry.id}`,
+    calendarId: JOURNAL_MARKER_CALENDAR_ID,
+    ownerUserId: '',
+    title: moodOption ? `${moodOption.emoji} Diário` : 'Diário',
+    description: null,
+    location: null,
+    startAt,
+    endAt,
+    eventTimezone: 'UTC',
+    allDay: true,
+    rrule: null,
+    exdate: null,
+    createdAt: entry.createdAt,
+    updatedAt: entry.updatedAt,
+    archivedAt: null,
+    calendar: {
+      id: JOURNAL_MARKER_CALENDAR_ID,
+      ownerUserId: '',
+      name: 'Diário',
+      description: null,
+      color: '#a855f7',
+      visibility: CalendarVisibility.Private,
+      subscribeToken: null,
+      subscribeEnabled: false,
+      createdAt: '',
+      updatedAt: '',
+      archivedAt: null
+    }
+  }
+}
+
+const journalMarkers = computed(() => (journalEntriesData.value?.data ?? []).map(journalEntryToMarker))
+
+const eventsList = computed(() => [...(eventsData.value?.data ?? []), ...journalMarkers.value])
 
 function onCreateCalendar() {
   calendarToEdit.value = null
@@ -324,11 +405,13 @@ async function onRestoreCalendar(calendar: Calendar) {
 }
 
 async function onEventDrop(eventId: string, newStartAt: string, newEndAt: string) {
+  if (eventId.startsWith('journal-')) return
   const success = await updateEvent(eventId, { startAt: newStartAt, endAt: newEndAt })
   if (success) refreshEvents()
 }
 
 async function onMonthEventDrop(eventId: string, newDate: string) {
+  if (eventId.startsWith('journal-')) return
   const event = eventsList.value.find(e => e.id === eventId)
   if (!event) return
   const origStart = new Date(event.startAt)
@@ -415,11 +498,14 @@ onMounted(() => {
             </UButton>
           </UTooltip>
 
+          <!-- Quick add (natural language) -->
+          <AppointmentsQuickAddPopover @parsed="onQuickAddParsed" />
+
           <!-- New event -->
           <UTooltip text="Novo evento">
             <UButton
               square
-              @click="eventCreateOpen = true"
+              @click="eventCreateOpen = true; eventCreatePrefill = null"
             >
               <UIcon name="i-lucide-plus" class="size-5 shrink-0" />
             </UButton>
@@ -555,6 +641,7 @@ onMounted(() => {
   <AppointmentsEventCreateModal
     :open="eventCreateOpen"
     :calendars="calendars"
+    :prefill="eventCreatePrefill"
     @update:open="eventCreateOpen = $event"
     @created="refreshEvents"
   />

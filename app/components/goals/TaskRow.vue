@@ -6,9 +6,14 @@ defineProps<{
 }>()
 
 const emit = defineEmits<{
-  toggle: [task: GoalTask]
-  delete: [taskId: string]
+  'toggle': [task: GoalTask]
+  'delete': [taskId: string]
+  'due-date': [task: GoalTask, dueDate: string | null]
 }>()
+
+function formatDueDate(dueDate: string): string {
+  return new Date(`${dueDate}T12:00:00`).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })
+}
 </script>
 
 <template>
@@ -26,10 +31,41 @@ const emit = defineEmits<{
         >
           {{ task.title }}
         </p>
-        <p class="mt-1 text-xs text-muted">
-          {{ task.completed ? 'Concluída' : 'Pendente' }}
-        </p>
+        <div class="mt-1 flex items-center gap-2 text-xs text-muted">
+          <span>{{ task.completed ? 'Concluída' : 'Pendente' }}</span>
+          <span v-if="task.dueDate">· {{ formatDueDate(task.dueDate) }}</span>
+        </div>
       </div>
+      <UPopover :content="{ align: 'end' }">
+        <UButton
+          icon="i-lucide-calendar"
+          :color="task.dueDate ? 'primary' : 'neutral'"
+          variant="ghost"
+          size="xs"
+          aria-label="Definir data de vencimento"
+        />
+        <template #content>
+          <div class="space-y-2 p-3">
+            <p class="text-xs font-medium text-highlighted">
+              Data de vencimento
+            </p>
+            <input
+              type="date"
+              :value="task.dueDate ?? ''"
+              class="rounded-md border border-default bg-default px-2 py-1 text-sm text-highlighted"
+              @change="emit('due-date', task, ($event.target as HTMLInputElement).value || null)"
+            >
+            <UButton
+              v-if="task.dueDate"
+              label="Remover data"
+              size="xs"
+              color="neutral"
+              variant="ghost"
+              @click="emit('due-date', task, null)"
+            />
+          </div>
+        </template>
+      </UPopover>
       <UButton
         icon="i-lucide-trash-2"
         color="neutral"

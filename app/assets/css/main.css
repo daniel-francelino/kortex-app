@@ -33,7 +33,9 @@ html {
   --safe-area-bottom: env(safe-area-inset-bottom, 0px);
   --safe-area-left: env(safe-area-inset-left, 0px);
   --safe-area-right: env(safe-area-inset-right, 0px);
-  --mobile-bottom-nav-height: 4.75rem;
+  --mobile-bottom-nav-bar-height: 4.75rem;
+  --mobile-bottom-nav-safe-padding: min(var(--safe-area-bottom), 0.75rem);
+  --mobile-bottom-nav-height: calc(var(--mobile-bottom-nav-bar-height) + var(--mobile-bottom-nav-safe-padding));
   scrollbar-color: color-mix(in srgb, var(--ui-primary) 55%, transparent) color-mix(in srgb, var(--ui-bg-elevated) 72%, transparent);
   scrollbar-width: thin;
 }
@@ -83,6 +85,19 @@ html {
   }
 }
 
+.kortex-app-shell {
+  min-height: 100dvh;
+  background: var(--ui-bg);
+}
+
+@media (max-width: 1023px) {
+  .kortex-app-shell {
+    height: 100dvh;
+    padding-top: var(--safe-area-top);
+    overflow: hidden;
+  }
+}
+
 /* ─── Mobile touch & interaction improvements ───────────────────── */
 @media (max-width: 768px) {
   /* Smaller icon-only buttons keep 40px minimum */
@@ -116,7 +131,9 @@ body.keyboard-open .mobile-bottom-nav {
   left: 0;
   right: 0;
   z-index: 50;
-  padding-bottom: var(--safe-area-bottom);
+  padding-right: var(--safe-area-right);
+  padding-bottom: var(--mobile-bottom-nav-safe-padding);
+  padding-left: var(--safe-area-left);
   background: var(--ui-bg);
   border-top: 1px solid var(--ui-border-default, var(--ui-color-neutral-200));
 }
@@ -132,7 +149,7 @@ body.keyboard-open .mobile-bottom-nav {
 /* Offset main content so it's not hidden behind bottom nav */
 @media (max-width: 1023px) {
   .app-content-with-bottom-nav {
-    padding-bottom: calc(var(--mobile-bottom-nav-height, 4.75rem) + var(--safe-area-bottom) + 1rem);
+    padding-bottom: calc(var(--mobile-bottom-nav-height, 4.75rem) + 1rem);
   }
 }
 

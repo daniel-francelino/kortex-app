@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { getSupabaseAdminClient } from '../../../utils/supabase'
 import { requireAuthUser } from '../../../utils/require-auth'
 import { mapGoalTask } from '../../../utils/goals'
+import { syncGoalTaskLinkedEvent } from '../../../utils/goal-task-event-sync'
 
 const paramsSchema = z.object({
   id: z.string().uuid()
@@ -11,7 +12,8 @@ const bodySchema = z.object({
   title: z.string().min(1).max(200).optional(),
   description: z.string().max(1000).nullable().optional(),
   completed: z.boolean().optional(),
-  milestoneId: z.string().uuid().nullable().optional()
+  milestoneId: z.string().uuid().nullable().optional(),
+  dueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data deve estar no formato YYYY-MM-DD').nullable().optional()
 })
 
 export default eventHandler(async (event) => {
@@ -58,6 +60,7 @@ export default eventHandler(async (event) => {
   if (parsed.description !== undefined) updateData.description = parsed.description
   if (parsed.completed !== undefined) updateData.completed = parsed.completed
   if (parsed.milestoneId !== undefined) updateData.milestone_id = parsed.milestoneId
+  if (parsed.dueDate !== undefined) updateData.due_date = parsed.dueDate
 
   const { data, error } = await supabase
     .from('goal_tasks')
@@ -70,5 +73,17 @@ export default eventHandler(async (event) => {
     throw createError({ statusCode: 500, statusMessage: 'Falha ao atualizar tarefa', data: error?.message })
   }
 
-  return mapGoalTask(data as Record<string, unknown>)
+  const taskRow = data as Record<string, unknown>
+
+  if (parsed.dueDate !== undefined || parsed.completed !== undefined || parsed.title !== undefined || parsed.description !== undefined) {
+    await syncGoalTaskLinkedEvent(supabase, user.id, {
+      id: taskRow.id as string,
+      title: taskRow.title as string,
+      description: taskRow.description as string | null,
+      dueDate: taskRow.due_date as string | null,
+      completed: Boolean(taskRow.completed)
+    })
+  }
+
+  return mapGoalTask(taskRow)
 })

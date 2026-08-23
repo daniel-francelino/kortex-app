@@ -53,12 +53,18 @@ function navigateTo(to: string) {
 watchEffect(() => {
   if (!import.meta.client) return
 
-  document.documentElement.style.setProperty('--mobile-bottom-nav-height', '4.75rem')
+  document.documentElement.style.setProperty(
+    '--mobile-bottom-nav-height',
+    'calc(var(--mobile-bottom-nav-bar-height, 4.75rem) + var(--mobile-bottom-nav-safe-padding, 0px))'
+  )
 })
 
 onUnmounted(() => {
   if (!import.meta.client) return
-  document.documentElement.style.setProperty('--mobile-bottom-nav-height', '4.75rem')
+  document.documentElement.style.setProperty(
+    '--mobile-bottom-nav-height',
+    'calc(var(--mobile-bottom-nav-bar-height, 4.75rem) + var(--mobile-bottom-nav-safe-padding, 0px))'
+  )
 })
 </script>
 
