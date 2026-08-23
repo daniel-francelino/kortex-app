@@ -2,6 +2,10 @@
 import { AnimatePresence, motion } from 'motion-v'
 import type { JournalEntry, UpsertEntryPayload } from '~/types/journal'
 import { isEditorContentEmpty, serializeEditorContent } from '~/utils/editor/content'
+import { tiptapJsonToMarkdown } from '~/utils/tiptap-markdown'
+import { downloadTextFile, printHtmlAsPdf } from '~/utils/export-download'
+import { captureWeatherSnapshot } from '~/utils/journal-weather'
+import { getWeatherInfo } from '~/utils/weather-codes'
 
 const props = defineProps<{
   todayEntry: JournalEntry | null
@@ -48,6 +52,43 @@ async function onToggleLock() {
     if (updated) entryLocked.value = updated.locked
   } finally {
     togglingLock.value = false
+  }
+}
+
+// ─── Clima/localização (item 17 — automático) ────────────────────────────────
+// Tenta sozinho, uma vez por carregamento da página (`weatherAttempted`
+// evita repetir o pedido de permissão a cada re-render/save). Se a pessoa
+// negar a permissão, ou o clima não estiver disponível por qualquer razão,
+// falha em silêncio de propósito — sem toast, sem botão de "tentar de
+// novo", sem indício nenhum na tela de que isso foi tentado.
+const weatherTempC = ref<number | null>(null)
+const weatherCode = ref<number | null>(null)
+const weatherAttempted = ref(false)
+// A entrada de hoje pode ainda não existir no momento em que a permissão é
+// concedida (dia em branco) — não dá pra gravar clima sem conteúdo (a API
+// exige `content` não-vazio), então o snapshot fica em memória até o
+// primeiro `doSave()` real anexar ele no mesmo payload.
+let pendingWeatherSnapshot: { latitude: number, longitude: number, weatherTempC: number, weatherCode: number } | null = null
+
+async function tryAutoCaptureWeather() {
+  if (weatherAttempted.value || weatherCode.value !== null || needsEncryptionUnlock.value) return
+  weatherAttempted.value = true
+  try {
+    const snapshot = await captureWeatherSnapshot()
+    if (props.todayEntry) {
+      const payload: UpsertEntryPayload = encryptionEnabled.value
+        ? { entryDate: today, mood: savedMood.value, ...(await encryptEntryFields(null, savedContent.value)), ...snapshot }
+        : { entryDate: today, title: null, content: savedContent.value, mood: savedMood.value, ...snapshot }
+      const result = await props.onUpsertEntry(payload, { silent: true })
+      if (result) {
+        weatherTempC.value = result.weatherTempC
+        weatherCode.value = result.weatherCode
+      }
+    } else {
+      pendingWeatherSnapshot = snapshot
+    }
+  } catch {
+    // Silencioso de propósito — ver comentário acima.
   }
 }
 
@@ -154,8 +195,11 @@ watch(
       }
       savedMood.value = m
       entryLocked.value = entry.locked
+      weatherTempC.value = entry.weatherTempC
+      weatherCode.value = entry.weatherCode
       armContentSuppression()
       initialized.value = true
+      void tryAutoCaptureWeather()
     } else if (!props.loading) {
       // Only reset when truly no entry and not mid-fetch
       content.value = ''
@@ -163,10 +207,13 @@ watch(
       mood.value = null
       savedMood.value = null
       entryLocked.value = false
+      weatherTempC.value = null
+      weatherCode.value = null
       lastChangeAt.value = 0
       saveStatus.value = 'idle'
       armContentSuppression()
       initialized.value = true
+      void tryAutoCaptureWeather()
     }
   },
   { immediate: true }
@@ -198,15 +245,24 @@ async function doSave() {
   const savingMood = mood.value
 
   try {
+    // Anexa o clima capturado enquanto a entrada de hoje ainda não existia
+    // (ver tryAutoCaptureWeather) neste primeiro save real.
+    const weatherFields = pendingWeatherSnapshot ?? {}
+
     const payload: UpsertEntryPayload = encryptionEnabled.value
-      ? { entryDate: today, mood: savingMood, ...(await encryptEntryFields(null, savingContent)) }
-      : { entryDate: today, title: null, content: savingContent, mood: savingMood }
+      ? { entryDate: today, mood: savingMood, ...(await encryptEntryFields(null, savingContent)), ...weatherFields }
+      : { entryDate: today, title: null, content: savingContent, mood: savingMood, ...weatherFields }
 
     const result = await props.onUpsertEntry(payload, { silent: true })
     if (result) {
       if (savedContent.value !== savingContent) savedContent.value = savingContent
       if (savedMood.value !== savingMood) savedMood.value = savingMood
       if (content.value === savingContent && mood.value === savingMood) lastChangeAt.value = 0
+      if (pendingWeatherSnapshot) {
+        weatherTempC.value = result.weatherTempC
+        weatherCode.value = result.weatherCode
+        pendingWeatherSnapshot = null
+      }
       saveStatus.value = resolveSavedStatus()
       savedAt.value = new Date()
     } else {
@@ -347,6 +403,24 @@ function applyPrompt(prompt: string) {
   })
 }
 
+// ─── Exportar ────────────────────────────────────────────────────────────────
+const editorRef = ref<{ $el: HTMLElement } | null>(null)
+
+function exportMarkdown() {
+  const md = tiptapJsonToMarkdown(content.value)
+  downloadTextFile(`diario-${today}.md`, `# ${formatToday()}\n\n${md}\n`)
+}
+
+function exportPdf() {
+  const html = editorRef.value?.$el?.querySelector('.ProseMirror')?.innerHTML ?? ''
+  printHtmlAsPdf(formatToday(), html)
+}
+
+const exportMenuItems = computed(() => [
+  { label: 'Markdown (.md)', icon: 'i-lucide-file-text', onSelect: exportMarkdown },
+  { label: 'PDF (imprimir)', icon: 'i-lucide-printer', onSelect: exportPdf }
+])
+
 defineExpose({ isUnsaved: () => hasChanges.value, doSave })
 </script>
 
@@ -423,6 +497,32 @@ defineExpose({ isUnsaved: () => hasChanges.value, doSave })
         </div>
 
         <div class="flex shrink-0 items-center gap-2">
+          <!-- Clima/geotag — capturado sozinho ao abrir a página (item 17).
+               Sem badge nenhum se a pessoa negar a permissão ou o clima não
+               estiver disponível — falha em silêncio de propósito, sem
+               botão de "tentar de novo" nem qualquer indício na tela. -->
+          <UBadge
+            v-if="weatherCode !== null && !isLockedForViewing && !needsEncryptionUnlock"
+            color="neutral"
+            variant="subtle"
+            size="sm"
+            class="gap-1"
+          >
+            <UIcon :name="getWeatherInfo(weatherCode).icon" class="size-3.5" />
+            {{ weatherTempC !== null ? `${Math.round(weatherTempC)}°C` : getWeatherInfo(weatherCode).label }}
+          </UBadge>
+          <UDropdownMenu
+            v-if="!isContentEmpty && !isLockedForViewing && !needsEncryptionUnlock"
+            :items="exportMenuItems"
+            :content="{ align: 'end' }"
+          >
+            <UButton
+              icon="i-lucide-download"
+              color="neutral"
+              variant="ghost"
+              :size="isMobile ? 'md' : 'sm'"
+            />
+          </UDropdownMenu>
           <!-- Per-entry lock toggle — only shown in "entradas específicas" mode,
                and only once already unlocked: showing it while still locked
                would let anyone turn the lock off without ever entering the PIN. -->
@@ -522,6 +622,7 @@ defineExpose({ isUnsaved: () => hasChanges.value, doSave })
       >
         <ClientOnly>
           <NotionEditor
+            ref="editorRef"
             :key="today"
             v-model="content"
             placeholder="Escreva livremente sobre o seu dia... use '/' para inserir blocos."

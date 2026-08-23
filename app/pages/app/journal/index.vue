@@ -2,6 +2,8 @@
 import { AnimatePresence, motion } from "motion-v";
 import { useDebounceFn } from '@vueuse/core'
 import type { JournalEntry, JournalListResponse } from '~/types/journal'
+import { tiptapJsonToMarkdown } from '~/utils/tiptap-markdown'
+import { downloadTextFile } from '~/utils/export-download'
 
 definePageMeta({
   layout: "app",
@@ -63,6 +65,20 @@ const encryptedSearchResults = ref<JournalEntry[] | null>(null)
 const encryptedSearchLoading = ref(false)
 const usingEncryptedSearch = computed(() => encryptionEnabled.value && listSearch.value.trim().length > 0)
 
+async function fetchAllEntries(): Promise<JournalEntry[]> {
+  const all: JournalEntry[] = []
+  let page = 1
+  let fetchedTotal = Infinity
+  while ((page - 1) * 100 < fetchedTotal) {
+    const result = await $fetch<JournalListResponse>('/api/journal/entries', { query: { page, pageSize: 100 } })
+    fetchedTotal = result.total
+    all.push(...result.data)
+    if (result.data.length === 0) break
+    page++
+  }
+  return all
+}
+
 async function runEncryptedSearch(query: string) {
   const trimmed = query.trim()
   if (!trimmed) {
@@ -71,16 +87,7 @@ async function runEncryptedSearch(query: string) {
   }
   encryptedSearchLoading.value = true
   try {
-    const all: JournalEntry[] = []
-    let page = 1
-    let fetchedTotal = Infinity
-    while ((page - 1) * 100 < fetchedTotal) {
-      const result = await $fetch<JournalListResponse>('/api/journal/entries', { query: { page, pageSize: 100 } })
-      fetchedTotal = result.total
-      all.push(...result.data)
-      if (result.data.length === 0) break
-      page++
-    }
+    const all = await fetchAllEntries()
     const needle = trimmed.toLowerCase()
     const matches: JournalEntry[] = []
     for (const entry of all) {
@@ -103,10 +110,77 @@ watch(listSearch, (val) => {
   if (encryptionEnabled.value) debouncedEncryptedSearch(val)
 })
 
+// ─── Exportar tudo (backup) ─────────────────────────────────────────────────
+// Decifra tudo no cliente antes de exportar (se E2EE estiver ligado) — o
+// arquivo baixado sempre sai em texto legível, nunca com ciphertext dentro.
+const exportingAll = ref(false)
+
+async function decryptedFor(entry: JournalEntry): Promise<{ title: string | null, content: string }> {
+  if (!entry.isEncrypted) return { title: entry.title, content: entry.content }
+  try {
+    return await decryptEntryFields(entry)
+  } catch {
+    return { title: entry.title, content: '[Não foi possível decifrar esta entrada]' }
+  }
+}
+
+function formatExportDate(dateStr: string): string {
+  return new Date(dateStr + 'T12:00:00').toLocaleDateString('pt-BR', {
+    weekday: 'long', day: '2-digit', month: 'long', year: 'numeric'
+  })
+}
+
+async function exportAllMarkdown() {
+  if (exportingAll.value) return
+  exportingAll.value = true
+  try {
+    const all = await fetchAllEntries()
+    all.sort((a, b) => a.entryDate.localeCompare(b.entryDate))
+    const parts: string[] = []
+    for (const entry of all) {
+      const { title, content: plain } = await decryptedFor(entry)
+      const heading = `## ${formatExportDate(entry.entryDate)}${title ? ` — ${title}` : ''}`
+      parts.push(`${heading}\n\n${tiptapJsonToMarkdown(plain)}`)
+    }
+    downloadTextFile(
+      `diario-completo-${new Date().toISOString().split('T')[0]}.md`,
+      `# Diário de Bordo\n\n${parts.join('\n\n---\n\n')}\n`
+    )
+  } finally {
+    exportingAll.value = false
+  }
+}
+
+async function exportAllJson() {
+  if (exportingAll.value) return
+  exportingAll.value = true
+  try {
+    const all = await fetchAllEntries()
+    all.sort((a, b) => a.entryDate.localeCompare(b.entryDate))
+    const backup = []
+    for (const entry of all) {
+      const { title, content: plain } = await decryptedFor(entry)
+      backup.push({ entryDate: entry.entryDate, title, content: plain, mood: entry.mood })
+    }
+    downloadTextFile(
+      `diario-backup-${new Date().toISOString().split('T')[0]}.json`,
+      JSON.stringify({ exportedAt: new Date().toISOString(), entries: backup }, null, 2),
+      'application/json;charset=utf-8'
+    )
+  } finally {
+    exportingAll.value = false
+  }
+}
+
+const exportAllMenuItems = computed(() => [
+  { label: 'Markdown (um arquivo)', icon: 'i-lucide-file-text', onSelect: exportAllMarkdown },
+  { label: 'Backup (JSON)', icon: 'i-lucide-database-backup', onSelect: exportAllJson }
+])
+
 const isMobile = useIsMobile();
 
 // ─── View mode ────────────────────────────────────────────────────────────────
-type JournalView = "editor" | "calendar" | "list" | "insights";
+type JournalView = "editor" | "calendar" | "list" | "periods" | "insights";
 const activeView = ref<JournalView>("editor");
 
 watch(activeView, (view) => {
@@ -176,6 +250,7 @@ const viewOptions: { value: JournalView; icon: string; tooltip: string }[] = [
   { value: "editor", icon: "i-lucide-pen-line", tooltip: "Editor de hoje" },
   { value: "calendar", icon: "i-lucide-calendar-days", tooltip: "Calendário" },
   { value: "list", icon: "i-lucide-list", tooltip: "Lista de entradas" },
+  { value: "periods", icon: "i-lucide-calendar-range", tooltip: "Notas semanais/mensais" },
   { value: "insights", icon: "i-lucide-bar-chart-3", tooltip: "Insights" },
 ];
 
@@ -313,11 +388,26 @@ function onInsightsRangeChange(range: "7d" | "30d" | "90d") {
             :exit="{ opacity: 0, y: -8, filter: 'blur(2px)' }"
             :transition="{ duration: 0.18, ease: 'easeOut' }"
           >
-            <UInput
-              v-model="listSearch"
-              icon="i-lucide-search"
-              placeholder="Buscar no diário..."
-            />
+            <div class="flex items-center gap-2">
+              <UInput
+                v-model="listSearch"
+                icon="i-lucide-search"
+                placeholder="Buscar no diário..."
+                class="flex-1"
+              />
+              <UDropdownMenu
+                :items="exportAllMenuItems"
+                :content="{ align: 'end' }"
+              >
+                <UButton
+                  icon="i-lucide-download"
+                  label="Exportar tudo"
+                  color="neutral"
+                  variant="outline"
+                  :loading="exportingAll"
+                />
+              </UDropdownMenu>
+            </div>
 
             <JournalEntryList
               :entries="usingEncryptedSearch ? (encryptedSearchResults ?? []) : (listData?.data ?? [])"
@@ -328,6 +418,17 @@ function onInsightsRangeChange(range: "7d" | "30d" | "90d") {
               @update:page="listPage = $event"
               @select="onListEntrySelect"
             />
+          </motion.div>
+
+          <!-- PERIODIC NOTES VIEW -->
+          <motion.div
+            v-else-if="activeView === 'periods'"
+            :initial="{ opacity: 0, y: 10, filter: 'blur(2px)' }"
+            :animate="{ opacity: 1, y: 0, filter: 'blur(0px)' }"
+            :exit="{ opacity: 0, y: -8, filter: 'blur(2px)' }"
+            :transition="{ duration: 0.18, ease: 'easeOut' }"
+          >
+            <JournalPeriodicNotesView @select-date="onSelectDate" />
           </motion.div>
 
           <!-- INSIGHTS VIEW -->

@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import type { CreateNoteSharePayload, Note, NoteDetail, NoteFolder, NoteShare, UpdateNotePayload, UpdateNoteSharePayload } from '~/types/notes'
 import { NOTE_TYPE_META, NoteType, NoteVisibility } from '~/types/notes'
+import { tiptapJsonToMarkdown } from '~/utils/tiptap-markdown'
+import { downloadTextFile, printHtmlAsPdf } from '~/utils/export-download'
 
 interface NotionStyleEditorRef {
   focus: () => void
@@ -493,6 +495,24 @@ function onDrop(event: DragEvent) {
   editorRef.value?.insertWikilink(droppedNoteId, droppedNote.title || 'Sem título')
 }
 
+// ─── Exportar ────────────────────────────────────────────────────────────────
+function exportMarkdown() {
+  const md = tiptapJsonToMarkdown(content.value)
+  const title = editTitle.value?.trim() || 'Sem título'
+  downloadTextFile(`${title.replace(/[\\/:*?"<>|]/g, '-')}.md`, `# ${title}\n\n${md}\n`)
+}
+
+function exportPdf() {
+  const el = (editorRef.value as unknown as { $el?: HTMLElement } | null)?.$el
+  const html = el?.querySelector('.ProseMirror')?.innerHTML ?? ''
+  printHtmlAsPdf(editTitle.value?.trim() || 'Sem título', html)
+}
+
+const exportMenuItems = computed(() => [
+  { label: 'Markdown (.md)', icon: 'i-lucide-file-text', onSelect: exportMarkdown },
+  { label: 'PDF (imprimir)', icon: 'i-lucide-printer', onSelect: exportPdf }
+])
+
 defineExpose({
   isUnsaved: () => saveStatus.value === 'unsaved',
   doSave: saveNote,
@@ -654,6 +674,19 @@ defineExpose({
               @click="emit('open-panel', 'properties')"
             />
           </UTooltip>
+          <UDropdownMenu
+            :items="exportMenuItems"
+            :content="{ align: 'end' }"
+          >
+            <UTooltip text="Exportar">
+              <UButton
+                icon="i-lucide-download"
+                size="xs"
+                variant="ghost"
+                color="neutral"
+              />
+            </UTooltip>
+          </UDropdownMenu>
           <UTooltip
             v-if="isOwner"
             text="Compartilhar"

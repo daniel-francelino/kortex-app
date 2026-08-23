@@ -211,7 +211,11 @@ export function useJournal() {
       locked: previous?.locked ?? false,
       isEncrypted: payload.isEncrypted !== undefined ? payload.isEncrypted : (previous?.isEncrypted ?? false),
       contentIv: payload.contentIv !== undefined ? payload.contentIv : (previous?.contentIv ?? null),
-      titleIv: payload.titleIv !== undefined ? payload.titleIv : (previous?.titleIv ?? null)
+      titleIv: payload.titleIv !== undefined ? payload.titleIv : (previous?.titleIv ?? null),
+      latitude: payload.latitude !== undefined ? payload.latitude : (previous?.latitude ?? null),
+      longitude: payload.longitude !== undefined ? payload.longitude : (previous?.longitude ?? null),
+      weatherTempC: payload.weatherTempC !== undefined ? payload.weatherTempC : (previous?.weatherTempC ?? null),
+      weatherCode: payload.weatherCode !== undefined ? payload.weatherCode : (previous?.weatherCode ?? null)
     }
 
     const result = await runOptimisticAction({

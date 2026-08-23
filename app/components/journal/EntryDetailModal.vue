@@ -3,6 +3,9 @@ import { AnimatePresence, motion } from 'motion-v'
 import type { JournalEntry } from '~/types/journal'
 import { getMoodOption } from '~/types/journal'
 import { isEditorContentEmpty } from '~/utils/editor/content'
+import { tiptapJsonToMarkdown } from '~/utils/tiptap-markdown'
+import { downloadTextFile, printHtmlAsPdf } from '~/utils/export-download'
+import { getWeatherInfo } from '~/utils/weather-codes'
 
 const props = defineProps<{
   open: boolean
@@ -152,6 +155,24 @@ function formatDate(dateStr: string): string {
 function onOpenChange(value: boolean) {
   emit('update:open', value)
 }
+
+// ─── Exportar ────────────────────────────────────────────────────────────────
+const viewContentRef = ref<{ $el: HTMLElement } | null>(null)
+
+function exportMarkdown() {
+  const md = tiptapJsonToMarkdown(content.value)
+  downloadTextFile(`diario-${props.date}.md`, `# ${formatDate(props.date)}\n\n${md}\n`)
+}
+
+function exportPdf() {
+  const html = viewContentRef.value?.$el?.querySelector('.ProseMirror')?.innerHTML ?? ''
+  printHtmlAsPdf(formatDate(props.date), html)
+}
+
+const exportMenuItems = computed(() => [
+  { label: 'Markdown (.md)', icon: 'i-lucide-file-text', onSelect: exportMarkdown },
+  { label: 'PDF (imprimir)', icon: 'i-lucide-printer', onSelect: exportPdf }
+])
 </script>
 
 <template>
@@ -246,9 +267,32 @@ function onOpenChange(value: boolean) {
                 class="text-sm font-medium"
                 :style="{ color: getMoodOption(entry.mood)?.color }"
               >{{ getMoodOption(entry.mood)?.label }}</span>
+              <UBadge
+                v-if="entry.weatherCode !== null"
+                color="neutral"
+                variant="subtle"
+                size="sm"
+                class="gap-1"
+              >
+                <UIcon :name="getWeatherInfo(entry.weatherCode).icon" class="size-3.5" />
+                {{ entry.weatherTempC !== null ? `${Math.round(entry.weatherTempC)}°C` : getWeatherInfo(entry.weatherCode).label }}
+              </UBadge>
             </div>
             <div v-else />
             <div class="flex items-center gap-2">
+              <UDropdownMenu
+                v-if="!isLockedForViewing"
+                :items="exportMenuItems"
+                :content="{ align: 'end' }"
+              >
+                <UButton
+                  icon="i-lucide-download"
+                  label="Exportar"
+                  color="neutral"
+                  variant="ghost"
+                  :size="isMobile ? 'md' : 'sm'"
+                />
+              </UDropdownMenu>
               <!-- Per-entry lock toggle — "entradas específicas" mode only,
                    and only once already unlocked (otherwise this would let
                    anyone turn the lock off without ever entering the PIN). -->
@@ -304,6 +348,7 @@ function onOpenChange(value: boolean) {
           >
             <ClientOnly>
               <NotionEditor
+                ref="viewContentRef"
                 :key="props.date + '-view'"
                 :model-value="content"
                 :editable="false"

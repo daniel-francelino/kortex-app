@@ -30,6 +30,10 @@ export interface JournalEntry {
   isEncrypted: boolean
   contentIv: string | null
   titleIv: string | null
+  latitude: number | null
+  longitude: number | null
+  weatherTempC: number | null
+  weatherCode: number | null
 }
 
 // ─── PIN lock ─────────────────────────────────────────────────────────────────
@@ -72,6 +76,45 @@ export interface SetupEncryptionPayload {
   kdfIterations: number
 }
 
+// ─── Notas periódicas (semana/mês) ─────────────────────────────────────────────
+// Ver app/utils/journal-periods.ts — período identificado por period_key
+// (Monday da semana em 'YYYY-MM-DD', ou 'YYYY-MM' pro mês), não por número
+// ISO de semana.
+
+export interface PeriodicNote {
+  id: string
+  userId: string
+  periodType: 'week' | 'month'
+  periodKey: string
+  periodStart: string
+  periodEnd: string
+  title: string | null
+  content: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface PeriodicNoteEntrySummary {
+  entryDate: string
+  title: string | null
+  mood: string | null
+  isEncrypted: boolean
+}
+
+export interface PeriodicNoteResponse {
+  note: PeriodicNote | null
+  entries: PeriodicNoteEntrySummary[]
+}
+
+export interface UpsertPeriodicNotePayload {
+  periodType: 'week' | 'month'
+  periodKey: string
+  periodStart: string
+  periodEnd: string
+  title?: string | null
+  content: string
+}
+
 // ─── Payloads ─────────────────────────────────────────────────────────────────
 
 export interface UpsertEntryPayload {
@@ -82,6 +125,10 @@ export interface UpsertEntryPayload {
   isEncrypted?: boolean
   contentIv?: string | null
   titleIv?: string | null
+  latitude?: number | null
+  longitude?: number | null
+  weatherTempC?: number | null
+  weatherCode?: number | null
 }
 
 // ─── Responses ────────────────────────────────────────────────────────────────

@@ -12,7 +12,11 @@ const bodySchema = z.object({
   mood: z.enum(['very_bad', 'bad', 'neutral', 'good', 'very_good']).nullable().optional(),
   isEncrypted: z.boolean().optional(),
   contentIv: z.string().nullable().optional(),
-  titleIv: z.string().nullable().optional()
+  titleIv: z.string().nullable().optional(),
+  latitude: z.number().min(-90).max(90).nullable().optional(),
+  longitude: z.number().min(-180).max(180).nullable().optional(),
+  weatherTempC: z.number().nullable().optional(),
+  weatherCode: z.number().int().nullable().optional()
 })
 
 export default eventHandler(async (event) => {
@@ -40,6 +44,14 @@ export default eventHandler(async (event) => {
     upsertPayload.is_encrypted = parsed.isEncrypted
     upsertPayload.content_iv = parsed.contentIv ?? null
     upsertPayload.title_iv = parsed.titleIv ?? null
+  }
+  // Mesmo raciocínio acima — só grava clima/localização quando o cliente
+  // de fato os envia (botão "Adicionar clima"), não em todo autosave.
+  if (parsed.latitude !== undefined) {
+    upsertPayload.latitude = parsed.latitude
+    upsertPayload.longitude = parsed.longitude ?? null
+    upsertPayload.weather_temp_c = parsed.weatherTempC ?? null
+    upsertPayload.weather_code = parsed.weatherCode ?? null
   }
 
   // Upsert entry (one per user per date)
