@@ -306,6 +306,24 @@ function onRowKeydown(event: KeyboardEvent) {
           </UBadge>
 
           <UTooltip
+            v-if="node.habit.goalId"
+            :content="{ side: 'top', align: 'center' }"
+          >
+            <span
+              class="inline-flex size-6 items-center justify-center rounded-md border border-default/60 bg-default/40 text-muted"
+              :aria-label="`Sustenta a meta: ${node.habit.goalTitle ?? 'sem título'}`"
+            >
+              <UIcon name="i-lucide-target" class="size-3.5" />
+            </span>
+
+            <template #content>
+              <div class="max-w-64 whitespace-normal break-words rounded-lg border border-default/70 bg-default px-3 py-2 text-sm leading-5 text-toned shadow-lg">
+                Sustenta a meta: {{ node.habit.goalTitle ?? 'sem título' }}
+              </div>
+            </template>
+          </UTooltip>
+
+          <UTooltip
             v-for="hint in lawHints"
             :key="hint.key"
             :content="{ side: 'top', align: 'center' }"

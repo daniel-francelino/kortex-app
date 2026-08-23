@@ -54,8 +54,9 @@ const BLOCK_TYPES = [
   { key: 'heading3', label: 'Título 3', icon: 'i-lucide-heading-3', action: (e: Editor) => e.chain().focus().setHeading({ level: 3 }).run() },
   { key: 'bulletList', label: 'Lista com marcadores', icon: 'i-lucide-list', action: (e: Editor) => e.chain().focus().toggleBulletList().run() },
   { key: 'orderedList', label: 'Lista numerada', icon: 'i-lucide-list-ordered', action: (e: Editor) => e.chain().focus().toggleOrderedList().run() },
+  { key: 'taskList', label: 'Lista de tarefas', icon: 'i-lucide-list-checks', action: (e: Editor) => e.chain().focus().toggleTaskList().run() },
   { key: 'blockquote', label: 'Citação', icon: 'i-lucide-quote', action: (e: Editor) => e.chain().focus().toggleBlockquote().run() },
-  { key: 'codeBlock', label: 'Bloco de código', icon: 'i-lucide-code-2', action: (e: Editor) => e.chain().focus().toggleCodeBlock().run() },
+  { key: 'codeBlock', label: 'Bloco de código', icon: 'i-lucide-code-2', action: (e: Editor) => e.chain().focus().toggleCodeBlock().run() }
 ]
 
 const currentBlockType = computed(() => {
@@ -66,8 +67,9 @@ const currentBlockType = computed(() => {
   if (e.isActive('heading', { level: 3 })) return BLOCK_TYPES[3]!
   if (e.isActive('bulletList')) return BLOCK_TYPES[4]!
   if (e.isActive('orderedList')) return BLOCK_TYPES[5]!
-  if (e.isActive('blockquote')) return BLOCK_TYPES[6]!
-  if (e.isActive('codeBlock')) return BLOCK_TYPES[7]!
+  if (e.isActive('taskList')) return BLOCK_TYPES[6]!
+  if (e.isActive('blockquote')) return BLOCK_TYPES[7]!
+  if (e.isActive('codeBlock')) return BLOCK_TYPES[8]!
   return BLOCK_TYPES[0]!
 })
 

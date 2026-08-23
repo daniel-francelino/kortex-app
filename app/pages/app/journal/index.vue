@@ -261,11 +261,17 @@ const {
   setMobileContextNav
 } = useMobileContextNav()
 
-watch(activeView, (view) => {
+watch([activeView, lockStatusLoaded, isModuleLocked], ([view, statusLoaded, moduleLocked]) => {
+  if (!statusLoaded || moduleLocked) {
+    clearMobileContextNav(mobileContextNavOwner)
+    return
+  }
+
   setMobileContextNav(mobileContextNavOwner, viewOptions, view)
 }, { immediate: true })
 
 watch(activeMobileContextNav, (view) => {
+  if (!lockStatusLoaded.value || isModuleLocked.value) return
   if (!view || !viewOptions.some(option => option.value === view)) return
   if (activeView.value === view) return
   activeView.value = view as JournalView

@@ -208,14 +208,16 @@ Hoje, olhar o detalhe de um hábito não dá nenhuma pista de que ele existe par
 
 ## 5. Checklist de rollout
 
-- [ ] Fase 1.1 — migration de deduplicação + constraint testada em cópia de produção
-- [ ] Fase 1.2 — mensagem de erro 409 melhorada + `GET /api/habits` expõe vínculo existente
-- [ ] Fase 1.3 — campo "Meta vinculada" em `CreateModal`/`EditModal` de Hábitos
-- [ ] Fase 1.4 — tipos atualizados, badge de hábito arquivado no detalhe da meta
-- [ ] Fase 2.1 — `isDueOnDay()` consolidada em `server/utils/habits.ts`
-- [ ] Fase 2.2 — `calculateHabitConsistency()` implementada e testada com hábitos diário/semanal/customizado
-- [ ] Fase 2.3 — `GET /api/goals/[id]` retorna `taskProgress`/`habitProgress`/`combinedProgress`
-- [ ] Fase 2.4 — UI do detalhe da meta mostra os três valores de forma transparente
-- [ ] Fase 3.1 — criar hábito vinculado direto do detalhe da meta
-- [ ] Fase 3.2 — sugestão opcional pós-criação de meta
-- [ ] Fase 4 — badge de meta vinculada no detalhe do hábito
+> **Status (2026-08-23): todas as fases implementadas.**
+
+- [x] Fase 1.1 — migration de deduplicação + constraint (`20260827000000_goal_habits_unique_per_habit.sql`) — ⚠️ ainda precisa ser testada numa cópia de produção antes de aplicar (é destrutiva, ver seção 4)
+- [x] Fase 1.2 — mensagem de erro 409 melhorada (`habits.post.ts`) + `GET /api/habits` expõe `goalId`/`goalTitle`/`goalLinkId` via `fetchHabitGoalMap()`
+- [x] Fase 1.3 — campo "Meta vinculada" em `CreateModal`/`EditModal` de Hábitos
+- [x] Fase 1.4 — tipos atualizados, badge "Arquivado" no detalhe da meta para hábitos vinculados arquivados
+- [x] Fase 2.1 — `isDueOnDay()` consolidada em `server/utils/habits.ts` (corrigiu de brinde a divergência em `cron-skip.post.ts`, que tratava hábitos semanais como devidos todo dia)
+- [x] Fase 2.2 — `calculateHabitConsistency()` implementada (janela de até 90 dias, `completed = true` como sinal de conclusão)
+- [x] Fase 2.3 — `GET /api/goals/[id]` retorna `taskProgress`/`habitProgress`/`combinedProgress`
+- [x] Fase 2.4 — UI do detalhe da meta mostra as três barras de forma transparente
+- [x] Fase 3.1 — "Criar hábito para esta meta" a partir do vinculador de hábitos da meta (`HabitsCreateModal` com `initialGoalId`)
+- [x] Fase 3.2 — toast dispensável após criar uma meta, com ação "Adicionar hábito" (`goals/index.vue`, `onGoalCreated`)
+- [x] Fase 4 — badge "Meta: {título}" no detalhe do hábito, clicável para `/app/goals`; ícone com tooltip "Sustenta a meta: {título}" em `TodayTreeRow.vue` e `AllTreeRow.vue`

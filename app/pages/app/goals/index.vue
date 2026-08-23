@@ -129,6 +129,25 @@ function onCreateHabitForGoal(goalId: string) {
   createHabitModalOpen.value = true
 }
 
+const toast = useToast()
+
+function onGoalCreated(goal: Goal) {
+  refreshList()
+  toast.add({
+    title: 'Sustentar com hábitos?',
+    description: `Quer adicionar hábitos que vão sustentar "${goal.title}"?`,
+    icon: 'i-lucide-calendar-check',
+    duration: 8000,
+    actions: [
+      {
+        label: 'Adicionar hábito',
+        color: 'primary',
+        onClick: () => onCreateHabitForGoal(goal.id)
+      }
+    ]
+  })
+}
+
 function onHabitCreated() {
   refreshList()
   if (detailSlideoverOpen.value && selectedGoal.value && createHabitGoalId.value === selectedGoal.value.id) {
@@ -248,7 +267,7 @@ const statusFilterOptions = computed(() => [
   <GoalsCreateModal
     :open="createModalOpen"
     @update:open="createModalOpen = $event"
-    @saved="refreshList"
+    @saved="onGoalCreated"
   />
 
   <GoalsEditModal

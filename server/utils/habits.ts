@@ -85,7 +85,8 @@ export function mapHabitFromVersion(
   identity: Record<string, unknown> | null | undefined,
   streak: Record<string, unknown> | null | undefined,
   archivedAt: string | null,
-  tags?: Array<{ id: string, name: string, color: string | null }>
+  tags?: Array<{ id: string, name: string, color: string | null }>,
+  goalLink?: { linkId: string, goalId: string, goalTitle: string | null } | null
 ): Record<string, unknown> {
   return {
     id: version.habit_id,
@@ -113,9 +114,9 @@ export function mapHabitFromVersion(
     identity: mapIdentity(identity ?? null),
     streak: mapStreak(streak ?? null),
     tags: tags ?? [],
-    goalLinkId: null,
-    goalId: null,
-    goalTitle: null
+    goalLinkId: goalLink?.linkId ?? null,
+    goalId: goalLink?.goalId ?? null,
+    goalTitle: goalLink?.goalTitle ?? null
   }
 }
 

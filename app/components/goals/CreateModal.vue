@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import * as z from 'zod'
 import type { FormSubmitEvent } from '@nuxt/ui'
+import type { Goal } from '~/types/goals'
 import { GoalTimeCategory, GoalLifeCategory, GoalProgressType } from '~/types/goals'
 import { GOAL_TEMPLATES, type GoalTemplate } from '~/utils/goal-templates'
 
@@ -10,7 +11,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   'update:open': [value: boolean]
-  'saved': []
+  'saved': [goal: Goal]
 }>()
 
 const { createGoal, createTask, timeCategoryOptions, lifeCategoryOptions, getLifeCategoryLabel } = useGoalActions()
@@ -94,7 +95,7 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
         await createTask(result.id, { title: taskTitle })
       }
       resetForm()
-      emit('saved')
+      emit('saved', result)
       emit('update:open', false)
     }
   } finally {
