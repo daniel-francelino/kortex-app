@@ -236,6 +236,23 @@ body.keyboard-open .mobile-bottom-nav {
   border-top-color: var(--ui-color-neutral-800);
 }
 
+/* In a regular Safari tab, `top: calc(visualHeight - navHeight)` (above) is
+   needed because a plain `bottom: 0` fixed element jumps around as iOS
+   collapses/expands the address bar. Installed as a home-screen app
+   (display-mode: standalone) there's no address bar to collapse, and iOS's
+   own `visualViewport.height` reporting in that mode doesn't always line up
+   with the real rendered viewport — the mismatch showed up as extra blank
+   space below the bottom nav. `bottom: 0` sidesteps the JS-computed height
+   entirely and lets the browser position it correctly. */
+@supports (-webkit-touch-callout: none) {
+  @media (display-mode: standalone) and (max-width: 1023px) {
+    .mobile-bottom-nav {
+      top: auto;
+      bottom: 0;
+    }
+  }
+}
+
 .mobile-bottom-nav > nav {
   display: flex;
   min-height: 0;
