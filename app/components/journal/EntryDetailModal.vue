@@ -14,6 +14,7 @@ const emit = defineEmits<{
 }>()
 
 const { fetchEntryByDate, upsertEntry, deleteEntry } = useJournal()
+const { mode: pinMode, isEntryLocked, toggleEntryLock } = useJournalLock()
 
 const isMobile = useIsMobile()
 
@@ -26,6 +27,20 @@ const editing = ref(false)
 const saving = ref(false)
 const deleting = ref(false)
 const confirmDeleteOpen = ref(false)
+const togglingLock = ref(false)
+
+const isLockedForViewing = computed(() => isEntryLocked(entry.value))
+
+async function onToggleLock() {
+  if (!entry.value || togglingLock.value) return
+  togglingLock.value = true
+  try {
+    const updated = await toggleEntryLock(props.date, !entry.value.locked)
+    if (updated) entry.value = updated
+  } finally {
+    togglingLock.value = false
+  }
+}
 
 watch(() => props.open, async (isOpen) => {
   if (isOpen && props.date) await loadEntry()
@@ -161,10 +176,10 @@ function onOpenChange(value: boolean) {
 
         <!-- View mode -->
         <template v-if="entry && !editing">
-          <!-- Mood display + edit action -->
+          <!-- Mood display + actions -->
           <div class="flex items-center justify-between gap-3 border-b border-default pb-4">
             <div
-              v-if="getMoodOption(entry.mood)"
+              v-if="!isLockedForViewing && getMoodOption(entry.mood)"
               class="flex items-center gap-2"
             >
               <span class="text-2xl leading-none">{{ getMoodOption(entry.mood)?.emoji }}</span>
@@ -175,6 +190,19 @@ function onOpenChange(value: boolean) {
             </div>
             <div v-else />
             <div class="flex items-center gap-2">
+              <!-- Per-entry lock toggle — "entradas específicas" mode only,
+                   and only once already unlocked (otherwise this would let
+                   anyone turn the lock off without ever entering the PIN). -->
+              <UButton
+                v-if="pinMode === 'entries' && !isLockedForViewing"
+                :icon="entry.locked ? 'i-lucide-lock' : 'i-lucide-lock-open'"
+                :color="entry.locked ? 'warning' : 'neutral'"
+                variant="ghost"
+                :size="isMobile ? 'md' : 'sm'"
+                :loading="togglingLock"
+                :title="entry.locked ? 'Remover proteção desta entrada' : 'Proteger esta entrada com PIN'"
+                @click="onToggleLock"
+              />
               <UButton
                 icon="i-lucide-trash-2"
                 label="Excluir"
@@ -184,6 +212,7 @@ function onOpenChange(value: boolean) {
                 @click="confirmDeleteOpen = true"
               />
               <UButton
+                v-if="!isLockedForViewing"
                 icon="i-lucide-pencil"
                 label="Editar"
                 color="neutral"
@@ -194,8 +223,15 @@ function onOpenChange(value: boolean) {
             </div>
           </div>
 
+          <!-- Locked entry — hides mood/content until the PIN is entered -->
+          <JournalLockScreen
+            v-if="isLockedForViewing"
+            compact
+            :entry-date="props.date"
+          />
+
           <!-- Rich content (read-only) -->
-          <ClientOnly>
+          <ClientOnly v-else>
             <NotionEditor
               :key="props.date + '-view'"
               :model-value="entry.content ?? ''"

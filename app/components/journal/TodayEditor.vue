@@ -17,9 +17,30 @@ const props = defineProps<{
 
 const isMobile = useIsMobile()
 
+const { mode: pinMode, isEntryLocked, toggleEntryLock } = useJournalLock()
+
 const today = new Date().toISOString().split('T')[0] ?? ''
 const content = ref('')
 const mood = ref<string | null>(null)
+// Mirrors `todayEntry.locked` locally so toggling the lock reflects
+// immediately — useJournal()'s store isn't refetched by toggleEntryLock().
+const entryLocked = ref(false)
+const togglingLock = ref(false)
+
+const isLockedForViewing = computed(() =>
+  isEntryLocked({ entryDate: today, locked: entryLocked.value })
+)
+
+async function onToggleLock() {
+  if (!props.todayEntry || togglingLock.value) return
+  togglingLock.value = true
+  try {
+    const updated = await toggleEntryLock(today, !entryLocked.value)
+    if (updated) entryLocked.value = updated.locked
+  } finally {
+    togglingLock.value = false
+  }
+}
 
 // Last saved snapshot — what the server currently has
 const savedContent = ref('')
@@ -110,6 +131,7 @@ watch(
         mood.value = m
       }
       savedMood.value = m
+      entryLocked.value = entry.locked
       armContentSuppression()
       initialized.value = true
     } else if (!props.loading) {
@@ -118,6 +140,7 @@ watch(
       savedContent.value = ''
       mood.value = null
       savedMood.value = null
+      entryLocked.value = false
       lastChangeAt.value = 0
       saveStatus.value = 'idle'
       armContentSuppression()
@@ -367,12 +390,34 @@ defineExpose({ isUnsaved: () => hasChanges.value, doSave })
           </div>
         </div>
 
-        <!-- Mood selector -->
-        <div class="shrink-0">
-          <JournalMoodSelector v-model="mood" />
+        <div class="flex shrink-0 items-center gap-2">
+          <!-- Per-entry lock toggle — only shown in "entradas específicas" mode,
+               and only once already unlocked: showing it while still locked
+               would let anyone turn the lock off without ever entering the PIN. -->
+          <UButton
+            v-if="pinMode === 'entries' && todayEntry && !isLockedForViewing"
+            :icon="entryLocked ? 'i-lucide-lock' : 'i-lucide-lock-open'"
+            :color="entryLocked ? 'warning' : 'neutral'"
+            variant="ghost"
+            :size="isMobile ? 'md' : 'sm'"
+            :loading="togglingLock"
+            :title="entryLocked ? 'Remover proteção desta entrada' : 'Proteger esta entrada com PIN'"
+            @click="onToggleLock"
+          />
+          <!-- Mood selector — hidden while locked, same reasoning as the
+               content below (todayEntry.mood would otherwise leak here). -->
+          <JournalMoodSelector v-if="!isLockedForViewing" v-model="mood" />
         </div>
       </div>
 
+      <!-- Locked entry (mode "entradas específicas") — hides mood/prompts/editor until the PIN is entered -->
+      <JournalLockScreen
+        v-if="isLockedForViewing"
+        compact
+        :entry-date="today"
+      />
+
+      <template v-else>
       <!-- Entry prompts — a nudge to get past the blank page, gone once there's content. -->
       <ClientOnly v-if="isContentEmpty">
         <div class="space-y-1.5">
@@ -423,6 +468,7 @@ defineExpose({ isUnsaved: () => hasChanges.value, doSave })
           <USkeleton class="h-56 w-full rounded-lg" />
         </template>
       </ClientOnly>
+      </template>
     </template>
   </div>
 </template>

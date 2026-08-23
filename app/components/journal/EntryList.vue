@@ -15,6 +15,11 @@ const emit = defineEmits<{
   'select': [date: string]
 }>()
 
+// Goes through the composable (not the raw `entry.locked` flag) so a mode
+// switch away from "entradas específicas", or already having unlocked this
+// entry this session, correctly stop masking it here too.
+const { isEntryLocked } = useJournalLock()
+
 function formatDate(dateStr: string): string {
   return new Date(dateStr + 'T12:00:00').toLocaleDateString('pt-BR', {
     weekday: 'short',
@@ -96,15 +101,26 @@ function extractPreview(jsonContent: string): string {
           <p class="text-xs font-medium text-muted capitalize">
             {{ formatDate(entry.entryDate) }}
           </p>
+          <UIcon
+            v-if="isEntryLocked(entry)"
+            name="i-lucide-lock"
+            class="size-4 text-warning"
+          />
           <span
-            v-if="getMoodOption(entry.mood)"
+            v-else-if="getMoodOption(entry.mood)"
             class="text-base leading-none"
             :title="getMoodOption(entry.mood)?.label"
           >{{ getMoodOption(entry.mood)?.emoji }}</span>
         </div>
-        <!-- Content preview — up to 5 visual lines -->
+        <!-- Locked entries never show their real preview text, search match or not -->
         <p
-          v-if="extractPreview(entry.content)"
+          v-if="isEntryLocked(entry)"
+          class="text-sm text-dimmed italic"
+        >
+          Entrada protegida
+        </p>
+        <p
+          v-else-if="extractPreview(entry.content)"
           class="text-sm text-highlighted line-clamp-5 leading-relaxed"
         >
           {{ extractPreview(entry.content) }}

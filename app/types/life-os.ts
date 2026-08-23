@@ -77,6 +77,7 @@ export interface DashboardJournal {
   title: string | null
   contentPreview: string | null
   exists: boolean
+  locked: boolean
 }
 
 export interface DailyDashboardResponse {

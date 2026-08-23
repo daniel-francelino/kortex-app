@@ -15,6 +15,7 @@ export function mapJournalEntry(row: Row) {
     mood: row.mood,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
-    archivedAt: row.archived_at
+    archivedAt: row.archived_at,
+    locked: row.locked ?? false
   }
 }

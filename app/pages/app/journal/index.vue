@@ -32,6 +32,12 @@ const {
   syncingOffline
 } = useJournal()
 
+const { statusLoaded: lockStatusLoaded, refreshStatus: refreshLockStatus, isModuleLocked } = useJournalLock()
+
+onMounted(() => {
+  refreshLockStatus()
+})
+
 const isMobile = useIsMobile()
 
 // ─── View mode ────────────────────────────────────────────────────────────────
@@ -148,7 +154,18 @@ function onInsightsRangeChange(range: '7d' | '30d' | '90d') {
     </template>
 
     <template #body>
-      <div class="space-y-4">
+      <!-- PIN lock (module mode) — gates the whole panel until unlocked this session -->
+      <template v-if="!lockStatusLoaded">
+        <div class="space-y-4">
+          <USkeleton class="h-6 w-48" />
+          <USkeleton class="h-64 w-full rounded-lg" />
+        </div>
+      </template>
+      <!-- isModuleLocked is a computed driven by useJournalLock's internal
+           unlocked-state ref, which LockScreen updates on a valid PIN — no
+           local handler needed, it recomputes to false on its own. -->
+      <JournalLockScreen v-else-if="isModuleLocked" />
+      <div v-else class="space-y-4">
         <!-- Offline / pending sync indicator -->
         <div
           v-if="!isOnline || pendingSyncCount > 0"

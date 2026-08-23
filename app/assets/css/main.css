@@ -151,6 +151,17 @@ body.keyboard-open .mobile-bottom-nav {
   }
 }
 
+/* ─── PIN pad: shake feedback on a wrong PIN ────── */
+.kortex-pin-shake {
+  animation: kortex-pin-shake 0.4s ease-in-out;
+}
+
+@keyframes kortex-pin-shake {
+  0%, 100% { transform: translateX(0); }
+  20%, 60% { transform: translateX(-6px); }
+  40%, 80% { transform: translateX(6px); }
+}
+
 .kortex-guided-tour {
   background:
     radial-gradient(circle at top, color-mix(in srgb, var(--ui-primary) 18%, transparent), transparent 48%),

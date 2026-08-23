@@ -4,6 +4,7 @@ import { getMoodOption } from '~/types/journal'
 interface EntryDay {
   date: string
   mood: string | null
+  locked: boolean
 }
 
 const props = defineProps<{
@@ -16,6 +17,8 @@ const emit = defineEmits<{
   monthChange: [from: string, to: string]
 }>()
 
+const { isEntryLocked } = useJournalLock()
+
 const currentYear = ref(new Date().getFullYear())
 const currentMonth = ref(new Date().getMonth())
 const today = new Date().toISOString().split('T')[0] ?? ''
@@ -26,10 +29,10 @@ const monthNames = [
 ]
 const dayHeaders = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
 
-// Map date → mood for O(1) lookup
-const entryMoodMap = computed(() => {
-  const map = new Map<string, string | null>()
-  props.entryDates.forEach(e => map.set(e.date, e.mood))
+// Map date → { mood, locked } for O(1) lookup
+const entryInfoMap = computed(() => {
+  const map = new Map<string, { mood: string | null, locked: boolean }>()
+  props.entryDates.forEach(e => map.set(e.date, { mood: e.mood, locked: e.locked }))
   return map
 })
 
@@ -39,7 +42,13 @@ interface CalendarDay {
   isCurrentMonth: boolean
   hasEntry: boolean
   mood: string | null
+  locked: boolean
   isToday: boolean
+}
+
+function dayInfo(date: string) {
+  const info = entryInfoMap.value.get(date)
+  return { hasEntry: !!info, mood: info?.mood ?? null, locked: info?.locked ?? false }
 }
 
 const calendarDays = computed<CalendarDay[]>(() => {
@@ -56,20 +65,20 @@ const calendarDays = computed<CalendarDay[]>(() => {
   for (let i = startWeekday - 1; i >= 0; i--) {
     const d = prevLastDay - i
     const date = fmt(year, month - 1, d)
-    days.push({ date, day: d, isCurrentMonth: false, hasEntry: entryMoodMap.value.has(date), mood: entryMoodMap.value.get(date) ?? null, isToday: date === today })
+    days.push({ date, day: d, isCurrentMonth: false, ...dayInfo(date), isToday: date === today })
   }
 
   // Current month
   for (let d = 1; d <= lastDay.getDate(); d++) {
     const date = fmt(year, month, d)
-    days.push({ date, day: d, isCurrentMonth: true, hasEntry: entryMoodMap.value.has(date), mood: entryMoodMap.value.get(date) ?? null, isToday: date === today })
+    days.push({ date, day: d, isCurrentMonth: true, ...dayInfo(date), isToday: date === today })
   }
 
   // Next month padding
   const remaining = 42 - days.length
   for (let d = 1; d <= remaining; d++) {
     const date = fmt(year, month + 1, d)
-    days.push({ date, day: d, isCurrentMonth: false, hasEntry: entryMoodMap.value.has(date), mood: entryMoodMap.value.get(date) ?? null, isToday: date === today })
+    days.push({ date, day: d, isCurrentMonth: false, ...dayInfo(date), isToday: date === today })
   }
 
   return days
@@ -191,9 +200,16 @@ onMounted(() => emitRange())
           {{ day.day }}
         </span>
 
+        <!-- Lock icon (protected entry) -->
+        <UIcon
+          v-if="day.hasEntry && isEntryLocked({ entryDate: day.date, locked: day.locked })"
+          name="i-lucide-lock"
+          class="size-3 text-warning"
+        />
+
         <!-- Mood emoji (entry with mood) -->
         <span
-          v-if="day.hasEntry && day.mood"
+          v-else-if="day.hasEntry && day.mood"
           class="text-base leading-none"
           :title="getMoodOption(day.mood)?.label"
         >

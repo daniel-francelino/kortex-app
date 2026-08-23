@@ -26,6 +26,16 @@ export interface JournalEntry {
   createdAt: string
   updatedAt: string
   archivedAt: string | null
+  locked: boolean
+}
+
+// ─── PIN lock ─────────────────────────────────────────────────────────────────
+
+export type JournalPinMode = 'module' | 'entries'
+
+export interface JournalLockStatus {
+  enabled: boolean
+  mode: JournalPinMode | null
 }
 
 // ─── Payloads ─────────────────────────────────────────────────────────────────

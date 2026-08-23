@@ -64,6 +64,33 @@ async function onSubmitPassword(_event: FormSubmitEvent<PasswordSchema>) {
   }
 }
 
+// ─── Journal PIN lock ────────────────────────────────────────────────────────
+const { enabled: pinEnabled, mode: pinMode, statusLoaded: pinStatusLoaded, refreshStatus: refreshPinStatus, disablePin } = useJournalLock()
+
+onMounted(() => {
+  refreshPinStatus()
+})
+
+const pinModeLabels: Record<string, string> = {
+  module: 'Diário inteiro',
+  entries: 'Entradas específicas'
+}
+
+const pinSetupOpen = ref(false)
+const isDisablingPin = ref(false)
+const confirmDisablePinOpen = ref(false)
+
+async function onDisablePin() {
+  if (isDisablingPin.value) return
+  isDisablingPin.value = true
+  try {
+    const ok = await disablePin()
+    if (ok) confirmDisablePinOpen.value = false
+  } finally {
+    isDisablingPin.value = false
+  }
+}
+
 const isDeletingAccount = ref(false)
 
 async function deleteAccount() {
@@ -136,6 +163,89 @@ async function deleteAccount() {
       />
     </UForm>
   </UPageCard>
+
+  <UPageCard
+    title="PIN do Diário de Bordo"
+    description="Uma trava extra para o conteúdo mais sensível do app — pedida antes de mostrar o Diário (ou entradas específicas), separada do login da conta."
+    variant="subtle"
+  >
+    <div v-if="!pinStatusLoaded" class="flex items-center gap-2 text-sm text-muted">
+      <UIcon name="i-lucide-loader-2" class="size-4 animate-spin" />
+      Carregando...
+    </div>
+
+    <div v-else-if="pinEnabled" class="flex flex-col gap-3">
+      <div class="flex items-center gap-2 text-sm text-highlighted">
+        <UIcon name="i-lucide-lock" class="size-4 text-success" />
+        PIN ativo — modo: {{ pinModeLabels[pinMode ?? ''] ?? pinMode }}
+      </div>
+      <div class="flex flex-wrap gap-2">
+        <UButton
+          label="Alterar PIN"
+          color="neutral"
+          variant="outline"
+          @click="pinSetupOpen = true"
+        />
+        <UButton
+          label="Desativar"
+          color="error"
+          variant="outline"
+          @click="confirmDisablePinOpen = true"
+        />
+      </div>
+    </div>
+
+    <div v-else class="flex flex-col gap-3">
+      <p class="text-sm text-muted">
+        Desativado — o Diário abre normalmente, sem PIN.
+      </p>
+      <UButton
+        label="Ativar PIN"
+        class="w-fit"
+        @click="pinSetupOpen = true"
+      />
+    </div>
+  </UPageCard>
+
+  <JournalPinSetupModal
+    v-model:open="pinSetupOpen"
+    @saved="refreshPinStatus"
+  />
+
+  <UModal
+    :open="confirmDisablePinOpen"
+    @update:open="confirmDisablePinOpen = $event"
+  >
+    <template #header>
+      <div class="flex items-center gap-2">
+        <UIcon name="i-lucide-lock-open" class="size-4 text-warning" />
+        <span class="text-sm font-semibold text-highlighted">Desativar PIN do Diário</span>
+      </div>
+    </template>
+
+    <template #body>
+      <p class="text-sm text-muted">
+        O Diário de Bordo (e qualquer entrada protegida individualmente) deixará de pedir PIN. Deseja continuar?
+      </p>
+    </template>
+
+    <template #footer>
+      <div class="flex w-full items-center justify-end gap-2">
+        <UButton
+          label="Cancelar"
+          variant="ghost"
+          color="neutral"
+          @click="confirmDisablePinOpen = false"
+        />
+        <UButton
+          label="Desativar"
+          color="error"
+          :loading="isDisablingPin"
+          @click="onDisablePin"
+        />
+      </div>
+    </template>
+  </UModal>
 
   <UPageCard
     title="Conta"

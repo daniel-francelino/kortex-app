@@ -172,7 +172,7 @@ export default eventHandler(async (event) => {
   // ─── Journal ──────────────────────────────────────────────────────────────
   const { data: journalEntries } = await supabase
     .from('journal_entries')
-    .select('id, entry_date, title, content')
+    .select('id, entry_date, title, content, locked')
     .eq('user_id', user.id)
     .eq('entry_date', date)
     .limit(1)
@@ -181,14 +181,30 @@ export default eventHandler(async (event) => {
     ? journalEntries[0] as unknown as Record<string, unknown>
     : null
 
+  // A PIN lock on the journal ("módulo inteiro", or this specific entry
+  // under "entradas específicas") must also hide the preview here — this
+  // widget reads journal_entries directly, outside the /api/journal/* API
+  // the lock screen otherwise gates, so it would otherwise leak the exact
+  // content the lock exists to hide.
+  const { data: prefsRow } = await supabase
+    .from('user_preferences')
+    .select('journal_pin_hash, journal_pin_mode')
+    .eq('user_id', user.id)
+    .single()
+
+  const prefs = prefsRow as { journal_pin_hash: string | null, journal_pin_mode: string | null } | null
+  const pinMode = prefs?.journal_pin_hash ? prefs.journal_pin_mode : null
+  const isLocked = pinMode === 'module' || (pinMode === 'entries' && journalRow?.locked === true)
+
   const journal = {
     id: journalRow ? (journalRow.id as string) : null,
     entryDate: date,
-    title: journalRow ? (journalRow.title as string | null) : null,
-    contentPreview: journalRow
-      ? ((journalRow.content as string) ?? '').substring(0, 120)
-      : null,
-    exists: !!journalRow
+    title: isLocked ? null : journalRow ? (journalRow.title as string | null) : null,
+    contentPreview: isLocked || !journalRow
+      ? null
+      : ((journalRow.content as string) ?? '').substring(0, 120),
+    exists: !!journalRow,
+    locked: isLocked
   }
 
   return {

@@ -26,7 +26,14 @@ defineProps<{
       </div>
     </template>
 
-    <div v-if="journal.exists" class="space-y-2">
+    <div v-if="journal.locked" class="flex flex-col items-center gap-2 py-4 text-center">
+      <UIcon name="i-lucide-lock" class="size-6 text-dimmed" />
+      <p class="text-sm text-muted">
+        Diário protegido por PIN
+      </p>
+    </div>
+
+    <div v-else-if="journal.exists" class="space-y-2">
       <p v-if="journal.title" class="text-sm font-medium">
         {{ journal.title }}
       </p>
