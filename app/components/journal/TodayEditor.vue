@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { AnimatePresence, motion } from 'motion-v'
 import type { JournalEntry } from '~/types/journal'
 import { isEditorContentEmpty, serializeEditorContent } from '~/utils/editor/content'
 
@@ -332,18 +333,29 @@ defineExpose({ isUnsaved: () => hasChanges.value, doSave })
 <template>
   <div class="space-y-5">
     <!-- Loading skeleton — only on initial load, not on background saves -->
-    <template v-if="!initialized">
+    <motion.div
+      v-if="!initialized"
+      :initial="{ opacity: 0 }"
+      :animate="{ opacity: 1 }"
+      :exit="{ opacity: 0 }"
+      :transition="{ duration: 0.18 }"
+    >
       <USkeleton class="h-6 w-48" />
       <USkeleton class="h-8 w-40" />
       <USkeleton class="h-64 w-full rounded-lg" />
-    </template>
+    </motion.div>
 
     <template v-else>
       <!-- Header: date + mood selector — stacked on mobile (the mood
            selector's five 48px touch targets squeeze the date column down
            to almost nothing side-by-side on a phone, wrapping the date
            across 2-3 lines), side-by-side from lg up. -->
-      <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between lg:gap-4">
+      <motion.div
+        class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between lg:gap-4"
+        :initial="{ opacity: 0, y: 8 }"
+        :animate="{ opacity: 1, y: 0 }"
+        :transition="{ duration: 0.18 }"
+      >
         <div class="min-w-0">
           <div class="flex items-center gap-2">
             <h3 class="text-lg font-semibold text-highlighted">
@@ -408,19 +420,32 @@ defineExpose({ isUnsaved: () => hasChanges.value, doSave })
                content below (todayEntry.mood would otherwise leak here). -->
           <JournalMoodSelector v-if="!isLockedForViewing" v-model="mood" />
         </div>
-      </div>
+      </motion.div>
 
       <!-- Locked entry (mode "entradas específicas") — hides mood/prompts/editor until the PIN is entered -->
-      <JournalLockScreen
+      <motion.div
         v-if="isLockedForViewing"
-        compact
-        :entry-date="today"
-      />
+        :initial="{ opacity: 0, y: 8, scale: 0.99 }"
+        :animate="{ opacity: 1, y: 0, scale: 1 }"
+        :transition="{ duration: 0.18 }"
+      >
+        <JournalLockScreen
+          compact
+          :entry-date="today"
+        />
+      </motion.div>
 
       <template v-else>
       <!-- Entry prompts — a nudge to get past the blank page, gone once there's content. -->
-      <ClientOnly v-if="isContentEmpty">
-        <div class="space-y-1.5">
+      <AnimatePresence>
+        <ClientOnly v-if="isContentEmpty">
+          <motion.div
+            class="space-y-1.5"
+            :initial="{ opacity: 0, y: 8, scale: 0.99 }"
+            :animate="{ opacity: 1, y: 0, scale: 1 }"
+            :exit="{ opacity: 0, y: -6, scale: 0.99 }"
+            :transition="{ duration: 0.18 }"
+          >
           <div class="flex items-center justify-between gap-2">
             <span class="text-xs text-dimmed">Não sabe por onde começar?</span>
             <UButton
@@ -450,24 +475,31 @@ defineExpose({ isUnsaved: () => hasChanges.value, doSave })
               @click="applyPrompt(p.prompt)"
             />
           </div>
-        </div>
-        <template #fallback>
-          <USkeleton class="h-7 w-full max-w-sm" />
-        </template>
-      </ClientOnly>
+          </motion.div>
+          <template #fallback>
+            <USkeleton class="h-7 w-full max-w-sm" />
+          </template>
+        </ClientOnly>
+      </AnimatePresence>
 
       <!-- Notion editor -->
-      <ClientOnly>
-        <NotionEditor
-          :key="today"
-          v-model="content"
-          placeholder="Escreva livremente sobre o seu dia... use '/' para inserir blocos."
-          :min-height="'14rem'"
-        />
-        <template #fallback>
-          <USkeleton class="h-56 w-full rounded-lg" />
-        </template>
-      </ClientOnly>
+      <motion.div
+        :initial="{ opacity: 0, y: 10 }"
+        :animate="{ opacity: 1, y: 0 }"
+        :transition="{ duration: 0.2, delay: 0.04 }"
+      >
+        <ClientOnly>
+          <NotionEditor
+            :key="today"
+            v-model="content"
+            placeholder="Escreva livremente sobre o seu dia... use '/' para inserir blocos."
+            :min-height="'14rem'"
+          />
+          <template #fallback>
+            <USkeleton class="h-56 w-full rounded-lg" />
+          </template>
+        </ClientOnly>
+      </motion.div>
       </template>
     </template>
   </div>

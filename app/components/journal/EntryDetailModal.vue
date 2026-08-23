@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { AnimatePresence, motion } from 'motion-v'
 import type { JournalEntry } from '~/types/journal'
 import { getMoodOption } from '~/types/journal'
 import { isEditorContentEmpty } from '~/utils/editor/content'
@@ -140,25 +141,37 @@ function onOpenChange(value: boolean) {
     @update:open="onOpenChange"
   >
     <template #body>
-      <!-- Loading -->
-      <div
-        v-if="loading"
+      <AnimatePresence mode="wait">
+        <!-- Loading -->
+        <motion.div
+          v-if="loading"
         class="mx-auto w-full max-w-4xl space-y-4 px-4 py-8 sm:px-8"
+        :initial="{ opacity: 0 }"
+        :animate="{ opacity: 1 }"
+        :exit="{ opacity: 0 }"
+        :transition="{ duration: 0.16 }"
       >
         <USkeleton class="h-4 w-full" />
         <USkeleton class="h-4 w-5/6" />
         <USkeleton class="h-4 w-4/5" />
         <USkeleton class="h-40 w-full" />
-      </div>
+        </motion.div>
 
-      <div
-        v-else
+        <motion.div
+          v-else
         class="mx-auto flex min-h-full w-full max-w-4xl flex-col gap-6 px-4 py-8 sm:px-8"
+        :initial="{ opacity: 0, y: 10 }"
+        :animate="{ opacity: 1, y: 0 }"
+        :transition="{ duration: 0.18 }"
       >
         <!-- No entry yet -->
-        <div
+        <motion.div
           v-if="!entry && !editing"
           class="flex flex-1 flex-col items-center justify-center gap-3 py-16"
+          :initial="{ opacity: 0, y: 10, scale: 0.98 }"
+          :animate="{ opacity: 1, y: 0, scale: 1 }"
+          :exit="{ opacity: 0, y: -6, scale: 0.98 }"
+          :transition="{ duration: 0.18 }"
         >
           <UIcon
             name="i-lucide-book-open"
@@ -172,12 +185,17 @@ function onOpenChange(value: boolean) {
             icon="i-lucide-plus"
             @click="editing = true"
           />
-        </div>
+        </motion.div>
 
         <!-- View mode -->
         <template v-if="entry && !editing">
           <!-- Mood display + actions -->
-          <div class="flex items-center justify-between gap-3 border-b border-default pb-4">
+          <motion.div
+            class="flex items-center justify-between gap-3 border-b border-default pb-4"
+            :initial="{ opacity: 0, y: 8 }"
+            :animate="{ opacity: 1, y: 0 }"
+            :transition="{ duration: 0.18 }"
+          >
             <div
               v-if="!isLockedForViewing && getMoodOption(entry.mood)"
               class="flex items-center gap-2"
@@ -221,46 +239,72 @@ function onOpenChange(value: boolean) {
                 @click="editing = true"
               />
             </div>
-          </div>
+          </motion.div>
 
           <!-- Locked entry — hides mood/content until the PIN is entered -->
-          <JournalLockScreen
+          <motion.div
             v-if="isLockedForViewing"
-            compact
-            :entry-date="props.date"
-          />
+            :initial="{ opacity: 0, y: 8, scale: 0.99 }"
+            :animate="{ opacity: 1, y: 0, scale: 1 }"
+            :transition="{ duration: 0.18 }"
+          >
+            <JournalLockScreen
+              compact
+              :entry-date="props.date"
+            />
+          </motion.div>
 
           <!-- Rich content (read-only) -->
-          <ClientOnly v-else>
-            <NotionEditor
-              :key="props.date + '-view'"
-              :model-value="entry.content ?? ''"
-              :editable="false"
-              min-height="60vh"
-            />
-            <template #fallback>
-              <USkeleton class="h-32 w-full" />
-            </template>
-          </ClientOnly>
+          <motion.div
+            v-else
+            :initial="{ opacity: 0, y: 10 }"
+            :animate="{ opacity: 1, y: 0 }"
+            :transition="{ duration: 0.2, delay: 0.04 }"
+          >
+            <ClientOnly>
+              <NotionEditor
+                :key="props.date + '-view'"
+                :model-value="entry.content ?? ''"
+                :editable="false"
+                min-height="60vh"
+              />
+              <template #fallback>
+                <USkeleton class="h-32 w-full" />
+              </template>
+            </ClientOnly>
+          </motion.div>
         </template>
 
         <!-- Edit mode -->
         <template v-if="editing">
-          <JournalMoodSelector v-model="mood" />
+          <motion.div
+            :initial="{ opacity: 0, y: 8 }"
+            :animate="{ opacity: 1, y: 0 }"
+            :transition="{ duration: 0.18 }"
+          >
+            <JournalMoodSelector v-model="mood" />
+          </motion.div>
 
-          <ClientOnly>
-            <NotionEditor
-              :key="props.date + '-edit'"
-              v-model="content"
-              placeholder="Escreva sua entrada... use '/' para inserir blocos."
-              min-height="60vh"
-            />
-            <template #fallback>
-              <USkeleton class="h-40 w-full" />
-            </template>
-          </ClientOnly>
+          <motion.div
+            :initial="{ opacity: 0, y: 10 }"
+            :animate="{ opacity: 1, y: 0 }"
+            :transition="{ duration: 0.2, delay: 0.04 }"
+          >
+            <ClientOnly>
+              <NotionEditor
+                :key="props.date + '-edit'"
+                v-model="content"
+                placeholder="Escreva sua entrada... use '/' para inserir blocos."
+                min-height="60vh"
+              />
+              <template #fallback>
+                <USkeleton class="h-40 w-full" />
+              </template>
+            </ClientOnly>
+          </motion.div>
         </template>
-      </div>
+        </motion.div>
+      </AnimatePresence>
     </template>
 
     <template #footer>

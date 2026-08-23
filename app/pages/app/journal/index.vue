@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { AnimatePresence, motion } from 'motion-v'
+
 definePageMeta({
   layout: 'app',
   ssr: false
@@ -182,8 +184,15 @@ function onInsightsRangeChange(range: '7d' | '30d' | '90d') {
           <span v-else>{{ pendingSyncCount }} alteração(ões) pendente(s) de sincronização</span>
         </div>
 
-        <!-- EDITOR VIEW -->
-        <div v-if="activeView === 'editor'">
+        <AnimatePresence mode="wait">
+          <!-- EDITOR VIEW -->
+          <motion.div
+            v-if="activeView === 'editor'"
+          :initial="{ opacity: 0, y: 10, filter: 'blur(2px)' }"
+          :animate="{ opacity: 1, y: 0, filter: 'blur(0px)' }"
+          :exit="{ opacity: 0, y: -8, filter: 'blur(2px)' }"
+          :transition="{ duration: 0.18, ease: 'easeOut' }"
+        >
           <JournalTodayEditor
             ref="editorRef"
             :today-entry="todayData?.entry ?? null"
@@ -192,20 +201,33 @@ function onInsightsRangeChange(range: '7d' | '30d' | '90d') {
             :is-online="isOnline"
             :on-upsert-entry="upsertEntry"
           />
-        </div>
+          </motion.div>
 
-        <!-- CALENDAR VIEW -->
-        <div v-else-if="activeView === 'calendar'">
+          <!-- CALENDAR VIEW -->
+          <motion.div
+            v-else-if="activeView === 'calendar'"
+          :initial="{ opacity: 0, y: 10, filter: 'blur(2px)' }"
+          :animate="{ opacity: 1, y: 0, filter: 'blur(0px)' }"
+          :exit="{ opacity: 0, y: -8, filter: 'blur(2px)' }"
+          :transition="{ duration: 0.18, ease: 'easeOut' }"
+        >
           <JournalCalendarView
             :entry-dates="calendarDates ?? []"
             :loading="calendarStatus === 'pending'"
             @select-date="onSelectDate"
             @month-change="onCalendarMonthChange"
           />
-        </div>
+          </motion.div>
 
-        <!-- LIST VIEW -->
-        <div v-else-if="activeView === 'list'" class="space-y-4">
+          <!-- LIST VIEW -->
+          <motion.div
+            v-else-if="activeView === 'list'"
+          class="space-y-4"
+          :initial="{ opacity: 0, y: 10, filter: 'blur(2px)' }"
+          :animate="{ opacity: 1, y: 0, filter: 'blur(0px)' }"
+          :exit="{ opacity: 0, y: -8, filter: 'blur(2px)' }"
+          :transition="{ duration: 0.18, ease: 'easeOut' }"
+        >
           <UInput
             v-model="listSearch"
             icon="i-lucide-search"
@@ -221,10 +243,17 @@ function onInsightsRangeChange(range: '7d' | '30d' | '90d') {
             @update:page="listPage = $event"
             @select="onListEntrySelect"
           />
-        </div>
+          </motion.div>
 
-        <!-- INSIGHTS VIEW -->
-        <div v-else-if="activeView === 'insights'" class="space-y-4">
+          <!-- INSIGHTS VIEW -->
+          <motion.div
+            v-else-if="activeView === 'insights'"
+          class="space-y-4"
+          :initial="{ opacity: 0, y: 10, filter: 'blur(2px)' }"
+          :animate="{ opacity: 1, y: 0, filter: 'blur(0px)' }"
+          :exit="{ opacity: 0, y: -8, filter: 'blur(2px)' }"
+          :transition="{ duration: 0.18, ease: 'easeOut' }"
+        >
           <div
             v-if="(todayData?.streak ?? 0) > 0"
             class="flex items-center gap-2 rounded-lg border border-default bg-elevated/30 px-4 py-3"
@@ -240,7 +269,8 @@ function onInsightsRangeChange(range: '7d' | '30d' | '90d') {
             :loading="insightsStatus === 'pending'"
             @range-change="onInsightsRangeChange"
           />
-        </div>
+          </motion.div>
+        </AnimatePresence>
       </div>
     </template>
   </UDashboardPanel>

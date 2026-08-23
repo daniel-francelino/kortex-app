@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { AnimatePresence, motion } from 'motion-v'
 import type { JournalInsights } from '~/types/journal'
 
 const props = defineProps<{
@@ -43,8 +44,16 @@ const _props = props
       />
     </div>
 
-    <!-- Loading -->
-    <template v-if="_props.loading">
+    <AnimatePresence mode="wait">
+      <!-- Loading -->
+      <motion.div
+        v-if="_props.loading"
+      class="space-y-6"
+      :initial="{ opacity: 0, y: 8 }"
+      :animate="{ opacity: 1, y: 0 }"
+      :exit="{ opacity: 0, y: -6 }"
+      :transition="{ duration: 0.16 }"
+    >
       <UCard>
         <div class="text-center space-y-2">
           <USkeleton class="h-8 w-12 mx-auto" />
@@ -61,9 +70,16 @@ const _props = props
           />
         </div>
       </UCard>
-    </template>
+      </motion.div>
 
-    <template v-else-if="_props.insights">
+      <motion.div
+        v-else-if="_props.insights"
+      class="space-y-6"
+      :initial="{ opacity: 0, y: 10 }"
+      :animate="{ opacity: 1, y: 0 }"
+      :exit="{ opacity: 0, y: -6 }"
+      :transition="{ duration: 0.18 }"
+    >
       <!-- Total entries -->
       <UCard>
         <div class="text-center">
@@ -85,10 +101,13 @@ const _props = props
         </template>
 
         <div class="space-y-2">
-          <div
-            v-for="day in _props.insights.entriesByDayOfWeek"
+          <motion.div
+            v-for="(day, index) in _props.insights.entriesByDayOfWeek"
             :key="day.day"
             class="flex items-center justify-between text-sm"
+            :initial="{ opacity: 0, x: -8 }"
+            :animate="{ opacity: 1, x: 0 }"
+            :transition="{ duration: 0.16, delay: 0.08 + index * 0.03 }"
           >
             <span class="text-highlighted w-20">{{ day.day }}</span>
             <div class="flex-1 mx-3">
@@ -101,7 +120,7 @@ const _props = props
             <span class="text-muted tabular-nums w-8 text-right">
               {{ day.count }}
             </span>
-          </div>
+          </motion.div>
         </div>
       </UCard>
 
@@ -118,6 +137,7 @@ const _props = props
           Escreva entradas no diário para ver insights aqui.
         </p>
       </div>
-    </template>
+      </motion.div>
+    </AnimatePresence>
   </div>
 </template>

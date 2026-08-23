@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { AnimatePresence, motion } from 'motion-v'
 import type { JournalEntry } from '~/types/journal'
 import { getMoodOption } from '~/types/journal'
 
@@ -53,27 +54,40 @@ function extractPreview(jsonContent: string): string {
 
 <template>
   <!-- Loading -->
-  <div
+  <motion.div
     v-if="loading"
     class="space-y-3"
+    :initial="{ opacity: 0 }"
+    :animate="{ opacity: 1 }"
+    :exit="{ opacity: 0 }"
+    :transition="{ duration: 0.16 }"
   >
-    <UCard
+    <motion.div
       v-for="i in 5"
       :key="i"
+      :initial="{ opacity: 0, y: 10 }"
+      :animate="{ opacity: 1, y: 0 }"
+      :transition="{ duration: 0.16, delay: i * 0.025 }"
     >
-      <div class="space-y-2">
-        <USkeleton class="h-4 w-40" />
-        <USkeleton class="h-3 w-full" />
-        <USkeleton class="h-3 w-4/5" />
-        <USkeleton class="h-3 w-3/5" />
-      </div>
-    </UCard>
-  </div>
+      <UCard>
+        <div class="space-y-2">
+          <USkeleton class="h-4 w-40" />
+          <USkeleton class="h-3 w-full" />
+          <USkeleton class="h-3 w-4/5" />
+          <USkeleton class="h-3 w-3/5" />
+        </div>
+      </UCard>
+    </motion.div>
+  </motion.div>
 
   <!-- Empty -->
-  <div
+  <motion.div
     v-else-if="entries.length === 0"
     class="flex flex-col items-center justify-center py-12 gap-3"
+    :initial="{ opacity: 0, y: 10, scale: 0.98 }"
+    :animate="{ opacity: 1, y: 0, scale: 1 }"
+    :exit="{ opacity: 0, y: -6, scale: 0.98 }"
+    :transition="{ duration: 0.18 }"
   >
     <UIcon
       name="i-lucide-book-open"
@@ -82,20 +96,30 @@ function extractPreview(jsonContent: string): string {
     <p class="text-sm text-muted">
       Nenhuma entrada encontrada.
     </p>
-  </div>
+  </motion.div>
 
   <!-- Entry cards -->
   <div
     v-else
     class="space-y-3"
   >
-    <UCard
-      v-for="entry in entries"
-      :key="entry.id"
-      class="cursor-pointer transition-all hover:ring-1 hover:ring-primary"
-      @click="emit('select', entry.entryDate)"
-    >
-      <div class="space-y-2">
+    <AnimatePresence>
+      <motion.div
+        v-for="(entry, index) in entries"
+        :key="entry.id"
+        layout="position"
+        :initial="{ opacity: 0, y: 12, scale: 0.99 }"
+        :animate="{ opacity: 1, y: 0, scale: 1 }"
+        :exit="{ opacity: 0, y: -8, scale: 0.98 }"
+        :while-hover="{ y: -2 }"
+        :while-tap="{ scale: 0.99 }"
+        :transition="{ duration: 0.16, delay: Math.min(index * 0.025, 0.12) }"
+      >
+        <UCard
+          class="cursor-pointer transition-all hover:ring-1 hover:ring-primary"
+          @click="emit('select', entry.entryDate)"
+        >
+          <div class="space-y-2">
         <!-- Date + mood -->
         <div class="flex items-center justify-between gap-2">
           <p class="text-xs font-medium text-muted capitalize">
@@ -131,8 +155,10 @@ function extractPreview(jsonContent: string): string {
         >
           Sem conteúdo
         </p>
-      </div>
-    </UCard>
+          </div>
+        </UCard>
+      </motion.div>
+    </AnimatePresence>
 
     <!-- Pagination -->
     <div

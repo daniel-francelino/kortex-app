@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { AnimatePresence, motion } from 'motion-v'
 import { getMoodOption } from '~/types/journal'
 
 interface EntryDay {
@@ -120,7 +121,12 @@ onMounted(() => emitRange())
 <template>
   <div class="overflow-hidden rounded-xl border border-default">
     <!-- Navigation header -->
-    <div class="flex items-center justify-between border-b border-default bg-elevated/30 px-4 py-3">
+    <motion.div
+      class="flex items-center justify-between border-b border-default bg-elevated/30 px-4 py-3"
+      :initial="{ opacity: 0, y: -6 }"
+      :animate="{ opacity: 1, y: 0 }"
+      :transition="{ duration: 0.18 }"
+    >
       <div class="flex items-center gap-1">
         <UButton
           icon="i-lucide-chevron-left"
@@ -147,7 +153,7 @@ onMounted(() => emitRange())
         color="neutral"
         @click="goToToday"
       />
-    </div>
+    </motion.div>
 
     <!-- Day headers -->
     <div class="grid grid-cols-7 border-b border-default/50">
@@ -161,20 +167,43 @@ onMounted(() => emitRange())
     </div>
 
     <!-- Loading -->
-    <div v-if="props.loading" class="grid grid-cols-7">
-      <USkeleton
+    <motion.div
+      v-if="props.loading"
+      class="grid grid-cols-7"
+      :initial="{ opacity: 0 }"
+      :animate="{ opacity: 1 }"
+      :transition="{ duration: 0.16 }"
+    >
+      <motion.div
         v-for="i in 42"
         :key="i"
-        class="h-16 rounded-none"
-      />
-    </div>
+        :initial="{ opacity: 0 }"
+        :animate="{ opacity: 1 }"
+        :transition="{ duration: 0.12, delay: Math.min(i * 0.004, 0.12) }"
+      >
+        <USkeleton class="h-16 rounded-none" />
+      </motion.div>
+    </motion.div>
 
     <!-- Calendar grid -->
-    <div v-else class="grid grid-cols-7">
-      <button
+    <AnimatePresence v-else mode="wait">
+      <motion.div
+        :key="`${currentYear}-${currentMonth}`"
+        class="grid grid-cols-7"
+        :initial="{ opacity: 0 }"
+        :animate="{ opacity: 1 }"
+        :exit="{ opacity: 0 }"
+        :transition="{ duration: 0.14 }"
+      >
+      <motion.button
         v-for="(day, idx) in calendarDays"
         :key="idx"
         class="group relative flex flex-col items-center gap-1 border-b border-r border-default/30 py-2 transition-colors last:border-r-0"
+        :initial="{ opacity: 0, y: 8 }"
+        :animate="{ opacity: 1, y: 0 }"
+        :while-hover="{ y: -1 }"
+        :while-tap="{ scale: 0.98 }"
+        :transition="{ duration: 0.12, delay: Math.min(idx * 0.004, 0.12) }"
         :class="[
           (idx + 1) % 7 === 0 ? 'border-r-0' : '',
           idx >= 35 ? 'border-b-0' : '',
@@ -225,7 +254,8 @@ onMounted(() => emitRange())
 
         <!-- Spacer to keep height consistent -->
         <span v-else class="size-3" />
-      </button>
-    </div>
+      </motion.button>
+      </motion.div>
+    </AnimatePresence>
   </div>
 </template>
