@@ -208,10 +208,10 @@ watch(
       :resizable="!isMobile"
       class="kortex-app-sidebar bg-elevated/25"
       :ui="{
-        content: 'max-lg:h-dvh max-lg:max-h-dvh max-lg:overflow-hidden max-lg:bg-default',
-        header: 'max-lg:h-auto max-lg:min-h-[calc(var(--ui-header-height)+var(--safe-area-top))] max-lg:items-end max-lg:pt-[var(--safe-area-top)] max-lg:px-4',
+        content: 'kortex-mobile-sidebar-content max-lg:overflow-hidden max-lg:bg-default',
+        header: 'max-lg:h-auto max-lg:min-h-[calc(var(--ui-header-height)+var(--mobile-sidebar-safe-area-top))] max-lg:items-end max-lg:pt-[var(--mobile-sidebar-safe-area-top)] max-lg:px-4',
         body: 'max-lg:px-4 max-lg:pb-3',
-        footer: 'max-lg:border-t max-lg:border-default max-lg:px-4 max-lg:pt-3 max-lg:pb-[max(0.75rem,var(--safe-area-bottom))] lg:border-t lg:border-default'
+        footer: 'max-lg:border-t max-lg:border-default max-lg:px-4 max-lg:pt-3 max-lg:pb-[max(0.75rem,var(--mobile-sidebar-safe-area-bottom))] lg:border-t lg:border-default'
       }"
     >
       <template #header="{ collapsed }">
