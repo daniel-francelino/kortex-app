@@ -111,3 +111,4 @@ async function onConfirmPin(pin: string) {
       </div>
     </template>
   </UModal>
+</template>
