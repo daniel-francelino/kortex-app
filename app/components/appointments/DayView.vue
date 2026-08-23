@@ -62,7 +62,11 @@ const isToday = computed(() => formatDate(new Date()) === dayStr.value)
 
 const currentTimePx = ref(getCurrentTimePx())
 let timerId: ReturnType<typeof setInterval>
-onMounted(() => { timerId = setInterval(() => { currentTimePx.value = getCurrentTimePx() }, 60_000) })
+onMounted(() => {
+  timerId = setInterval(() => {
+    currentTimePx.value = getCurrentTimePx()
+  }, 60_000)
+})
 onUnmounted(() => clearInterval(timerId))
 
 // ─── Drag state ───────────────────────────────────────────────────────────
@@ -136,7 +140,9 @@ function onPointerUp(e: PointerEvent) {
   endDrag()
 }
 
-function onPointerCancel() { endDrag() }
+function onPointerCancel() {
+  endDrag()
+}
 
 function commitDrop() {
   if (!drag.event) return
@@ -229,8 +235,37 @@ defineExpose({ viewDate })
     @pointercancel="onPointerCancel"
   >
     <!-- Loading -->
-    <div v-if="loading" class="space-y-px p-1">
-      <USkeleton v-for="i in 12" :key="i" class="h-12 w-full rounded-none" />
+    <div
+      v-if="loading"
+      class="min-h-[calc(100vh-12rem)]"
+    >
+      <div class="flex items-start gap-3 border-b border-default/50 px-3 py-2">
+        <USkeleton class="h-3 w-10 shrink-0" />
+        <div class="flex flex-1 flex-wrap gap-1">
+          <USkeleton class="h-5 w-32 rounded" />
+          <USkeleton class="h-5 w-24 rounded" />
+        </div>
+      </div>
+
+      <div class="overflow-hidden">
+        <div class="relative min-h-[calc(100vh-15rem)]">
+          <div
+            v-for="hour in hours"
+            :key="hour"
+            class="flex border-b border-default/30"
+            :style="{ height: `${HOUR_HEIGHT}px` }"
+          >
+            <div class="w-12 shrink-0 pr-2 text-right">
+              <USkeleton class="ml-auto mt-0 h-2 w-7" />
+            </div>
+            <div class="flex-1 border-l border-default/20" />
+          </div>
+
+          <USkeleton class="absolute left-14 right-4 top-16 h-16 rounded" />
+          <USkeleton class="absolute left-14 right-10 top-44 h-24 rounded" />
+          <USkeleton class="absolute left-14 right-24 top-[22rem] h-12 rounded" />
+        </div>
+      </div>
     </div>
 
     <div v-else>

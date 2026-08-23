@@ -124,7 +124,10 @@ function onDrop(dateStr: string, e: DragEvent) {
   dragOver.value = ''
   if (!dragEvent.value) return
   const original = formatDate(new Date(dragEvent.value.startAt))
-  if (original === dateStr) { dragEvent.value = null; return }
+  if (original === dateStr) {
+    dragEvent.value = null
+    return
+  }
   emit('dropEvent', dragEvent.value.id, dateStr)
   dragEvent.value = null
 }
@@ -148,10 +151,43 @@ const MAX_VISIBLE = 3
 </script>
 
 <template>
-  <div class="overflow-hidden rounded-lg border border-default">
+  <div class="min-h-[calc(100vh-12rem)] overflow-hidden rounded-lg border border-default">
     <!-- Loading -->
-    <div v-if="loading" class="grid grid-cols-7">
-      <USkeleton v-for="i in 35" :key="i" class="h-28 rounded-none" />
+    <div v-if="loading" class="flex min-h-[calc(100vh-12rem)] flex-col">
+      <div class="grid grid-cols-7 border-b border-default bg-elevated/30">
+        <div
+          v-for="header in dayHeaders"
+          :key="header"
+          class="py-2.5 text-center text-[11px] font-semibold uppercase tracking-wide text-muted"
+        >
+          {{ header }}
+        </div>
+      </div>
+
+      <div class="grid flex-1 grid-cols-7 grid-rows-6">
+        <div
+          v-for="i in 42"
+          :key="i"
+          class="min-h-24 border-r border-b border-default/50 p-1.5 last:border-r-0"
+          :class="i > 35 ? 'border-b-0' : ''"
+        >
+          <USkeleton class="mb-3 size-6 rounded-full" />
+          <div class="space-y-1">
+            <USkeleton
+              v-if="i % 2 === 0"
+              class="h-4 w-11/12 rounded-sm"
+            />
+            <USkeleton
+              v-if="i % 3 === 0"
+              class="h-4 w-2/3 rounded-sm"
+            />
+            <USkeleton
+              v-if="i % 5 === 0"
+              class="h-4 w-4/5 rounded-sm"
+            />
+          </div>
+        </div>
+      </div>
     </div>
 
     <template v-else>

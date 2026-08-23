@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { z } from 'zod'
-import type { Calendar, CalendarEvent } from '~/types/appointments'
+import type { Calendar, CalendarEvent, EventParticipant } from '~/types/appointments'
+import { RsvpStatus } from '~/types/appointments'
 import { strToDateValue, dateValueToStr, strToTimeValue, timeValueToStr, type TimeValue } from '~/utils/calendarDate'
 
 const props = defineProps<{
@@ -16,13 +17,88 @@ const emit = defineEmits<{
   'archived': []
 }>()
 
-const { updateEvent, archiveEvent, cancelOccurrence, getRecurrenceLabel, recurrenceOptions, NONE_RECURRENCE_VALUE } = useAppointments()
+const {
+  updateEvent,
+  archiveEvent,
+  cancelOccurrence,
+  modifyOccurrence,
+  splitSeries,
+  fetchParticipants,
+  inviteParticipant,
+  removeParticipant,
+  respondRsvp,
+  getRecurrenceLabel,
+  recurrenceOptions,
+  NONE_RECURRENCE_VALUE
+} = useAppointments()
+const { user } = useAuth()
 const toast = useToast()
 
 const editing = ref(false)
 const saving = ref(false)
 const archiving = ref(false)
 const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone
+
+const isOwner = computed(() => Boolean(props.event) && props.event?.ownerUserId === user.value?.id)
+
+// ─── Occurrence edit scope ─────────────────────────────────────────────────
+const scopeModalOpen = ref(false)
+const pendingEditPayload = ref<{ title: string, description: string | null, location: string | null, startAt: string, endAt: string } | null>(null)
+
+// ─── Participants ───────────────────────────────────────────────────────────
+const participants = ref<EventParticipant[]>([])
+const participantsLoading = ref(false)
+const newParticipantEmail = ref('')
+const invitingParticipant = ref(false)
+const respondingRsvp = ref(false)
+
+const myParticipation = computed(() =>
+  participants.value.find(p => p.invitedUserId === user.value?.id) ?? null
+)
+
+const RSVP_META: Record<RsvpStatus, { label: string, color: 'neutral' | 'success' | 'error' | 'warning' }> = {
+  [RsvpStatus.Pending]: { label: 'Pendente', color: 'neutral' },
+  [RsvpStatus.Accepted]: { label: 'Confirmado', color: 'success' },
+  [RsvpStatus.Declined]: { label: 'Recusou', color: 'error' },
+  [RsvpStatus.Tentative]: { label: 'Talvez', color: 'warning' }
+}
+
+async function loadParticipants() {
+  if (!props.event) return
+  participantsLoading.value = true
+  participants.value = await fetchParticipants(props.event.id)
+  participantsLoading.value = false
+}
+
+async function onInviteParticipant() {
+  const email = newParticipantEmail.value.trim()
+  if (!email || !props.event) return
+  invitingParticipant.value = true
+  const created = await inviteParticipant(props.event.id, email)
+  invitingParticipant.value = false
+  if (created) {
+    participants.value = [...participants.value, created]
+    newParticipantEmail.value = ''
+  }
+}
+
+async function onRemoveParticipant(participant: EventParticipant) {
+  if (!props.event) return
+  const ok = await removeParticipant(props.event.id, participant.id)
+  if (ok) {
+    participants.value = participants.value.filter(p => p.id !== participant.id)
+  }
+}
+
+async function onRespondRsvp(status: RsvpStatus.Accepted | RsvpStatus.Declined | RsvpStatus.Tentative) {
+  if (!props.event || !myParticipation.value) return
+  respondingRsvp.value = true
+  const ok = await respondRsvp(props.event.id, myParticipation.value.id, status)
+  respondingRsvp.value = false
+  if (ok) {
+    myParticipation.value.rsvpStatus = status
+  }
+}
 
 const schema = z.object({
   calendarId: z.string().uuid('Selecione um calendário'),
@@ -88,6 +164,7 @@ const endTimeValue = computed({
 })
 
 watch(() => props.event, (event) => {
+  participants.value = []
   if (!event) return
   state.calendarId = event.calendarId
   state.title = event.title
@@ -100,6 +177,7 @@ watch(() => props.event, (event) => {
   state.allDay = event.allDay
   state.rrule = event.rrule ?? ''
   editing.value = false
+  void loadParticipants()
 }, { immediate: true })
 
 function toDateInput(dateStr: string): string {
@@ -124,6 +202,23 @@ async function saveEdit() {
     return
   }
 
+  const startAtIso = new Date(startAt).toISOString()
+  const endAtIso = new Date(endAt).toISOString()
+
+  // Editing a single occurrence of a recurring series — ask which scope
+  // applies before saving, instead of silently editing the whole series.
+  if (props.event.recurrenceId) {
+    pendingEditPayload.value = {
+      title: state.title,
+      description: state.description || null,
+      location: state.location || null,
+      startAt: startAtIso,
+      endAt: endAtIso
+    }
+    scopeModalOpen.value = true
+    return
+  }
+
   saving.value = true
   try {
     const success = await updateEvent(props.event.id, {
@@ -131,13 +226,52 @@ async function saveEdit() {
       title: state.title,
       description: state.description || null,
       location: state.location || null,
-      startAt: new Date(startAt).toISOString(),
-      endAt: new Date(endAt).toISOString(),
+      startAt: startAtIso,
+      endAt: endAtIso,
       eventTimezone: props.event.eventTimezone || timezone,
       allDay: state.allDay,
       rrule: state.rrule || null
     })
-    if (success) { editing.value = false; emit('updated') }
+    if (success) {
+      editing.value = false
+      emit('updated')
+    }
+  } finally {
+    saving.value = false
+  }
+}
+
+async function saveWithScope(scope: 'this' | 'this-and-following' | 'all') {
+  if (!props.event) return
+  const recurrenceId = props.event.recurrenceId
+  const pending = pendingEditPayload.value
+
+  if (!recurrenceId || !pending) return
+
+  saving.value = true
+  try {
+    let success = false
+
+    if (scope === 'this') {
+      success = await modifyOccurrence(props.event.id, { recurrenceId, ...pending })
+    } else if (scope === 'this-and-following') {
+      success = await splitSeries(props.event.id, { recurrenceId, ...pending })
+    } else {
+      success = await updateEvent(props.event.id, {
+        calendarId: state.calendarId,
+        eventTimezone: props.event.eventTimezone || timezone,
+        allDay: state.allDay,
+        rrule: state.rrule || null,
+        ...pending
+      })
+    }
+
+    if (success) {
+      editing.value = false
+      scopeModalOpen.value = false
+      pendingEditPayload.value = null
+      emit('updated')
+    }
   } finally {
     saving.value = false
   }
@@ -148,7 +282,10 @@ async function onArchive() {
   archiving.value = true
   try {
     const success = await archiveEvent(props.event.id)
-    if (success) { emit('update:open', false); emit('archived') }
+    if (success) {
+      emit('update:open', false)
+      emit('archived')
+    }
   } finally {
     archiving.value = false
   }
@@ -157,7 +294,10 @@ async function onArchive() {
 async function onCancelOccurrence(recurrenceId: string) {
   if (!props.event) return
   const success = await cancelOccurrence(props.event.id, { recurrenceId })
-  if (success) { emit('update:open', false); emit('updated') }
+  if (success) {
+    emit('update:open', false)
+    emit('updated')
+  }
 }
 
 function formatDate(dateStr: string, allDay: boolean): string {
@@ -208,7 +348,9 @@ function formatTimeRange(evt: CalendarEvent): string {
         class="flex flex-col items-center justify-center gap-3 py-16"
       >
         <UIcon name="i-lucide-calendar-x" class="size-10 text-dimmed" />
-        <p class="text-sm text-muted">Nenhum evento selecionado</p>
+        <p class="text-sm text-muted">
+          Nenhum evento selecionado
+        </p>
       </div>
 
       <!-- ── View mode ──────────────────────────────────────────── -->
@@ -266,7 +408,9 @@ function formatTimeRange(evt: CalendarEvent): string {
           <!-- Description -->
           <div v-if="event.description" class="flex items-start gap-3">
             <UIcon name="i-lucide-align-left" class="mt-0.5 size-4 shrink-0 text-muted" />
-            <p class="whitespace-pre-wrap text-muted">{{ event.description }}</p>
+            <p class="whitespace-pre-wrap text-muted">
+              {{ event.description }}
+            </p>
           </div>
 
           <!-- Reminders -->
@@ -284,8 +428,103 @@ function formatTimeRange(evt: CalendarEvent): string {
           </div>
         </div>
 
+        <!-- RSVP banner (invited, not the owner) -->
+        <div
+          v-if="!isOwner && myParticipation"
+          class="mt-4 rounded-lg border border-default bg-elevated/50 p-3"
+        >
+          <p class="mb-2 text-sm font-medium text-highlighted">
+            Você foi convidado para este evento
+          </p>
+          <div class="flex flex-wrap items-center gap-2">
+            <UButton
+              label="Aceitar"
+              icon="i-lucide-check"
+              size="xs"
+              :color="myParticipation.rsvpStatus === 'accepted' ? 'success' : 'neutral'"
+              :variant="myParticipation.rsvpStatus === 'accepted' ? 'solid' : 'outline'"
+              :loading="respondingRsvp"
+              @click="onRespondRsvp(RsvpStatus.Accepted)"
+            />
+            <UButton
+              label="Talvez"
+              icon="i-lucide-help-circle"
+              size="xs"
+              :color="myParticipation.rsvpStatus === 'tentative' ? 'warning' : 'neutral'"
+              :variant="myParticipation.rsvpStatus === 'tentative' ? 'solid' : 'outline'"
+              :loading="respondingRsvp"
+              @click="onRespondRsvp(RsvpStatus.Tentative)"
+            />
+            <UButton
+              label="Recusar"
+              icon="i-lucide-x"
+              size="xs"
+              :color="myParticipation.rsvpStatus === 'declined' ? 'error' : 'neutral'"
+              :variant="myParticipation.rsvpStatus === 'declined' ? 'solid' : 'outline'"
+              :loading="respondingRsvp"
+              @click="onRespondRsvp(RsvpStatus.Declined)"
+            />
+          </div>
+        </div>
+
+        <!-- Participants (owner manages, everyone can see) -->
+        <div v-if="isOwner || participants.length > 0" class="mt-4 space-y-2 border-t border-default pt-4">
+          <p class="text-xs font-medium uppercase tracking-wide text-muted">
+            Convidados
+          </p>
+
+          <div v-if="isOwner" class="flex items-center gap-2">
+            <UInput
+              v-model="newParticipantEmail"
+              type="email"
+              placeholder="email@exemplo.com"
+              size="sm"
+              class="flex-1"
+              @keydown.enter="onInviteParticipant"
+            />
+            <UButton
+              icon="i-lucide-plus"
+              size="sm"
+              color="primary"
+              variant="subtle"
+              :loading="invitingParticipant"
+              :disabled="!newParticipantEmail.trim()"
+              @click="onInviteParticipant"
+            />
+          </div>
+
+          <div v-if="participantsLoading" class="text-xs text-muted">
+            Carregando...
+          </div>
+          <ul v-else-if="participants.length > 0" class="space-y-1">
+            <li
+              v-for="participant in participants"
+              :key="participant.id"
+              class="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-elevated"
+            >
+              <UIcon name="i-lucide-user" class="size-3.5 shrink-0 text-dimmed" />
+              <span class="flex-1 truncate">{{ participant.invitedEmail }}</span>
+              <UBadge
+                :color="RSVP_META[participant.rsvpStatus].color"
+                variant="subtle"
+                size="sm"
+              >
+                {{ RSVP_META[participant.rsvpStatus].label }}
+              </UBadge>
+              <UButton
+                v-if="isOwner"
+                icon="i-lucide-x"
+                size="xs"
+                color="neutral"
+                variant="ghost"
+                @click="onRemoveParticipant(participant)"
+              />
+            </li>
+          </ul>
+        </div>
+
         <!-- Actions -->
-        <div class="mt-6 flex flex-wrap gap-2 border-t border-default pt-4">
+        <div v-if="isOwner" class="mt-6 flex flex-wrap gap-2 border-t border-default pt-4">
           <UButton
             label="Editar"
             icon="i-lucide-pencil"
@@ -349,10 +588,20 @@ function formatTimeRange(evt: CalendarEvent): string {
               </div>
               <div class="flex flex-wrap items-center gap-2">
                 <UInputDate v-model="startDateValue" size="sm" :leading-icon="null" />
-                <UInputTime v-if="!state.allDay" v-model="startTimeValue" granularity="minute" size="sm" />
+                <UInputTime
+                  v-if="!state.allDay"
+                  v-model="startTimeValue"
+                  granularity="minute"
+                  size="sm"
+                />
                 <span class="text-xs text-muted">até</span>
                 <UInputDate v-model="endDateValue" size="sm" :leading-icon="null" />
-                <UInputTime v-if="!state.allDay" v-model="endTimeValue" granularity="minute" size="sm" />
+                <UInputTime
+                  v-if="!state.allDay"
+                  v-model="endTimeValue"
+                  granularity="minute"
+                  size="sm"
+                />
               </div>
             </div>
           </div>
@@ -444,6 +693,35 @@ function formatTimeRange(evt: CalendarEvent): string {
           />
         </div>
       </UForm>
+
+      <!-- Occurrence edit scope confirmation -->
+      <UModal v-model:open="scopeModalOpen" title="Aplicar alteração a quais ocorrências?">
+        <template #body>
+          <div class="flex flex-col gap-2">
+            <UButton
+              label="Somente esta"
+              variant="outline"
+              block
+              :loading="saving"
+              @click="saveWithScope('this')"
+            />
+            <UButton
+              label="Esta e as seguintes"
+              variant="outline"
+              block
+              :loading="saving"
+              @click="saveWithScope('this-and-following')"
+            />
+            <UButton
+              label="Todas as ocorrências"
+              variant="outline"
+              block
+              :loading="saving"
+              @click="saveWithScope('all')"
+            />
+          </div>
+        </template>
+      </UModal>
     </template>
   </USlideover>
 </template>

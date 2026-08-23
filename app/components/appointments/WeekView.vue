@@ -86,7 +86,11 @@ const hours = Array.from({ length: 24 }, (_, i) => i)
 // ─── Current time indicator ───────────────────────────────────────────────
 const currentTimePx = ref(getCurrentTimePx())
 let timerId: ReturnType<typeof setInterval>
-onMounted(() => { timerId = setInterval(() => { currentTimePx.value = getCurrentTimePx() }, 60_000) })
+onMounted(() => {
+  timerId = setInterval(() => {
+    currentTimePx.value = getCurrentTimePx()
+  }, 60_000)
+})
 onUnmounted(() => clearInterval(timerId))
 
 // ─── Drag state ───────────────────────────────────────────────────────────
@@ -162,7 +166,9 @@ function onPointerUp(e: PointerEvent) {
   endDrag()
 }
 
-function onPointerCancel() { endDrag() }
+function onPointerCancel() {
+  endDrag()
+}
 
 function commitDrop() {
   if (!drag.event) return
@@ -260,8 +266,75 @@ function getEventStyle(evt: PositionedEvent, day: DayColumn) {
     @pointercancel="onPointerCancel"
   >
     <!-- Loading -->
-    <div v-if="loading" class="flex flex-1 gap-px p-2">
-      <USkeleton v-for="i in 7" :key="i" class="h-48 flex-1" />
+    <div
+      v-if="loading"
+      class="flex min-h-[calc(100vh-12rem)] flex-col"
+    >
+      <div class="flex shrink-0 border-b border-default bg-elevated/30">
+        <div class="w-14 shrink-0" />
+        <div
+          v-for="day in weekDays"
+          :key="day.dateStr"
+          class="flex flex-1 flex-col items-center border-l border-default/30 py-2"
+        >
+          <USkeleton class="h-3 w-8" />
+          <USkeleton class="mt-1 size-7 rounded-full" />
+        </div>
+      </div>
+
+      <div class="flex min-h-8 shrink-0 border-b border-default/30 bg-default">
+        <div class="w-14 shrink-0" />
+        <div
+          v-for="day in weekDays"
+          :key="`all-day-${day.dateStr}`"
+          class="flex-1 border-l border-default/20 p-1"
+        >
+          <USkeleton
+            v-if="day.dayNumber % 3 === 0"
+            class="h-4 w-10/12 rounded-sm"
+          />
+        </div>
+      </div>
+
+      <div class="flex flex-1 overflow-hidden">
+        <div class="w-14 shrink-0">
+          <div
+            v-for="hour in hours"
+            :key="hour"
+            class="relative flex justify-end pr-2"
+            :style="{ height: `${HOUR_HEIGHT}px` }"
+          >
+            <USkeleton class="absolute -top-1 h-2 w-7" />
+          </div>
+        </div>
+
+        <div class="grid flex-1 grid-cols-7">
+          <div
+            v-for="(day, dayIndex) in weekDays"
+            :key="`loading-${day.dateStr}`"
+            class="relative border-l border-default/20"
+          >
+            <div
+              v-for="hour in hours"
+              :key="hour"
+              class="border-b border-default/20"
+              :style="{ height: `${HOUR_HEIGHT}px` }"
+            />
+            <USkeleton
+              v-if="dayIndex % 2 === 0"
+              class="absolute left-1 right-1 top-20 h-16 rounded"
+            />
+            <USkeleton
+              v-if="dayIndex % 3 === 1"
+              class="absolute left-1 right-1 top-56 h-24 rounded"
+            />
+            <USkeleton
+              v-if="dayIndex % 4 === 2"
+              class="absolute left-1 right-1 top-96 h-12 rounded"
+            />
+          </div>
+        </div>
+      </div>
     </div>
 
     <template v-else>
