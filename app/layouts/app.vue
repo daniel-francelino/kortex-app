@@ -44,14 +44,14 @@ const links = [
         open.value = false
       }
     },
-    // {
-    //  label: 'Tarefas',
-    //  icon: 'i-lucide-check-square',
-    //  to: '/app/tasks',
-    //  onSelect: () => {
-    //    open.value = false
-    //  }
-    // },
+    {
+      label: 'Tarefas',
+      icon: 'i-lucide-check-square',
+      to: '/app/tasks',
+      onSelect: () => {
+        open.value = false
+      }
+    },
     {
       label: 'Diário de Bordo',
       icon: 'i-lucide-book-open',
