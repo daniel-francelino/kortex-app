@@ -182,7 +182,9 @@ async function onSubmit() {
       maxAdvanceDays: state.maxAdvanceDays,
       maxBookingsPerDay: state.maxBookingsPerDay ?? null,
       availabilityRules,
-      questions: questions.value.filter(q => q.label.trim()).map((q, i) => ({ ...q, sortOrder: i }))
+      questions: questions.value
+        .filter(q => q.label.trim())
+        .map((q, i) => ({ ...q, options: q.options ?? undefined, sortOrder: i }))
     }
 
     const result = props.page

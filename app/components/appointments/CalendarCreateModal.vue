@@ -344,7 +344,7 @@ watch(
                 value-key="value"
                 size="sm"
                 class="w-28"
-                @update:model-value="(value: 'view' | 'edit') => onChangeSharePermission(share, value)"
+                @update:model-value="(value: string) => onChangeSharePermission(share, value as 'view' | 'edit')"
               />
               <UButton
                 icon="i-lucide-x"
