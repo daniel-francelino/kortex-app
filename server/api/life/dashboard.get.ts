@@ -2,19 +2,11 @@ import { z } from 'zod'
 import { getSupabaseAdminClient } from '../../utils/supabase'
 import { requireAuthUser } from '../../utils/require-auth'
 import { resolveHabitsForDate } from '../../utils/habit-versions'
+import { isDueOnDay } from '../../utils/habits'
 
 const querySchema = z.object({
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data deve estar no formato YYYY-MM-DD').optional()
 })
-
-function isDueOnDay(frequency: unknown, customDays: unknown, dayOfWeek: number): boolean {
-  if (frequency === 'daily') return true
-  if (frequency === 'weekly') return dayOfWeek === 1
-  if (frequency === 'custom' && Array.isArray(customDays)) {
-    return (customDays as number[]).includes(dayOfWeek)
-  }
-  return false
-}
 
 export default eventHandler(async (event) => {
   const user = await requireAuthUser(event)

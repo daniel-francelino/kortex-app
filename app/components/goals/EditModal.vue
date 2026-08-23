@@ -2,7 +2,7 @@
 import * as z from 'zod'
 import type { FormSubmitEvent } from '@nuxt/ui'
 import type { Goal } from '~/types/goals'
-import { GoalTimeCategory, GoalLifeCategory } from '~/types/goals'
+import { GoalTimeCategory, GoalLifeCategory, GoalProgressType } from '~/types/goals'
 
 const props = defineProps<{
   open: boolean
@@ -20,7 +20,11 @@ const schema = z.object({
   title: z.string().min(1, 'Título é obrigatório').max(200),
   description: z.string().max(2000).optional(),
   timeCategory: z.nativeEnum(GoalTimeCategory),
-  lifeCategory: z.nativeEnum(GoalLifeCategory)
+  lifeCategory: z.nativeEnum(GoalLifeCategory),
+  progressType: z.nativeEnum(GoalProgressType).default(GoalProgressType.Tasks),
+  targetValue: z.number().min(0).optional(),
+  currentValue: z.number().min(0).default(0),
+  unit: z.string().max(30).optional()
 })
 
 type Schema = z.output<typeof schema>
@@ -29,8 +33,18 @@ const state = reactive<Partial<Schema>>({
   title: '',
   description: '',
   timeCategory: GoalTimeCategory.Monthly,
-  lifeCategory: GoalLifeCategory.Personal
+  lifeCategory: GoalLifeCategory.Personal,
+  progressType: GoalProgressType.Tasks,
+  targetValue: undefined,
+  currentValue: 0,
+  unit: ''
 })
+
+const progressTypeOptions = [
+  { label: 'Por tarefas', value: GoalProgressType.Tasks },
+  { label: 'Numérico', value: GoalProgressType.Numeric },
+  { label: 'Monetário', value: GoalProgressType.Monetary }
+]
 
 const selectedEmoji = ref<string | null>(null)
 
@@ -40,6 +54,10 @@ watch(() => props.goal, (goal) => {
     state.description = goal.description ?? ''
     state.timeCategory = goal.timeCategory as GoalTimeCategory
     state.lifeCategory = goal.lifeCategory as GoalLifeCategory
+    state.progressType = goal.progressType ?? GoalProgressType.Tasks
+    state.targetValue = goal.targetValue ?? undefined
+    state.currentValue = goal.currentValue ?? 0
+    state.unit = goal.unit ?? ''
     selectedEmoji.value = goal.emoji ?? null
   }
 }, { immediate: true })
@@ -51,7 +69,12 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
   if (!props.goal) return
   loading.value = true
   try {
-    const result = await updateGoal(props.goal.id, { ...event.data, emoji: selectedEmoji.value })
+    const result = await updateGoal(props.goal.id, {
+      ...event.data,
+      emoji: selectedEmoji.value,
+      targetValue: event.data.progressType === GoalProgressType.Tasks ? null : (event.data.targetValue ?? null),
+      unit: event.data.progressType === GoalProgressType.Tasks ? null : (event.data.unit || null)
+    })
     if (result) {
       emit('saved')
       emit('update:open', false)
@@ -120,6 +143,27 @@ function onClose() {
             class="w-full"
           />
         </UFormField>
+
+        <UFormField label="Tipo de progresso" name="progressType">
+          <USelect
+            v-model="state.progressType"
+            :items="progressTypeOptions"
+            value-key="value"
+            class="w-full"
+          />
+        </UFormField>
+
+        <div v-if="state.progressType !== GoalProgressType.Tasks" class="grid gap-4 sm:grid-cols-3">
+          <UFormField label="Valor atual" name="currentValue">
+            <UInputNumber v-model="state.currentValue" :min="0" class="w-full" />
+          </UFormField>
+          <UFormField label="Meta" name="targetValue">
+            <UInputNumber v-model="state.targetValue" :min="0" class="w-full" />
+          </UFormField>
+          <UFormField label="Unidade" name="unit">
+            <UInput v-model="state.unit" placeholder="Ex: livros, R$, km" class="w-full" />
+          </UFormField>
+        </div>
 
         <div class="flex justify-end gap-2 pt-2">
           <UButton

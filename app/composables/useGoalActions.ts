@@ -1,12 +1,17 @@
 import type {
+  CreateGoalMilestonePayload,
   CreateGoalPayload,
   CreateGoalTaskPayload,
   Goal,
   GoalHabitLink,
+  GoalMilestone,
+  GoalReflection,
   GoalTask,
   LinkHabitPayload,
+  UpdateGoalMilestonePayload,
   UpdateGoalPayload,
-  UpdateGoalTaskPayload
+  UpdateGoalTaskPayload,
+  UpsertGoalReflectionPayload
 } from '~/types/goals'
 import { GoalLifeCategory, GoalStatus, GoalTimeCategory } from '~/types/goals'
 
@@ -151,6 +156,43 @@ export function useGoalActions() {
     }
   }
 
+  async function createMilestone(goalId: string, payload: CreateGoalMilestonePayload): Promise<GoalMilestone | null> {
+    try {
+      const milestone = await $fetch<GoalMilestone>(`/api/goals/${goalId}/milestones`, {
+        method: 'POST',
+        body: payload
+      })
+      toast.add({ title: 'Marco criado', description: `"${milestone.title}" adicionado.`, color: 'success' })
+      return milestone
+    } catch {
+      toast.add({ title: 'Erro', description: 'Não foi possível criar o marco.', color: 'error' })
+      return null
+    }
+  }
+
+  async function updateMilestone(milestoneId: string, payload: UpdateGoalMilestonePayload): Promise<GoalMilestone | null> {
+    try {
+      return await $fetch<GoalMilestone>(`/api/goals/milestones/${milestoneId}`, {
+        method: 'PUT',
+        body: payload
+      })
+    } catch {
+      toast.add({ title: 'Erro', description: 'Não foi possível atualizar o marco.', color: 'error' })
+      return null
+    }
+  }
+
+  async function deleteMilestone(milestoneId: string): Promise<boolean> {
+    try {
+      await $fetch(`/api/goals/milestones/${milestoneId}`, { method: 'DELETE' })
+      toast.add({ title: 'Marco removido', description: 'O marco foi excluído.', color: 'success' })
+      return true
+    } catch {
+      toast.add({ title: 'Erro', description: 'Não foi possível excluir o marco.', color: 'error' })
+      return false
+    }
+  }
+
   async function linkHabit(goalId: string, payload: LinkHabitPayload): Promise<GoalHabitLink | null> {
     try {
       const link = await $fetch<GoalHabitLink>(`/api/goals/${goalId}/habits`, {
@@ -173,6 +215,30 @@ export function useGoalActions() {
     } catch {
       toast.add({ title: 'Erro', description: 'Não foi possível remover o vínculo.', color: 'error' })
       return false
+    }
+  }
+
+  async function fetchReflection(goalId: string, weekKey: string): Promise<GoalReflection | null> {
+    try {
+      return await $fetch<GoalReflection | null>(`/api/goals/${goalId}/reflections`, {
+        query: { weekKey }
+      })
+    } catch {
+      return null
+    }
+  }
+
+  async function saveReflection(goalId: string, payload: UpsertGoalReflectionPayload): Promise<GoalReflection | null> {
+    try {
+      const reflection = await $fetch<GoalReflection>(`/api/goals/${goalId}/reflections`, {
+        method: 'POST',
+        body: payload
+      })
+      toast.add({ title: 'Revisão salva', description: 'Sua reflexão semanal foi registrada.', color: 'success' })
+      return reflection
+    } catch {
+      toast.add({ title: 'Erro', description: 'Não foi possível salvar a revisão.', color: 'error' })
+      return null
     }
   }
 
@@ -207,8 +273,13 @@ export function useGoalActions() {
     createTask,
     updateTask,
     deleteTask,
+    createMilestone,
+    updateMilestone,
+    deleteMilestone,
     linkHabit,
     unlinkHabit,
+    fetchReflection,
+    saveReflection,
     timeCategoryOptions,
     lifeCategoryOptions,
     statusOptions,

@@ -91,14 +91,24 @@ function fmt(year: number, month: number, day: number): string {
 }
 
 function prevMonth() {
-  if (currentMonth.value === 0) { currentMonth.value = 11; currentYear.value-- }
-  else currentMonth.value--
+  if (currentMonth.value === 0) {
+    currentMonth.value = 11
+    currentYear.value--
+  } else {
+    currentMonth.value--
+  }
+
   emitRange()
 }
 
 function nextMonth() {
-  if (currentMonth.value === 11) { currentMonth.value = 0; currentYear.value++ }
-  else currentMonth.value++
+  if (currentMonth.value === 11) {
+    currentMonth.value = 0
+    currentYear.value++
+  } else {
+    currentMonth.value++
+  }
+
   emitRange()
 }
 
@@ -119,7 +129,7 @@ onMounted(() => emitRange())
 </script>
 
 <template>
-  <div class="overflow-hidden rounded-xl border border-default">
+  <div class="journal-calendar-shell flex flex-col overflow-hidden rounded-xl border border-default">
     <!-- Navigation header -->
     <motion.div
       class="flex items-center justify-between border-b border-default bg-elevated/30 px-4 py-3"
@@ -169,7 +179,7 @@ onMounted(() => emitRange())
     <!-- Loading -->
     <motion.div
       v-if="props.loading"
-      class="grid grid-cols-7"
+      class="grid flex-1 grid-cols-7 grid-rows-6"
       :initial="{ opacity: 0 }"
       :animate="{ opacity: 1 }"
       :transition="{ duration: 0.16 }"
@@ -181,81 +191,95 @@ onMounted(() => emitRange())
         :animate="{ opacity: 1 }"
         :transition="{ duration: 0.12, delay: Math.min(i * 0.004, 0.12) }"
       >
-        <USkeleton class="h-16 rounded-none" />
+        <USkeleton class="size-full rounded-none" />
       </motion.div>
     </motion.div>
 
     <!-- Calendar grid -->
-    <AnimatePresence v-else mode="wait">
-      <motion.div
-        :key="`${currentYear}-${currentMonth}`"
-        class="grid grid-cols-7"
-        :initial="{ opacity: 0 }"
-        :animate="{ opacity: 1 }"
-        :exit="{ opacity: 0 }"
-        :transition="{ duration: 0.14 }"
-      >
-      <motion.button
-        v-for="(day, idx) in calendarDays"
-        :key="idx"
-        class="group relative flex flex-col items-center gap-1 border-b border-r border-default/30 py-2 transition-colors last:border-r-0"
-        :initial="{ opacity: 0, y: 8 }"
-        :animate="{ opacity: 1, y: 0 }"
-        :while-hover="{ y: -1 }"
-        :while-tap="{ scale: 0.98 }"
-        :transition="{ duration: 0.12, delay: Math.min(idx * 0.004, 0.12) }"
-        :class="[
-          (idx + 1) % 7 === 0 ? 'border-r-0' : '',
-          idx >= 35 ? 'border-b-0' : '',
-          day.hasEntry && day.isCurrentMonth
-            ? 'bg-primary/8 hover:bg-primary/[0.14]'
-            : day.isCurrentMonth
-              ? 'hover:bg-elevated/60'
-              : 'hover:bg-elevated/30',
-        ]"
-        @click="emit('selectDate', day.date)"
-      >
-        <!-- Day number -->
-        <span
-          class="flex size-7 items-center justify-center rounded-full text-sm font-medium transition-colors"
-          :class="[
-            day.isToday
-              ? 'bg-primary font-bold text-white'
-              : day.isCurrentMonth
-                ? 'text-highlighted group-hover:bg-elevated'
-                : 'text-muted/40',
-          ]"
+    <div v-else class="flex flex-1 flex-col">
+      <AnimatePresence mode="wait">
+        <motion.div
+          :key="`${currentYear}-${currentMonth}`"
+          class="grid flex-1 grid-cols-7 grid-rows-6"
+          :initial="{ opacity: 0 }"
+          :animate="{ opacity: 1 }"
+          :exit="{ opacity: 0 }"
+          :transition="{ duration: 0.14 }"
         >
-          {{ day.day }}
-        </span>
+          <motion.button
+            v-for="(day, idx) in calendarDays"
+            :key="idx"
+            class="group relative flex min-h-16 flex-col items-center justify-center gap-1 border-b border-r border-default/30 py-2 transition-colors last:border-r-0 sm:min-h-20"
+            :initial="{ opacity: 0, y: 8 }"
+            :animate="{ opacity: 1, y: 0 }"
+            :while-hover="{ y: -1 }"
+            :while-tap="{ scale: 0.98 }"
+            :transition="{ duration: 0.12, delay: Math.min(idx * 0.004, 0.12) }"
+            :class="[
+              (idx + 1) % 7 === 0 ? 'border-r-0' : '',
+              idx >= 35 ? 'border-b-0' : '',
+              day.hasEntry && day.isCurrentMonth
+                ? 'bg-primary/8 hover:bg-primary/[0.14]'
+                : day.isCurrentMonth
+                  ? 'hover:bg-elevated/60'
+                  : 'hover:bg-elevated/30'
+            ]"
+            @click="emit('selectDate', day.date)"
+          >
+            <!-- Day number -->
+            <span
+              class="flex size-7 items-center justify-center rounded-full text-sm font-medium transition-colors"
+              :class="[
+                day.isToday
+                  ? 'bg-primary font-bold text-white'
+                  : day.isCurrentMonth
+                    ? 'text-highlighted group-hover:bg-elevated'
+                    : 'text-muted/40'
+              ]"
+            >
+              {{ day.day }}
+            </span>
 
-        <!-- Lock icon (protected entry) -->
-        <UIcon
-          v-if="day.hasEntry && isEntryLocked({ entryDate: day.date, locked: day.locked })"
-          name="i-lucide-lock"
-          class="size-3 text-warning"
-        />
+            <!-- Lock icon (protected entry) -->
+            <UIcon
+              v-if="day.hasEntry && isEntryLocked({ entryDate: day.date, locked: day.locked })"
+              name="i-lucide-lock"
+              class="size-3 text-warning"
+            />
 
-        <!-- Mood emoji (entry with mood) -->
-        <span
-          v-else-if="day.hasEntry && day.mood"
-          class="text-base leading-none"
-          :title="getMoodOption(day.mood)?.label"
-        >
-          {{ getMoodOption(day.mood)?.emoji }}
-        </span>
+            <!-- Mood emoji (entry with mood) -->
+            <span
+              v-else-if="day.hasEntry && day.mood"
+              class="text-base leading-none"
+              :title="getMoodOption(day.mood)?.label"
+            >
+              {{ getMoodOption(day.mood)?.emoji }}
+            </span>
 
-        <!-- Pencil icon (entry without mood) -->
-        <UIcon
-          v-else-if="day.hasEntry"
-          name="i-lucide-pencil-line"
-          class="size-3 text-primary/60"
-        />
+            <!-- Pencil icon (entry without mood) -->
+            <UIcon
+              v-else-if="day.hasEntry"
+              name="i-lucide-pencil-line"
+              class="size-3 text-primary/60"
+            />
 
-        <!-- Spacer to keep height consistent -->
-        <span v-else class="size-3" />
-      </motion.button>
-      </motion.div>
-    </AnimatePresence>
+            <!-- Spacer to keep height consistent -->
+            <span v-else class="size-3" />
+          </motion.button>
+        </motion.div>
+      </AnimatePresence>
+    </div>
   </div>
 </template>
+
+<style scoped>
+.journal-calendar-shell {
+  min-height: calc(100dvh - 11rem);
+}
+
+@media (min-width: 1024px) {
+  .journal-calendar-shell {
+    min-height: max(28rem, calc(100dvh - 10rem));
+  }
+}
+</style>

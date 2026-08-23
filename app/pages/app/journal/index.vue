@@ -268,14 +268,14 @@ function onInsightsRangeChange(range: "7d" | "30d" | "90d") {
 <template>
   <UDashboardPanel id="journal">
     <template #header>
-      <UDashboardNavbar title="Diário de Bordo">
+      <UDashboardNavbar :title="isMobile ? 'Diário' : 'Diário de Bordo'">
         <template #leading>
           <AppSidebarCollapse />
         </template>
 
         <template #right>
           <div
-            class="flex items-center gap-0.5 rounded-lg border border-default p-0.5"
+            class="journal-view-switcher flex max-w-[52vw] items-center gap-0.5 overflow-x-auto rounded-lg border border-default p-0.5 sm:max-w-none"
           >
             <UTooltip
               v-for="opt in viewOptions"
@@ -284,8 +284,10 @@ function onInsightsRangeChange(range: "7d" | "30d" | "90d") {
             >
               <UButton
                 square
+                :size="isMobile ? 'sm' : 'md'"
                 :color="activeView === opt.value ? 'primary' : 'neutral'"
                 :variant="activeView === opt.value ? 'soft' : 'ghost'"
+                :aria-label="opt.tooltip"
                 @click="activeView = opt.value"
               >
                 <UIcon :name="opt.icon" class="size-5 shrink-0" />
@@ -310,7 +312,7 @@ function onInsightsRangeChange(range: "7d" | "30d" | "90d") {
            unlocked-state ref, which LockScreen updates on a valid PIN — no
            local handler needed, it recomputes to false on its own. -->
       <JournalLockScreen v-else-if="isModuleLocked" />
-      <div v-else class="space-y-4">
+      <div v-else class="journal-mobile-surface space-y-4">
         <!-- Offline / pending sync indicator -->
         <div
           v-if="!isOnline || pendingSyncCount > 0"
@@ -388,7 +390,7 @@ function onInsightsRangeChange(range: "7d" | "30d" | "90d") {
             :exit="{ opacity: 0, y: -8, filter: 'blur(2px)' }"
             :transition="{ duration: 0.18, ease: 'easeOut' }"
           >
-            <div class="flex items-center gap-2">
+            <div class="flex flex-col gap-2 sm:flex-row sm:items-center">
               <UInput
                 v-model="listSearch"
                 icon="i-lucide-search"
@@ -401,10 +403,11 @@ function onInsightsRangeChange(range: "7d" | "30d" | "90d") {
               >
                 <UButton
                   icon="i-lucide-download"
-                  label="Exportar tudo"
+                  :label="isMobile ? 'Exportar' : 'Exportar tudo'"
                   color="neutral"
                   variant="outline"
                   :loading="exportingAll"
+                  class="w-full justify-center sm:w-auto"
                 />
               </UDropdownMenu>
             </div>
@@ -525,3 +528,19 @@ function onInsightsRangeChange(range: "7d" | "30d" | "90d") {
     "
   />
 </template>
+
+<style scoped>
+.journal-view-switcher {
+  scrollbar-width: none;
+}
+
+.journal-view-switcher::-webkit-scrollbar {
+  display: none;
+}
+
+@media (max-width: 1023px) {
+  .journal-mobile-surface {
+    padding-bottom: 0.5rem;
+  }
+}
+</style>

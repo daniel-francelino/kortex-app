@@ -51,6 +51,9 @@ const editModalOpen = ref(false)
 const archiveModalOpen = ref(false)
 const detailSlideoverOpen = ref(false)
 const selectedGoal = ref<Goal | null>(null)
+const createHabitModalOpen = ref(false)
+const createHabitGoalId = ref<string | undefined>(undefined)
+const detailSlideoverRef = ref<{ reload: () => Promise<void> } | null>(null)
 
 const ALL_FILTER_VALUE = '__all__'
 
@@ -117,6 +120,18 @@ function onGoalArchived() {
 
 function onGoalUpdated() {
   refreshList()
+}
+
+function onCreateHabitForGoal(goalId: string) {
+  createHabitGoalId.value = goalId
+  createHabitModalOpen.value = true
+}
+
+function onHabitCreated() {
+  refreshList()
+  if (detailSlideoverOpen.value && selectedGoal.value && createHabitGoalId.value === selectedGoal.value.id) {
+    detailSlideoverRef.value?.reload()
+  }
 }
 
 // ─── Filter options ───────────────────────────────────────────────────────────
@@ -247,11 +262,20 @@ const statusFilterOptions = computed(() => [
 
   <GoalsDetailSlideover
     v-if="selectedGoal"
+    ref="detailSlideoverRef"
     :open="detailSlideoverOpen"
     :goal="selectedGoal"
     @update:open="detailSlideoverOpen = $event"
     @edit="editModalOpen = true"
     @archive="archiveModalOpen = true"
     @updated="onGoalUpdated"
+    @create-habit="onCreateHabitForGoal"
+  />
+
+  <HabitsCreateModal
+    :open="createHabitModalOpen"
+    :initial-goal-id="createHabitGoalId"
+    @update:open="createHabitModalOpen = $event"
+    @created="onHabitCreated"
   />
 </template>

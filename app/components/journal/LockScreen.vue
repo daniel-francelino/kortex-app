@@ -135,9 +135,6 @@ async function onSubmit(pin: string) {
             :description="errorMessage"
             :ui="{ description: 'text-xs' }"
           />
-          <p v-else class="text-xs text-dimmed">
-            O acesso será solicitado novamente após recarregar a página.
-          </p>
         </div>
       </div>
     </UCard>

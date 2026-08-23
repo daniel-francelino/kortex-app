@@ -457,14 +457,14 @@ defineExpose({ isUnsaved: () => hasChanges.value, doSave })
            to almost nothing side-by-side on a phone, wrapping the date
            across 2-3 lines), side-by-side from lg up. -->
       <motion.div
-        class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between lg:gap-4"
+        class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between"
         :initial="{ opacity: 0, y: 8 }"
         :animate="{ opacity: 1, y: 0 }"
         :transition="{ duration: 0.18 }"
       >
         <div class="min-w-0">
-          <div class="flex items-center gap-2">
-            <h3 class="text-lg font-semibold text-highlighted">
+          <div class="flex flex-wrap items-center gap-2">
+            <h3 class="text-base font-semibold leading-snug text-highlighted sm:text-lg">
               {{ formatToday() }}
             </h3>
             <UBadge
@@ -472,12 +472,12 @@ defineExpose({ isUnsaved: () => hasChanges.value, doSave })
               color="warning"
               variant="subtle"
               size="sm"
-              class="gap-1"
+              class="shrink-0 gap-1"
             >
               🔥 {{ streak }} {{ streak === 1 ? 'dia' : 'dias' }}
             </UBadge>
           </div>
-          <div class="flex items-center gap-2 mt-0.5">
+          <div class="mt-1 flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-2">
             <p class="text-sm text-muted">
               Seu diário de bordo de hoje.
             </p>
@@ -508,7 +508,7 @@ defineExpose({ isUnsaved: () => hasChanges.value, doSave })
           </div>
         </div>
 
-        <div class="flex shrink-0 items-center gap-2">
+        <div class="flex shrink-0 flex-wrap items-center gap-2 max-lg:w-full max-lg:justify-between">
           <!-- Clima/geotag — capturado sozinho ao abrir a página (item 17).
                Sem badge nenhum se a pessoa negar a permissão ou o clima não
                estiver disponível — falha em silêncio de propósito, sem

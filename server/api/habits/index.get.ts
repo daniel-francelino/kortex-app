@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { getSupabaseAdminClient } from '../../utils/supabase'
 import { requireAuthUser } from '../../utils/require-auth'
-import { mapHabitList, fetchHabitTagMap } from '../../utils/habits'
+import { mapHabitList, fetchHabitTagMap, fetchHabitGoalMap } from '../../utils/habits'
 
 const querySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
@@ -81,9 +81,12 @@ export default eventHandler(async (event) => {
   }
 
   const habitIds = (data ?? []).map((h: Record<string, unknown>) => String(h.id))
-  const tagMap = await fetchHabitTagMap(supabase, habitIds)
+  const [tagMap, goalMap] = await Promise.all([
+    fetchHabitTagMap(supabase, habitIds),
+    fetchHabitGoalMap(supabase, habitIds)
+  ])
 
-  const habits = mapHabitList((data ?? []) as Record<string, unknown>[], tagMap)
+  const habits = mapHabitList((data ?? []) as Record<string, unknown>[], tagMap, goalMap)
   const visibleHabitIds = new Set(habits.map(habit => String(habit.id)))
   const habitsById = new Map(habits.map(habit => [String(habit.id), habit] as const))
   const childrenByParent = new Map<string, string[]>()

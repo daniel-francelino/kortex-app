@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { getSupabaseAdminClient } from '../../../utils/supabase'
 import { requireAuthUser } from '../../../utils/require-auth'
-import { mapGoalTask } from '../../../utils/goals'
+import { mapGoalMilestone } from '../../../utils/goals'
 
 const paramsSchema = z.object({
   id: z.string().uuid()
@@ -9,8 +9,7 @@ const paramsSchema = z.object({
 
 const bodySchema = z.object({
   title: z.string().min(1, 'Título é obrigatório').max(200),
-  description: z.string().max(1000).optional(),
-  milestoneId: z.string().uuid().nullable().optional()
+  description: z.string().max(1000).optional()
 })
 
 export default eventHandler(async (event) => {
@@ -33,22 +32,9 @@ export default eventHandler(async (event) => {
     throw createError({ statusCode: 404, statusMessage: 'Meta não encontrada' })
   }
 
-  if (parsed.milestoneId) {
-    const { data: milestone } = await supabase
-      .from('goal_milestones')
-      .select('id')
-      .eq('id', parsed.milestoneId)
-      .eq('goal_id', goalId)
-      .maybeSingle()
-
-    if (!milestone) {
-      throw createError({ statusCode: 404, statusMessage: 'Marco não encontrado' })
-    }
-  }
-
   // Get max sort_order for this goal
   const { data: existing } = await supabase
-    .from('goal_tasks')
+    .from('goal_milestones')
     .select('sort_order')
     .eq('goal_id', goalId)
     .order('sort_order', { ascending: false })
@@ -59,20 +45,19 @@ export default eventHandler(async (event) => {
     : 0
 
   const { data, error } = await supabase
-    .from('goal_tasks')
+    .from('goal_milestones')
     .insert({
       goal_id: goalId,
       title: parsed.title,
       description: parsed.description ?? null,
-      sort_order: nextOrder,
-      milestone_id: parsed.milestoneId ?? null
+      sort_order: nextOrder
     })
     .select('*')
     .single()
 
   if (error) {
-    throw createError({ statusCode: 500, statusMessage: 'Falha ao criar tarefa', data: error.message })
+    throw createError({ statusCode: 500, statusMessage: 'Falha ao criar marco', data: error.message })
   }
 
-  return mapGoalTask(data as Record<string, unknown>)
+  return mapGoalMilestone(data as Record<string, unknown>)
 })

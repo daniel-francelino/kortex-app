@@ -6,8 +6,9 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
-  link: [habitId: string]
-  cancel: []
+  'link': [habitId: string]
+  'cancel': []
+  'create-habit': []
 }>()
 
 const search = ref('')
@@ -27,8 +28,16 @@ onMounted(async () => {
   }
 })
 
+const linkableHabits = computed(() =>
+  habits.value.filter(h => !props.existingHabitIds.includes(h.id) && !h.goalId)
+)
+
+const hiddenByOtherGoalCount = computed(() =>
+  habits.value.filter(h => !props.existingHabitIds.includes(h.id) && h.goalId).length
+)
+
 const availableHabits = computed(() => {
-  let filtered = habits.value.filter(h => !props.existingHabitIds.includes(h.id))
+  let filtered = linkableHabits.value
   if (search.value) {
     const q = search.value.toLowerCase()
     filtered = filtered.filter(h => h.name.toLowerCase().includes(q))
@@ -67,7 +76,19 @@ const availableHabits = computed(() => {
       Nenhum hábito disponível
     </p>
 
-    <div class="flex justify-end pt-1">
+    <p v-if="hiddenByOtherGoalCount > 0" class="text-xs text-muted px-1">
+      {{ hiddenByOtherGoalCount }} hábito(s) já vinculado(s) a outras metas não aparecem aqui.
+    </p>
+
+    <div class="flex items-center justify-between gap-2 pt-1">
+      <UButton
+        label="Criar novo hábito para esta meta"
+        icon="i-lucide-plus"
+        size="xs"
+        color="primary"
+        variant="subtle"
+        @click="emit('create-habit')"
+      />
       <UButton
         label="Fechar"
         size="xs"

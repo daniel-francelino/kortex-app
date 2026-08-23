@@ -39,7 +39,7 @@ function formatEntryDate(dateStr: string): string {
 <template>
   <div class="space-y-4">
     <!-- Type toggle + navigator -->
-    <div class="flex flex-wrap items-center justify-between gap-2">
+    <div class="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:gap-2">
       <div class="flex items-center gap-0.5 rounded-lg border border-default p-0.5">
         <UButton
           label="Semana"
@@ -57,7 +57,7 @@ function formatEntryDate(dateStr: string): string {
         />
       </div>
 
-      <div class="flex items-center gap-1">
+      <div class="flex w-full items-center justify-between gap-1 sm:w-auto sm:justify-start">
         <UButton
           icon="i-lucide-chevron-left"
           color="neutral"
@@ -65,7 +65,7 @@ function formatEntryDate(dateStr: string): string {
           size="sm"
           @click="shift(-1)"
         />
-        <span class="min-w-40 text-center text-sm font-medium capitalize text-highlighted">
+        <span class="min-w-0 flex-1 text-center text-sm font-medium capitalize text-highlighted sm:min-w-40 sm:flex-none">
           {{ formatPeriodLabel(periodType, periodKey) }}
         </span>
         <UButton
@@ -80,7 +80,7 @@ function formatEntryDate(dateStr: string): string {
           size="xs"
           variant="outline"
           color="neutral"
-          class="ml-1"
+          class="ml-1 shrink-0"
           @click="goToToday"
         />
       </div>
@@ -112,7 +112,7 @@ function formatEntryDate(dateStr: string): string {
             :key="`${periodType}-${periodKey}`"
             v-model="content"
             placeholder="Reflita sobre este período... o que funcionou, o que quer mudar?"
-            min-height="10rem"
+            :min-height="isMobile ? '12rem' : '10rem'"
           />
           <template #fallback>
             <USkeleton class="h-40 w-full rounded-lg" />

@@ -3,6 +3,7 @@ import * as z from 'zod'
 import type { FormSubmitEvent } from '@nuxt/ui'
 import type { Calendar } from '~/types/appointments'
 import type { Habit } from '~/types/habits'
+import type { Goal } from '~/types/goals'
 import { HabitFrequency, HabitDifficulty, HabitType } from '~/types/habits'
 
 const RICH_TEXT_MAX_LENGTH = 10000
@@ -42,6 +43,25 @@ const {
   calendarsStatus,
   refreshCalendars
 } = useAppointments()
+const { linkHabit, unlinkHabit } = useGoalActions()
+
+const goals = ref<Goal[]>([])
+const goalsLoading = ref(false)
+const selectedGoalId = ref<string | undefined>(undefined)
+
+async function loadGoals() {
+  goalsLoading.value = true
+  try {
+    const response = await $fetch<{ data: Goal[] }>('/api/goals', {
+      query: { pageSize: 100, status: 'active' }
+    })
+    goals.value = response.data ?? []
+  } catch {
+    goals.value = []
+  } finally {
+    goalsLoading.value = false
+  }
+}
 
 const schema = z
   .object({
@@ -104,6 +124,7 @@ watch(
       state.scheduledTime = habit.scheduledTime ?? undefined
       state.scheduledEndTime = habit.scheduledEndTime ?? undefined
       selectedTagIds.value = (habit.tags ?? []).map(t => t.id)
+      selectedGoalId.value = habit.goalId ?? undefined
     }
   },
   { immediate: true }
@@ -124,6 +145,8 @@ watch(
       if (calendarsStatus.value === 'idle') {
         void refreshCalendars()
       }
+
+      void loadGoals()
     }
 
     if (!open) activeFormTab.value = undefined
@@ -131,7 +154,20 @@ watch(
 )
 
 const NONE_IDENTITY_VALUE = '__none__'
+const NONE_GOAL_VALUE = '__none__'
 const AUTO_CALENDAR_VALUE = '__auto__'
+
+const goalIdModel = computed<string>({
+  get: () => selectedGoalId.value || NONE_GOAL_VALUE,
+  set: (value) => {
+    selectedGoalId.value = value === NONE_GOAL_VALUE ? undefined : value
+  }
+})
+
+const goalItems = computed(() => [
+  { label: 'Nenhuma', value: NONE_GOAL_VALUE },
+  ...goals.value.map(g => ({ label: g.title, value: g.id }))
+])
 
 const identityIdModel = computed<string | undefined>({
   get: () => state.identityId,
@@ -186,6 +222,15 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
       tagIds: selectedTagIds.value
     })
     if (result) {
+      const previousGoalId = props.habit.goalId ?? undefined
+      if (selectedGoalId.value !== previousGoalId) {
+        if (props.habit.goalLinkId) {
+          await unlinkHabit(props.habit.goalLinkId)
+        }
+        if (selectedGoalId.value) {
+          await linkHabit(selectedGoalId.value, { habitId: props.habit.id })
+        }
+      }
       emit('updated')
       emit('update:open', false)
     }
@@ -502,6 +547,17 @@ function getHabitTypeIcon(habitType: HabitType) {
                   :items="identityItems"
                   value-key="value"
                   placeholder="Quem você quer se tornar?"
+                  class="w-full"
+                />
+              </UFormField>
+
+              <UFormField label="Meta vinculada" name="goalId" description="Este hábito sustenta alguma meta?">
+                <USelect
+                  v-model="goalIdModel"
+                  :items="goalItems"
+                  :loading="goalsLoading"
+                  value-key="value"
+                  placeholder="Nenhuma"
                   class="w-full"
                 />
               </UFormField>

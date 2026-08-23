@@ -1,6 +1,7 @@
 import { getSupabaseAdminClient } from '../../utils/supabase'
 import { resolveHabitVersionIdForDate } from '../../utils/habit-versions'
 import { requireCronSecret } from '../../utils/require-cron-secret'
+import { isDueOnDay } from '../../utils/habits'
 
 /**
  * Marks all habits that were not logged for a given date as "skipped".
@@ -36,16 +37,9 @@ export default eventHandler(async (event) => {
   const targetDayOfWeek = new Date(`${targetDate}T12:00:00`).getDay()
 
   // 2. Filter habits that should have been done on the target date
-  const applicableHabits = habits.filter((habit: Record<string, unknown>) => {
-    const frequency = habit.frequency as string
-    if (frequency === 'daily') return true
-    if (frequency === 'weekly') return true
-    if (frequency === 'custom') {
-      const customDays = habit.custom_days as number[] | null
-      return customDays?.includes(targetDayOfWeek) ?? false
-    }
-    return false
-  })
+  const applicableHabits = habits.filter((habit: Record<string, unknown>) =>
+    isDueOnDay(habit.frequency, habit.custom_days, targetDayOfWeek)
+  )
 
   if (applicableHabits.length === 0) {
     return { skipped: 0, date: targetDate }

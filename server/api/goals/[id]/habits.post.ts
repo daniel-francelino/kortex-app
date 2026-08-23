@@ -43,6 +43,21 @@ export default eventHandler(async (event) => {
     throw createError({ statusCode: 404, statusMessage: 'Hábito não encontrado' })
   }
 
+  // Um hábito só pode sustentar uma meta por vez — avisar com o nome da meta atual
+  const { data: existingLink } = await supabase
+    .from('goal_habits')
+    .select('goal_id, goal:goals(title)')
+    .eq('habit_id', parsed.habitId)
+    .maybeSingle()
+
+  if (existingLink) {
+    const linkedGoal = (existingLink as Record<string, unknown>).goal as { title: string } | null
+    throw createError({
+      statusCode: 409,
+      statusMessage: `Este hábito já está vinculado à meta "${linkedGoal?.title ?? ''}"`
+    })
+  }
+
   const { data, error } = await supabase
     .from('goal_habits')
     .insert({

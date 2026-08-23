@@ -199,6 +199,16 @@ const incomingStacks = computed(() =>
             color="primary"
             size="sm"
           />
+          <NuxtLink v-if="habit.goalId" to="/app/goals">
+            <UBadge
+              :label="`Meta: ${habit.goalTitle ?? 'sem título'}`"
+              icon="i-lucide-target"
+              variant="subtle"
+              color="secondary"
+              size="sm"
+              class="cursor-pointer hover:opacity-80 transition-opacity"
+            />
+          </NuxtLink>
           <UBadge
             v-if="scheduledWindow"
             :label="scheduledWindow"

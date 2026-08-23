@@ -112,6 +112,9 @@ export interface Habit {
   identity?: Identity | null
   streak?: HabitStreak | null
   tags?: HabitTag[]
+  goalLinkId?: string | null
+  goalId?: string | null
+  goalTitle?: string | null
 }
 
 export interface HabitChangeHistory {

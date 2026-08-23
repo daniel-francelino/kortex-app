@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { getSupabaseAdminClient } from '../../../utils/supabase'
 import { requireAuthUser } from '../../../utils/require-auth'
-import { mapGoalTask } from '../../../utils/goals'
+import { mapGoalMilestone } from '../../../utils/goals'
 
 const paramsSchema = z.object({
   id: z.string().uuid()
@@ -11,45 +11,31 @@ const bodySchema = z.object({
   title: z.string().min(1).max(200).optional(),
   description: z.string().max(1000).nullable().optional(),
   completed: z.boolean().optional(),
-  milestoneId: z.string().uuid().nullable().optional()
+  sortOrder: z.number().int().min(0).optional()
 })
 
 export default eventHandler(async (event) => {
   const user = await requireAuthUser(event)
-  const { id: taskId } = paramsSchema.parse(getRouterParams(event))
+  const { id: milestoneId } = paramsSchema.parse(getRouterParams(event))
   const body = await readBody(event)
   const parsed = bodySchema.parse(body)
 
   const supabase = getSupabaseAdminClient()
 
-  // Verify task ownership via goal
-  const { data: task, error: taskError } = await supabase
-    .from('goal_tasks')
+  // Verify milestone ownership via goal
+  const { data: milestone, error: milestoneError } = await supabase
+    .from('goal_milestones')
     .select('id, goal_id, goals!inner(user_id)')
-    .eq('id', taskId)
+    .eq('id', milestoneId)
     .single()
 
-  if (taskError || !task) {
-    throw createError({ statusCode: 404, statusMessage: 'Tarefa não encontrada' })
+  if (milestoneError || !milestone) {
+    throw createError({ statusCode: 404, statusMessage: 'Marco não encontrado' })
   }
 
-  const goalData = (task as Record<string, unknown>).goals as Record<string, unknown>
+  const goalData = (milestone as Record<string, unknown>).goals as Record<string, unknown>
   if (goalData.user_id !== user.id) {
     throw createError({ statusCode: 403, statusMessage: 'Acesso negado' })
-  }
-
-  if (parsed.milestoneId) {
-    const goalId = (task as Record<string, unknown>).goal_id as string
-    const { data: milestone } = await supabase
-      .from('goal_milestones')
-      .select('id')
-      .eq('id', parsed.milestoneId)
-      .eq('goal_id', goalId)
-      .maybeSingle()
-
-    if (!milestone) {
-      throw createError({ statusCode: 404, statusMessage: 'Marco não encontrado' })
-    }
   }
 
   const updateData: Record<string, unknown> = { updated_at: new Date().toISOString() }
@@ -57,18 +43,18 @@ export default eventHandler(async (event) => {
   if (parsed.title !== undefined) updateData.title = parsed.title
   if (parsed.description !== undefined) updateData.description = parsed.description
   if (parsed.completed !== undefined) updateData.completed = parsed.completed
-  if (parsed.milestoneId !== undefined) updateData.milestone_id = parsed.milestoneId
+  if (parsed.sortOrder !== undefined) updateData.sort_order = parsed.sortOrder
 
   const { data, error } = await supabase
-    .from('goal_tasks')
+    .from('goal_milestones')
     .update(updateData)
-    .eq('id', taskId)
+    .eq('id', milestoneId)
     .select('*')
     .single()
 
   if (error || !data) {
-    throw createError({ statusCode: 500, statusMessage: 'Falha ao atualizar tarefa', data: error?.message })
+    throw createError({ statusCode: 500, statusMessage: 'Falha ao atualizar marco', data: error?.message })
   }
 
-  return mapGoalTask(data as Record<string, unknown>)
+  return mapGoalMilestone(data as Record<string, unknown>)
 })

@@ -1,3 +1,16 @@
+/**
+ * A habit is due on `dayOfWeek` (0=Sun..6=Sat) based on its frequency.
+ * 'weekly' is anchored to Monday — the same convention used across the app.
+ */
+export function isDueOnDay(frequency: unknown, customDays: unknown, dayOfWeek: number): boolean {
+  if (frequency === 'daily') return true
+  if (frequency === 'weekly') return dayOfWeek === 1
+  if (frequency === 'custom' && Array.isArray(customDays)) {
+    return (customDays as number[]).includes(dayOfWeek)
+  }
+  return false
+}
+
 export function mapIdentity(row: Record<string, unknown> | null | undefined): Record<string, unknown> | null {
   if (!row) return null
 
@@ -26,7 +39,11 @@ function mapStreak(row: Record<string, unknown> | null | undefined): Record<stri
   }
 }
 
-export function mapHabit(row: Record<string, unknown>, tags?: Array<{ id: string, name: string, color: string | null }>): Record<string, unknown> {
+export function mapHabit(
+  row: Record<string, unknown>,
+  tags?: Array<{ id: string, name: string, color: string | null }>,
+  goalLink?: { linkId: string, goalId: string, goalTitle: string | null } | null
+): Record<string, unknown> {
   return {
     id: row.id,
     userId: row.userId ?? row.user_id,
@@ -52,7 +69,10 @@ export function mapHabit(row: Record<string, unknown>, tags?: Array<{ id: string
     updatedAt: row.updatedAt ?? row.updated_at,
     identity: mapIdentity((row.identity ?? null) as Record<string, unknown> | null),
     streak: mapStreak((row.streak ?? null) as Record<string, unknown> | null),
-    tags: tags ?? []
+    tags: tags ?? [],
+    goalLinkId: goalLink?.linkId ?? null,
+    goalId: goalLink?.goalId ?? null,
+    goalTitle: goalLink?.goalTitle ?? null
   }
 }
 
@@ -92,15 +112,19 @@ export function mapHabitFromVersion(
     updatedAt: version.updated_at,
     identity: mapIdentity(identity ?? null),
     streak: mapStreak(streak ?? null),
-    tags: tags ?? []
+    tags: tags ?? [],
+    goalLinkId: null,
+    goalId: null,
+    goalTitle: null
   }
 }
 
 export function mapHabitList(
   rows: Record<string, unknown>[] | null | undefined,
-  tagMap?: Map<string, Array<{ id: string, name: string, color: string | null }>>
+  tagMap?: Map<string, Array<{ id: string, name: string, color: string | null }>>,
+  goalMap?: Map<string, { linkId: string, goalId: string, goalTitle: string | null }>
 ): Record<string, unknown>[] {
-  return (rows ?? []).map(row => mapHabit(row, tagMap?.get(String(row.id))))
+  return (rows ?? []).map(row => mapHabit(row, tagMap?.get(String(row.id)), goalMap?.get(String(row.id))))
 }
 
 /**
@@ -127,4 +151,81 @@ export async function fetchHabitTagMap(
   }
 
   return tagMap
+}
+
+/**
+ * Fetches the goal each habit sustains (a habit belongs to at most one goal)
+ * and builds a lookup map keyed by habit ID.
+ */
+export async function fetchHabitGoalMap(
+  supabase: ReturnType<typeof import('./supabase').getSupabaseAdminClient>,
+  habitIds: string[]
+): Promise<Map<string, { linkId: string, goalId: string, goalTitle: string | null }>> {
+  const goalMap = new Map<string, { linkId: string, goalId: string, goalTitle: string | null }>()
+  if (habitIds.length === 0) return goalMap
+
+  const { data: links } = await supabase
+    .from('goal_habits')
+    .select('id, habit_id, goal_id, goal:goals(title)')
+    .in('habit_id', habitIds)
+
+  for (const link of (links ?? []) as Array<Record<string, unknown>>) {
+    const goal = link.goal as { title: string } | null
+    goalMap.set(String(link.habit_id), {
+      linkId: String(link.id),
+      goalId: String(link.goal_id),
+      goalTitle: goal?.title ?? null
+    })
+  }
+
+  return goalMap
+}
+
+/**
+ * Consistency rate of a habit over a date window (rate = completedDays / dueDays).
+ * Window is capped at 90 days ending at `toDate` to keep the query bounded and
+ * avoid old history diluting a goal's current progress.
+ */
+export async function calculateHabitConsistency(
+  supabase: ReturnType<typeof import('./supabase').getSupabaseAdminClient>,
+  habitId: string,
+  frequency: unknown,
+  customDays: unknown,
+  fromDate: string,
+  toDate: string
+): Promise<{ dueDays: number, completedDays: number, rate: number }> {
+  const MAX_WINDOW_DAYS = 90
+  const from = new Date(`${fromDate}T00:00:00Z`)
+  const to = new Date(`${toDate}T00:00:00Z`)
+
+  const totalSpanDays = Math.floor((to.getTime() - from.getTime()) / 86400000)
+  const windowStart = totalSpanDays > MAX_WINDOW_DAYS
+    ? new Date(to.getTime() - MAX_WINDOW_DAYS * 86400000)
+    : from
+
+  const dueDates: string[] = []
+  for (const d = new Date(windowStart); d.getTime() <= to.getTime(); d.setUTCDate(d.getUTCDate() + 1)) {
+    if (isDueOnDay(frequency, customDays, d.getUTCDay())) {
+      dueDates.push(d.toISOString().split('T')[0]!)
+    }
+  }
+
+  if (dueDates.length === 0) {
+    return { dueDays: 0, completedDays: 0, rate: 0 }
+  }
+
+  const { data: logs } = await supabase
+    .from('habit_logs')
+    .select('log_date')
+    .eq('habit_id', habitId)
+    .eq('completed', true)
+    .in('log_date', dueDates)
+
+  const completedDays = (logs ?? []).length
+
+  return {
+    dueDays: dueDates.length,
+    completedDays,
+    rate: completedDays / dueDates.length
+  }
 }

@@ -34,13 +34,13 @@ const hoverClasses: Record<MoodValue, string> = {
 </script>
 
 <template>
-  <div class="flex items-center gap-1">
+  <div class="flex items-center gap-0.5 sm:gap-1">
     <button
       v-for="mood in MOOD_OPTIONS"
       :key="mood.value"
       type="button"
       :class="[
-        'group flex flex-col items-center justify-center gap-1 w-12 h-12 rounded-xl',
+        'group flex size-10 flex-col items-center justify-center gap-1 rounded-xl sm:size-12',
         'border transition-all duration-150 cursor-pointer select-none',
         modelValue === mood.value
           ? ['ring-2 border-transparent', bgClasses[mood.value]]
@@ -51,7 +51,7 @@ const hoverClasses: Record<MoodValue, string> = {
     >
       <span
         :class="[
-          'text-xl leading-none transition-all duration-150',
+          'text-lg leading-none transition-all duration-150 sm:text-xl',
           modelValue === mood.value ? 'scale-110' : '',
           modelValue !== null && modelValue !== mood.value ? 'opacity-35' : 'opacity-100',
         ]"

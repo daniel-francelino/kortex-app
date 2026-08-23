@@ -3,6 +3,7 @@ import * as z from 'zod'
 import type { FormSubmitEvent } from '@nuxt/ui'
 import type { DriveStep, Driver } from 'driver.js'
 import type { Calendar } from '~/types/appointments'
+import type { Goal } from '~/types/goals'
 import { HabitFrequency, HabitDifficulty, HabitType } from '~/types/habits'
 import { GuidedTourKey } from '~/types/guided-tour'
 
@@ -29,10 +30,12 @@ const ALL_WEEK_DAYS = [0, 1, 2, 3, 4, 5, 6]
 const props = defineProps<{
   open: boolean
   guidedTourEnabled?: boolean
+  initialGoalId?: string
 }>()
 
 const emit = defineEmits<{
   'update:open': [value: boolean]
+  'created': []
 }>()
 
 const {
@@ -48,7 +51,26 @@ const {
   refreshTags
 } = useHabits()
 const { calendars, calendarsStatus, refreshCalendars } = useAppointments()
+const { linkHabit } = useGoalActions()
 const { startIfNeeded } = useGuidedTour()
+
+const goals = ref<Goal[]>([])
+const goalsLoading = ref(false)
+const selectedGoalId = ref<string | undefined>(undefined)
+
+async function loadGoals() {
+  goalsLoading.value = true
+  try {
+    const response = await $fetch<{ data: Goal[] }>('/api/goals', {
+      query: { pageSize: 100, status: 'active' }
+    })
+    goals.value = response.data ?? []
+  } catch {
+    goals.value = []
+  } finally {
+    goalsLoading.value = false
+  }
+}
 
 const schema = z.object({
   name: z.string().min(1, 'Nome é obrigatório').max(200),
@@ -116,6 +138,9 @@ watch(
         void refreshCalendars()
       }
 
+      void loadGoals()
+      selectedGoalId.value = props.initialGoalId
+
       if (props.guidedTourEnabled) {
         createHabitTour = await startIfNeeded({
           key: GuidedTourKey.HabitsFirstHabitCreate,
@@ -137,7 +162,20 @@ watch(
 )
 
 const NONE_IDENTITY_VALUE = '__none__'
+const NONE_GOAL_VALUE = '__none__'
 const AUTO_CALENDAR_VALUE = '__auto__'
+
+const goalIdModel = computed<string>({
+  get: () => selectedGoalId.value || NONE_GOAL_VALUE,
+  set: (value) => {
+    selectedGoalId.value = value === NONE_GOAL_VALUE ? undefined : value
+  }
+})
+
+const goalItems = computed(() => [
+  { label: 'Nenhuma', value: NONE_GOAL_VALUE },
+  ...goals.value.map(g => ({ label: g.title, value: g.id }))
+])
 
 const identityIdModel = computed<string | undefined>({
   get: () => state.identityId,
@@ -195,7 +233,11 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
         selectedTagIds.value.length > 0 ? selectedTagIds.value : undefined
     })
     if (result) {
+      if (selectedGoalId.value) {
+        await linkHabit(selectedGoalId.value, { habitId: result.id })
+      }
       resetForm()
+      emit('created')
       emit('update:open', false)
     }
   } finally {
@@ -204,6 +246,7 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
 }
 
 function resetForm() {
+  selectedGoalId.value = undefined
   state.name = ''
   state.avatarEmoji = undefined
   state.description = ''
@@ -699,6 +742,17 @@ onBeforeUnmount(() => {
                   :items="identityItems"
                   value-key="value"
                   placeholder="Quem você quer se tornar?"
+                  class="w-full"
+                />
+              </UFormField>
+
+              <UFormField label="Meta vinculada" name="goalId" description="Este hábito sustenta alguma meta?">
+                <USelect
+                  v-model="goalIdModel"
+                  :items="goalItems"
+                  :loading="goalsLoading"
+                  value-key="value"
+                  placeholder="Nenhuma"
                   class="w-full"
                 />
               </UFormField>
