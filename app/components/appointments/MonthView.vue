@@ -158,13 +158,12 @@ function onEventClick(evt: CalendarEvent, e: MouseEvent) {
   emit('selectEvent', evt, e)
 }
 
-const MAX_VISIBLE = 3
-const MAX_VISIBLE_DOTS = 4
+const MAX_VISIBLE = 4
 </script>
 
 <template>
   <div
-    class="flex min-h-[calc(var(--app-visual-height,100dvh)-var(--ui-header-height)-var(--mobile-bottom-nav-height,4.75rem))] flex-col overflow-hidden border-y border-default sm:min-h-[calc(100vh-12rem)] sm:rounded-lg sm:border"
+    class="flex min-h-[calc(var(--app-visual-height,100dvh)-var(--ui-header-height)-var(--mobile-bottom-nav-height,4.75rem))] flex-col border-y border-default sm:min-h-[calc(100vh-12rem)] sm:rounded-lg sm:border"
     @pointermove="onPointerMove"
     @pointerup="onPointerUp"
     @pointercancel="onPointerCancel"
@@ -209,7 +208,7 @@ const MAX_VISIBLE_DOTS = 4
 
     <template v-else>
       <!-- Day headers -->
-      <div class="grid grid-cols-7 border-b border-default bg-elevated/30">
+      <div class="sticky top-0 z-10 grid grid-cols-7 border-b border-default bg-elevated/95 backdrop-blur-sm">
         <div
           v-for="header in dayHeaders"
           :key="header"
@@ -219,21 +218,25 @@ const MAX_VISIBLE_DOTS = 4
         </div>
       </div>
 
-      <!-- Weeks -->
+      <!-- Weeks: natural per-row height (not squeezed to fit the viewport in
+           one screen, unlike a fixed `1fr` split) so each day can actually
+           show a few readable event bars — the whole grid scrolls, matching
+           how Google Calendar's own month view behaves rather than clipping
+           everything past row 1 to fit on one screen. -->
       <div
-        class="grid flex-1"
-        :style="{ gridTemplateRows: `repeat(${calendarGrid.length}, minmax(0, 1fr))` }"
+        class="grid"
+        :style="{ gridTemplateRows: `repeat(${calendarGrid.length}, minmax(6rem, auto))` }"
       >
         <div
           v-for="(week, wi) in calendarGrid"
           :key="wi"
-          class="grid min-h-0 grid-cols-7 border-b border-default/50 last:border-b-0"
+          class="grid grid-cols-7 border-b border-default/50 last:border-b-0"
         >
           <div
             v-for="cell in week"
             :key="cell.dateStr"
             :data-date="cell.dateStr"
-            class="group min-h-0 cursor-pointer border-r border-default/50 p-0.5 transition-colors last:border-r-0 sm:min-h-28 sm:p-1.5"
+            class="group min-h-24 cursor-pointer border-r border-default/50 p-0.5 transition-colors last:border-r-0 sm:min-h-28 sm:p-1.5"
             :class="[
               !cell.isCurrentMonth ? 'bg-muted/3' : 'hover:bg-elevated/40',
               dragOver === cell.dateStr ? 'bg-primary/10' : ''
@@ -256,30 +259,31 @@ const MAX_VISIBLE_DOTS = 4
               </span>
             </div>
 
-            <!-- Events: Google Calendar-style compact dots on mobile (a day cell is too
-                 narrow to show readable text), full text+time chips from sm: up -->
-            <div class="flex flex-wrap items-center gap-1 pl-0.5 sm:hidden">
-              <button
-                v-for="(evt, ei) in cell.events.slice(0, MAX_VISIBLE_DOTS)"
+            <!-- Events: solid colored bars on every size, like Google Calendar's
+                 own month view — text is truncated at this column width (same
+                 as Google's), but a readable label beats an unreadable dot. -->
+            <div class="space-y-0.5 sm:hidden">
+              <div
+                v-for="(evt, ei) in cell.events.slice(0, MAX_VISIBLE)"
                 :key="ei"
-                type="button"
-                class="flex size-4 shrink-0 touch-manipulation items-center justify-center"
-                :aria-label="`${formatEventTime(evt)} ${evt.title}`"
+                class="h-[15px] min-w-0 touch-manipulation overflow-hidden rounded-[3px] px-1 text-[10px] font-medium leading-[15px] text-white transition-opacity"
+                :class="dragEvent?.id === evt.id ? 'opacity-40' : ''"
+                :style="{ backgroundColor: getEventColor(evt) }"
+                :title="`${formatEventTime(evt)} ${evt.title}`"
                 @click.stop="onEventClick(evt, $event)"
                 @pointerdown.stop="startDrag(evt, $event)"
               >
-                <span
-                  class="size-1.5 rounded-full transition-transform"
-                  :class="dragEvent?.id === evt.id ? 'scale-150 opacity-60' : ''"
-                  :style="{ backgroundColor: getEventColor(evt) }"
-                />
-              </button>
-              <span
-                v-if="cell.events.length > MAX_VISIBLE_DOTS"
-                class="text-[9px] font-medium leading-none text-muted"
+                <span class="block truncate">{{ evt.title }}</span>
+              </div>
+
+              <!-- Overflow indicator -->
+              <div
+                v-if="cell.events.length > MAX_VISIBLE"
+                class="cursor-pointer px-1 text-[10px] font-medium text-muted hover:text-highlighted"
+                @click.stop="onDayClick(cell, $event)"
               >
-                +{{ cell.events.length - MAX_VISIBLE_DOTS }}
-              </span>
+                +{{ cell.events.length - MAX_VISIBLE }}
+              </div>
             </div>
 
             <div class="hidden space-y-0.5 sm:block">
