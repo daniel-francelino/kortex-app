@@ -550,7 +550,7 @@ onMounted(() => {
         </div>
 
         <!-- Main calendar area -->
-        <div class="min-w-0 flex-1 overflow-auto p-2">
+        <div class="min-w-0 flex-1 overflow-auto p-0 lg:p-2">
           <!-- Month view -->
           <AppointmentsMonthView
             v-if="activeView === 'month'"

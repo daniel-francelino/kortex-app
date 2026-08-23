@@ -97,6 +97,17 @@ function getEventColor(evt: CalendarEvent): string {
   return evt.calendar?.color ?? '#10b981'
 }
 
+function formatEventTime(evt: CalendarEvent): string {
+  return new Date(evt.startAt).toLocaleTimeString('pt-BR', {
+    hour: '2-digit',
+    minute: '2-digit'
+  })
+}
+
+function getMobileEventLabel(evt: CalendarEvent): string {
+  return evt.allDay ? evt.title : formatEventTime(evt)
+}
+
 // ─── Drag state ───────────────────────────────────────────────────────────
 const dragEvent = ref<CalendarEvent | null>(null)
 const dragOver = ref<string>('')
@@ -151,14 +162,14 @@ const MAX_VISIBLE = 3
 </script>
 
 <template>
-  <div class="min-h-[calc(100vh-12rem)] overflow-hidden rounded-lg border border-default">
+  <div class="min-h-[calc(100dvh-8.25rem)] overflow-hidden border-y border-default sm:min-h-[calc(100vh-12rem)] sm:rounded-lg sm:border">
     <!-- Loading -->
-    <div v-if="loading" class="flex min-h-[calc(100vh-12rem)] flex-col">
+    <div v-if="loading" class="flex min-h-[calc(100dvh-8.25rem)] flex-col sm:min-h-[calc(100vh-12rem)]">
       <div class="grid grid-cols-7 border-b border-default bg-elevated/30">
         <div
           v-for="header in dayHeaders"
           :key="header"
-          class="py-2.5 text-center text-[11px] font-semibold uppercase tracking-wide text-muted"
+          class="py-2 text-center text-[10px] font-semibold uppercase tracking-wide text-muted sm:py-2.5 sm:text-[11px]"
         >
           {{ header }}
         </div>
@@ -168,7 +179,7 @@ const MAX_VISIBLE = 3
         <div
           v-for="i in 42"
           :key="i"
-          class="min-h-24 border-r border-b border-default/50 p-1.5 last:border-r-0"
+          class="min-h-20 border-r border-b border-default/50 p-1 last:border-r-0 sm:min-h-24 sm:p-1.5"
           :class="i > 35 ? 'border-b-0' : ''"
         >
           <USkeleton class="mb-3 size-6 rounded-full" />
@@ -196,7 +207,7 @@ const MAX_VISIBLE = 3
         <div
           v-for="header in dayHeaders"
           :key="header"
-          class="py-2.5 text-center text-[11px] font-semibold uppercase tracking-wide text-muted"
+          class="py-2 text-center text-[10px] font-semibold uppercase tracking-wide text-muted sm:py-2.5 sm:text-[11px]"
         >
           {{ header }}
         </div>
@@ -212,7 +223,7 @@ const MAX_VISIBLE = 3
           <div
             v-for="cell in week"
             :key="cell.dateStr"
-            class="group min-h-28 cursor-pointer border-r border-default/50 p-1.5 transition-colors last:border-r-0"
+            class="group min-h-[5.75rem] cursor-pointer border-r border-default/50 p-1 transition-colors last:border-r-0 sm:min-h-28 sm:p-1.5"
             :class="[
               !cell.isCurrentMonth ? 'bg-muted/3' : 'hover:bg-elevated/40',
               dragOver === cell.dateStr ? 'bg-primary/10' : ''
@@ -225,7 +236,7 @@ const MAX_VISIBLE = 3
             <!-- Date number -->
             <div class="mb-1">
               <span
-                class="inline-flex size-6 items-center justify-center rounded-full text-xs font-medium transition-colors"
+                class="inline-flex size-5 items-center justify-center rounded-full text-[11px] font-medium transition-colors sm:size-6 sm:text-xs"
                 :class="[
                   cell.isToday
                     ? 'bg-primary text-white'
@@ -243,12 +254,13 @@ const MAX_VISIBLE = 3
               <div
                 v-for="(evt, ei) in cell.events.slice(0, MAX_VISIBLE)"
                 :key="ei"
-                class="flex cursor-grab items-center gap-1 truncate rounded-sm px-1 py-px text-[11px] leading-4 font-medium"
+                class="flex h-4 min-w-0 cursor-grab items-center gap-0.5 overflow-hidden rounded-sm px-0.5 text-[10px] leading-4 font-medium sm:gap-1 sm:px-1 sm:text-[11px]"
                 :class="evt.allDay ? 'text-white' : ''"
                 :style="evt.allDay
                   ? { backgroundColor: getEventColor(evt) }
                   : { color: getEventColor(evt) }"
                 draggable="true"
+                :title="`${formatEventTime(evt)} ${evt.title}`"
                 @click.stop="onEventClick(evt, $event)"
                 @dragstart="onEventDragStart(evt, $event)"
                 @dragend="onDragEnd"
@@ -256,21 +268,26 @@ const MAX_VISIBLE = 3
                 <!-- Dot for timed events -->
                 <span
                   v-if="!evt.allDay"
-                  class="inline-block size-1.5 shrink-0 rounded-full"
+                  class="inline-block size-1 shrink-0 rounded-full sm:size-1.5"
                   :style="{ backgroundColor: getEventColor(evt) }"
                 />
-                <span class="truncate">
-                  <span v-if="!evt.allDay" class="mr-0.5 font-normal opacity-75">
-                    {{ new Date(evt.startAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) }}
+                <span class="min-w-0 truncate">
+                  <span class="sm:hidden">
+                    {{ getMobileEventLabel(evt) }}
                   </span>
-                  {{ evt.title }}
+                  <span class="hidden sm:inline">
+                    <span v-if="!evt.allDay" class="mr-0.5 font-normal opacity-75">
+                      {{ formatEventTime(evt) }}
+                    </span>
+                    {{ evt.title }}
+                  </span>
                 </span>
               </div>
 
               <!-- Overflow indicator -->
               <div
                 v-if="cell.events.length > MAX_VISIBLE"
-                class="cursor-pointer px-1 text-[11px] font-medium text-muted hover:text-highlighted"
+                class="cursor-pointer px-0.5 text-[10px] font-medium text-muted hover:text-highlighted sm:px-1 sm:text-[11px]"
                 @click.stop="onDayClick(cell, $event)"
               >
                 +{{ cell.events.length - MAX_VISIBLE }} mais
