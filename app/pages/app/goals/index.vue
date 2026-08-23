@@ -37,6 +37,8 @@ const tabs = [
   { label: 'Insights', value: 'insights', icon: 'i-lucide-bar-chart-3' }
 ]
 
+useMobileContextNav().registerMobileContextNav('goals', tabs, activeTab)
+
 function ensureLoaded(status: Ref<'idle' | 'pending' | 'success' | 'error'>, refresh: () => Promise<unknown>) {
   if (status.value === 'idle') void refresh()
 }
@@ -174,11 +176,13 @@ const statusFilterOptions = computed(() => [
 
     <template #body>
       <div class="space-y-4">
-        <UTabs
-          :items="tabs"
-          :model-value="activeTab"
-          @update:model-value="activeTab = $event as string"
-        />
+        <div class="hidden lg:block">
+          <UTabs
+            :items="tabs"
+            :model-value="activeTab"
+            @update:model-value="activeTab = $event as string"
+          />
+        </div>
 
         <template v-if="activeTab === 'list'">
           <!-- Filters -->

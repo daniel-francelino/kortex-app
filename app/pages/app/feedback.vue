@@ -46,6 +46,8 @@ const tabs = [
   { label: 'Admin', value: 'admin', icon: 'i-lucide-shield' }
 ]
 
+useMobileContextNav().registerMobileContextNav('feedback', tabs, activeTab)
+
 const createModalOpen = ref(false)
 const detailSlideoverOpen = ref(false)
 const adminSlideoverOpen = ref(false)
@@ -187,11 +189,13 @@ function onAdminPageUpdate(page: number) {
 
     <template #body>
       <div class="p-4 space-y-4">
-        <UTabs
-          :items="tabs"
-          :model-value="activeTab"
-          @update:model-value="activeTab = $event as string"
-        />
+        <div class="hidden lg:block">
+          <UTabs
+            :items="tabs"
+            :model-value="activeTab"
+            @update:model-value="activeTab = $event as string"
+          />
+        </div>
 
         <!-- My Feedbacks Tab -->
         <div v-if="activeTab === 'my'" class="space-y-4">

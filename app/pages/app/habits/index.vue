@@ -58,6 +58,8 @@ const tabs = [
   { label: 'Insights', value: 'insights', icon: 'i-lucide-bar-chart-3' }
 ]
 
+useMobileContextNav().registerMobileContextNav('habits', tabs, activeTab)
+
 const todayDateKey = computed(
   () => todayDate.value ?? new Date().toISOString().split('T')[0]!
 )
@@ -669,7 +671,7 @@ onBeforeUnmount(() => {
     <template #body>
       <div class="space-y-6 pb-10 sm:pb-4">
         <!-- Tabs -->
-        <div data-tour="habits-tabs">
+        <div data-tour="habits-tabs" class="hidden lg:block">
           <UTabs
             :items="tabs"
             :model-value="activeTab"

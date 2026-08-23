@@ -43,6 +43,8 @@ const viewModes: { label: string, value: CalendarViewMode, icon: string }[] = [
   { label: 'Mês', value: 'month', icon: 'i-lucide-grid-3x3' }
 ]
 
+useMobileContextNav().registerMobileContextNav('appointments', viewModes, activeView)
+
 // ─── Navigation state ───────────────────────────────────────────────────
 const today = new Date()
 const viewYear = ref(today.getFullYear())
@@ -337,7 +339,7 @@ onMounted(() => {
 
         <template #right>
           <!-- View mode (icon + tooltip) -->
-          <div class="flex items-center gap-0.5 rounded-lg border border-default p-0.5">
+          <div class="hidden items-center gap-0.5 rounded-lg border border-default p-0.5 lg:flex">
             <UTooltip
               v-for="mode in viewModes"
               :key="mode.value"

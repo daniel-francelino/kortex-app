@@ -26,6 +26,13 @@ const {
 // ─── View & UI state ──────────────────────────────────────────────────────────
 
 const activeView = ref<'table' | 'board'>('table')
+const viewOptions = [
+  { label: 'Tabela', value: 'table', icon: 'i-lucide-table' },
+  { label: 'Quadro', value: 'board', icon: 'i-lucide-kanban' }
+]
+
+useMobileContextNav().registerMobileContextNav('ideas', viewOptions, activeView)
+
 const createModalOpen = ref(false)
 const detailOpen = ref(false)
 const selectedIdeaId = ref<string | null>(null)
@@ -157,7 +164,7 @@ function onSearchInput(val: string): void {
         <template #right>
           <div class="flex items-center gap-2">
             <!-- View Toggle -->
-            <div class="flex items-center border border-default rounded-md">
+            <div class="hidden items-center border border-default rounded-md lg:flex">
               <UButton
                 icon="i-lucide-table"
                 size="xs"

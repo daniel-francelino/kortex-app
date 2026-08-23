@@ -39,6 +39,8 @@ const tabs = [
   { label: 'Insights', value: 'insights', icon: 'i-lucide-bar-chart-3' }
 ]
 
+useMobileContextNav().registerMobileContextNav('tasks', tabs, activeTab)
+
 watch(activeTab, (tab) => {
   if (tab === 'pending') {
     listStatus.value = TaskStatus.Pending
@@ -177,11 +179,13 @@ const listFilterOptions = computed(() => [
     <template #body>
       <div class="space-y-6">
         <!-- Tabs -->
-        <UTabs
-          :items="tabs"
-          :model-value="activeTab"
-          @update:model-value="activeTab = $event as string"
-        />
+        <div class="hidden lg:block">
+          <UTabs
+            :items="tabs"
+            :model-value="activeTab"
+            @update:model-value="activeTab = $event as string"
+          />
+        </div>
 
         <!-- PENDING TAB -->
         <div v-if="activeTab === 'pending'" class="space-y-4">

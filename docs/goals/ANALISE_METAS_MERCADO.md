@@ -31,25 +31,25 @@ Metas com título, descrição, emoji, categorização por prazo (diário a long
 
 | Recurso | Status | Nota |
 | --- | --- | --- |
-| **Vision board** (quadro visual da meta, com imagem/visualização do resultado desejado) | ❌ Faltando | Recurso citado como diferencial tanto de GoalsOnTrack quanto de Lifetick — "visualizar o resultado-alvo e ver os passos necessários para alcançá-lo". O Kortex trata toda meta como uma linha de lista + card de progresso, sem nenhuma representação visual dedicada. |
-| **Metas ancoradas em valores pessoais** | ❌ Faltando | A proposta central do Lifetick é inverter a ordem usual: primeiro definir o que importa (saúde, família, carreira, criatividade), depois criar metas SMART alinhadas a esses valores. O Kortex tem "área da vida" como uma categorização plana (8 opções fixas) — organiza, mas não pede ao usuário para articular *por que* aquela meta importa, nem conecta metas que sirvam ao mesmo valor. |
-| Templates de meta prontos | ❌ Faltando | Notion e ClickUp têm bibliotecas extensas de templates de OKR/SMART goals; o Kortex sempre parte de um formulário em branco (mesma lacuna já registrada no roadmap de Hábitos). |
+| **Vision board** (quadro visual da meta, com imagem/visualização do resultado desejado) | ✅ Implementado (simplificado) | `goals.cover_image_url` — uma imagem de capa por meta (não colagem múltipla), P2 item 9. |
+| **Metas ancoradas em valores pessoais** | ❌ Faltando (P3) | Decisão de produto maior, fora do escopo P0–P2 — ver seção 3. |
+| Templates de meta prontos | ✅ Implementado | `app/utils/goal-templates.ts`, aba de templates no modal de criação (P2, item 10). |
 
 ### 2.3 Revisão e acompanhamento contínuo
 
 | Recurso | Status | Nota |
 | --- | --- | --- |
-| **Check-in/revisão periódica dedicada à meta** | ❌ Faltando | O Kortex tem revisão semanal — mas ela pertence ao módulo **Hábitos** (`habit_reflections`, seção 4 de `1.HABITS.md`), sem nenhuma pergunta ou seção voltada a metas especificamente. Apps dedicados de meta (GoalsOnTrack, Lifetick, e o padrão de planejadores como Sunsama/Full Focus Planner) tratam a revisão periódica como parte central do produto — "essa meta ainda faz sentido?", "o que mudou desde a última revisão?". O Kortex não pergunta isso em lugar nenhum. |
-| Lembretes/notificações por meta | ❌ Faltando | Nenhuma notificação específica de meta existe hoje (contraste com o lembrete de revisão semanal de Hábitos, que é módulo-inteiro, não por hábito — ver `docs/habits/ANALISE_HABITOS_MERCADO.md`, item 6 do roadmap). |
-| Journaling vinculado à meta | ⚠️ Existe em outro módulo, sem vínculo | O Kortex já tem um módulo de Diário — mas não há nenhuma forma de vincular uma entrada de diário a uma meta específica (o mecanismo de vínculo do Life OS existe para outras combinações — ver `docs/journal/1.JOURNAL.md`, seção 13 — mas metas não são um tipo de entidade linkável hoje). GoalsOnTrack e Lifetick tratam journaling-por-meta como recurso nativo. |
+| **Check-in/revisão periódica dedicada à meta** | ✅ Implementado | `goal_reflections`, seção "Revisão semanal" no detalhe da meta (P2, item 8). |
+| Lembretes/notificações por meta | ❌ Faltando | Nenhuma notificação específica de meta existe hoje (contraste com o lembrete de revisão semanal de Hábitos, que é módulo-inteiro, não por hábito — ver `docs/habits/ANALISE_HABITOS_MERCADO.md`, item 6 do roadmap). Fora do escopo P0–P2 (depende de infraestrutura de notificação por entidade). |
+| Journaling vinculado à meta | ✅ Implementado | `entity_links`/`useLifeOS()` — vínculo bidirecional entre meta e entrada de diário, com label resolvido em `GET /api/life/links` (P2, item 11). |
 
 ### 2.4 Progresso alimentado por hábitos (o gap mais citado internamente)
 
 | Recurso | Status | Nota |
 | --- | --- | --- |
 | Vincular um hábito a uma meta | ✅ Já existe | `goal_habits`, editável a partir do slideover da meta. |
-| **Progresso da meta alimentado pela consistência do hábito** | ❌ Faltando | Um app recente pesquisado (Beyond Time) resume exatamente esse modelo: "defina um objetivo mensurável, vincule um hábito diário a ele, e veja o progresso atualizar automaticamente conforme você registra sessões". O Kortex tem os dois lados prontos (hábito com log diário, meta com hábito vinculado) mas **nenhuma ponte entre eles** — o progresso da meta continua vindo só de tarefas, mesmo com hábitos vinculados (já documentado como gap interno da própria equipe, ver `1.GOALS.md`, seção 8, e `docs/habits/ANALISE_HABITOS_MERCADO.md`, item 7 do roadmap — os dois documentos apontam para o mesmo problema). |
-| Cardinalidade hábito↔meta (1 hábito, 1 meta) | ❌ Não aplicado | Já coberto em `1.GOALS.md` (seção 12) — citado aqui só porque a maioria dos apps concorrentes que combina hábito+meta (Strides, Beyond Time) trata isso como uma relação clara e geralmente 1:1 por desenho, não como uma tabela de junção sem restrição. |
+| **Progresso da meta alimentado pela consistência do hábito** | ✅ Implementado | `calculateHabitConsistency()` combina taxa de consistência dos hábitos com progresso de tarefas em `GET /api/goals/[id]` (P1, item 4). |
+| Cardinalidade hábito↔meta (1 hábito, 1 meta) | ✅ Aplicado | `UNIQUE(habit_id)` em `goal_habits`, com migration de dedup (P1, item 7). |
 
 ### 2.5 Social e responsabilização (accountability)
 

@@ -254,6 +254,27 @@ const viewOptions: { value: JournalView, icon: string, label: string, tooltip: s
   { value: 'insights', icon: 'i-lucide-bar-chart-3', label: 'Insights', tooltip: 'Insights' }
 ]
 
+const mobileContextNavOwner = 'journal'
+const {
+  active: activeMobileContextNav,
+  clearMobileContextNav,
+  setMobileContextNav
+} = useMobileContextNav()
+
+watch(activeView, (view) => {
+  setMobileContextNav(mobileContextNavOwner, viewOptions, view)
+}, { immediate: true })
+
+watch(activeMobileContextNav, (view) => {
+  if (!view || !viewOptions.some(option => option.value === view)) return
+  if (activeView.value === view) return
+  activeView.value = view as JournalView
+})
+
+onBeforeUnmount(() => {
+  clearMobileContextNav(mobileContextNavOwner)
+})
+
 // ─── Entry list view ────────────────────────────────────────────────────────────
 function onListEntrySelect(date: string) {
   onSelectDate(date)
@@ -313,27 +334,6 @@ function onInsightsRangeChange(range: '7d' | '30d' | '90d') {
            local handler needed, it recomputes to false on its own. -->
       <JournalLockScreen v-else-if="isModuleLocked" />
       <div v-else class="journal-mobile-surface space-y-4">
-        <div class="lg:hidden">
-          <div class="journal-view-switcher -mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
-            <button
-              v-for="opt in viewOptions"
-              :key="opt.value"
-              type="button"
-              class="flex h-12 min-w-28 items-center justify-center gap-2 rounded-xl border px-3 text-sm font-medium transition-colors"
-              :class="
-                activeView === opt.value
-                  ? 'border-primary/40 bg-primary/15 text-primary'
-                  : 'border-default bg-elevated/20 text-muted active:bg-elevated/70'
-              "
-              :aria-pressed="activeView === opt.value"
-              @click="activeView = opt.value"
-            >
-              <UIcon :name="opt.icon" class="size-5 shrink-0" />
-              <span>{{ opt.label }}</span>
-            </button>
-          </div>
-        </div>
-
         <!-- Offline / pending sync indicator -->
         <div
           v-if="!isOnline || pendingSyncCount > 0"

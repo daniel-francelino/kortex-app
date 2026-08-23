@@ -1,6 +1,14 @@
 <script setup lang="ts">
+import { AnimatePresence, motion } from 'motion-v'
+
 const route = useRoute()
 const router = useRouter()
+const {
+  active,
+  hasItems: hasContextItems,
+  items: contextItems,
+  selectMobileContextNav
+} = useMobileContextNav()
 
 const items = [
   { label: 'Início', icon: 'i-lucide-house', to: '/app' },
@@ -41,6 +49,20 @@ function navigateTo(to: string) {
     router.push(to)
   }
 }
+
+watchEffect(() => {
+  if (!import.meta.client) return
+
+  document.documentElement.style.setProperty(
+    '--mobile-bottom-nav-height',
+    hasContextItems.value ? '8.75rem' : '4.75rem'
+  )
+})
+
+onUnmounted(() => {
+  if (!import.meta.client) return
+  document.documentElement.style.setProperty('--mobile-bottom-nav-height', '4.75rem')
+})
 </script>
 
 <template>
@@ -76,6 +98,47 @@ function navigateTo(to: string) {
         />
       </Transition>
     </Teleport>
+
+    <!-- Contextual view switcher -->
+    <AnimatePresence>
+      <motion.div
+        v-if="hasContextItems"
+        class="border-b border-default px-2 py-2"
+        :initial="{ opacity: 0, y: 12 }"
+        :animate="{ opacity: 1, y: 0 }"
+        :exit="{ opacity: 0, y: 10 }"
+        :transition="{ duration: 0.18, ease: 'easeOut' }"
+      >
+        <div class="mobile-context-nav flex gap-2 overflow-x-auto px-1">
+          <motion.button
+            v-for="(item, index) in contextItems"
+            :key="item.value"
+            type="button"
+            class="relative flex h-12 min-w-28 items-center justify-center gap-2 overflow-hidden rounded-xl border px-3 text-sm font-medium transition-colors"
+            :class="
+              active === item.value
+                ? 'border-primary/40 text-primary'
+                : 'border-default text-muted active:bg-elevated/80'
+            "
+            :initial="{ opacity: 0, y: 8 }"
+            :animate="{ opacity: 1, y: 0 }"
+            :transition="{ duration: 0.16, delay: Math.min(index * 0.025, 0.1), ease: 'easeOut' }"
+            :while-tap="{ scale: 0.98 }"
+            :aria-pressed="active === item.value"
+            @click="selectMobileContextNav(item.value)"
+          >
+            <motion.span
+              v-if="active === item.value"
+              class="absolute inset-0 rounded-xl bg-primary/15"
+              layout-id="mobile-context-active"
+              :transition="{ duration: 0.18, ease: 'easeOut' }"
+            />
+            <UIcon :name="item.icon" class="relative size-5 shrink-0" />
+            <span class="relative whitespace-nowrap">{{ item.label }}</span>
+          </motion.button>
+        </div>
+      </motion.div>
+    </AnimatePresence>
 
     <!-- Bottom nav bar -->
     <nav class="flex items-center justify-around px-2 py-1.5">
@@ -125,5 +188,13 @@ function navigateTo(to: string) {
 .fade-enter-from,
 .fade-leave-to {
   opacity: 0;
+}
+
+.mobile-context-nav {
+  scrollbar-width: none;
+}
+
+.mobile-context-nav::-webkit-scrollbar {
+  display: none;
 }
 </style>
