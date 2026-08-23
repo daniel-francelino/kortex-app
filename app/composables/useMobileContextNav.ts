@@ -4,6 +4,8 @@ export interface MobileContextNavItem {
   value: string
   label: string
   icon: string
+  /** When set, tapping this item navigates here instead of switching the active tab. */
+  to?: string
 }
 
 interface MobileContextNavState {

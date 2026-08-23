@@ -39,6 +39,19 @@ function isMoreActive(): boolean {
   return moreItems.some(item => route.path.startsWith(item.to))
 }
 
+function isContextItemActive(item: { value: string, to?: string }): boolean {
+  if (item.to) return route.path.startsWith(item.to)
+  return active.value === item.value
+}
+
+function onContextItemClick(item: { value: string, to?: string }) {
+  if (item.to) {
+    router.push(item.to)
+    return
+  }
+  selectMobileContextNav(item.value)
+}
+
 function handleMoreClick() {
   showMoreMenu.value = !showMoreMenu.value
 }
@@ -120,7 +133,7 @@ onUnmounted(() => {
             type="button"
             class="flex min-h-14 min-w-[4.25rem] flex-col items-center justify-center gap-0.5 rounded-xl px-3 text-center transition-colors"
             :class="
-              active === item.value
+              isContextItemActive(item)
                 ? 'text-primary'
                 : 'text-muted active:bg-elevated/80'
             "
@@ -128,8 +141,8 @@ onUnmounted(() => {
             :animate="{ opacity: 1, y: 0 }"
             :transition="{ duration: 0.16, delay: Math.min(index * 0.025, 0.1), ease: 'easeOut' }"
             :while-tap="{ scale: 0.98 }"
-            :aria-pressed="active === item.value"
-            @click="selectMobileContextNav(item.value)"
+            :aria-pressed="!item.to ? isContextItemActive(item) : undefined"
+            @click="onContextItemClick(item)"
           >
             <UIcon :name="item.icon" class="size-5 shrink-0" />
             <span class="max-w-full truncate text-[10px] font-medium leading-tight">{{ item.label }}</span>
