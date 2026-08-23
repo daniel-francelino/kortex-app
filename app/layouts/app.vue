@@ -1,11 +1,14 @@
 <script setup lang="ts">
+import { AnimatePresence, motion } from 'motion-v'
 import type { NavigationMenuItem } from '@nuxt/ui'
 
 const toast = useToast()
+const route = useRoute()
 
 const open = ref(false)
 const sidebarCollapsed = ref(true)
 const isMobile = useMediaQuery('(max-width: 1023px)')
+const mobileSettingsOpen = ref(true)
 
 const links = [
   [
@@ -137,6 +140,21 @@ const groups = computed(() => [
   }
 ])
 
+const primaryLinks = computed(() => links[0].filter(item => !item.children))
+const settingsLink = computed(() => links[0].find(item => item.children))
+const secondaryLinks = computed(() => links[1])
+const mobileMenuTransition = { duration: 0.18, ease: 'easeOut' }
+
+function isActivePath(to?: string, exact?: boolean): boolean {
+  if (!to) return false
+  if (exact || to === '/app') return route.path === to
+  return route.path.startsWith(to)
+}
+
+function closeMobileSidebar() {
+  open.value = false
+}
+
 const { load: loadPreferences } = useUserPreferences()
 
 onMounted(async () => {
@@ -198,24 +216,180 @@ watch(
       <template #default="{ collapsed }">
         <UDashboardSearchButton
           :collapsed="collapsed"
-          class="bg-transparent ring-default"
+          class="bg-transparent ring-default max-lg:h-12 max-lg:text-sm"
         />
 
-        <UNavigationMenu
-          :collapsed="collapsed"
-          :items="links[0]"
-          orientation="vertical"
-          tooltip
-          popover
-        />
+        <template v-if="isMobile">
+          <motion.div
+            class="mt-4 flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto pb-4"
+            :initial="{ opacity: 0, y: 8 }"
+            :animate="{ opacity: 1, y: 0 }"
+            :transition="{ duration: 0.2, ease: 'easeOut' }"
+          >
+            <nav class="space-y-1.5" aria-label="Navegação principal">
+              <motion.div
+                v-for="(item, itemIndex) in primaryLinks"
+                :key="item.to"
+                :initial="{ opacity: 0, x: -10 }"
+                :animate="{ opacity: 1, x: 0 }"
+                :transition="{ ...mobileMenuTransition, delay: Math.min(itemIndex * 0.025, 0.12) }"
+                :while-tap="{ scale: 0.985 }"
+              >
+                <NuxtLink
+                  :to="item.to"
+                  class="relative flex min-h-12 items-center gap-3 overflow-hidden rounded-xl px-3 text-[15px] font-medium transition-colors"
+                  :class="
+                    isActivePath(item.to, item.exact)
+                      ? 'text-primary'
+                      : 'text-muted active:bg-elevated/80'
+                  "
+                  @click="closeMobileSidebar"
+                >
+                  <motion.span
+                    v-if="isActivePath(item.to, item.exact)"
+                    class="absolute inset-0 rounded-xl bg-primary/15"
+                    layout-id="mobile-sidebar-active-link"
+                    :transition="{ duration: 0.18, ease: 'easeOut' }"
+                  />
+                  <span
+                    class="relative flex size-9 shrink-0 items-center justify-center rounded-lg"
+                    :class="isActivePath(item.to, item.exact) ? 'bg-primary/15' : 'bg-elevated/50'"
+                  >
+                    <UIcon :name="item.icon" class="size-5" />
+                  </span>
+                  <span class="relative truncate">{{ item.label }}</span>
+                </NuxtLink>
+              </motion.div>
+            </nav>
 
-        <UNavigationMenu
-          :collapsed="collapsed"
-          :items="links[1]"
-          orientation="vertical"
-          tooltip
-          class="mt-auto"
-        />
+            <motion.section
+              v-if="settingsLink"
+              class="space-y-1.5"
+              :initial="{ opacity: 0, x: -10 }"
+              :animate="{ opacity: 1, x: 0 }"
+              :transition="{ ...mobileMenuTransition, delay: 0.14 }"
+            >
+              <motion.button
+                type="button"
+                class="relative flex min-h-12 w-full items-center gap-3 overflow-hidden rounded-xl px-3 text-left text-[15px] font-medium transition-colors"
+                :class="
+                  isActivePath(settingsLink.to)
+                    ? 'text-primary'
+                    : 'text-muted active:bg-elevated/80'
+                "
+                :aria-expanded="mobileSettingsOpen"
+                :while-tap="{ scale: 0.985 }"
+                @click="mobileSettingsOpen = !mobileSettingsOpen"
+              >
+                <motion.span
+                  v-if="isActivePath(settingsLink.to)"
+                  class="absolute inset-0 rounded-xl bg-primary/15"
+                  layout-id="mobile-sidebar-active-link"
+                  :transition="{ duration: 0.18, ease: 'easeOut' }"
+                />
+                <span
+                  class="relative flex size-9 shrink-0 items-center justify-center rounded-lg"
+                  :class="isActivePath(settingsLink.to) ? 'bg-primary/15' : 'bg-elevated/50'"
+                >
+                  <UIcon :name="settingsLink.icon" class="size-5" />
+                </span>
+                <span class="relative min-w-0 flex-1 truncate">{{ settingsLink.label }}</span>
+                <motion.div
+                  class="relative shrink-0"
+                  :animate="{ rotate: mobileSettingsOpen ? 180 : 0 }"
+                  :transition="{ duration: 0.18, ease: 'easeOut' }"
+                >
+                  <UIcon
+                    name="i-lucide-chevron-down"
+                    class="size-5"
+                  />
+                </motion.div>
+              </motion.button>
+
+              <AnimatePresence>
+                <motion.div
+                  v-if="mobileSettingsOpen"
+                  class="ml-6 overflow-hidden border-l border-default pl-3"
+                  :initial="{ height: 0, opacity: 0 }"
+                  :animate="{ height: 'auto', opacity: 1 }"
+                  :exit="{ height: 0, opacity: 0 }"
+                  :transition="{ duration: 0.2, ease: 'easeOut' }"
+                >
+                  <div class="space-y-1 py-1">
+                    <motion.div
+                      v-for="(child, childIndex) in settingsLink.children"
+                      :key="child.to"
+                      :initial="{ opacity: 0, x: -8 }"
+                      :animate="{ opacity: 1, x: 0 }"
+                      :exit="{ opacity: 0, x: -6 }"
+                      :transition="{ duration: 0.16, delay: childIndex * 0.025, ease: 'easeOut' }"
+                      :while-tap="{ scale: 0.985 }"
+                    >
+                      <NuxtLink
+                        :to="child.to"
+                        class="flex min-h-11 items-center rounded-lg px-3 text-sm font-medium transition-colors"
+                        :class="
+                          isActivePath(child.to, child.exact)
+                            ? 'bg-primary/10 text-primary'
+                            : 'text-muted active:bg-elevated/80'
+                        "
+                        @click="closeMobileSidebar"
+                      >
+                        {{ child.label }}
+                      </NuxtLink>
+                    </motion.div>
+                  </div>
+                </motion.div>
+              </AnimatePresence>
+            </motion.section>
+
+            <motion.nav
+              class="mt-auto space-y-1.5 border-t border-default pt-4"
+              aria-label="Suporte"
+              :initial="{ opacity: 0, y: 8 }"
+              :animate="{ opacity: 1, y: 0 }"
+              :transition="{ ...mobileMenuTransition, delay: 0.18 }"
+            >
+              <motion.div
+                v-for="(item, itemIndex) in secondaryLinks"
+                :key="item.to"
+                :initial="{ opacity: 0, x: -8 }"
+                :animate="{ opacity: 1, x: 0 }"
+                :transition="{ ...mobileMenuTransition, delay: Math.min(itemIndex * 0.025, 0.08) }"
+                :while-tap="{ scale: 0.985 }"
+              >
+                <NuxtLink
+                  :to="item.to"
+                  class="flex min-h-12 items-center gap-3 rounded-xl px-3 text-[15px] font-medium text-muted transition-colors active:bg-elevated/80"
+                  @click="closeMobileSidebar"
+                >
+                  <span class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-elevated/50">
+                    <UIcon :name="item.icon" class="size-5" />
+                  </span>
+                  <span class="truncate">{{ item.label }}</span>
+                </NuxtLink>
+              </motion.div>
+            </motion.nav>
+          </motion.div>
+        </template>
+
+        <template v-else>
+          <UNavigationMenu
+            :collapsed="collapsed"
+            :items="links[0]"
+            orientation="vertical"
+            tooltip
+            popover
+          />
+
+          <UNavigationMenu
+            :collapsed="collapsed"
+            :items="links[1]"
+            orientation="vertical"
+            tooltip
+            class="mt-auto"
+          />
+        </template>
       </template>
 
       <template #footer="{ collapsed }">
