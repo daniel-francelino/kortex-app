@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import type { Goal, GoalTask, GoalHabitLink, GoalMilestone } from '~/types/goals'
 import { GoalStatus, GoalProgressType } from '~/types/goals'
+import type { EntityLink } from '~/types/life-os'
+import { EntityType } from '~/types/life-os'
 
 const props = defineProps<{
   goal: Goal
@@ -31,11 +33,16 @@ const {
   linkHabit,
   unlinkHabit
 } = useGoalActions()
+const { createLink, deleteLink } = useLifeOS()
 
 // ─── Local state for goal detail (refreshable) ──────────────────────────────
 const goalDetail = ref<Goal | null>(null)
 const detailLoading = ref(false)
 const showHabitLinker = ref(false)
+const showJournalLinker = ref(false)
+const journalLinks = ref<EntityLink[]>([])
+const journalLinksLoading = ref(false)
+const showWeeklyReview = ref(false)
 const newTaskTitle = ref('')
 const newTaskMilestoneId = ref<string | undefined>(undefined)
 const addingTask = ref(false)
@@ -46,11 +53,12 @@ const expandedMilestones = reactive(new Set<string>())
 
 watch(() => props.open, async (isOpen) => {
   if (isOpen && props.goal) {
-    await loadDetail()
+    await Promise.all([loadDetail(), loadJournalLinks()])
     return
   }
 
   showHabitLinker.value = false
+  showJournalLinker.value = false
   newTaskTitle.value = ''
   newTaskMilestoneId.value = undefined
   showNewMilestoneInput.value = false
@@ -59,12 +67,48 @@ watch(() => props.open, async (isOpen) => {
 
 watch(() => props.goal?.id, async () => {
   showHabitLinker.value = false
+  showJournalLinker.value = false
   newTaskTitle.value = ''
 
   if (props.open && props.goal) {
-    await loadDetail()
+    await Promise.all([loadDetail(), loadJournalLinks()])
   }
 })
+
+async function loadJournalLinks() {
+  if (!props.goal) return
+  journalLinksLoading.value = true
+  try {
+    const response = await $fetch<{ data: EntityLink[] }>('/api/life/links', {
+      query: { sourceType: EntityType.Goal, sourceId: props.goal.id, targetType: EntityType.JournalEntry, pageSize: 50 }
+    })
+    journalLinks.value = response.data ?? []
+  } catch {
+    journalLinks.value = []
+  } finally {
+    journalLinksLoading.value = false
+  }
+}
+
+async function onLinkJournalEntry(entryId: string) {
+  const goalId = currentGoal.value?.id
+  if (!goalId) return
+  const result = await createLink({
+    sourceType: EntityType.Goal,
+    sourceId: goalId,
+    targetType: EntityType.JournalEntry,
+    targetId: entryId
+  })
+  if (result) {
+    showJournalLinker.value = false
+    await loadJournalLinks()
+  }
+}
+
+async function onUnlinkJournalEntry(linkId: string) {
+  await deleteLink(linkId)
+  await loadJournalLinks()
+}
 
 async function loadDetail() {
   if (!props.goal) return
@@ -128,6 +172,46 @@ watch(currentGoal, (goal) => {
     currentValueInput.value = goal.currentValue ?? 0
   }
 }, { immediate: true })
+
+const coverInputRef = ref<HTMLInputElement | null>(null)
+const coverUploading = ref(false)
+
+async function onCoverFileSelected(event: Event) {
+  const goalId = currentGoal.value?.id
+  const file = (event.target as HTMLInputElement).files?.[0]
+  if (!file || !goalId) return
+
+  coverUploading.value = true
+  try {
+    const form = new FormData()
+    form.append('file', file)
+    form.append('kind', 'image')
+
+    const uploaded = await $fetch<{ url: string }>('/api/editor/uploads', {
+      method: 'POST',
+      body: form
+    })
+
+    const result = await updateGoal(goalId, { coverImageUrl: uploaded.url })
+    if (result) {
+      await loadDetail()
+      emit('updated')
+    }
+  } finally {
+    coverUploading.value = false
+    if (coverInputRef.value) coverInputRef.value.value = ''
+  }
+}
+
+async function onRemoveCoverImage() {
+  const goalId = currentGoal.value?.id
+  if (!goalId) return
+  const result = await updateGoal(goalId, { coverImageUrl: null })
+  if (result) {
+    await loadDetail()
+    emit('updated')
+  }
+}
 
 async function onSaveCurrentValue() {
   const goalId = currentGoal.value?.id
@@ -319,6 +403,47 @@ function getStatusIcon(status: GoalStatus): string {
       </div>
 
       <div v-else-if="currentGoal" class="space-y-6">
+        <!-- Cover image -->
+        <div v-if="currentGoal.coverImageUrl" class="relative -mt-2 h-32 overflow-hidden rounded-xl">
+          <img :src="currentGoal.coverImageUrl" alt="" class="size-full object-cover">
+          <div class="absolute inset-x-0 bottom-0 flex justify-end gap-1 bg-gradient-to-t from-black/60 to-transparent p-2">
+            <UButton
+              icon="i-lucide-image"
+              size="xs"
+              color="neutral"
+              variant="solid"
+              :loading="coverUploading"
+              aria-label="Trocar capa"
+              @click="coverInputRef?.click()"
+            />
+            <UButton
+              icon="i-lucide-trash-2"
+              size="xs"
+              color="neutral"
+              variant="solid"
+              aria-label="Remover capa"
+              @click="onRemoveCoverImage"
+            />
+          </div>
+        </div>
+        <UButton
+          v-else
+          label="Adicionar capa"
+          icon="i-lucide-image-plus"
+          size="xs"
+          color="neutral"
+          variant="subtle"
+          :loading="coverUploading"
+          @click="coverInputRef?.click()"
+        />
+        <input
+          ref="coverInputRef"
+          type="file"
+          accept="image/png,image/jpeg,image/webp,image/gif"
+          class="hidden"
+          @change="onCoverFileSelected"
+        >
+
         <!-- Header -->
         <div class="flex items-start justify-between gap-4">
           <div class="min-w-0 flex-1 space-y-2">
@@ -749,6 +874,94 @@ function getStatusIcon(status: GoalStatus): string {
             @cancel="showHabitLinker = false"
             @create-habit="currentGoal && emit('create-habit', currentGoal.id)"
           />
+        </div>
+
+        <!-- Linked journal entries -->
+        <div class="space-y-3">
+          <div class="flex items-center justify-between gap-2">
+            <div class="flex items-center gap-2">
+              <UIcon name="i-lucide-notebook-pen" class="size-4 text-primary" />
+              <h4 class="text-sm font-semibold text-highlighted">
+                Entradas do diário vinculadas
+              </h4>
+              <span class="text-xs text-muted">
+                {{ journalLinks.length }}
+              </span>
+            </div>
+            <UButton
+              v-if="!showJournalLinker"
+              icon="i-lucide-link"
+              label="Vincular"
+              size="xs"
+              color="neutral"
+              variant="subtle"
+              @click="showJournalLinker = true"
+            />
+          </div>
+
+          <div v-if="journalLinksLoading" class="space-y-2">
+            <USkeleton class="h-10 w-full" />
+          </div>
+
+          <div v-else-if="journalLinks.length > 0" class="space-y-2">
+            <div
+              v-for="link in journalLinks"
+              :key="link.id"
+              class="flex items-center justify-between gap-3 rounded-xl border border-default/60 bg-default/30 p-3"
+            >
+              <div class="flex min-w-0 items-center gap-3">
+                <div class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                  <UIcon name="i-lucide-notebook-pen" class="size-4" />
+                </div>
+                <p class="truncate text-sm font-medium text-highlighted">
+                  {{ link.targetLabel ?? 'Entrada do diário' }}
+                </p>
+              </div>
+              <UButton
+                icon="i-lucide-unlink"
+                color="neutral"
+                variant="ghost"
+                size="xs"
+                aria-label="Desvincular entrada"
+                @click="onUnlinkJournalEntry(link.id)"
+              />
+            </div>
+          </div>
+
+          <div
+            v-else-if="!showJournalLinker"
+            class="rounded-xl border border-dashed border-default px-4 py-5 text-sm text-muted"
+          >
+            Nenhuma entrada vinculada.
+          </div>
+
+          <!-- Journal linker -->
+          <GoalsJournalLinker
+            v-if="showJournalLinker"
+            :existing-entry-ids="journalLinks.map(l => l.targetId)"
+            @link="onLinkJournalEntry"
+            @cancel="showJournalLinker = false"
+          />
+        </div>
+
+        <!-- Weekly review -->
+        <div class="space-y-3">
+          <button
+            type="button"
+            class="flex w-full items-center gap-2 text-left"
+            @click="showWeeklyReview = !showWeeklyReview"
+          >
+            <UIcon
+              :name="showWeeklyReview ? 'i-lucide-chevron-down' : 'i-lucide-chevron-right'"
+              class="size-4 shrink-0 text-muted"
+            />
+            <UIcon name="i-lucide-calendar-check-2" class="size-4 shrink-0 text-primary" />
+            <h4 class="text-sm font-semibold text-highlighted">
+              Revisão semanal
+            </h4>
+          </button>
+
+          <GoalsWeeklyReview v-if="showWeeklyReview && currentGoal" :goal-id="currentGoal.id" />
         </div>
 
         <!-- Meta info -->

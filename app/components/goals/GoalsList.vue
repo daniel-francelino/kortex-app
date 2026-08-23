@@ -129,9 +129,15 @@ function getRowItems(goal: Goal) {
         @click="emit('select', goal.id)"
       >
         <div class="flex items-center gap-3">
-          <!-- Emoji avatar -->
-          <div class="size-9 rounded-xl flex items-center justify-center shrink-0 bg-elevated border border-default">
-            <span v-if="goal.emoji" class="text-xl leading-none select-none">{{ goal.emoji }}</span>
+          <!-- Cover thumbnail / emoji avatar -->
+          <div class="size-9 rounded-xl flex items-center justify-center shrink-0 bg-elevated border border-default overflow-hidden">
+            <img
+              v-if="goal.coverImageUrl"
+              :src="goal.coverImageUrl"
+              alt=""
+              class="size-full object-cover"
+            >
+            <span v-else-if="goal.emoji" class="text-xl leading-none select-none">{{ goal.emoji }}</span>
             <UIcon v-else name="i-lucide-target" class="size-4 text-muted" />
           </div>
 

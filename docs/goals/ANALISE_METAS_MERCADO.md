@@ -23,8 +23,8 @@ Metas com título, descrição, emoji, categorização por prazo (diário a long
 | Recurso | Status | Nota |
 | --- | --- | --- |
 | Subtarefas simples (lista plana) | ✅ Já existe | `goal_tasks`, progresso calculado pela proporção concluída. |
-| **Sub-metas / marcos (hierarquia meta → sub-meta → tarefa)** | ❌ Faltando | GoalsOnTrack estrutura explicitamente "metas divididas em sub-metas e marcos, usados para planejar as ações necessárias" — uma meta grande (ex.: "Correr uma maratona") se decompõe em metas menores (ex.: "Correr 10km sem parar") antes de virar tarefas. O Kortex só tem um nível: meta → tarefas planas, sem nenhuma noção de meta intermediária. |
-| **Tipos de progresso além de "tarefas concluídas"** (numérico, monetário, vinculado a métrica) | ❌ Faltando | ClickUp modela progresso como "um número, um valor monetário, verdadeiro/falso, ou tarefas vinculadas" — no Kortex, o progresso é **sempre e apenas** a razão de tarefas concluídas (seção 8 de `1.GOALS.md`); não há como modelar "economizar R$ 10.000" ou "ler 12 livros" como progresso numérico direto, só quebrando em 12 tarefas manuais. |
+| **Sub-metas / marcos (hierarquia meta → sub-meta → tarefa)** | ✅ Implementado | `goal_milestones` + `goal_tasks.milestone_id`, grupos colapsáveis no detalhe da meta (P1, item 5). |
+| **Tipos de progresso além de "tarefas concluídas"** (numérico, monetário, vinculado a métrica) | ✅ Implementado | `goals.progress_type`/`target_value`/`current_value`/`unit` (P1, item 6). |
 | Reordenar tarefas | ❌ Faltando | `sort_order` existe no schema mas só é definido na criação (sempre no fim); não há UI de arrastar para reordenar. |
 
 ### 2.2 Visualização e planejamento
@@ -62,23 +62,25 @@ Metas com título, descrição, emoji, categorização por prazo (diário a long
 
 ## 3. Roadmap sugerido (por esforço x impacto)
 
-### P0 — Corrigir bugs confirmados + ligar o que já está construído
-1. **Corrigir a lista que não atualiza** após criar, editar, concluir, arquivar ou restaurar uma meta pelo menu de contexto — hoje só ações feitas de dentro do slideover de detalhe atualizam a lista (`1.GOALS.md`, seções 2–4). Nenhum concorrente pesquisado teria esse tipo de falha básica de sincronização de UI.
-2. **Unificar a regra de "concluir uma meta"** — hoje o slideover exige progresso ≥ 100%, mas o menu de contexto da lista permite concluir com qualquer progresso, inclusive 0% (`1.GOALS.md`, seção 5). Decidir uma regra única.
-3. **Conectar o painel de Insights** (`GoalsInsightsPanel.vue` + `GET /api/goals/insights`, ambos prontos e corretos) — hoje não existe nem o conceito de uma segunda visão na tela de Metas onde ele pudesse entrar (`1.GOALS.md`, seção 9).
+> **Status (2026-08-23): itens 1–12 (P0+P1+P2) implementados.** Só o P3 (itens 13–15) segue em aberto — decisões de produto maiores, e o item 15 (IA) contraria a decisão já registrada de deferir features de IA até os módulos base estarem prontos. Ver `docs/goals/PLANO_METAS_HABITOS.md` para o detalhe de implementação dos itens 4/7/12.
 
-### P1 — Fecha o gap estrutural nº1 da categoria: hierarquia e progresso real
-4. **Progresso da meta alimentado por hábitos vinculados**, não só tarefas — a lacuna mais citada tanto interna (TODO da própria equipe) quanto externamente (modelo do Beyond Time); ver também o roadmap de Hábitos, item 7.
-5. **Sub-metas/marcos** (um nível intermediário entre meta e tarefa) — o recurso estrutural que mais separa GoalsOnTrack/Lifetick de uma lista de tarefas com rótulo de "meta".
-6. **Tipos de progresso além de tarefa concluída** (numérico, monetário) — modelo ClickUp; permite metas como "economizar R$X" ou "ler N livros" sem precisar simular isso com tarefas artificiais.
-7. **Decidir e aplicar a cardinalidade hábito↔meta** (ou documentar deliberadamente que é muitos-para-muitos e ajustar a UI para refletir isso, em vez de a intenção de produto divergir do comportamento real).
+### P0 — Corrigir bugs confirmados + ligar o que já está construído ✅
+1. ✅ **Lista atualiza** após criar, editar, concluir, arquivar ou restaurar uma meta pelo menu de contexto — todo handler de mutação em `goals/index.vue` chama `refreshList()`; `CreateModal`/`EditModal` emitem `saved`.
+2. ✅ **Regra de "concluir uma meta" unificada** — removido o gate de progresso ≥ 100% do slideover; concluir manualmente exige só `status === active`, igual ao menu de contexto da lista.
+3. ✅ **Painel de Insights conectado** — aba "Insights" em `goals/index.vue` (`UTabs`), carregada sob demanda.
 
-### P2 — Recursos de "app de meta maduro"
-8. **Revisão periódica dedicada a metas** (não a revisão semanal de hábitos) — um check-in "essa meta ainda faz sentido? o que mudou?" no espírito de GoalsOnTrack/Lifetick e do padrão de planejadores semanais (Sunsama, Full Focus Planner).
-9. **Vision board / representação visual da meta** — imagem de capa ou colagem por meta, complementando o emoji que já existe.
-10. **Templates de meta prontos** — biblioteca inicial por área da vida/prazo, reduzindo a fricção do formulário em branco (mesmo espírito do item já citado no roadmap de Hábitos).
-11. **Vincular entradas do Diário a uma meta** — reaproveitar o mecanismo de vínculo genérico do Life OS (`server/api/life/links/*`, já usado para outras combinações), adicionando "goal" como tipo de entidade linkável.
-12. **UI bidirecional de vínculo com hábitos** — hoje só é possível vincular a partir da tela de Metas; adicionar o controle equivalente a partir da tela de Hábitos (criar/editar hábito, detalhe do hábito).
+### P1 — Fecha o gap estrutural nº1 da categoria: hierarquia e progresso real ✅
+4. ✅ **Progresso da meta alimentado por hábitos vinculados** — `calculateHabitConsistency()` + `GET /api/goals/[id]` retorna `taskProgress`/`habitProgress`/`combinedProgress`, com as três barras visíveis no detalhe.
+5. ✅ **Sub-metas/marcos** — tabela `goal_milestones`, `goal_tasks.milestone_id`, grupos colapsáveis no detalhe da meta.
+6. ✅ **Tipos de progresso** (tarefas/numérico/monetário) — `goals.progress_type`/`target_value`/`current_value`/`unit`, trigger de progresso guardado para só recalcular metas do tipo `tasks`.
+7. ✅ **Cardinalidade hábito↔meta aplicada** — `UNIQUE(habit_id)` em `goal_habits` (com migration de dedup), erro 409 nomeando a meta atual ao tentar vincular um hábito já ocupado.
+
+### P2 — Recursos de "app de meta maduro" ✅
+8. ✅ **Revisão periódica dedicada a metas** — `goal_reflections` (upsert por `user_id, goal_id, week_key`), seção colapsável "Revisão semanal" no detalhe.
+9. ✅ **Vision board simplificado** — `goals.cover_image_url`, banner no detalhe (reaproveita `POST /api/editor/uploads`) e thumbnail na listagem.
+10. ✅ **Templates de meta prontos** — `app/utils/goal-templates.ts` (10 templates por área da vida), aba "Começar de um template" no modal de criação, com tarefas sugeridas criadas junto.
+11. ✅ **Vincular entradas do Diário a uma meta** — reaproveita `entity_links`/`useLifeOS()`; `GET /api/life/links` agora resolve `sourceLabel`/`targetLabel` em lote. UI nos dois sentidos (detalhe da meta e detalhe da entrada).
+12. ✅ **UI bidirecional de vínculo com hábitos** — campo "Meta vinculada" em criar/editar hábito, badge "Meta: {título}" no detalhe do hábito, "Criar hábito para esta meta" a partir do vinculador da meta.
 
 ### P3 — Apostas maiores / diferenciação
 13. **Metas ancoradas em valores pessoais** — reformular a criação de meta para opcionalmente começar por "o que importa para você" (inspirado no Lifetick), com "área da vida" deixando de ser só uma categorização e passando a ser um agrupamento navegável por valor.

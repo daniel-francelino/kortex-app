@@ -1,18 +1,18 @@
 <script setup lang="ts">
-import { AnimatePresence, motion } from "motion-v";
+import { AnimatePresence, motion } from 'motion-v'
 import { useDebounceFn } from '@vueuse/core'
 import type { JournalEntry, JournalListResponse } from '~/types/journal'
 import { tiptapJsonToMarkdown } from '~/utils/tiptap-markdown'
 import { downloadTextFile } from '~/utils/export-download'
 
 definePageMeta({
-  layout: "app",
-  ssr: false,
-});
+  layout: 'app',
+  ssr: false
+})
 
 useSeoMeta({
-  title: "Diário de Bordo",
-});
+  title: 'Diário de Bordo'
+})
 
 const {
   todayData,
@@ -35,14 +35,14 @@ const {
   refreshInsights,
   isOnline,
   pendingSyncCount,
-  syncingOffline,
-} = useJournal();
+  syncingOffline
+} = useJournal()
 
 const {
   statusLoaded: lockStatusLoaded,
   refreshStatus: refreshLockStatus,
-  isModuleLocked,
-} = useJournalLock();
+  isModuleLocked
+} = useJournalLock()
 
 const {
   enabled: encryptionEnabled,
@@ -177,91 +177,91 @@ const exportAllMenuItems = computed(() => [
   { label: 'Backup (JSON)', icon: 'i-lucide-database-backup', onSelect: exportAllJson }
 ])
 
-const isMobile = useIsMobile();
+const isMobile = useIsMobile()
 
 // ─── View mode ────────────────────────────────────────────────────────────────
-type JournalView = "editor" | "calendar" | "list" | "periods" | "insights";
-const activeView = ref<JournalView>("editor");
+type JournalView = 'editor' | 'calendar' | 'list' | 'periods' | 'insights'
+const activeView = ref<JournalView>('editor')
 
 watch(activeView, (view) => {
-  if (view === "editor") refreshToday();
-  if (view === "calendar") refreshCalendar();
-  if (view === "list") {
-    refreshList();
+  if (view === 'editor') refreshToday()
+  if (view === 'calendar') refreshCalendar()
+  if (view === 'list') {
+    refreshList()
   }
-  if (view === "insights") refreshInsights();
-});
+  if (view === 'insights') refreshInsights()
+})
 
 // ─── Editor ref (for unsaved-changes check) ───────────────────────────────────
 const editorRef = ref<{
-  isUnsaved: () => boolean;
-  doSave: () => Promise<void>;
-} | null>(null);
+  isUnsaved: () => boolean
+  doSave: () => Promise<void>
+} | null>(null)
 
 // ─── Unsaved-changes confirmation on route leave ──────────────────────────────
-const confirmLeaveOpen = ref(false);
-let resolvePendingNav: ((allow: boolean) => void) | null = null;
+const confirmLeaveOpen = ref(false)
+let resolvePendingNav: ((allow: boolean) => void) | null = null
 
 onBeforeRouteLeave(async () => {
-  const editor = editorRef.value;
-  if (!editor?.isUnsaved()) return; // nothing unsaved, allow navigation
+  const editor = editorRef.value
+  if (!editor?.isUnsaved()) return // nothing unsaved, allow navigation
 
   return new Promise<boolean | undefined>((resolve) => {
-    resolvePendingNav = resolve;
-    confirmLeaveOpen.value = true;
-  }).then((allow) => (allow ? undefined : false));
-});
+    resolvePendingNav = resolve
+    confirmLeaveOpen.value = true
+  }).then(allow => (allow ? undefined : false))
+})
 
 async function onConfirmSaveAndLeave() {
-  confirmLeaveOpen.value = false;
-  await editorRef.value?.doSave();
-  resolvePendingNav?.(true);
-  resolvePendingNav = null;
+  confirmLeaveOpen.value = false
+  await editorRef.value?.doSave()
+  resolvePendingNav?.(true)
+  resolvePendingNav = null
 }
 
 function onConfirmDiscardAndLeave() {
-  confirmLeaveOpen.value = false;
-  resolvePendingNav?.(true);
-  resolvePendingNav = null;
+  confirmLeaveOpen.value = false
+  resolvePendingNav?.(true)
+  resolvePendingNav = null
 }
 
 function onConfirmCancel() {
-  confirmLeaveOpen.value = false;
-  resolvePendingNav?.(false);
-  resolvePendingNav = null;
+  confirmLeaveOpen.value = false
+  resolvePendingNav?.(false)
+  resolvePendingNav = null
 }
 
 // Calendar entry modal
-const detailModalOpen = ref(false);
-const selectedDate = ref("");
+const detailModalOpen = ref(false)
+const selectedDate = ref('')
 
 function onSelectDate(date: string) {
-  selectedDate.value = date;
-  detailModalOpen.value = true;
+  selectedDate.value = date
+  detailModalOpen.value = true
 }
 
 function onCalendarMonthChange(from: string, to: string) {
-  calendarFrom.value = from;
-  calendarTo.value = to;
+  calendarFrom.value = from
+  calendarTo.value = to
 }
 
 // ─── View options ─────────────────────────────────────────────────────────────
-const viewOptions: { value: JournalView; icon: string; tooltip: string }[] = [
-  { value: "editor", icon: "i-lucide-pen-line", tooltip: "Editor de hoje" },
-  { value: "calendar", icon: "i-lucide-calendar-days", tooltip: "Calendário" },
-  { value: "list", icon: "i-lucide-list", tooltip: "Lista de entradas" },
-  { value: "periods", icon: "i-lucide-calendar-range", tooltip: "Notas semanais/mensais" },
-  { value: "insights", icon: "i-lucide-bar-chart-3", tooltip: "Insights" },
-];
+const viewOptions: { value: JournalView, icon: string, label: string, tooltip: string }[] = [
+  { value: 'editor', icon: 'i-lucide-pen-line', label: 'Hoje', tooltip: 'Editor de hoje' },
+  { value: 'calendar', icon: 'i-lucide-calendar-days', label: 'Calendário', tooltip: 'Calendário' },
+  { value: 'list', icon: 'i-lucide-list', label: 'Entradas', tooltip: 'Lista de entradas' },
+  { value: 'periods', icon: 'i-lucide-calendar-range', label: 'Períodos', tooltip: 'Notas semanais/mensais' },
+  { value: 'insights', icon: 'i-lucide-bar-chart-3', label: 'Insights', tooltip: 'Insights' }
+]
 
 // ─── Entry list view ────────────────────────────────────────────────────────────
 function onListEntrySelect(date: string) {
-  onSelectDate(date);
+  onSelectDate(date)
 }
 
 // ─── Insights view ────────────────────────────────────────────────────────────
-function onInsightsRangeChange(range: "7d" | "30d" | "90d") {
-  insightsRange.value = range;
+function onInsightsRangeChange(range: '7d' | '30d' | '90d') {
+  insightsRange.value = range
 }
 </script>
 
@@ -275,7 +275,7 @@ function onInsightsRangeChange(range: "7d" | "30d" | "90d") {
 
         <template #right>
           <div
-            class="journal-view-switcher flex max-w-[52vw] items-center gap-0.5 overflow-x-auto rounded-lg border border-default p-0.5 sm:max-w-none"
+            class="hidden items-center gap-0.5 rounded-lg border border-default p-0.5 lg:flex"
           >
             <UTooltip
               v-for="opt in viewOptions"
@@ -313,6 +313,27 @@ function onInsightsRangeChange(range: "7d" | "30d" | "90d") {
            local handler needed, it recomputes to false on its own. -->
       <JournalLockScreen v-else-if="isModuleLocked" />
       <div v-else class="journal-mobile-surface space-y-4">
+        <div class="lg:hidden">
+          <div class="journal-view-switcher -mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
+            <button
+              v-for="opt in viewOptions"
+              :key="opt.value"
+              type="button"
+              class="flex h-12 min-w-28 items-center justify-center gap-2 rounded-xl border px-3 text-sm font-medium transition-colors"
+              :class="
+                activeView === opt.value
+                  ? 'border-primary/40 bg-primary/15 text-primary'
+                  : 'border-default bg-elevated/20 text-muted active:bg-elevated/70'
+              "
+              :aria-pressed="activeView === opt.value"
+              @click="activeView = opt.value"
+            >
+              <UIcon :name="opt.icon" class="size-5 shrink-0" />
+              <span>{{ opt.label }}</span>
+            </button>
+          </div>
+        </div>
+
         <!-- Offline / pending sync indicator -->
         <div
           v-if="!isOnline || pendingSyncCount > 0"
@@ -334,16 +355,10 @@ function onInsightsRangeChange(range: "7d" | "30d" | "90d") {
             class="size-3.5 shrink-0"
             :class="syncingOffline ? 'animate-spin' : ''"
           />
-          <span v-if="!isOnline"
-            >Offline — as alterações serão sincronizadas ao reconectar</span
-          >
-          <span v-else-if="syncingOffline"
-            >Sincronizando alterações offline...</span
-          >
-          <span v-else
-            >{{ pendingSyncCount }} alteração(ões) pendente(s) de
-            sincronização</span
-          >
+          <span v-if="!isOnline">Offline — as alterações serão sincronizadas ao reconectar</span>
+          <span v-else-if="syncingOffline">Sincronizando alterações offline...</span>
+          <span v-else>{{ pendingSyncCount }} alteração(ões) pendente(s) de
+            sincronização</span>
         </div>
 
         <AnimatePresence mode="wait">
@@ -477,9 +492,7 @@ function onInsightsRangeChange(range: "7d" | "30d" | "90d") {
     <template #header>
       <div class="flex items-center gap-2">
         <UIcon name="i-lucide-pencil-line" class="size-4 text-warning" />
-        <span class="text-sm font-semibold text-highlighted"
-          >Alterações não salvas</span
-        >
+        <span class="text-sm font-semibold text-highlighted">Alterações não salvas</span>
       </div>
     </template>
 

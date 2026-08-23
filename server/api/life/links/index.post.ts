@@ -40,5 +40,15 @@ export default eventHandler(async (event) => {
     throw createError({ statusCode: 500, statusMessage: 'Falha ao criar vínculo', data: error.message })
   }
 
-  return data
+  const row = data as Record<string, unknown>
+
+  return {
+    id: row.id,
+    userId: row.user_id,
+    sourceType: row.source_type,
+    sourceId: row.source_id,
+    targetType: row.target_type,
+    targetId: row.target_id,
+    createdAt: row.created_at
+  }
 })

@@ -44,7 +44,7 @@ const hoverClasses: Record<MoodValue, string> = {
         'border transition-all duration-150 cursor-pointer select-none',
         modelValue === mood.value
           ? ['ring-2 border-transparent', bgClasses[mood.value]]
-          : ['border-transparent', hoverClasses[mood.value]],
+          : ['border-transparent', hoverClasses[mood.value]]
       ]"
       :title="mood.label"
       @click="select(mood.value)"
@@ -53,7 +53,7 @@ const hoverClasses: Record<MoodValue, string> = {
         :class="[
           'text-lg leading-none transition-all duration-150 sm:text-xl',
           modelValue === mood.value ? 'scale-110' : '',
-          modelValue !== null && modelValue !== mood.value ? 'opacity-35' : 'opacity-100',
+          modelValue !== null && modelValue !== mood.value ? 'opacity-35' : 'opacity-100'
         ]"
       >{{ mood.emoji }}</span>
     </button>
