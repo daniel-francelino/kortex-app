@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { z } from 'zod'
-import type { Calendar, CalendarVisibility } from '~/types/appointments'
+import type { Calendar, CalendarShare, CalendarVisibility } from '~/types/appointments'
 
 const props = defineProps<{
   open: boolean
@@ -14,10 +14,61 @@ const emit = defineEmits<{
   'updated': []
 }>()
 
-const { createCalendar, updateCalendar, toggleCalendarSubscribe } = useAppointments()
+const {
+  createCalendar,
+  updateCalendar,
+  toggleCalendarSubscribe,
+  fetchCalendarShares,
+  shareCalendar,
+  updateCalendarSharePermission,
+  removeCalendarShare
+} = useAppointments()
 const toast = useToast()
 const subscribeToggling = ref(false)
 const localCalendar = ref<Calendar | null>(null)
+
+// ─── Sharing ─────────────────────────────────────────────────────────────────
+const shares = ref<CalendarShare[]>([])
+const sharesLoading = ref(false)
+const newShareEmail = ref('')
+const newSharePermission = ref<'view' | 'edit'>('view')
+const addingShare = ref(false)
+
+async function loadShares() {
+  if (!props.calendar) return
+  sharesLoading.value = true
+  shares.value = await fetchCalendarShares(props.calendar.id)
+  sharesLoading.value = false
+}
+
+async function onAddShare() {
+  const email = newShareEmail.value.trim()
+  if (!email || !props.calendar) return
+  addingShare.value = true
+  const created = await shareCalendar(props.calendar.id, email, newSharePermission.value)
+  addingShare.value = false
+  if (created) {
+    shares.value = [...shares.value, created]
+    newShareEmail.value = ''
+    newSharePermission.value = 'view'
+  }
+}
+
+async function onChangeSharePermission(share: CalendarShare, permission: 'view' | 'edit') {
+  if (!props.calendar) return
+  const updated = await updateCalendarSharePermission(props.calendar.id, share.id, permission)
+  if (updated) {
+    shares.value = shares.value.map(s => s.id === share.id ? updated : s)
+  }
+}
+
+async function onRemoveShare(share: CalendarShare) {
+  if (!props.calendar) return
+  const ok = await removeCalendarShare(props.calendar.id, share.id)
+  if (ok) {
+    shares.value = shares.value.filter(s => s.id !== share.id)
+  }
+}
 
 const subscribeUrl = computed(() => {
   if (!localCalendar.value?.subscribeToken || !localCalendar.value.subscribeEnabled) return null
@@ -131,6 +182,8 @@ watch(
     state.color = calendar?.color ?? '#10b981'
     state.visibility = calendar?.visibility ?? 'private'
     localCalendar.value = calendar ?? null
+    shares.value = []
+    if (calendar) void loadShares()
   },
   { immediate: true }
 )
@@ -229,6 +282,82 @@ watch(
               @click="copySubscribeUrl"
             />
           </div>
+        </div>
+
+        <div v-if="isEditing" class="space-y-3 border-t border-default pt-4">
+          <p class="text-sm font-medium text-highlighted">
+            Compartilhar calendário
+          </p>
+
+          <div class="flex items-center gap-2">
+            <UInput
+              v-model="newShareEmail"
+              type="email"
+              placeholder="email@exemplo.com"
+              size="sm"
+              class="flex-1"
+              @keydown.enter="onAddShare"
+            />
+            <USelect
+              v-model="newSharePermission"
+              :items="[{ label: 'Visualizar', value: 'view' }, { label: 'Editar', value: 'edit' }]"
+              value-key="value"
+              size="sm"
+              class="w-32"
+            />
+            <UButton
+              icon="i-lucide-plus"
+              size="sm"
+              color="primary"
+              variant="subtle"
+              :loading="addingShare"
+              :disabled="!newShareEmail.trim()"
+              @click="onAddShare"
+            />
+          </div>
+
+          <div v-if="sharesLoading" class="text-xs text-muted">
+            Carregando...
+          </div>
+          <ul v-else-if="shares.length > 0" class="space-y-1.5">
+            <li
+              v-for="share in shares"
+              :key="share.id"
+              class="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-elevated"
+            >
+              <UIcon
+                :name="share.status === 'pending' ? 'i-lucide-mail' : 'i-lucide-user'"
+                class="size-3.5 shrink-0 text-dimmed"
+              />
+              <span class="flex-1 truncate">{{ share.invitedEmail }}</span>
+              <UBadge
+                v-if="share.status === 'pending'"
+                color="neutral"
+                variant="subtle"
+                size="sm"
+              >
+                Convite pendente
+              </UBadge>
+              <USelect
+                :model-value="share.permission"
+                :items="[{ label: 'Visualizar', value: 'view' }, { label: 'Editar', value: 'edit' }]"
+                value-key="value"
+                size="sm"
+                class="w-28"
+                @update:model-value="(value: 'view' | 'edit') => onChangeSharePermission(share, value)"
+              />
+              <UButton
+                icon="i-lucide-x"
+                size="xs"
+                color="neutral"
+                variant="ghost"
+                @click="onRemoveShare(share)"
+              />
+            </li>
+          </ul>
+          <p v-else class="text-xs text-dimmed">
+            Ninguém tem acesso ainda.
+          </p>
         </div>
 
         <div class="flex justify-end gap-2 pt-2">

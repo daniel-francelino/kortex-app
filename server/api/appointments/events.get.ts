@@ -24,18 +24,27 @@ export default eventHandler(async (event) => {
 
   const supabase = getSupabaseAdminClient()
 
-  // First get user's calendar IDs
+  // First get user's calendar IDs (own calendars + calendars shared with them)
   let calendarIds: string[] = []
   if (params.calendarId) {
     calendarIds = [params.calendarId]
   } else {
-    const { data: cals } = await supabase
-      .from('calendars')
-      .select('id')
-      .eq('owner_user_id', user.id)
-      .is('archived_at', null)
+    const [{ data: cals }, { data: shares }] = await Promise.all([
+      supabase
+        .from('calendars')
+        .select('id')
+        .eq('owner_user_id', user.id)
+        .is('archived_at', null),
+      supabase
+        .from('calendar_shares')
+        .select('calendar_id')
+        .eq('invited_user_id', user.id)
+        .eq('status', 'accepted')
+    ])
 
-    calendarIds = (cals ?? []).map((c: Record<string, unknown>) => c.id as string)
+    const ownIds = (cals ?? []).map((c: Record<string, unknown>) => c.id as string)
+    const sharedIds = (shares ?? []).map((s: Record<string, unknown>) => s.calendar_id as string)
+    calendarIds = [...new Set([...ownIds, ...sharedIds])]
   }
 
   // Events the user was invited to (as a participant, not an owner) also show

@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { getSupabaseAdminClient } from '../../../utils/supabase'
 import { requireAuthUser } from '../../../utils/require-auth'
+import { resolveCalendarForWrite } from '../../../utils/calendar-access'
 
 const bodySchema = z.object({
   title: z.string().min(1).max(200).optional(),
@@ -32,15 +33,19 @@ export default eventHandler(async (event) => {
     .from('events')
     .select('*')
     .eq('id', id)
-    .eq('owner_user_id', user.id)
     .single()
 
   if (!currentEvent) {
     throw createError({ statusCode: 404, statusMessage: 'Evento não encontrado' })
   }
 
-  // Save snapshot to event_history
   const current = currentEvent as Record<string, unknown>
+  const access = await resolveCalendarForWrite(supabase, current.calendar_id as string, user.id)
+  if (!access) {
+    throw createError({ statusCode: 404, statusMessage: 'Evento não encontrado' })
+  }
+
+  // Save snapshot to event_history
   await supabase.from('event_history').insert({
     event_id: id,
     changed_by: user.id,
@@ -74,7 +79,7 @@ export default eventHandler(async (event) => {
     .from('events')
     .update(updateData)
     .eq('id', id)
-    .eq('owner_user_id', user.id)
+    .eq('owner_user_id', access.ownerId)
     .select()
     .single()
 

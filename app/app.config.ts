@@ -42,8 +42,26 @@ export default defineAppConfig({
     },
     modal: {
       slots: {
-        content: 'max-h-[90vh] flex flex-col',
-        body: 'overflow-y-auto'
+        overlay: 'max-lg:p-[max(1rem,var(--safe-area-top))_1rem_max(1rem,var(--safe-area-bottom))]',
+        content: 'max-h-[90vh] flex flex-col max-lg:max-h-[calc(100dvh-var(--safe-area-top)-var(--safe-area-bottom)-2rem)]',
+        header: 'max-lg:pt-[max(1rem,var(--safe-area-top))]',
+        body: 'overflow-y-auto',
+        footer: 'max-lg:pb-[max(1rem,var(--safe-area-bottom))]',
+        close: 'max-lg:top-[max(1rem,var(--safe-area-top))]'
+      }
+    },
+    slideover: {
+      slots: {
+        content: 'max-lg:max-h-dvh max-lg:pt-[var(--safe-area-top)] max-lg:pb-[var(--safe-area-bottom)]',
+        header: 'max-lg:min-h-[calc(var(--ui-header-height)+var(--safe-area-top))] max-lg:items-end max-lg:pt-[var(--safe-area-top)]',
+        footer: 'max-lg:pb-[max(1rem,var(--safe-area-bottom))]',
+        close: 'max-lg:top-[max(1rem,var(--safe-area-top))]'
+      }
+    },
+    drawer: {
+      slots: {
+        content: 'max-lg:max-h-dvh',
+        container: 'max-lg:pt-[max(1rem,var(--safe-area-top))] max-lg:pb-[max(1rem,var(--safe-area-bottom))]'
       }
     }
   }

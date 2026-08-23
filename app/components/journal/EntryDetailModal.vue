@@ -228,9 +228,9 @@ const exportMenuItems = computed(() => [
     :ui="{
       overlay: 'z-[220] bg-elevated/80',
       content: 'z-[230] flex h-dvh max-h-dvh flex-col',
-      header: 'shrink-0 px-4 py-3 sm:px-8',
+      header: 'shrink-0 px-4 pb-3 pt-[max(0.75rem,var(--safe-area-top))] sm:px-8',
       body: 'min-h-0 flex-1 overflow-y-auto p-0',
-      footer: 'shrink-0 px-4 py-3 sm:px-8'
+      footer: 'shrink-0 px-4 pb-[max(0.75rem,var(--safe-area-bottom))] pt-3 sm:px-8'
     }"
     @update:open="onOpenChange"
   >

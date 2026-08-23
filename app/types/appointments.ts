@@ -84,6 +84,18 @@ export interface EventException {
   updatedAt: string
 }
 
+export interface CalendarShare {
+  id: string
+  calendarId: string
+  ownerId: string
+  invitedUserId: string | null
+  invitedEmail: string
+  permission: 'view' | 'edit'
+  status: 'pending' | 'accepted'
+  createdAt: string
+  updatedAt: string
+}
+
 export interface EventParticipant {
   id: string
   eventId: string

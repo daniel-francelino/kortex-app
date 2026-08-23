@@ -27,5 +27,40 @@ export default eventHandler(async (event) => {
     throw createError({ statusCode: 500, statusMessage: error.message })
   }
 
-  return data ?? []
+  const ownCalendars = data ?? []
+
+  if (params.archived) {
+    return ownCalendars
+  }
+
+  // Also surface calendars someone else shared with this user (accepted only).
+  const { data: shares } = await supabase
+    .from('calendar_shares')
+    .select('calendar_id')
+    .eq('invited_user_id', user.id)
+    .eq('status', 'accepted')
+
+  const sharedCalendarIds = [...new Set((shares ?? []).map((s: Record<string, unknown>) => s.calendar_id as string))]
+
+  let sharedCalendars: Record<string, unknown>[] = []
+  if (sharedCalendarIds.length > 0) {
+    const { data: sharedData } = await supabase
+      .from('calendars')
+      .select('*')
+      .in('id', sharedCalendarIds)
+      .is('archived_at', null)
+
+    sharedCalendars = sharedData ?? []
+  }
+
+  const seenIds = new Set<string>()
+  const merged: Record<string, unknown>[] = []
+  for (const cal of [...ownCalendars, ...sharedCalendars]) {
+    const id = (cal as Record<string, unknown>).id as string
+    if (seenIds.has(id)) continue
+    seenIds.add(id)
+    merged.push(cal as Record<string, unknown>)
+  }
+
+  return merged
 })

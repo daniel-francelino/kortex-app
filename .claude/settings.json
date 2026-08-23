@@ -22,7 +22,8 @@
       "Bash(node -e \"console.log\\(require\\('./package.json'\\).dependencies['date-fns']\\)\")",
       "Bash(pnpm add *)",
       "Bash(npx --no-install tsx --version)",
-      "Bash(node -e ' *)"
+      "Bash(node -e ' *)",
+      "Bash(node \"C:\\\\Users\\\\DANIEL~1.FRA\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-daniel-francelino-Desktop-projects-study-kortex-app\\\\8ab1ea3f-4dde-43fe-a8df-078ee2ca9bea\\\\scratchpad\\\\test-availability.mjs\")"
     ]
   }
 }

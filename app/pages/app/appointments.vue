@@ -485,6 +485,17 @@ onMounted(() => {
             </UTooltip>
           </div>
 
+          <!-- Public scheduling pages -->
+          <UTooltip text="Link de agendamento">
+            <UButton
+              square
+              color="neutral"
+              variant="ghost"
+              icon="i-lucide-calendar-clock"
+              to="/app/scheduling"
+            />
+          </UTooltip>
+
           <!-- Calendar sidebar toggle -->
           <UTooltip text="Calendários">
             <UButton

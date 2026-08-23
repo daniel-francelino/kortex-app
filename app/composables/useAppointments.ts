@@ -2,6 +2,7 @@ import { useDebounceFn } from '@vueuse/core'
 import type {
   Calendar,
   CalendarEvent,
+  CalendarShare,
   EventException,
   EventParticipant,
   EventReminder,
@@ -72,6 +73,22 @@ function normalizeException(input: unknown): EventException {
     overrideEndAt: (exception.overrideEndAt as string | null) ?? (exception.override_end_at as string | null) ?? null,
     createdAt: String(exception.createdAt ?? exception.created_at ?? ''),
     updatedAt: String(exception.updatedAt ?? exception.updated_at ?? '')
+  }
+}
+
+function normalizeCalendarShare(input: unknown): CalendarShare {
+  const share = (input ?? {}) as Record<string, unknown>
+
+  return {
+    id: String(share.id ?? ''),
+    calendarId: String(share.calendarId ?? share.calendar_id ?? ''),
+    ownerId: String(share.ownerId ?? share.owner_id ?? ''),
+    invitedUserId: (share.invitedUserId as string | null) ?? (share.invited_user_id as string | null) ?? null,
+    invitedEmail: String(share.invitedEmail ?? share.invited_email ?? ''),
+    permission: (share.permission ?? 'view') as CalendarShare['permission'],
+    status: (share.status ?? 'pending') as CalendarShare['status'],
+    createdAt: String(share.createdAt ?? share.created_at ?? ''),
+    updatedAt: String(share.updatedAt ?? share.updated_at ?? '')
   }
 }
 
@@ -263,6 +280,55 @@ export function useAppointments() {
       return true
     } catch {
       toast.add({ title: 'Erro', description: 'Não foi possível arquivar o calendário', color: 'error' })
+      return false
+    }
+  }
+
+  // ─── Calendar sharing ─────────────────────────────────────────────────────
+  async function fetchCalendarShares(calendarId: string): Promise<CalendarShare[]> {
+    try {
+      const data = await $fetch<unknown[]>(`/api/appointments/calendars/${calendarId}/shares`)
+      return (data ?? []).map(normalizeCalendarShare)
+    } catch {
+      return []
+    }
+  }
+
+  async function shareCalendar(calendarId: string, email: string, permission: 'view' | 'edit'): Promise<CalendarShare | null> {
+    try {
+      const data = await $fetch(`/api/appointments/calendars/${calendarId}/shares`, {
+        method: 'POST',
+        body: { email, permission }
+      })
+      toast.add({ title: 'Convite enviado', color: 'success' })
+      return normalizeCalendarShare(data)
+    } catch (err: unknown) {
+      const message = (err as { data?: { statusMessage?: string } })?.data?.statusMessage
+      toast.add({ title: 'Erro', description: message ?? 'Não foi possível compartilhar o calendário.', color: 'error' })
+      return null
+    }
+  }
+
+  async function updateCalendarSharePermission(calendarId: string, shareId: string, permission: 'view' | 'edit'): Promise<CalendarShare | null> {
+    try {
+      const data = await $fetch(`/api/appointments/calendars/${calendarId}/shares/${shareId}`, {
+        method: 'PUT',
+        body: { permission }
+      })
+      return normalizeCalendarShare(data)
+    } catch {
+      toast.add({ title: 'Erro', description: 'Não foi possível atualizar a permissão.', color: 'error' })
+      return null
+    }
+  }
+
+  async function removeCalendarShare(calendarId: string, shareId: string): Promise<boolean> {
+    try {
+      await $fetch(`/api/appointments/calendars/${calendarId}/shares/${shareId}`, { method: 'DELETE' })
+      toast.add({ title: 'Acesso removido', color: 'success' })
+      return true
+    } catch {
+      toast.add({ title: 'Erro', description: 'Não foi possível remover o acesso.', color: 'error' })
       return false
     }
   }
@@ -524,6 +590,10 @@ export function useAppointments() {
     archiveCalendar,
     restoreCalendar,
     toggleCalendarSubscribe,
+    fetchCalendarShares,
+    shareCalendar,
+    updateCalendarSharePermission,
+    removeCalendarShare,
     getCalendarColor,
 
     // Events
