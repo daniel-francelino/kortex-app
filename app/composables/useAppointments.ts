@@ -35,6 +35,8 @@ function normalizeCalendar(input: unknown): Calendar {
     description: (calendar.description as string | null) ?? null,
     color: (calendar.color as string | null) ?? null,
     visibility: String(calendar.visibility ?? 'private') as CalendarVisibility,
+    subscribeToken: (calendar.subscribeToken as string | null) ?? (calendar.subscribe_token as string | null) ?? null,
+    subscribeEnabled: Boolean(calendar.subscribeEnabled ?? calendar.subscribe_enabled ?? false),
     createdAt: String(calendar.createdAt ?? calendar.created_at ?? ''),
     updatedAt: String(calendar.updatedAt ?? calendar.updated_at ?? ''),
     archivedAt: (calendar.archivedAt as string | null) ?? (calendar.archived_at as string | null) ?? null
@@ -262,6 +264,20 @@ export function useAppointments() {
     } catch {
       toast.add({ title: 'Erro', description: 'Não foi possível arquivar o calendário', color: 'error' })
       return false
+    }
+  }
+
+  async function toggleCalendarSubscribe(id: string, enabled: boolean): Promise<Calendar | null> {
+    try {
+      const data = await $fetch(`/api/appointments/calendars/${id}`, {
+        method: 'PATCH',
+        body: { subscribeEnabled: enabled }
+      })
+      await refreshCalendars()
+      return normalizeCalendar(data)
+    } catch {
+      toast.add({ title: 'Erro', description: 'Não foi possível atualizar a assinatura.', color: 'error' })
+      return null
     }
   }
 
@@ -507,6 +523,7 @@ export function useAppointments() {
     updateCalendar,
     archiveCalendar,
     restoreCalendar,
+    toggleCalendarSubscribe,
     getCalendarColor,
 
     // Events

@@ -14,7 +14,44 @@ const emit = defineEmits<{
   'updated': []
 }>()
 
-const { createCalendar, updateCalendar } = useAppointments()
+const { createCalendar, updateCalendar, toggleCalendarSubscribe } = useAppointments()
+const toast = useToast()
+const subscribeToggling = ref(false)
+const localCalendar = ref<Calendar | null>(null)
+
+const subscribeUrl = computed(() => {
+  if (!localCalendar.value?.subscribeToken || !localCalendar.value.subscribeEnabled) return null
+  const base = window.location.origin.replace(/^https?:/, 'webcal:')
+  return `${base}/api/appointments/calendars/${localCalendar.value.id}/subscribe.ics?token=${encodeURIComponent(localCalendar.value.subscribeToken)}`
+})
+
+const exportUrl = computed(() => {
+  if (!localCalendar.value) return null
+  return `/api/appointments/calendars/${localCalendar.value.id}/export.ics`
+})
+
+async function onToggleSubscribe(enabled: boolean) {
+  if (!localCalendar.value) return
+  subscribeToggling.value = true
+  const updated = await toggleCalendarSubscribe(localCalendar.value.id, enabled)
+  if (updated) localCalendar.value = updated
+  subscribeToggling.value = false
+}
+
+function onExportIcs() {
+  if (!exportUrl.value) return
+  window.open(exportUrl.value, '_blank')
+}
+
+async function copySubscribeUrl() {
+  if (!subscribeUrl.value) return
+  try {
+    await navigator.clipboard.writeText(subscribeUrl.value)
+    toast.add({ title: 'Link copiado!', color: 'success' })
+  } catch {
+    toast.add({ title: 'Erro', description: 'Não foi possível copiar o link.', color: 'error' })
+  }
+}
 
 const schema = z.object({
   name: z.string().min(1, 'Nome Ã© obrigatÃ³rio').max(100),
@@ -93,6 +130,7 @@ watch(
     state.description = calendar?.description ?? ''
     state.color = calendar?.color ?? '#10b981'
     state.visibility = calendar?.visibility ?? 'private'
+    localCalendar.value = calendar ?? null
   },
   { immediate: true }
 )
@@ -151,6 +189,47 @@ watch(
             />
           </div>
         </UFormField>
+
+        <div v-if="isEditing" class="space-y-2 border-t border-default pt-4">
+          <p class="text-sm font-medium text-highlighted">
+            Exportar / assinar (.ics)
+          </p>
+          <UButton
+            icon="i-lucide-download"
+            label="Exportar .ics"
+            color="neutral"
+            variant="subtle"
+            size="sm"
+            @click="onExportIcs"
+          />
+          <div class="flex items-center gap-3">
+            <UCheckbox
+              :model-value="localCalendar?.subscribeEnabled ?? false"
+              label="Assinatura ativa"
+              :disabled="subscribeToggling"
+              @update:model-value="onToggleSubscribe(Boolean($event))"
+            />
+          </div>
+          <p class="text-xs text-muted">
+            Gera um link para assinar este calendário em outro app (Google Calendar, Apple Calendar, etc).
+          </p>
+          <div v-if="subscribeUrl" class="flex items-center gap-2">
+            <UInput
+              :model-value="subscribeUrl"
+              readonly
+              class="flex-1"
+              size="sm"
+            />
+            <UButton
+              icon="i-lucide-copy"
+              color="neutral"
+              variant="subtle"
+              size="sm"
+              aria-label="Copiar link"
+              @click="copySubscribeUrl"
+            />
+          </div>
+        </div>
 
         <div class="flex justify-end gap-2 pt-2">
           <UButton

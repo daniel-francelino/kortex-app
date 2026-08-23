@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { randomBytes } from 'node:crypto'
 import { getSupabaseAdminClient } from '../../../utils/supabase'
 import { requireAuthUser } from '../../../utils/require-auth'
 
@@ -6,7 +7,8 @@ const bodySchema = z.object({
   name: z.string().min(1).max(100).optional(),
   description: z.string().max(500).nullable().optional(),
   color: z.string().max(20).nullable().optional(),
-  visibility: z.enum(['private', 'shared', 'public']).optional()
+  visibility: z.enum(['private', 'shared', 'public']).optional(),
+  subscribeEnabled: z.boolean().optional()
 })
 
 export default eventHandler(async (event) => {
@@ -30,6 +32,21 @@ export default eventHandler(async (event) => {
   if (payload.description !== undefined) updateData.description = payload.description
   if (payload.color !== undefined) updateData.color = payload.color
   if (payload.visibility !== undefined) updateData.visibility = payload.visibility
+  if (payload.subscribeEnabled !== undefined) updateData.subscribe_enabled = payload.subscribeEnabled
+
+  // Generate the subscribe token on first enable
+  if (payload.subscribeEnabled === true) {
+    const { data: existing } = await supabase
+      .from('calendars')
+      .select('subscribe_token')
+      .eq('id', id)
+      .eq('owner_user_id', user.id)
+      .maybeSingle()
+
+    if (!existing?.subscribe_token) {
+      updateData.subscribe_token = randomBytes(24).toString('base64url')
+    }
+  }
 
   const { data, error } = await supabase
     .from('calendars')

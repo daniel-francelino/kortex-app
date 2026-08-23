@@ -39,6 +39,8 @@ export interface Calendar {
   description: string | null
   color: string | null
   visibility: CalendarVisibility
+  subscribeToken: string | null
+  subscribeEnabled: boolean
   createdAt: string
   updatedAt: string
   archivedAt: string | null
@@ -144,6 +146,7 @@ export interface UpdateCalendarPayload {
   description?: string | null
   color?: string | null
   visibility?: CalendarVisibility
+  subscribeEnabled?: boolean
 }
 
 export interface CreateEventPayload {
