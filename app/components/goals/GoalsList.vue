@@ -128,7 +128,7 @@ function getRowItems(goal: Goal) {
         class="cursor-pointer transition-colors hover:bg-elevated/50"
         @click="emit('select', goal.id)"
       >
-        <div class="flex items-center gap-3">
+        <div class="flex flex-wrap items-center gap-3">
           <!-- Cover thumbnail / emoji avatar -->
           <div class="size-9 rounded-xl flex items-center justify-center shrink-0 bg-elevated border border-default overflow-hidden">
             <img
@@ -145,49 +145,46 @@ function getRowItems(goal: Goal) {
             <p class="font-medium text-highlighted truncate">
               {{ goal.title }}
             </p>
-            <div class="flex items-center gap-2 mt-0.5">
-              <span class="text-xs text-muted">
-                {{ getLifeCategoryLabel(goal.lifeCategory) }}
-              </span>
-              <span class="text-xs text-muted">
-                · {{ getTimeCategoryLabel(goal.timeCategory) }}
-              </span>
-            </div>
+            <p class="text-xs text-muted truncate mt-0.5">
+              {{ getLifeCategoryLabel(goal.lifeCategory) }} · {{ getTimeCategoryLabel(goal.timeCategory) }}
+            </p>
           </div>
 
-          <div class="flex items-center gap-3 shrink-0">
+          <UDropdownMenu
+            :items="getRowItems(goal)"
+            :content="{ align: 'end' }"
+            class="shrink-0 sm:order-last"
+          >
+            <UButton
+              icon="i-lucide-ellipsis-vertical"
+              color="neutral"
+              variant="ghost"
+              size="xs"
+              @click.stop
+            />
+          </UDropdownMenu>
+
+          <!-- Status + progress — full width row on mobile (forces a wrap under the title), inline on larger screens -->
+          <div class="flex w-full items-center gap-3 pl-12 sm:w-auto sm:shrink-0 sm:pl-0">
             <UBadge
               :label="getStatusLabel(goal.status)"
               :color="getStatusColor(goal.status)"
               variant="subtle"
               size="xs"
+              class="shrink-0"
             />
 
-            <!-- Progress bar -->
-            <div class="flex items-center gap-2 min-w-24">
+            <div class="flex flex-1 items-center gap-2 sm:max-w-40">
               <UProgress
                 :model-value="Number(goal.progress)"
                 :max="100"
                 size="xs"
                 class="flex-1"
               />
-              <span class="text-xs text-muted tabular-nums w-8 text-right">
+              <span class="text-xs text-muted tabular-nums w-8 text-right shrink-0">
                 {{ Math.round(goal.progress) }}%
               </span>
             </div>
-
-            <UDropdownMenu
-              :items="getRowItems(goal)"
-              :content="{ align: 'end' }"
-            >
-              <UButton
-                icon="i-lucide-ellipsis-vertical"
-                color="neutral"
-                variant="ghost"
-                size="xs"
-                @click.stop
-              />
-            </UDropdownMenu>
           </div>
         </div>
       </UCard>

@@ -191,24 +191,27 @@ const statusFilterOptions = computed(() => [
             />
             <USelect
               v-model="listTimeCategoryModel"
+              icon="i-lucide-calendar-range"
               :items="timeCategoryFilterOptions"
               value-key="value"
               placeholder="Prazo"
-              class="min-w-32"
+              class="min-w-32 flex-1 sm:flex-initial"
             />
             <USelect
               v-model="listLifeCategoryModel"
+              icon="i-lucide-compass"
               :items="lifeCategoryFilterOptions"
               value-key="value"
               placeholder="Área"
-              class="min-w-32"
+              class="min-w-32 flex-1 sm:flex-initial"
             />
             <USelect
               v-model="listStatusModel"
+              icon="i-lucide-flag"
               :items="statusFilterOptions"
               value-key="value"
               placeholder="Status"
-              class="min-w-32"
+              class="min-w-32 flex-1 sm:flex-initial"
             />
           </div>
 
