@@ -207,7 +207,7 @@ watch(
       :collapsible="!isMobile"
       :resizable="!isMobile"
       class="bg-elevated/25"
-      :ui="{ footer: 'lg:border-t lg:border-default' }"
+      :ui="{ footer: 'max-lg:border-t max-lg:border-default max-lg:p-3 lg:border-t lg:border-default' }"
     >
       <template #header="{ collapsed }">
         <TeamsMenu :collapsed="collapsed" />
@@ -221,7 +221,7 @@ watch(
 
         <template v-if="isMobile">
           <motion.div
-            class="mt-4 flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto pb-4"
+            class="mt-3 flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto pb-3"
             :initial="{ opacity: 0, y: 8 }"
             :animate="{ opacity: 1, y: 0 }"
             :transition="{ duration: 0.2, ease: 'easeOut' }"
@@ -344,7 +344,7 @@ watch(
             </motion.section>
 
             <motion.nav
-              class="mt-auto space-y-1.5 border-t border-default pt-4"
+              class="mt-auto space-y-1.5 border-t border-default pt-3"
               aria-label="Suporte"
               :initial="{ opacity: 0, y: 8 }"
               :animate="{ opacity: 1, y: 0 }"

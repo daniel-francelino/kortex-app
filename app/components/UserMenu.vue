@@ -159,8 +159,11 @@ const items = computed<DropdownMenuItem[][]>(() => ([[{
 <template>
   <UDropdownMenu
     :items="items"
-    :content="{ align: 'center', collisionPadding: 12 }"
-    :ui="{ content: collapsed ? 'w-48' : 'w-(--reka-dropdown-menu-trigger-width)' }"
+    :content="{ align: 'center', collisionPadding: 12, sideOffset: 8 }"
+    :ui="{
+      content: collapsed ? 'w-48' : 'w-(--reka-dropdown-menu-trigger-width) max-lg:min-w-64',
+      item: 'max-lg:min-h-11 max-lg:text-sm'
+    }"
   >
     <UButton
       v-bind="{
@@ -172,9 +175,10 @@ const items = computed<DropdownMenuItem[][]>(() => ([[{
       variant="ghost"
       block
       :square="collapsed"
-      class="data-[state=open]:bg-elevated"
+      class="data-[state=open]:bg-elevated max-lg:min-h-14 max-lg:justify-start max-lg:rounded-xl max-lg:px-3 max-lg:text-[15px]"
       :ui="{
-        trailingIcon: 'text-dimmed'
+        leadingAvatar: 'max-lg:size-8',
+        trailingIcon: 'text-dimmed max-lg:size-5 max-lg:ml-auto'
       }"
     />
 
