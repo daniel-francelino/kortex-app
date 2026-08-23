@@ -26,10 +26,10 @@ defineProps<{
       </div>
     </template>
 
-    <div v-if="journal.locked" class="flex flex-col items-center gap-2 py-4 text-center">
+    <div v-if="journal.locked || journal.encrypted" class="flex flex-col items-center gap-2 py-4 text-center">
       <UIcon name="i-lucide-lock" class="size-6 text-dimmed" />
       <p class="text-sm text-muted">
-        Diário protegido por PIN
+        {{ journal.encrypted ? 'Diário criptografado ponta-a-ponta' : 'Diário protegido por PIN' }}
       </p>
     </div>
 

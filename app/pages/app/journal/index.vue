@@ -1,14 +1,16 @@
 <script setup lang="ts">
-import { AnimatePresence, motion } from 'motion-v'
+import { AnimatePresence, motion } from "motion-v";
+import { useDebounceFn } from '@vueuse/core'
+import type { JournalEntry, JournalListResponse } from '~/types/journal'
 
 definePageMeta({
-  layout: 'app',
-  ssr: false
-})
+  layout: "app",
+  ssr: false,
+});
 
 useSeoMeta({
-  title: 'Diário de Bordo'
-})
+  title: "Diário de Bordo",
+});
 
 const {
   todayData,
@@ -31,96 +33,160 @@ const {
   refreshInsights,
   isOnline,
   pendingSyncCount,
-  syncingOffline
-} = useJournal()
+  syncingOffline,
+} = useJournal();
 
-const { statusLoaded: lockStatusLoaded, refreshStatus: refreshLockStatus, isModuleLocked } = useJournalLock()
+const {
+  statusLoaded: lockStatusLoaded,
+  refreshStatus: refreshLockStatus,
+  isModuleLocked,
+} = useJournalLock();
+
+const {
+  enabled: encryptionEnabled,
+  refreshStatus: refreshEncryptionStatus,
+  decryptEntryFields
+} = useJournalEncryption()
 
 onMounted(() => {
   refreshLockStatus()
+  refreshEncryptionStatus()
 })
 
-const isMobile = useIsMobile()
+// ─── Busca sob criptografia (client-side) ──────────────────────────────────────
+// O servidor não consegue mais fazer `ilike` em ciphertext — com E2EE ligado,
+// a busca por texto passa a rodar aqui: busca todas as entradas sem filtro,
+// decifra e compara no navegador. Fica fora de `useJournal.ts` porque só o
+// modo de busca sob criptografia precisa disso; a paginação normal (sem
+// busca) continua indo pelo fluxo de sempre.
+const encryptedSearchResults = ref<JournalEntry[] | null>(null)
+const encryptedSearchLoading = ref(false)
+const usingEncryptedSearch = computed(() => encryptionEnabled.value && listSearch.value.trim().length > 0)
+
+async function runEncryptedSearch(query: string) {
+  const trimmed = query.trim()
+  if (!trimmed) {
+    encryptedSearchResults.value = null
+    return
+  }
+  encryptedSearchLoading.value = true
+  try {
+    const all: JournalEntry[] = []
+    let page = 1
+    let fetchedTotal = Infinity
+    while ((page - 1) * 100 < fetchedTotal) {
+      const result = await $fetch<JournalListResponse>('/api/journal/entries', { query: { page, pageSize: 100 } })
+      fetchedTotal = result.total
+      all.push(...result.data)
+      if (result.data.length === 0) break
+      page++
+    }
+    const needle = trimmed.toLowerCase()
+    const matches: JournalEntry[] = []
+    for (const entry of all) {
+      const decrypted = entry.isEncrypted
+        ? await decryptEntryFields(entry).catch(() => null)
+        : { title: entry.title, content: entry.content }
+      if (!decrypted) continue
+      const haystack = `${decrypted.title ?? ''} ${decrypted.content ?? ''}`.toLowerCase()
+      if (haystack.includes(needle)) matches.push(entry)
+    }
+    encryptedSearchResults.value = matches
+  } finally {
+    encryptedSearchLoading.value = false
+  }
+}
+
+const debouncedEncryptedSearch = useDebounceFn(runEncryptedSearch, 300)
+
+watch(listSearch, (val) => {
+  if (encryptionEnabled.value) debouncedEncryptedSearch(val)
+})
+
+const isMobile = useIsMobile();
 
 // ─── View mode ────────────────────────────────────────────────────────────────
-type JournalView = 'editor' | 'calendar' | 'list' | 'insights'
-const activeView = ref<JournalView>('editor')
+type JournalView = "editor" | "calendar" | "list" | "insights";
+const activeView = ref<JournalView>("editor");
 
 watch(activeView, (view) => {
-  if (view === 'editor') refreshToday()
-  if (view === 'calendar') refreshCalendar()
-  if (view === 'list') {
-    refreshList()
+  if (view === "editor") refreshToday();
+  if (view === "calendar") refreshCalendar();
+  if (view === "list") {
+    refreshList();
   }
-  if (view === 'insights') refreshInsights()
-})
+  if (view === "insights") refreshInsights();
+});
 
 // ─── Editor ref (for unsaved-changes check) ───────────────────────────────────
-const editorRef = ref<{ isUnsaved: () => boolean, doSave: () => Promise<void> } | null>(null)
+const editorRef = ref<{
+  isUnsaved: () => boolean;
+  doSave: () => Promise<void>;
+} | null>(null);
 
 // ─── Unsaved-changes confirmation on route leave ──────────────────────────────
-const confirmLeaveOpen = ref(false)
-let resolvePendingNav: ((allow: boolean) => void) | null = null
+const confirmLeaveOpen = ref(false);
+let resolvePendingNav: ((allow: boolean) => void) | null = null;
 
 onBeforeRouteLeave(async () => {
-  const editor = editorRef.value
-  if (!editor?.isUnsaved()) return // nothing unsaved, allow navigation
+  const editor = editorRef.value;
+  if (!editor?.isUnsaved()) return; // nothing unsaved, allow navigation
 
   return new Promise<boolean | undefined>((resolve) => {
-    resolvePendingNav = resolve
-    confirmLeaveOpen.value = true
-  }).then(allow => (allow ? undefined : false))
-})
+    resolvePendingNav = resolve;
+    confirmLeaveOpen.value = true;
+  }).then((allow) => (allow ? undefined : false));
+});
 
 async function onConfirmSaveAndLeave() {
-  confirmLeaveOpen.value = false
-  await editorRef.value?.doSave()
-  resolvePendingNav?.(true)
-  resolvePendingNav = null
+  confirmLeaveOpen.value = false;
+  await editorRef.value?.doSave();
+  resolvePendingNav?.(true);
+  resolvePendingNav = null;
 }
 
 function onConfirmDiscardAndLeave() {
-  confirmLeaveOpen.value = false
-  resolvePendingNav?.(true)
-  resolvePendingNav = null
+  confirmLeaveOpen.value = false;
+  resolvePendingNav?.(true);
+  resolvePendingNav = null;
 }
 
 function onConfirmCancel() {
-  confirmLeaveOpen.value = false
-  resolvePendingNav?.(false)
-  resolvePendingNav = null
+  confirmLeaveOpen.value = false;
+  resolvePendingNav?.(false);
+  resolvePendingNav = null;
 }
 
 // Calendar entry modal
-const detailModalOpen = ref(false)
-const selectedDate = ref('')
+const detailModalOpen = ref(false);
+const selectedDate = ref("");
 
 function onSelectDate(date: string) {
-  selectedDate.value = date
-  detailModalOpen.value = true
+  selectedDate.value = date;
+  detailModalOpen.value = true;
 }
 
 function onCalendarMonthChange(from: string, to: string) {
-  calendarFrom.value = from
-  calendarTo.value = to
+  calendarFrom.value = from;
+  calendarTo.value = to;
 }
 
 // ─── View options ─────────────────────────────────────────────────────────────
-const viewOptions: { value: JournalView, icon: string, tooltip: string }[] = [
-  { value: 'editor', icon: 'i-lucide-pen-line', tooltip: 'Editor de hoje' },
-  { value: 'calendar', icon: 'i-lucide-calendar-days', tooltip: 'Calendário' },
-  { value: 'list', icon: 'i-lucide-list', tooltip: 'Lista de entradas' },
-  { value: 'insights', icon: 'i-lucide-bar-chart-3', tooltip: 'Insights' }
-]
+const viewOptions: { value: JournalView; icon: string; tooltip: string }[] = [
+  { value: "editor", icon: "i-lucide-pen-line", tooltip: "Editor de hoje" },
+  { value: "calendar", icon: "i-lucide-calendar-days", tooltip: "Calendário" },
+  { value: "list", icon: "i-lucide-list", tooltip: "Lista de entradas" },
+  { value: "insights", icon: "i-lucide-bar-chart-3", tooltip: "Insights" },
+];
 
 // ─── Entry list view ────────────────────────────────────────────────────────────
 function onListEntrySelect(date: string) {
-  onSelectDate(date)
+  onSelectDate(date);
 }
 
 // ─── Insights view ────────────────────────────────────────────────────────────
-function onInsightsRangeChange(range: '7d' | '30d' | '90d') {
-  insightsRange.value = range
+function onInsightsRangeChange(range: "7d" | "30d" | "90d") {
+  insightsRange.value = range;
 }
 </script>
 
@@ -133,7 +199,9 @@ function onInsightsRangeChange(range: '7d' | '30d' | '90d') {
         </template>
 
         <template #right>
-          <div class="flex items-center gap-0.5 rounded-lg border border-default p-0.5">
+          <div
+            class="flex items-center gap-0.5 rounded-lg border border-default p-0.5"
+          >
             <UTooltip
               v-for="opt in viewOptions"
               :key="opt.value"
@@ -172,103 +240,124 @@ function onInsightsRangeChange(range: '7d' | '30d' | '90d') {
         <div
           v-if="!isOnline || pendingSyncCount > 0"
           class="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs"
-          :class="!isOnline ? 'text-warning bg-warning/5' : 'text-muted bg-elevated/40'"
+          :class="
+            !isOnline
+              ? 'text-warning bg-warning/5'
+              : 'text-muted bg-elevated/40'
+          "
         >
           <UIcon
-            :name="!isOnline ? 'i-lucide-cloud-off' : syncingOffline ? 'i-lucide-loader-2' : 'i-lucide-cloud-upload'"
+            :name="
+              !isOnline
+                ? 'i-lucide-cloud-off'
+                : syncingOffline
+                  ? 'i-lucide-loader-2'
+                  : 'i-lucide-cloud-upload'
+            "
             class="size-3.5 shrink-0"
             :class="syncingOffline ? 'animate-spin' : ''"
           />
-          <span v-if="!isOnline">Offline — as alterações serão sincronizadas ao reconectar</span>
-          <span v-else-if="syncingOffline">Sincronizando alterações offline...</span>
-          <span v-else>{{ pendingSyncCount }} alteração(ões) pendente(s) de sincronização</span>
+          <span v-if="!isOnline"
+            >Offline — as alterações serão sincronizadas ao reconectar</span
+          >
+          <span v-else-if="syncingOffline"
+            >Sincronizando alterações offline...</span
+          >
+          <span v-else
+            >{{ pendingSyncCount }} alteração(ões) pendente(s) de
+            sincronização</span
+          >
         </div>
 
         <AnimatePresence mode="wait">
           <!-- EDITOR VIEW -->
           <motion.div
             v-if="activeView === 'editor'"
-          :initial="{ opacity: 0, y: 10, filter: 'blur(2px)' }"
-          :animate="{ opacity: 1, y: 0, filter: 'blur(0px)' }"
-          :exit="{ opacity: 0, y: -8, filter: 'blur(2px)' }"
-          :transition="{ duration: 0.18, ease: 'easeOut' }"
-        >
-          <JournalTodayEditor
-            ref="editorRef"
-            :today-entry="todayData?.entry ?? null"
-            :streak="todayData?.streak ?? 0"
-            :loading="todayStatus === 'pending'"
-            :is-online="isOnline"
-            :on-upsert-entry="upsertEntry"
-          />
+            :initial="{ opacity: 0, y: 10, filter: 'blur(2px)' }"
+            :animate="{ opacity: 1, y: 0, filter: 'blur(0px)' }"
+            :exit="{ opacity: 0, y: -8, filter: 'blur(2px)' }"
+            :transition="{ duration: 0.18, ease: 'easeOut' }"
+          >
+            <JournalTodayEditor
+              ref="editorRef"
+              :today-entry="todayData?.entry ?? null"
+              :streak="todayData?.streak ?? 0"
+              :loading="todayStatus === 'pending'"
+              :is-online="isOnline"
+              :on-upsert-entry="upsertEntry"
+            />
           </motion.div>
 
           <!-- CALENDAR VIEW -->
           <motion.div
             v-else-if="activeView === 'calendar'"
-          :initial="{ opacity: 0, y: 10, filter: 'blur(2px)' }"
-          :animate="{ opacity: 1, y: 0, filter: 'blur(0px)' }"
-          :exit="{ opacity: 0, y: -8, filter: 'blur(2px)' }"
-          :transition="{ duration: 0.18, ease: 'easeOut' }"
-        >
-          <JournalCalendarView
-            :entry-dates="calendarDates ?? []"
-            :loading="calendarStatus === 'pending'"
-            @select-date="onSelectDate"
-            @month-change="onCalendarMonthChange"
-          />
+            :initial="{ opacity: 0, y: 10, filter: 'blur(2px)' }"
+            :animate="{ opacity: 1, y: 0, filter: 'blur(0px)' }"
+            :exit="{ opacity: 0, y: -8, filter: 'blur(2px)' }"
+            :transition="{ duration: 0.18, ease: 'easeOut' }"
+          >
+            <JournalCalendarView
+              :entry-dates="calendarDates ?? []"
+              :loading="calendarStatus === 'pending'"
+              @select-date="onSelectDate"
+              @month-change="onCalendarMonthChange"
+            />
           </motion.div>
 
           <!-- LIST VIEW -->
           <motion.div
             v-else-if="activeView === 'list'"
-          class="space-y-4"
-          :initial="{ opacity: 0, y: 10, filter: 'blur(2px)' }"
-          :animate="{ opacity: 1, y: 0, filter: 'blur(0px)' }"
-          :exit="{ opacity: 0, y: -8, filter: 'blur(2px)' }"
-          :transition="{ duration: 0.18, ease: 'easeOut' }"
-        >
-          <UInput
-            v-model="listSearch"
-            icon="i-lucide-search"
-            placeholder="Buscar no diário..."
-          />
+            class="space-y-4"
+            :initial="{ opacity: 0, y: 10, filter: 'blur(2px)' }"
+            :animate="{ opacity: 1, y: 0, filter: 'blur(0px)' }"
+            :exit="{ opacity: 0, y: -8, filter: 'blur(2px)' }"
+            :transition="{ duration: 0.18, ease: 'easeOut' }"
+          >
+            <UInput
+              v-model="listSearch"
+              icon="i-lucide-search"
+              placeholder="Buscar no diário..."
+            />
 
-          <JournalEntryList
-            :entries="listData?.data ?? []"
-            :total="listData?.total ?? 0"
-            :page="listPage"
-            :page-size="listData?.pageSize ?? 20"
-            :loading="listFetchStatus === 'pending'"
-            @update:page="listPage = $event"
-            @select="onListEntrySelect"
-          />
+            <JournalEntryList
+              :entries="usingEncryptedSearch ? (encryptedSearchResults ?? []) : (listData?.data ?? [])"
+              :total="usingEncryptedSearch ? (encryptedSearchResults?.length ?? 0) : (listData?.total ?? 0)"
+              :page="usingEncryptedSearch ? 1 : listPage"
+              :page-size="usingEncryptedSearch ? Math.max(encryptedSearchResults?.length ?? 1, 1) : (listData?.pageSize ?? 20)"
+              :loading="usingEncryptedSearch ? encryptedSearchLoading : listFetchStatus === 'pending'"
+              @update:page="listPage = $event"
+              @select="onListEntrySelect"
+            />
           </motion.div>
 
           <!-- INSIGHTS VIEW -->
           <motion.div
             v-else-if="activeView === 'insights'"
-          class="space-y-4"
-          :initial="{ opacity: 0, y: 10, filter: 'blur(2px)' }"
-          :animate="{ opacity: 1, y: 0, filter: 'blur(0px)' }"
-          :exit="{ opacity: 0, y: -8, filter: 'blur(2px)' }"
-          :transition="{ duration: 0.18, ease: 'easeOut' }"
-        >
-          <div
-            v-if="(todayData?.streak ?? 0) > 0"
-            class="flex items-center gap-2 rounded-lg border border-default bg-elevated/30 px-4 py-3"
+            class="space-y-4"
+            :initial="{ opacity: 0, y: 10, filter: 'blur(2px)' }"
+            :animate="{ opacity: 1, y: 0, filter: 'blur(0px)' }"
+            :exit="{ opacity: 0, y: -8, filter: 'blur(2px)' }"
+            :transition="{ duration: 0.18, ease: 'easeOut' }"
           >
-            <span class="text-xl leading-none">🔥</span>
-            <span class="text-sm text-highlighted">
-              <strong>{{ todayData?.streak }}</strong> {{ todayData?.streak === 1 ? 'dia seguido' : 'dias seguidos' }} escrevendo no diário
-            </span>
-          </div>
+            <div
+              v-if="(todayData?.streak ?? 0) > 0"
+              class="flex items-center gap-2 rounded-lg border border-default bg-elevated/30 px-4 py-3"
+            >
+              <span class="text-xl leading-none">🔥</span>
+              <span class="text-sm text-highlighted">
+                <strong>{{ todayData?.streak }}</strong>
+                {{
+                  todayData?.streak === 1 ? "dia seguido" : "dias seguidos"
+                }}
+                escrevendo no diário
+              </span>
+            </div>
 
-          <JournalInsightsPanel
-            :insights="insights ?? null"
-            :loading="insightsStatus === 'pending'"
-            @range-change="onInsightsRangeChange"
-          />
+            <JournalInsightsPanel
+              :insights="insights ?? null"
+              :loading="insightsStatus === 'pending'"
+              @range-change="onInsightsRangeChange"
+            />
           </motion.div>
         </AnimatePresence>
       </div>
@@ -284,13 +373,16 @@ function onInsightsRangeChange(range: '7d' | '30d' | '90d') {
     <template #header>
       <div class="flex items-center gap-2">
         <UIcon name="i-lucide-pencil-line" class="size-4 text-warning" />
-        <span class="text-sm font-semibold text-highlighted">Alterações não salvas</span>
+        <span class="text-sm font-semibold text-highlighted"
+          >Alterações não salvas</span
+        >
       </div>
     </template>
 
     <template #body>
       <p class="text-sm text-muted">
-        Você tem alterações no diário que ainda não foram salvas. O que deseja fazer?
+        Você tem alterações no diário que ainda não foram salvas. O que deseja
+        fazer?
       </p>
     </template>
 
@@ -325,6 +417,10 @@ function onInsightsRangeChange(range: '7d' | '30d' | '90d') {
     :open="detailModalOpen"
     :date="selectedDate"
     @update:open="detailModalOpen = $event"
-    @updated="refreshToday(); refreshCalendar(); refreshList()"
+    @updated="
+      refreshToday();
+      refreshCalendar();
+      refreshList();
+    "
   />
 </template>

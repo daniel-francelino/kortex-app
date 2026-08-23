@@ -172,7 +172,7 @@ export default eventHandler(async (event) => {
   // ─── Journal ──────────────────────────────────────────────────────────────
   const { data: journalEntries } = await supabase
     .from('journal_entries')
-    .select('id, entry_date, title, content, locked')
+    .select('id, entry_date, title, content, locked, is_encrypted')
     .eq('user_id', user.id)
     .eq('entry_date', date)
     .limit(1)
@@ -181,11 +181,12 @@ export default eventHandler(async (event) => {
     ? journalEntries[0] as unknown as Record<string, unknown>
     : null
 
-  // A PIN lock on the journal ("módulo inteiro", or this specific entry
-  // under "entradas específicas") must also hide the preview here — this
-  // widget reads journal_entries directly, outside the /api/journal/* API
-  // the lock screen otherwise gates, so it would otherwise leak the exact
-  // content the lock exists to hide.
+  // A PIN lock on the journal ("módulo inteiro", ou esta entrada específica
+  // no modo "entradas específicas") — e, agora, uma entrada cifrada por E2EE
+  // — precisam esconder o preview aqui também. Este widget lê
+  // journal_entries direto, fora da API /api/journal/* que a tela de
+  // bloqueio normalmente cobre, e o servidor não consegue decifrar conteúdo
+  // E2EE de qualquer forma (só o cliente, com a Data Key, consegue).
   const { data: prefsRow } = await supabase
     .from('user_preferences')
     .select('journal_pin_hash, journal_pin_mode')
@@ -194,17 +195,20 @@ export default eventHandler(async (event) => {
 
   const prefs = prefsRow as { journal_pin_hash: string | null, journal_pin_mode: string | null } | null
   const pinMode = prefs?.journal_pin_hash ? prefs.journal_pin_mode : null
-  const isLocked = pinMode === 'module' || (pinMode === 'entries' && journalRow?.locked === true)
+  const isPinLocked = pinMode === 'module' || (pinMode === 'entries' && journalRow?.locked === true)
+  const isEncrypted = journalRow?.is_encrypted === true
+  const isProtected = isPinLocked || isEncrypted
 
   const journal = {
     id: journalRow ? (journalRow.id as string) : null,
     entryDate: date,
-    title: isLocked ? null : journalRow ? (journalRow.title as string | null) : null,
-    contentPreview: isLocked || !journalRow
+    title: isProtected ? null : journalRow ? (journalRow.title as string | null) : null,
+    contentPreview: isProtected || !journalRow
       ? null
       : ((journalRow.content as string) ?? '').substring(0, 120),
     exists: !!journalRow,
-    locked: isLocked
+    locked: isPinLocked,
+    encrypted: isEncrypted
   }
 
   return {

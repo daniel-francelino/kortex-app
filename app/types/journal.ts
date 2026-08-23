@@ -27,6 +27,9 @@ export interface JournalEntry {
   updatedAt: string
   archivedAt: string | null
   locked: boolean
+  isEncrypted: boolean
+  contentIv: string | null
+  titleIv: string | null
 }
 
 // ─── PIN lock ─────────────────────────────────────────────────────────────────
@@ -38,6 +41,37 @@ export interface JournalLockStatus {
   mode: JournalPinMode | null
 }
 
+// ─── Criptografia ponta-a-ponta ────────────────────────────────────────────────
+// Ver docs/journal/PLANO_CRIPTOGRAFIA_PONTA_A_PONTA.md — toda cifra/decifra
+// roda no cliente (app/utils/journal-crypto.ts); estes tipos só descrevem os
+// blobs opacos que o servidor guarda/devolve.
+
+export interface JournalEncryptionStatus {
+  enabled: boolean
+}
+
+export interface JournalEncryptionKeys {
+  dataKeyWrappedPassword: string
+  dataKeyWrappedPasswordIv: string
+  passwordSalt: string
+  dataKeyWrappedRecovery: string
+  dataKeyWrappedRecoveryIv: string
+  recoverySalt: string
+  dataKeyWrappedAdmin: string
+  kdfIterations: number
+}
+
+export interface SetupEncryptionPayload {
+  dataKeyWrappedPassword: string
+  dataKeyWrappedPasswordIv: string
+  passwordSalt: string
+  dataKeyWrappedRecovery: string
+  dataKeyWrappedRecoveryIv: string
+  recoverySalt: string
+  dataKeyWrappedAdmin: string
+  kdfIterations: number
+}
+
 // ─── Payloads ─────────────────────────────────────────────────────────────────
 
 export interface UpsertEntryPayload {
@@ -45,6 +79,9 @@ export interface UpsertEntryPayload {
   title?: string | null
   content: string
   mood?: string | null
+  isEncrypted?: boolean
+  contentIv?: string | null
+  titleIv?: string | null
 }
 
 // ─── Responses ────────────────────────────────────────────────────────────────

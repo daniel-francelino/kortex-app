@@ -207,7 +207,11 @@ export function useJournal() {
       mood: payload.mood !== undefined ? payload.mood : (previous?.mood ?? null),
       createdAt: previous?.createdAt ?? now,
       updatedAt: now,
-      archivedAt: null
+      archivedAt: null,
+      locked: previous?.locked ?? false,
+      isEncrypted: payload.isEncrypted !== undefined ? payload.isEncrypted : (previous?.isEncrypted ?? false),
+      contentIv: payload.contentIv !== undefined ? payload.contentIv : (previous?.contentIv ?? null),
+      titleIv: payload.titleIv !== undefined ? payload.titleIv : (previous?.titleIv ?? null)
     }
 
     const result = await runOptimisticAction({

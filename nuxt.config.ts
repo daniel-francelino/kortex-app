@@ -34,6 +34,11 @@ export default defineNuxtConfig({
 
     public: {
       siteUrl: process.env.NUXT_PUBLIC_SITE_URL ?? '',
+      // Chave pública (SPKI, base64) do par de recuperação de suporte do
+      // Diário de Bordo — ver docs/journal/PLANO_CRIPTOGRAFIA_PONTA_A_PONTA.md
+      // e scripts/generate-journal-recovery-keypair.mjs. Só a metade pública
+      // vive aqui; a privada nunca entra neste repositório.
+      journalRecoveryPublicKey: process.env.NUXT_PUBLIC_JOURNAL_RECOVERY_PUBLIC_KEY ?? '',
       oneSignalEnabled: process.env.NODE_ENV === 'production' && process.env.NUXT_PUBLIC_ONESIGNAL_ENABLED === 'true',
       oneSignalAppId: process.env.NUXT_PUBLIC_ONESIGNAL_APP_ID ?? '',
       oneSignalServiceWorkerPath: process.env.NUXT_PUBLIC_ONESIGNAL_SERVICE_WORKER_PATH ?? '/push/onesignal/OneSignalSDKWorker.js',

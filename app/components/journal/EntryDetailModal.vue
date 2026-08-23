@@ -16,6 +16,16 @@ const emit = defineEmits<{
 
 const { fetchEntryByDate, upsertEntry, deleteEntry } = useJournal()
 const { mode: pinMode, isEntryLocked, toggleEntryLock } = useJournalLock()
+const {
+  enabled: encryptionEnabled,
+  isUnlocked: encryptionUnlocked,
+  encryptEntryFields,
+  decryptEntryFields
+} = useJournalEncryption()
+
+// Prioridade sobre o cadeado do PIN — sem a Data Key não dá nem pra saber
+// se essa data já tem entrada em texto legível (mesma razão do TodayEditor).
+const needsEncryptionUnlock = computed(() => encryptionEnabled.value && !encryptionUnlocked.value)
 
 const isMobile = useIsMobile()
 
@@ -23,6 +33,10 @@ const loading = ref(false)
 const entry = ref<JournalEntry | null>(null)
 
 const content = ref('')
+// Snapshot do texto claro já decifrado — usado por `cancelEditing()` em vez
+// de reler `entry.value.content` (que é ciphertext quando a entrada está
+// cifrada; ler direto de lá quebraria o cancelar).
+const savedContent = ref('')
 const mood = ref<string | null>(null)
 const editing = ref(false)
 const saving = ref(false)
@@ -54,12 +68,29 @@ watch(() => props.date, async () => {
   }
 })
 
+// Reabre a busca assim que a Data Key entra em memória (evento de desbloqueio
+// da tela de criptografia) — sem isso, quem desbloqueia dentro do modal
+// ficaria preso vendo o gate mesmo depois de já ter provado a frase.
+watch(encryptionUnlocked, async (isUnlocked) => {
+  if (isUnlocked && props.open && props.date) await loadEntry()
+})
+
 async function loadEntry() {
+  if (needsEncryptionUnlock.value) return
   loading.value = true
   try {
     const data = await fetchEntryByDate(props.date)
     entry.value = data?.entry ?? null
-    content.value = data?.entry?.content ?? ''
+    if (data?.entry?.isEncrypted) {
+      try {
+        content.value = (await decryptEntryFields(data.entry)).content
+      } catch {
+        content.value = ''
+      }
+    } else {
+      content.value = data?.entry?.content ?? ''
+    }
+    savedContent.value = content.value
     mood.value = data?.entry?.mood ?? null
   } finally {
     loading.value = false
@@ -87,7 +118,7 @@ function isContentEmpty(val: string): boolean {
 
 function cancelEditing() {
   editing.value = false
-  content.value = entry.value?.content ?? ''
+  content.value = savedContent.value
   mood.value = entry.value?.mood ?? null
 }
 
@@ -95,12 +126,10 @@ async function onSave() {
   if (isContentEmpty(content.value) || saving.value) return
   saving.value = true
   try {
-    const result = await upsertEntry({
-      entryDate: props.date,
-      title: null,
-      content: content.value,
-      mood: mood.value
-    })
+    const payload = encryptionEnabled.value
+      ? { entryDate: props.date, mood: mood.value, ...(await encryptEntryFields(null, content.value)) }
+      : { entryDate: props.date, title: null, content: content.value, mood: mood.value }
+    const result = await upsertEntry(payload)
     if (result) {
       editing.value = false
       await loadEntry()
@@ -164,9 +193,21 @@ function onOpenChange(value: boolean) {
         :animate="{ opacity: 1, y: 0 }"
         :transition="{ duration: 0.18 }"
       >
+        <!-- Criptografia ligada e ainda não desbloqueada nesta sessão —
+             prioridade sobre tudo, inclusive "nenhuma entrada ainda", já
+             que criar uma entrada nova também exige a Data Key. -->
+        <motion.div
+          v-if="needsEncryptionUnlock"
+          :initial="{ opacity: 0, y: 8, scale: 0.99 }"
+          :animate="{ opacity: 1, y: 0, scale: 1 }"
+          :transition="{ duration: 0.18 }"
+        >
+          <JournalEncryptionUnlockScreen compact />
+        </motion.div>
+
         <!-- No entry yet -->
         <motion.div
-          v-if="!entry && !editing"
+          v-else-if="!entry && !editing"
           class="flex flex-1 flex-col items-center justify-center gap-3 py-16"
           :initial="{ opacity: 0, y: 10, scale: 0.98 }"
           :animate="{ opacity: 1, y: 0, scale: 1 }"
@@ -188,7 +229,7 @@ function onOpenChange(value: boolean) {
         </motion.div>
 
         <!-- View mode -->
-        <template v-if="entry && !editing">
+        <template v-else-if="entry && !editing">
           <!-- Mood display + actions -->
           <motion.div
             class="flex items-center justify-between gap-3 border-b border-default pb-4"
@@ -264,7 +305,7 @@ function onOpenChange(value: boolean) {
             <ClientOnly>
               <NotionEditor
                 :key="props.date + '-view'"
-                :model-value="entry.content ?? ''"
+                :model-value="content"
                 :editable="false"
                 min-height="60vh"
               />
@@ -276,7 +317,7 @@ function onOpenChange(value: boolean) {
         </template>
 
         <!-- Edit mode -->
-        <template v-if="editing">
+        <template v-else-if="editing">
           <motion.div
             :initial="{ opacity: 0, y: 8 }"
             :animate="{ opacity: 1, y: 0 }"

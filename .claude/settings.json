@@ -5,7 +5,14 @@
       "Bash(echo \"EXIT:$?\")",
       "Skill(claude-api)",
       "Skill(claude-api:*)",
-      "WebSearch"
+      "WebSearch",
+      "Bash(curl -s -o /dev/null -w \"app/journal: %{http_code}\\\\n\" http://localhost:3000/app/journal)",
+      "Bash(curl -s -o /dev/null -w \"app/settings/security: %{http_code}\\\\n\" http://localhost:3000/app/settings/security)",
+      "Bash(curl -s -o /dev/null -w \"app: %{http_code}\\\\n\" http://localhost:3000/app)",
+      "Bash(curl -s -o /dev/null -w \"api/journal/encryption/status: %{http_code}\\\\n\" http://localhost:3000/api/journal/encryption/status)",
+      "Bash(curl -s -o /dev/null -w \"api/life/dashboard: %{http_code}\\\\n\" http://localhost:3000/api/life/dashboard)",
+      "Bash(curl -s -o /dev/null -w \"app \\(dashboard\\): %{http_code}\\\\n\" http://localhost:3000/app)",
+      "Bash(curl -s -o /dev/null -w \"api/journal/entries: %{http_code}\\\\n\" http://localhost:3000/api/journal/entries)"
     ]
   }
 }

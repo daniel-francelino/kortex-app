@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { AnimatePresence, motion } from 'motion-v'
-import type { JournalEntry } from '~/types/journal'
+import type { JournalEntry, UpsertEntryPayload } from '~/types/journal'
 import { isEditorContentEmpty, serializeEditorContent } from '~/utils/editor/content'
 
 const props = defineProps<{
@@ -8,17 +8,25 @@ const props = defineProps<{
   loading: boolean
   streak?: number
   isOnline?: boolean
-  onUpsertEntry: (payload: {
-    entryDate: string
-    title?: string | null
-    content: string
-    mood?: string | null
-  }, options?: { silent?: boolean }) => Promise<JournalEntry | null>
+  onUpsertEntry: (payload: UpsertEntryPayload, options?: { silent?: boolean }) => Promise<JournalEntry | null>
 }>()
 
 const isMobile = useIsMobile()
 
 const { mode: pinMode, isEntryLocked, toggleEntryLock } = useJournalLock()
+const {
+  enabled: encryptionEnabled,
+  isUnlocked: encryptionUnlocked,
+  encryptEntryFields,
+  decryptEntryFields
+} = useJournalEncryption()
+
+// Precisa de senha/código antes de mostrar QUALQUER coisa (não só a
+// entrada de hoje se ela já existir e estiver cifrada) — se a criptografia
+// está ligada, uma entrada nova também deve ser cifrada, então escrever
+// sem desbloquear primeiro criaria uma entrada em texto claro no meio de
+// um diário supostamente cifrado.
+const needsEncryptionUnlock = computed(() => encryptionEnabled.value && !encryptionUnlocked.value)
 
 const today = new Date().toISOString().split('T')[0] ?? ''
 const content = ref('')
@@ -116,12 +124,25 @@ const hasChanges = computed(() =>
 // pull from props when there's nothing unsaved locally (initial load, or a
 // genuinely external change made elsewhere, e.g. via EntryDetailModal).
 watch(
-  [() => props.todayEntry, () => props.loading],
-  ([entry]) => {
+  [() => props.todayEntry, () => props.loading, needsEncryptionUnlock],
+  async ([entry]) => {
     if (hasChanges.value) return
+    // Ainda esperando a frase-secreta — não tenta popular nada com
+    // ciphertext; assim que `needsEncryptionUnlock` virar `false` (evento
+    // `@unlocked` da tela de desbloqueio), este watcher roda de novo.
+    if (needsEncryptionUnlock.value) return
 
     if (entry) {
-      const c = entry.content ?? ''
+      let c = entry.content ?? ''
+      if (entry.isEncrypted) {
+        try {
+          c = (await decryptEntryFields(entry)).content
+        } catch {
+          // Chave errada ou corrompida — não tem como popular o editor com
+          // segurança; deixa como estava (skeleton) em vez de mostrar lixo.
+          return
+        }
+      }
       if (c !== content.value) {
         content.value = c
       }
@@ -162,7 +183,7 @@ function resolveSavedStatus(): SaveStatus {
 
 // ── Save logic ─────────────────────────────────────────────────────────────────
 async function doSave() {
-  if (isContentEmpty.value || !hasChanges.value) return
+  if (isContentEmpty.value || !hasChanges.value || needsEncryptionUnlock.value) return
 
   // Snapshot what's actually being sent — the save is asynchronous (the
   // composable's optimistic apply happens immediately, but doSave only
@@ -177,12 +198,11 @@ async function doSave() {
   const savingMood = mood.value
 
   try {
-    const result = await props.onUpsertEntry({
-      entryDate: today,
-      title: null,
-      content: savingContent,
-      mood: savingMood
-    }, { silent: true })
+    const payload: UpsertEntryPayload = encryptionEnabled.value
+      ? { entryDate: today, mood: savingMood, ...(await encryptEntryFields(null, savingContent)) }
+      : { entryDate: today, title: null, content: savingContent, mood: savingMood }
+
+    const result = await props.onUpsertEntry(payload, { silent: true })
     if (result) {
       if (savedContent.value !== savingContent) savedContent.value = savingContent
       if (savedMood.value !== savingMood) savedMood.value = savingMood
@@ -416,15 +436,27 @@ defineExpose({ isUnsaved: () => hasChanges.value, doSave })
             :title="entryLocked ? 'Remover proteção desta entrada' : 'Proteger esta entrada com PIN'"
             @click="onToggleLock"
           />
-          <!-- Mood selector — hidden while locked, same reasoning as the
-               content below (todayEntry.mood would otherwise leak here). -->
-          <JournalMoodSelector v-if="!isLockedForViewing" v-model="mood" />
+          <!-- Mood selector — hidden while locked (PIN) or not yet
+               decrypted (E2EE), same reasoning as the content below. -->
+          <JournalMoodSelector v-if="!isLockedForViewing && !needsEncryptionUnlock" v-model="mood" />
         </div>
+      </motion.div>
+
+      <!-- Criptografia ligada e ainda não desbloqueada nesta sessão — tem
+           prioridade sobre o cadeado do PIN: sem a Data Key não dá nem pra
+           saber se a entrada de hoje existe em texto legível. -->
+      <motion.div
+        v-if="needsEncryptionUnlock"
+        :initial="{ opacity: 0, y: 8, scale: 0.99 }"
+        :animate="{ opacity: 1, y: 0, scale: 1 }"
+        :transition="{ duration: 0.18 }"
+      >
+        <JournalEncryptionUnlockScreen compact />
       </motion.div>
 
       <!-- Locked entry (mode "entradas específicas") — hides mood/prompts/editor until the PIN is entered -->
       <motion.div
-        v-if="isLockedForViewing"
+        v-else-if="isLockedForViewing"
         :initial="{ opacity: 0, y: 8, scale: 0.99 }"
         :animate="{ opacity: 1, y: 0, scale: 1 }"
         :transition="{ duration: 0.18 }"

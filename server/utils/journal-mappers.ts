@@ -16,6 +16,22 @@ export function mapJournalEntry(row: Row) {
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     archivedAt: row.archived_at,
-    locked: row.locked ?? false
+    locked: row.locked ?? false,
+    isEncrypted: row.is_encrypted ?? false,
+    contentIv: row.content_iv ?? null,
+    titleIv: row.title_iv ?? null
+  }
+}
+
+export function mapJournalEncryption(row: Row) {
+  return {
+    dataKeyWrappedPassword: row.data_key_wrapped_password,
+    dataKeyWrappedPasswordIv: row.data_key_wrapped_password_iv,
+    passwordSalt: row.password_salt,
+    dataKeyWrappedRecovery: row.data_key_wrapped_recovery,
+    dataKeyWrappedRecoveryIv: row.data_key_wrapped_recovery_iv,
+    recoverySalt: row.recovery_salt,
+    dataKeyWrappedAdmin: row.data_key_wrapped_admin,
+    kdfIterations: row.kdf_iterations
   }
 }

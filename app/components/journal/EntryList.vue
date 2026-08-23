@@ -3,7 +3,7 @@ import { AnimatePresence, motion } from 'motion-v'
 import type { JournalEntry } from '~/types/journal'
 import { getMoodOption } from '~/types/journal'
 
-defineProps<{
+const props = defineProps<{
   entries: JournalEntry[]
   total: number
   page: number
@@ -20,6 +20,7 @@ const emit = defineEmits<{
 // switch away from "entradas específicas", or already having unlocked this
 // entry this session, correctly stop masking it here too.
 const { isEntryLocked } = useJournalLock()
+const { isUnlocked: encryptionUnlocked, decryptEntryFields } = useJournalEncryption()
 
 function formatDate(dateStr: string): string {
   return new Date(dateStr + 'T12:00:00').toLocaleDateString('pt-BR', {
@@ -49,6 +50,35 @@ function extractPreview(jsonContent: string): string {
     // Legacy plain text
     return jsonContent.replace(/\s+/g, ' ').trim()
   }
+}
+
+// `entry.content` é ciphertext (base64) quando `isEncrypted` — extrair o
+// preview direto dali mostraria lixo, não texto legível. Decifra sob
+// demanda e guarda por id (reactive Map, não `ref<Map>`, pra `.set()`
+// disparar reatividade — mesmo padrão de `entriesByDate` em useJournal.ts).
+const decryptedContentById = reactive(new Map<string, string>())
+
+watch(
+  () => props.entries,
+  async (entries) => {
+    if (!encryptionUnlocked.value) return
+    for (const entry of entries) {
+      if (entry.isEncrypted && !decryptedContentById.has(entry.id)) {
+        try {
+          decryptedContentById.set(entry.id, (await decryptEntryFields(entry)).content)
+        } catch {
+          decryptedContentById.set(entry.id, '')
+        }
+      }
+    }
+  },
+  { immediate: true }
+)
+
+function previewFor(entry: JournalEntry): string {
+  if (!entry.isEncrypted) return extractPreview(entry.content)
+  if (!encryptionUnlocked.value) return ''
+  return extractPreview(decryptedContentById.get(entry.id) ?? '')
 }
 </script>
 
@@ -136,18 +166,19 @@ function extractPreview(jsonContent: string): string {
             :title="getMoodOption(entry.mood)?.label"
           >{{ getMoodOption(entry.mood)?.emoji }}</span>
         </div>
-        <!-- Locked entries never show their real preview text, search match or not -->
+        <!-- Locked (PIN) or encrypted-but-not-unlocked-yet entries never
+             show their real preview text, search match or not -->
         <p
-          v-if="isEntryLocked(entry)"
+          v-if="isEntryLocked(entry) || (entry.isEncrypted && !encryptionUnlocked)"
           class="text-sm text-dimmed italic"
         >
           Entrada protegida
         </p>
         <p
-          v-else-if="extractPreview(entry.content)"
+          v-else-if="previewFor(entry)"
           class="text-sm text-highlighted line-clamp-5 leading-relaxed"
         >
-          {{ extractPreview(entry.content) }}
+          {{ previewFor(entry) }}
         </p>
         <p
           v-else
