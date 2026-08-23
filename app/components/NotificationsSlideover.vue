@@ -17,7 +17,8 @@ const notifications = useNotifications() as {
   markAllRead: () => Promise<void>
   ensureReady: () => Promise<void>
 }
-const notificationsList = computed(() => notifications.pending.value ? [] : notifications.items.value)
+const pending = notifications.pending
+const notificationsList = computed(() => pending.value ? [] : notifications.items.value)
 
 watch(isNotificationsSlideoverOpen, async (open) => {
   if (!open)
@@ -69,7 +70,7 @@ async function onOpen(notificationId: number) {
     </template>
 
     <template #body>
-      <div v-if="notifications.pending" class="space-y-3">
+      <div v-if="pending" class="space-y-3">
         <USkeleton class="h-12 w-full" />
         <USkeleton class="h-12 w-full" />
         <USkeleton class="h-12 w-full" />
