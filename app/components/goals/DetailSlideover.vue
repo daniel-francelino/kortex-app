@@ -720,11 +720,13 @@ function getStatusIcon(status: GoalStatus): string {
             class="overflow-hidden rounded-xl border border-default/60 bg-default/20"
           >
             <div class="flex items-center gap-2 p-3">
-              <UCheckbox
-                :model-value="milestone.completed"
-                size="sm"
-                @update:model-value="onToggleMilestoneCompleted(milestone)"
-              />
+              <div class="-m-2.5 flex size-11 shrink-0 items-center justify-center">
+                <UCheckbox
+                  :model-value="milestone.completed"
+                  size="sm"
+                  @update:model-value="onToggleMilestoneCompleted(milestone)"
+                />
+              </div>
               <button
                 type="button"
                 class="flex min-w-0 flex-1 items-center gap-2 text-left"

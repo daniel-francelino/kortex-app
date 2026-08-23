@@ -37,6 +37,7 @@ const createModalOpen = ref(false)
 const detailOpen = ref(false)
 const selectedIdeaId = ref<string | null>(null)
 const localSearch = ref('')
+const mobileFiltersOpen = ref(false)
 
 // ─── Handlers ─────────────────────────────────────────────────────────────────
 
@@ -77,8 +78,8 @@ function onSearchInput(val: string): void {
 
 <template>
   <UDashboardPanel id="ideas" class="!flex-row">
-    <!-- Left sidebar: Lists + Tags + Filters -->
-    <div class="w-60 shrink-0 flex flex-col border-r border-default h-full">
+    <!-- Left sidebar: Lists + Tags + Filters (hidden on mobile, reachable via drawer) -->
+    <div class="hidden w-60 shrink-0 lg:flex lg:flex-col border-r border-default h-full">
       <div class="px-3 py-3 border-b border-default">
         <h2 class="text-sm font-semibold text-highlighted">
           Ideias
@@ -156,13 +157,24 @@ function onSearchInput(val: string): void {
             icon="i-lucide-search"
             placeholder="Buscar ideias..."
             size="sm"
-            class="w-80"
+            class="w-full sm:w-80"
             @update:model-value="onSearchInput"
           />
         </template>
 
         <template #right>
           <div class="flex items-center gap-2">
+            <!-- Mobile: open lists/tags/filters drawer -->
+            <UButton
+              icon="i-lucide-sliders-horizontal"
+              square
+              color="neutral"
+              variant="ghost"
+              class="lg:hidden"
+              aria-label="Listas e filtros"
+              @click="mobileFiltersOpen = true"
+            />
+
             <!-- View Toggle -->
             <div class="hidden items-center border border-default rounded-md lg:flex">
               <UButton
@@ -279,6 +291,70 @@ function onSearchInput(val: string): void {
         />
       </div>
     </div>
+
+    <!-- Mobile: Lists + Tags + Filters drawer -->
+    <UDrawer
+      :open="mobileFiltersOpen"
+      direction="bottom"
+      title="Listas e filtros"
+      class="lg:hidden"
+      @update:open="(value: boolean) => { mobileFiltersOpen = value }"
+    >
+      <template #body>
+        <div class="max-h-[70vh] overflow-y-auto space-y-5 pb-2">
+          <IdeasIdeaListManager @filter-list="onFilterList" />
+
+          <div>
+            <h3 class="text-xs font-semibold text-muted uppercase tracking-wide mb-2">
+              Filtros
+            </h3>
+            <div class="space-y-2">
+              <div>
+                <label class="text-xs text-muted mb-1 block">Status</label>
+                <USelect
+                  v-model="filters.status"
+                  :items="[{ label: 'Todos', value: '' }, ...statusOptions]"
+                  value-key="value"
+                  size="lg"
+                  class="w-full"
+                />
+              </div>
+              <div>
+                <label class="text-xs text-muted mb-1 block">Prioridade</label>
+                <USelect
+                  v-model="filters.priority"
+                  :items="[{ label: 'Todas', value: '' }, ...priorityOptions]"
+                  value-key="value"
+                  size="lg"
+                  class="w-full"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <h3 class="text-xs font-semibold text-muted uppercase tracking-wide mb-2">
+              <UIcon name="i-lucide-tags" class="size-3 mr-1 inline" />
+              Tags
+            </h3>
+            <div v-if="tags && tags.length > 0" class="flex flex-wrap gap-1.5">
+              <button
+                v-for="tag in tags"
+                :key="tag.id"
+                class="rounded-full border border-default px-3 py-1.5 text-xs transition-colors"
+                :class="filters.tagId === tag.id ? 'bg-primary/10 text-primary border-primary/40 font-medium' : 'text-default'"
+                @click="filters.tagId = filters.tagId === tag.id ? '' : tag.id"
+              >
+                #{{ tag.name }}
+              </button>
+            </div>
+            <p v-else class="text-xs text-muted">
+              Nenhuma tag
+            </p>
+          </div>
+        </div>
+      </template>
+    </UDrawer>
 
     <!-- Detail Slideover -->
     <IdeasIdeaDetailSlideover

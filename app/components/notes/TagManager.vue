@@ -89,7 +89,7 @@ async function onDelete(tag: NoteTag): Promise<void> {
           <span :class="getNoteTagColorClass(tag.color)" class="inline-block size-2.5 rounded-full" />
           <span class="text-sm text-default">#{{ tag.name }}</span>
         </div>
-        <div class="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+        <div class="flex items-center gap-0.5 opacity-100 transition-opacity lg:opacity-0 lg:group-hover:opacity-100">
           <UButton
             icon="i-lucide-pencil"
             size="xs"

@@ -196,7 +196,7 @@ async function onDelete(e: Event, id: string): Promise<void> {
                 size="xs"
                 color="error"
                 variant="ghost"
-                class="opacity-0 group-hover:opacity-100 transition-opacity"
+                class="opacity-100 transition-opacity lg:opacity-0 lg:group-hover:opacity-100"
                 @click="(e: MouseEvent) => onDelete(e, idea.id)"
               />
             </td>

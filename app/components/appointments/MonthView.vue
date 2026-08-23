@@ -104,47 +104,47 @@ function formatEventTime(evt: CalendarEvent): string {
   })
 }
 
-function getMobileEventLabel(evt: CalendarEvent): string {
-  return evt.allDay ? evt.title : formatEventTime(evt)
-}
-
-// ─── Drag state ───────────────────────────────────────────────────────────
+// ─── Drag state (Pointer Events — works on touch, unlike native HTML5 DnD) ──
 const dragEvent = ref<CalendarEvent | null>(null)
 const dragOver = ref<string>('')
+const dragPointerId = ref<number | null>(null)
 
-function onEventDragStart(evt: CalendarEvent, e: DragEvent) {
+function targetDateFromPoint(x: number, y: number): string | null {
+  const el = document.elementFromPoint(x, y)
+  const cell = el?.closest<HTMLElement>('[data-date]')
+  return cell?.dataset.date ?? null
+}
+
+function startDrag(evt: CalendarEvent, e: PointerEvent) {
   dragEvent.value = evt
-  if (e.dataTransfer) {
-    e.dataTransfer.effectAllowed = 'move'
-    e.dataTransfer.setData('text/plain', evt.id)
-  }
+  dragPointerId.value = e.pointerId
+  dragOver.value = formatDate(new Date(evt.startAt))
+  ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
 }
 
-function onDragOver(dateStr: string, e: DragEvent) {
-  e.preventDefault()
-  if (e.dataTransfer) e.dataTransfer.dropEffect = 'move'
-  dragOver.value = dateStr
+function onPointerMove(e: PointerEvent) {
+  if (!dragEvent.value || e.pointerId !== dragPointerId.value) return
+  const dateStr = targetDateFromPoint(e.clientX, e.clientY)
+  if (dateStr) dragOver.value = dateStr
 }
 
-function onDragLeave() {
-  dragOver.value = ''
-}
-
-function onDrop(dateStr: string, e: DragEvent) {
-  e.preventDefault()
-  dragOver.value = ''
-  if (!dragEvent.value) return
+function onPointerUp(e: PointerEvent) {
+  if (!dragEvent.value || e.pointerId !== dragPointerId.value) return
+  const targetDate = targetDateFromPoint(e.clientX, e.clientY)
   const original = formatDate(new Date(dragEvent.value.startAt))
-  if (original === dateStr) {
-    dragEvent.value = null
-    return
+  if (targetDate && targetDate !== original) {
+    emit('dropEvent', dragEvent.value.id, targetDate)
   }
-  emit('dropEvent', dragEvent.value.id, dateStr)
-  dragEvent.value = null
+  endDrag()
 }
 
-function onDragEnd() {
+function onPointerCancel() {
+  endDrag()
+}
+
+function endDrag() {
   dragEvent.value = null
+  dragPointerId.value = null
   dragOver.value = ''
 }
 
@@ -159,10 +159,16 @@ function onEventClick(evt: CalendarEvent, e: MouseEvent) {
 }
 
 const MAX_VISIBLE = 3
+const MAX_VISIBLE_DOTS = 4
 </script>
 
 <template>
-  <div class="flex min-h-[calc(var(--app-visual-height,100dvh)-var(--ui-header-height)-var(--mobile-bottom-nav-height,4.75rem))] flex-col overflow-hidden border-y border-default sm:min-h-[calc(100vh-12rem)] sm:rounded-lg sm:border">
+  <div
+    class="flex min-h-[calc(var(--app-visual-height,100dvh)-var(--ui-header-height)-var(--mobile-bottom-nav-height,4.75rem))] flex-col overflow-hidden border-y border-default sm:min-h-[calc(100vh-12rem)] sm:rounded-lg sm:border"
+    @pointermove="onPointerMove"
+    @pointerup="onPointerUp"
+    @pointercancel="onPointerCancel"
+  >
     <!-- Loading -->
     <div v-if="loading" class="flex min-h-[calc(var(--app-visual-height,100dvh)-var(--ui-header-height)-var(--mobile-bottom-nav-height,4.75rem))] flex-col sm:min-h-[calc(100vh-12rem)]">
       <div class="grid grid-cols-7 border-b border-default bg-elevated/30">
@@ -226,15 +232,13 @@ const MAX_VISIBLE = 3
           <div
             v-for="cell in week"
             :key="cell.dateStr"
+            :data-date="cell.dateStr"
             class="group min-h-0 cursor-pointer border-r border-default/50 p-0.5 transition-colors last:border-r-0 sm:min-h-28 sm:p-1.5"
             :class="[
               !cell.isCurrentMonth ? 'bg-muted/3' : 'hover:bg-elevated/40',
               dragOver === cell.dateStr ? 'bg-primary/10' : ''
             ]"
             @click="onDayClick(cell, $event)"
-            @dragover="onDragOver(cell.dateStr, $event)"
-            @dragleave="onDragLeave"
-            @drop="onDrop(cell.dateStr, $event)"
           >
             <!-- Date number -->
             <div class="mb-1">
@@ -252,45 +256,63 @@ const MAX_VISIBLE = 3
               </span>
             </div>
 
-            <!-- Events (max 3 visible) -->
-            <div class="space-y-0.5">
+            <!-- Events: Google Calendar-style compact dots on mobile (a day cell is too
+                 narrow to show readable text), full text+time chips from sm: up -->
+            <div class="flex flex-wrap items-center gap-1 pl-0.5 sm:hidden">
+              <button
+                v-for="(evt, ei) in cell.events.slice(0, MAX_VISIBLE_DOTS)"
+                :key="ei"
+                type="button"
+                class="flex size-4 shrink-0 touch-manipulation items-center justify-center"
+                :aria-label="`${formatEventTime(evt)} ${evt.title}`"
+                @click.stop="onEventClick(evt, $event)"
+                @pointerdown.stop="startDrag(evt, $event)"
+              >
+                <span
+                  class="size-1.5 rounded-full transition-transform"
+                  :class="dragEvent?.id === evt.id ? 'scale-150 opacity-60' : ''"
+                  :style="{ backgroundColor: getEventColor(evt) }"
+                />
+              </button>
+              <span
+                v-if="cell.events.length > MAX_VISIBLE_DOTS"
+                class="text-[9px] font-medium leading-none text-muted"
+              >
+                +{{ cell.events.length - MAX_VISIBLE_DOTS }}
+              </span>
+            </div>
+
+            <div class="hidden space-y-0.5 sm:block">
               <div
                 v-for="(evt, ei) in cell.events.slice(0, MAX_VISIBLE)"
                 :key="ei"
-                class="flex h-4 min-w-0 cursor-grab items-center gap-0.5 overflow-hidden rounded-sm px-0.5 text-[10px] leading-4 font-medium sm:gap-1 sm:px-1 sm:text-[11px]"
-                :class="evt.allDay ? 'text-white' : ''"
+                class="flex h-4 min-w-0 cursor-grab touch-manipulation items-center gap-1 overflow-hidden rounded-sm px-1 text-[11px] leading-4 font-medium transition-opacity"
+                :class="[evt.allDay ? 'text-white' : '', dragEvent?.id === evt.id ? 'opacity-40' : '']"
                 :style="evt.allDay
                   ? { backgroundColor: getEventColor(evt) }
                   : { color: getEventColor(evt) }"
-                draggable="true"
                 :title="`${formatEventTime(evt)} ${evt.title}`"
                 @click.stop="onEventClick(evt, $event)"
-                @dragstart="onEventDragStart(evt, $event)"
-                @dragend="onDragEnd"
+                @pointerdown.stop="startDrag(evt, $event)"
               >
                 <!-- Dot for timed events -->
                 <span
                   v-if="!evt.allDay"
-                  class="inline-block size-1 shrink-0 rounded-full sm:size-1.5"
+                  class="inline-block size-1.5 shrink-0 rounded-full"
                   :style="{ backgroundColor: getEventColor(evt) }"
                 />
                 <span class="min-w-0 truncate">
-                  <span class="sm:hidden">
-                    {{ getMobileEventLabel(evt) }}
+                  <span v-if="!evt.allDay" class="mr-0.5 font-normal opacity-75">
+                    {{ formatEventTime(evt) }}
                   </span>
-                  <span class="hidden sm:inline">
-                    <span v-if="!evt.allDay" class="mr-0.5 font-normal opacity-75">
-                      {{ formatEventTime(evt) }}
-                    </span>
-                    {{ evt.title }}
-                  </span>
+                  {{ evt.title }}
                 </span>
               </div>
 
               <!-- Overflow indicator -->
               <div
                 v-if="cell.events.length > MAX_VISIBLE"
-                class="cursor-pointer px-0.5 text-[10px] font-medium text-muted hover:text-highlighted sm:px-1 sm:text-[11px]"
+                class="cursor-pointer px-1 text-[11px] font-medium text-muted hover:text-highlighted"
                 @click.stop="onDayClick(cell, $event)"
               >
                 +{{ cell.events.length - MAX_VISIBLE }} mais

@@ -19,11 +19,13 @@ function formatDueDate(dueDate: string): string {
 <template>
   <div class="rounded-xl border border-default/60 bg-default/30 p-3">
     <div class="flex items-start gap-3">
-      <UCheckbox
-        :model-value="task.completed"
-        size="sm"
-        @update:model-value="emit('toggle', task)"
-      />
+      <div class="-m-2.5 flex size-11 shrink-0 items-center justify-center">
+        <UCheckbox
+          :model-value="task.completed"
+          size="sm"
+          @update:model-value="emit('toggle', task)"
+        />
+      </div>
       <div class="min-w-0 flex-1">
         <p
           class="text-sm font-medium leading-5"
