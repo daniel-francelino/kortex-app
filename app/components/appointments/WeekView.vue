@@ -260,7 +260,7 @@ function getEventStyle(evt: PositionedEvent, day: DayColumn) {
 
 <template>
   <div
-    class="flex flex-col overflow-hidden rounded-lg border border-default"
+    class="flex min-h-[calc(var(--app-visual-height,100dvh)-var(--ui-header-height)-var(--mobile-bottom-nav-height,4.75rem))] flex-col overflow-hidden border-y border-default lg:min-h-0 lg:rounded-lg lg:border"
     @pointermove="onPointerMove"
     @pointerup="onPointerUp"
     @pointercancel="onPointerCancel"
@@ -268,10 +268,10 @@ function getEventStyle(evt: PositionedEvent, day: DayColumn) {
     <!-- Loading -->
     <div
       v-if="loading"
-      class="flex min-h-[calc(100vh-12rem)] flex-col"
+      class="flex min-h-[calc(var(--app-visual-height,100dvh)-var(--ui-header-height)-var(--mobile-bottom-nav-height,4.75rem))] flex-col sm:min-h-[calc(100vh-12rem)]"
     >
       <div class="flex shrink-0 border-b border-default bg-elevated/30">
-        <div class="w-14 shrink-0" />
+        <div class="w-10 shrink-0 sm:w-14" />
         <div
           v-for="day in weekDays"
           :key="day.dateStr"
@@ -283,7 +283,7 @@ function getEventStyle(evt: PositionedEvent, day: DayColumn) {
       </div>
 
       <div class="flex min-h-8 shrink-0 border-b border-default/30 bg-default">
-        <div class="w-14 shrink-0" />
+        <div class="w-10 shrink-0 sm:w-14" />
         <div
           v-for="day in weekDays"
           :key="`all-day-${day.dateStr}`"
@@ -297,11 +297,11 @@ function getEventStyle(evt: PositionedEvent, day: DayColumn) {
       </div>
 
       <div class="flex flex-1 overflow-hidden">
-        <div class="w-14 shrink-0">
+        <div class="w-10 shrink-0 sm:w-14">
           <div
             v-for="hour in hours"
             :key="hour"
-            class="relative flex justify-end pr-2"
+            class="relative flex justify-end pr-1 sm:pr-2"
             :style="{ height: `${HOUR_HEIGHT}px` }"
           >
             <USkeleton class="absolute -top-1 h-2 w-7" />
@@ -340,7 +340,7 @@ function getEventStyle(evt: PositionedEvent, day: DayColumn) {
     <template v-else>
       <!-- ── Header ────────────────────────────────────────────── -->
       <div class="flex shrink-0 border-b border-default bg-elevated/30">
-        <div class="w-14 shrink-0" />
+        <div class="w-10 shrink-0 sm:w-14" />
         <div
           v-for="day in weekDays"
           :key="day.dateStr"
@@ -366,7 +366,7 @@ function getEventStyle(evt: PositionedEvent, day: DayColumn) {
         v-if="hasAllDayEvents"
         class="flex shrink-0 border-b border-default/30 bg-default"
       >
-        <div class="flex w-14 shrink-0 items-start justify-end pr-2 pt-1.5">
+        <div class="flex w-10 shrink-0 items-start justify-end pr-1 pt-1.5 sm:w-14 sm:pr-2">
           <span class="text-[10px] text-muted/60">dia int.</span>
         </div>
         <div
@@ -388,13 +388,13 @@ function getEventStyle(evt: PositionedEvent, day: DayColumn) {
 
       <!-- ── Scrollable body ───────────────────────────────────── -->
       <div ref="gridRef" class="overflow-hidden">
-        <div data-scroll-body class="flex overflow-y-auto" style="max-height: calc(100vh - 200px)">
+        <div data-scroll-body class="flex overflow-y-auto" style="max-height: calc(var(--app-visual-height, 100vh) - var(--ui-header-height) - var(--mobile-bottom-nav-height, 4.75rem) - 5.5rem)">
           <!-- Hour labels -->
-          <div class="w-14 shrink-0">
+          <div class="w-10 shrink-0 sm:w-14">
             <div
               v-for="hour in hours"
               :key="hour"
-              class="relative flex justify-end pr-2"
+              class="relative flex justify-end pr-1 sm:pr-2"
               :style="{ height: `${HOUR_HEIGHT}px` }"
             >
               <span class="absolute -top-2 select-none text-[10px] leading-none text-muted/60">

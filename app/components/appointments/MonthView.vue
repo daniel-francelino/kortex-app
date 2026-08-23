@@ -162,9 +162,9 @@ const MAX_VISIBLE = 3
 </script>
 
 <template>
-  <div class="min-h-[calc(100dvh-8.25rem)] overflow-hidden border-y border-default sm:min-h-[calc(100vh-12rem)] sm:rounded-lg sm:border">
+  <div class="flex min-h-[calc(var(--app-visual-height,100dvh)-var(--ui-header-height)-var(--mobile-bottom-nav-height,4.75rem))] flex-col overflow-hidden border-y border-default sm:min-h-[calc(100vh-12rem)] sm:rounded-lg sm:border">
     <!-- Loading -->
-    <div v-if="loading" class="flex min-h-[calc(100dvh-8.25rem)] flex-col sm:min-h-[calc(100vh-12rem)]">
+    <div v-if="loading" class="flex min-h-[calc(var(--app-visual-height,100dvh)-var(--ui-header-height)-var(--mobile-bottom-nav-height,4.75rem))] flex-col sm:min-h-[calc(100vh-12rem)]">
       <div class="grid grid-cols-7 border-b border-default bg-elevated/30">
         <div
           v-for="header in dayHeaders"
@@ -179,7 +179,7 @@ const MAX_VISIBLE = 3
         <div
           v-for="i in 42"
           :key="i"
-          class="min-h-20 border-r border-b border-default/50 p-1 last:border-r-0 sm:min-h-24 sm:p-1.5"
+          class="min-h-20 border-r border-b border-default/50 p-0.5 last:border-r-0 sm:min-h-24 sm:p-1.5"
           :class="i > 35 ? 'border-b-0' : ''"
         >
           <USkeleton class="mb-3 size-6 rounded-full" />
@@ -214,16 +214,19 @@ const MAX_VISIBLE = 3
       </div>
 
       <!-- Weeks -->
-      <div>
+      <div
+        class="grid flex-1"
+        :style="{ gridTemplateRows: `repeat(${calendarGrid.length}, minmax(0, 1fr))` }"
+      >
         <div
           v-for="(week, wi) in calendarGrid"
           :key="wi"
-          class="grid grid-cols-7 border-b border-default/50 last:border-b-0"
+          class="grid min-h-0 grid-cols-7 border-b border-default/50 last:border-b-0"
         >
           <div
             v-for="cell in week"
             :key="cell.dateStr"
-            class="group min-h-[5.75rem] cursor-pointer border-r border-default/50 p-1 transition-colors last:border-r-0 sm:min-h-28 sm:p-1.5"
+            class="group min-h-0 cursor-pointer border-r border-default/50 p-0.5 transition-colors last:border-r-0 sm:min-h-28 sm:p-1.5"
             :class="[
               !cell.isCurrentMonth ? 'bg-muted/3' : 'hover:bg-elevated/40',
               dragOver === cell.dateStr ? 'bg-primary/10' : ''

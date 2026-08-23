@@ -431,7 +431,10 @@ onMounted(() => {
 </script>
 
 <template>
-  <UDashboardPanel id="appointments">
+  <UDashboardPanel
+    id="appointments"
+    :ui="{ body: 'max-lg:gap-0 max-lg:p-0 max-lg:pb-[var(--mobile-bottom-nav-height,4.75rem)]' }"
+  >
     <template #header>
       <UDashboardNavbar title="Agenda">
         <template #leading>

@@ -229,7 +229,7 @@ defineExpose({ viewDate })
 
 <template>
   <div
-    class="overflow-hidden rounded-lg border border-default"
+    class="min-h-[calc(var(--app-visual-height,100dvh)-var(--ui-header-height)-var(--mobile-bottom-nav-height,4.75rem))] overflow-hidden border-y border-default lg:min-h-0 lg:rounded-lg lg:border"
     @pointermove="onPointerMove"
     @pointerup="onPointerUp"
     @pointercancel="onPointerCancel"
@@ -237,9 +237,9 @@ defineExpose({ viewDate })
     <!-- Loading -->
     <div
       v-if="loading"
-      class="min-h-[calc(100vh-12rem)]"
+      class="min-h-[calc(var(--app-visual-height,100dvh)-var(--ui-header-height)-var(--mobile-bottom-nav-height,4.75rem))]"
     >
-      <div class="flex items-start gap-3 border-b border-default/50 px-3 py-2">
+      <div class="flex items-start gap-2 border-b border-default/50 px-2 py-2 sm:gap-3 sm:px-3">
         <USkeleton class="h-3 w-10 shrink-0" />
         <div class="flex flex-1 flex-wrap gap-1">
           <USkeleton class="h-5 w-32 rounded" />
@@ -248,22 +248,22 @@ defineExpose({ viewDate })
       </div>
 
       <div class="overflow-hidden">
-        <div class="relative min-h-[calc(100vh-15rem)]">
+        <div class="relative min-h-[calc(var(--app-visual-height,100dvh)-var(--ui-header-height)-var(--mobile-bottom-nav-height,4.75rem)-2.5rem)] sm:min-h-[calc(100vh-15rem)]">
           <div
             v-for="hour in hours"
             :key="hour"
             class="flex border-b border-default/30"
             :style="{ height: `${HOUR_HEIGHT}px` }"
           >
-            <div class="w-12 shrink-0 pr-2 text-right">
+            <div class="w-10 shrink-0 pr-1 text-right sm:w-12 sm:pr-2">
               <USkeleton class="ml-auto mt-0 h-2 w-7" />
             </div>
             <div class="flex-1 border-l border-default/20" />
           </div>
 
-          <USkeleton class="absolute left-14 right-4 top-16 h-16 rounded" />
-          <USkeleton class="absolute left-14 right-10 top-44 h-24 rounded" />
-          <USkeleton class="absolute left-14 right-24 top-[22rem] h-12 rounded" />
+          <USkeleton class="absolute left-11 right-2 top-16 h-16 rounded sm:left-14 sm:right-4" />
+          <USkeleton class="absolute left-11 right-6 top-44 h-24 rounded sm:left-14 sm:right-10" />
+          <USkeleton class="absolute left-11 right-14 top-[22rem] h-12 rounded sm:left-14 sm:right-24" />
         </div>
       </div>
     </div>
@@ -272,7 +272,7 @@ defineExpose({ viewDate })
       <!-- All-day section -->
       <div
         v-if="allDayEvents.length"
-        class="flex items-start gap-3 border-b border-default/50 px-3 py-1.5"
+        class="flex items-start gap-2 border-b border-default/50 px-2 py-1.5 sm:gap-3 sm:px-3"
       >
         <span class="w-10 shrink-0 text-right text-[10px] text-muted/60 pt-0.5">dia int.</span>
         <div class="flex flex-wrap gap-1">
@@ -293,7 +293,7 @@ defineExpose({ viewDate })
         <div
           data-scroll-body
           class="overflow-y-auto"
-          style="max-height: calc(100vh - 220px)"
+          style="max-height: calc(var(--app-visual-height, 100vh) - var(--ui-header-height) - var(--mobile-bottom-nav-height, 4.75rem) - 2.5rem)"
         >
           <div class="relative" :style="{ minHeight: `${24 * HOUR_HEIGHT}px` }">
             <!-- Hour rows -->
@@ -305,7 +305,7 @@ defineExpose({ viewDate })
               :style="{ height: `${HOUR_HEIGHT}px` }"
               @click="onSlotClick(hour, $event)"
             >
-              <div class="w-12 shrink-0 pr-2 text-right">
+              <div class="w-10 shrink-0 pr-1 text-right sm:w-12 sm:pr-2">
                 <span class="-translate-y-2 block select-none text-[10px] leading-none text-muted/60">
                   {{ formatHourLabel(hour) }}
                 </span>
@@ -316,8 +316,7 @@ defineExpose({ viewDate })
             <!-- Current time indicator -->
             <div
               v-if="isToday"
-              class="pointer-events-none absolute z-10 flex items-center"
-              style="left: 3rem; right: 0"
+              class="pointer-events-none absolute left-10 right-0 z-10 flex items-center sm:left-12"
               :style="{ top: `${currentTimePx}px` }"
             >
               <div class="-ml-1 size-2 rounded-full bg-red-500 shadow-sm" />
