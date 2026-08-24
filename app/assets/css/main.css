@@ -250,6 +250,15 @@ body.keyboard-open .mobile-bottom-nav {
       top: auto;
       bottom: 0;
     }
+
+    /* `.kortex-app-shell`'s height also depends on the same mismatched
+       `--app-visual-height` JS value (see above) — a shell shorter than the
+       real screen left a gap of raw `body` background between its bottom
+       edge and the now bottom-pinned nav. `100dvh` tracks the real
+       standalone viewport directly, no JS needed. */
+    .kortex-app-shell {
+      height: 100dvh;
+    }
   }
 }
 
