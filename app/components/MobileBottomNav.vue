@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { AnimatePresence, motion } from 'motion-v'
+import { isNavPathActive } from '~/utils/navigation'
 
 const route = useRoute()
 const router = useRouter()
@@ -30,13 +31,11 @@ const moreItems = [
 ]
 
 function isActive(to: string): boolean {
-  if (!to) return false
-  if (to === '/app') return route.path === '/app'
-  return route.path.startsWith(to)
+  return isNavPathActive(route.path, to)
 }
 
 function isMoreActive(): boolean {
-  return moreItems.some(item => route.path.startsWith(item.to))
+  return moreItems.some(item => isNavPathActive(route.path, item.to))
 }
 
 function isContextItemActive(item: { value: string, to?: string }): boolean {

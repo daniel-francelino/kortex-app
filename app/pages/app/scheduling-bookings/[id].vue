@@ -10,7 +10,7 @@ const pageId = route.params.id as string
 const { fetchSchedulingPage, fetchBookings } = useSchedulingPages()
 
 const { data: page } = await useAsyncData(`scheduling-page-${pageId}`, () => fetchSchedulingPage(pageId))
-const { data: bookingsData } = await useAsyncData<Booking[]>(`scheduling-page-bookings-${pageId}`, () => fetchBookings(pageId), { default: () => [] })
+const { data: bookingsData, status: bookingsStatus } = useAsyncData<Booking[]>(`scheduling-page-bookings-${pageId}`, () => fetchBookings(pageId), { lazy: true, default: () => [] })
 const bookings = computed(() => bookingsData.value ?? [])
 
 useSeoMeta({ title: page.value ? `Reservas — ${page.value.title}` : 'Reservas' })
@@ -43,12 +43,17 @@ function formatDate(iso: string): string {
 
     <template #body>
       <div class="mx-auto max-w-3xl space-y-3 p-4">
-        <div v-if="bookings.length === 0" class="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-default py-16">
-          <UIcon name="i-lucide-calendar-x" class="size-10 text-dimmed" />
-          <p class="text-sm text-muted">
-            Nenhuma reserva ainda.
-          </p>
+        <div v-if="bookingsStatus === 'pending'" class="space-y-3">
+          <USkeleton v-for="i in 3" :key="i" class="h-20 w-full rounded-xl" />
         </div>
+
+        <UEmpty
+          v-else-if="bookings.length === 0"
+          icon="i-lucide-calendar-x"
+          title="Nenhuma reserva ainda"
+          description="Assim que alguém marcar um horário por essa página, as reservas aparecem aqui."
+          class="py-16"
+        />
 
         <template v-else>
           <UCard v-for="booking in bookings" :key="booking.id">

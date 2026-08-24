@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { AnimatePresence, motion } from 'motion-v'
 import type { NavigationMenuItem } from '@nuxt/ui'
+import { isNavPathActive } from '~/utils/navigation'
 
 const toast = useToast()
 const route = useRoute()
@@ -10,7 +11,11 @@ const sidebarCollapsed = ref(true)
 const isMobile = useMediaQuery('(max-width: 1023px)')
 const mobileSettingsOpen = ref(true)
 
-const links = [
+function isActivePath(to?: string, exact?: boolean): boolean {
+  return isNavPathActive(route.path, to, exact)
+}
+
+const links = computed(() => [
   [
     {
       label: 'Visão geral',
@@ -24,6 +29,7 @@ const links = [
       label: 'Agenda',
       icon: 'i-lucide-calendar-days',
       to: '/app/appointments',
+      active: isActivePath('/app/appointments'),
       onSelect: () => {
         open.value = false
       }
@@ -130,26 +136,20 @@ const links = [
       to: '/docs'
     }
   ]
-] satisfies NavigationMenuItem[][]
+] satisfies NavigationMenuItem[][])
 
 const groups = computed(() => [
   {
     id: 'links',
     label: 'Ir para',
-    items: links.flat()
+    items: links.value.flat()
   }
 ])
 
-const primaryLinks = computed(() => links[0].filter(item => !item.children))
-const settingsLink = computed(() => links[0].find(item => item.children))
-const secondaryLinks = computed(() => links[1])
+const primaryLinks = computed(() => links.value[0].filter(item => !item.children))
+const settingsLink = computed(() => links.value[0].find(item => item.children))
+const secondaryLinks = computed(() => links.value[1])
 const mobileMenuTransition = { duration: 0.18, ease: 'easeOut' }
-
-function isActivePath(to?: string, exact?: boolean): boolean {
-  if (!to) return false
-  if (exact || to === '/app') return route.path === to
-  return route.path.startsWith(to)
-}
 
 function closeMobileSidebar() {
   open.value = false

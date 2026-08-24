@@ -7,6 +7,7 @@ definePageMeta({ layout: 'app' })
 useSeoMeta({ title: 'Agendamento' })
 
 const router = useRouter()
+const isMobile = useMediaQuery('(max-width: 1023px)')
 const { calendars, calendarsStatus, refreshCalendars } = useAppointments()
 const {
   pages,
@@ -90,7 +91,7 @@ function openPreview(page: SchedulingPage) {
     <template #header>
       <UDashboardNavbar title="Agendamento">
         <template #right>
-          <UButton icon="i-lucide-plus" label="Nova página" @click="onCreate" />
+          <UButton v-if="!isMobile" icon="i-lucide-plus" label="Nova página" @click="onCreate" />
         </template>
       </UDashboardNavbar>
     </template>
@@ -105,13 +106,14 @@ function openPreview(page: SchedulingPage) {
           <USkeleton v-for="i in 3" :key="i" class="h-24 w-full rounded-xl" />
         </div>
 
-        <div v-else-if="!pages || pages.length === 0" class="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-default py-16">
-          <UIcon name="i-lucide-calendar-plus" class="size-10 text-dimmed" />
-          <p class="text-sm text-muted">
-            Nenhuma página de agendamento ainda.
-          </p>
-          <UButton label="Criar a primeira" icon="i-lucide-plus" @click="onCreate" />
-        </div>
+        <UEmpty
+          v-else-if="!pages || pages.length === 0"
+          icon="i-lucide-calendar-plus"
+          title="Nenhuma página de agendamento ainda"
+          description="Crie sua primeira página para compartilhar um link de agendamento."
+          class="py-16"
+          :actions="[{ label: 'Criar a primeira', icon: 'i-lucide-plus', onClick: onCreate }]"
+        />
 
         <div v-else class="space-y-3">
           <UCard
@@ -212,6 +214,21 @@ function openPreview(page: SchedulingPage) {
       </div>
     </template>
   </UDashboardPanel>
+
+  <!-- Mobile: floating "new page" button, replaces the navbar action -->
+  <UButton
+    v-if="isMobile"
+    icon="i-lucide-plus"
+    size="xl"
+    square
+    class="fixed z-30 size-14 items-center justify-center rounded-full shadow-lg shadow-black/30"
+    :style="{
+      right: 'calc(1rem + var(--safe-area-right, 0px))',
+      bottom: 'calc(var(--mobile-bottom-nav-height, 4.75rem) + 1rem)'
+    }"
+    aria-label="Nova página"
+    @click="onCreate"
+  />
 
   <AppointmentsSchedulingQuickCreateModal
     :open="quickCreateOpen"
