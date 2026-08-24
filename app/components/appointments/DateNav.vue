@@ -34,6 +34,7 @@ const emit = defineEmits<{
       icon="i-lucide-chevron-left"
       variant="ghost"
       size="sm"
+      class="hidden sm:flex"
       aria-label="Período anterior"
       @click="emit('prev')"
     />
@@ -41,10 +42,11 @@ const emit = defineEmits<{
       icon="i-lucide-chevron-right"
       variant="ghost"
       size="sm"
+      class="hidden sm:flex"
       aria-label="Próximo período"
       @click="emit('next')"
     />
-    <h2 class="ml-1 min-w-0 truncate text-sm font-semibold capitalize text-highlighted sm:min-w-36">
+    <h2 class="ml-1 min-w-0 truncate text-sm font-semibold text-highlighted sm:min-w-36">
       {{ label }}
     </h2>
   </div>

@@ -63,14 +63,6 @@ function navigateTo(to: string) {
   }
 }
 
-function handleContextClick(item: MobileContextNavItem) {
-  if (item.to) {
-    router.push(item.to)
-    return
-  }
-  selectMobileContextNav(item.value)
-}
-
 watchEffect(() => {
   if (!import.meta.client) return
 
