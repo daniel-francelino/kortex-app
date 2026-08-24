@@ -11,10 +11,12 @@
     "lint:fix": "eslint . --fix",
     "typecheck": "nuxt typecheck",
     "generate:icons": "node scripts/generate-icons.mjs",
+    "generate:capacitor-assets": "node scripts/generate-capacitor-assets.mjs",
+    "cap:assets": "pnpm run generate:capacitor-assets && capacitor-assets generate --ios --android",
     "cap:init": "cap init 'Kortex' com.kortex.app --web-dir .output/public",
-    "cap:add:android": "cap add android",
-    "cap:add:ios": "cap add ios",
-    "cap:sync": "nuxt generate && cap sync",
+    "cap:add:android": "cap add android && pnpm run cap:assets",
+    "cap:add:ios": "cap add ios && pnpm run cap:assets",
+    "cap:sync": "nuxt generate && pnpm run cap:assets && cap sync",
     "cap:open:android": "cap open android",
     "cap:open:ios": "cap open ios"
   },
@@ -88,6 +90,7 @@
   },
   "devDependencies": {
     "@capacitor/android": "^8.2.0",
+    "@capacitor/assets": "^3.0.5",
     "@capacitor/cli": "^8.2.0",
     "@capacitor/ios": "^8.2.0",
     "@nuxt/eslint": "^1.15.2",

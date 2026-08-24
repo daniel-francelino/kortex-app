@@ -114,7 +114,7 @@ void props
             icon="i-lucide-more-horizontal"
             size="xs"
             variant="ghost"
-            class="opacity-0 group-hover:opacity-100"
+            class="opacity-100 lg:opacity-0 lg:group-hover:opacity-100"
           />
         </UDropdownMenu>
       </div>

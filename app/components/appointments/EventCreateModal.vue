@@ -187,8 +187,14 @@ function formatDateDisplay(dateStr: string): string {
         class="fixed inset-0 z-50 flex flex-col bg-default"
       >
         <!-- ── Top bar ──────────────────────────────────────────────── -->
+        <!-- This is a hand-rolled `fixed inset-0` overlay teleported to <body>,
+             so it sits outside UDashboardGroup/UModal — none of the app-wide
+             safe-area handling (kortex-app-shell, app.config.ts's modal/
+             slideover slots) reaches it. Without its own top padding, the
+             header sits flush at y=0 and the iOS status bar/notch paints
+             directly over the title and Salvar button. -->
         <div
-          class="flex h-14 shrink-0 items-center justify-between border-b border-default px-4"
+          class="flex min-h-14 shrink-0 items-center justify-between border-b border-default px-4 pt-[var(--safe-area-top)]"
         >
           <!-- Left: close + title -->
           <div class="flex items-center gap-3">

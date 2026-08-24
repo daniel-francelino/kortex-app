@@ -136,7 +136,12 @@ body,
 
 /* ─── Mobile touch & interaction improvements ───────────────────── */
 @media (max-width: 768px) {
-  /* Smaller icon-only buttons keep 40px minimum */
+  /* Smaller icon-only buttons keep 40px minimum.
+     Nuxt UI's Icon renders as `<span data-slot="leadingIcon">` (CSS-sprite
+     mode), never an inline <svg>, so a `:has(> svg:only-child)` selector
+     never matches real UButton markup — target the actual data-slot instead. */
+  button[data-slot="base"]:has(> [data-slot="leadingIcon"]:only-child),
+  a[data-slot="base"]:has(> [data-slot="leadingIcon"]:only-child),
   button[data-square],
   button:has(> svg:only-child) {
     min-height: 40px;
@@ -229,6 +234,32 @@ body.keyboard-open .mobile-bottom-nav {
 
 .dark .mobile-bottom-nav {
   border-top-color: var(--ui-color-neutral-800);
+}
+
+/* In a regular Safari tab, `top: calc(visualHeight - navHeight)` (above) is
+   needed because a plain `bottom: 0` fixed element jumps around as iOS
+   collapses/expands the address bar. Installed as a home-screen app
+   (display-mode: standalone) there's no address bar to collapse, and iOS's
+   own `visualViewport.height` reporting in that mode doesn't always line up
+   with the real rendered viewport — the mismatch showed up as extra blank
+   space below the bottom nav. `bottom: 0` sidesteps the JS-computed height
+   entirely and lets the browser position it correctly. */
+@supports (-webkit-touch-callout: none) {
+  @media (display-mode: standalone) and (max-width: 1023px) {
+    .mobile-bottom-nav {
+      top: auto;
+      bottom: 0;
+    }
+
+    /* `.kortex-app-shell`'s height also depends on the same mismatched
+       `--app-visual-height` JS value (see above) — a shell shorter than the
+       real screen left a gap of raw `body` background between its bottom
+       edge and the now bottom-pinned nav. `100dvh` tracks the real
+       standalone viewport directly, no JS needed. */
+    .kortex-app-shell {
+      height: 100dvh;
+    }
+  }
 }
 
 .mobile-bottom-nav > nav {

@@ -7,7 +7,7 @@ defineProps<{
 <template>
   <div
     class="flex items-center justify-between"
-    :class="orientation === 'vertical' ? 'flex-col space-y-4' : 'flex-row   space-x-4'"
+    :class="orientation === 'vertical' ? 'flex-col space-y-4' : 'flex-row flex-wrap gap-4 overflow-x-auto'"
   >
     <slot />
   </div>

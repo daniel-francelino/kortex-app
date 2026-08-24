@@ -250,7 +250,7 @@ function onRowKeydown(event: KeyboardEvent) {
             :icon="node.habit.log?.completed ? 'i-lucide-message-square' : 'i-lucide-message-square-plus'"
             color="neutral"
             variant="ghost"
-            size="xs"
+            :size="isMobile ? 'md' : 'xs'"
             :aria-label="node.habit.log?.completed ? 'Adicionar nota (feito)' : 'Marcar como não feito com nota'"
             @click.stop="emit('open-note', node.habit.id, !(node.habit.log?.completed ?? false))"
           />
@@ -310,10 +310,10 @@ function onRowKeydown(event: KeyboardEvent) {
             :content="{ side: 'top', align: 'center' }"
           >
             <span
-              class="inline-flex size-6 items-center justify-center rounded-md border border-default/60 bg-default/40 text-muted"
+              class="inline-flex size-8 sm:size-6 items-center justify-center rounded-md border border-default/60 bg-default/40 text-muted"
               :aria-label="`Sustenta a meta: ${node.habit.goalTitle ?? 'sem título'}`"
             >
-              <UIcon name="i-lucide-target" class="size-3.5" />
+              <UIcon name="i-lucide-target" class="size-4 sm:size-3.5" />
             </span>
 
             <template #content>
@@ -328,10 +328,10 @@ function onRowKeydown(event: KeyboardEvent) {
             :content="{ side: 'top', align: 'center' }"
           >
             <span
-              class="inline-flex size-6 items-center justify-center rounded-md border border-default/60 bg-default/40 text-muted"
+              class="inline-flex size-8 sm:size-6 items-center justify-center rounded-md border border-default/60 bg-default/40 text-muted"
               :aria-label="`Versão de emergência: ${node.habit.emergencyVersion}`"
             >
-              <UIcon name="i-lucide-life-buoy" class="size-3.5" />
+              <UIcon name="i-lucide-life-buoy" class="size-4 sm:size-3.5" />
             </span>
 
             <template #content>
@@ -348,11 +348,11 @@ function onRowKeydown(event: KeyboardEvent) {
           >
             <button
               type="button"
-              class="inline-flex size-6 items-center justify-center rounded-md border border-default/60 bg-default/40 text-muted transition hover:border-primary/40 hover:text-highlighted"
+              class="inline-flex size-8 sm:size-6 items-center justify-center rounded-md border border-default/60 bg-default/40 text-muted transition hover:border-primary/40 hover:text-highlighted"
               :aria-label="`${hint.label}: ${hint.plainText}`"
               @click.stop
             >
-              <UIcon :name="hint.icon" class="size-3.5" />
+              <UIcon :name="hint.icon" class="size-4 sm:size-3.5" />
             </button>
 
             <template #content>

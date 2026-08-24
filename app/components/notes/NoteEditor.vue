@@ -51,6 +51,8 @@ const emit = defineEmits<{
   'active-heading-change': [blockId: string | null]
 }>()
 
+const isMobile = useMediaQuery('(max-width: 1023px)')
+
 const editorRef = ref<NotionStyleEditorRef | null>(null)
 const titleRef = ref<HTMLTextAreaElement | null>(null)
 const scrollContainerRef = ref<HTMLElement | null>(null)
@@ -658,7 +660,7 @@ defineExpose({
           <UTooltip :text="outline.length < 2 ? 'Adicione títulos (H1/H2/H3) para gerar um sumário' : 'Sumário'">
             <UButton
               icon="i-lucide-list"
-              size="xs"
+              :size="isMobile ? 'sm' : 'xs'"
               variant="ghost"
               color="neutral"
               :disabled="outline.length < 2"
@@ -668,7 +670,7 @@ defineExpose({
           <UTooltip text="Propriedades">
             <UButton
               icon="i-lucide-sliders-horizontal"
-              size="xs"
+              :size="isMobile ? 'sm' : 'xs'"
               variant="ghost"
               color="neutral"
               @click="emit('open-panel', 'properties')"
@@ -681,7 +683,7 @@ defineExpose({
             <UTooltip text="Exportar">
               <UButton
                 icon="i-lucide-download"
-                size="xs"
+                :size="isMobile ? 'sm' : 'xs'"
                 variant="ghost"
                 color="neutral"
               />
@@ -693,7 +695,7 @@ defineExpose({
           >
             <UButton
               :icon="noteDetail.visibility === NoteVisibility.Private ? 'i-lucide-lock' : noteDetail.visibility === NoteVisibility.Public ? 'i-lucide-globe' : 'i-lucide-users'"
-              size="xs"
+              :size="isMobile ? 'sm' : 'xs'"
               :color="noteDetail.visibility === NoteVisibility.Private ? 'neutral' : 'primary'"
               variant="ghost"
               @click="shareDialogOpen = true"

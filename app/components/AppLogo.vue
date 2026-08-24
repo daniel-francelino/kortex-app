@@ -1,13 +1,17 @@
 <script setup lang="ts">
 const props = withDefaults(defineProps<{
   showLabel?: boolean
-  size?: 'sm' | 'md'
+  size?: 'sm' | 'md' | 'lg'
 }>(), {
   showLabel: true,
   size: 'md'
 })
 
-const iconClass = computed(() => props.size === 'sm' ? 'h-8 w-8 rounded-[1rem]' : 'h-9 w-9 rounded-[1.15rem]')
+const iconClass = computed(() => {
+  if (props.size === 'sm') return 'h-8 w-8 rounded-[1rem]'
+  if (props.size === 'lg') return 'h-16 w-16 rounded-[1.5rem]'
+  return 'h-9 w-9 rounded-[1.15rem]'
+})
 </script>
 
 <template>

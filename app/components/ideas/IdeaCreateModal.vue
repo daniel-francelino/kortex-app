@@ -111,7 +111,7 @@ async function onSubmit(): Promise<void> {
             />
           </UFormField>
 
-          <div class="grid grid-cols-2 gap-3">
+          <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <UFormField label="Status" name="status">
               <USelect
                 v-model="formState.status"
@@ -133,7 +133,7 @@ async function onSubmit(): Promise<void> {
             </UFormField>
           </div>
 
-          <div class="grid grid-cols-2 gap-3">
+          <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <UFormField label="Lista" name="listId">
               <USelect
                 v-model="formState.listId"

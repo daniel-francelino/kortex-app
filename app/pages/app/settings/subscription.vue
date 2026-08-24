@@ -445,10 +445,13 @@ async function openInvoice(url: string | null) {
       </div>
 
       <template v-else>
-        <UTable
-          :columns="invoiceColumns"
-          :data="invoicesData?.items || []"
-        />
+        <div class="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
+          <UTable
+            :columns="invoiceColumns"
+            :data="invoicesData?.items || []"
+            class="min-w-[640px] sm:min-w-0"
+          />
+        </div>
 
         <div
           v-if="(invoicesData?.total || 0) > invoicePageSize"

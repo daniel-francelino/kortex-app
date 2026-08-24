@@ -44,10 +44,8 @@ export default defineAppConfig({
       slots: {
         overlay: 'max-lg:p-[max(1rem,var(--safe-area-top))_1rem_max(1rem,var(--safe-area-bottom))]',
         content: 'max-h-[90vh] flex flex-col max-lg:max-h-[calc(100dvh-var(--safe-area-top)-var(--safe-area-bottom)-2rem)]',
-        header: 'max-lg:pt-[max(1rem,var(--safe-area-top))]',
         body: 'overflow-y-auto',
-        footer: 'max-lg:pb-[max(1rem,var(--safe-area-bottom))]',
-        close: 'max-lg:top-[max(1rem,var(--safe-area-top))]'
+        footer: 'max-lg:pb-[max(1rem,var(--safe-area-bottom))]'
       }
     },
     slideover: {

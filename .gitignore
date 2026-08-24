@@ -25,3 +25,9 @@ logs
 
 # VSC
 .history
+
+# Capacitor native projects — generated on demand via `pnpm cap:add:ios` /
+# `pnpm cap:add:android`, not checked in. Branded source assets live in
+# resources/ and are (re)applied via `pnpm cap:assets`.
+/ios
+/android

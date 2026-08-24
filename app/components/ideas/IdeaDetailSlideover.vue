@@ -378,7 +378,7 @@ onUnmounted(() => {
                       size="xs"
                       color="error"
                       variant="ghost"
-                      class="opacity-0 group-hover:opacity-100"
+                      class="opacity-100 lg:opacity-0 lg:group-hover:opacity-100"
                       @click="removeSubtask(subtask.id)"
                     />
                   </div>

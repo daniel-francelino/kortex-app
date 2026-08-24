@@ -338,11 +338,6 @@ defineExpose({ viewDate })
               >
                 {{ evt.title }}
               </div>
-              <div class="mt-px text-[10px] leading-tight text-muted">
-                {{ new Date(evt.startAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) }}
-                –
-                {{ new Date(evt.endAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) }}
-              </div>
             </div>
           </div>
         </div>

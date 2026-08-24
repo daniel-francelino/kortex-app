@@ -102,6 +102,16 @@ defineExpose({ el: menuRef })
   padding: 6px;
 }
 
+/* Clamp to the viewport on mobile — near a screen edge (or with the
+   on-screen keyboard shrinking the viewport) a fixed 280px menu can
+   otherwise clip off-screen, matching the guard already in EditorBubbleMenu.vue. */
+@media (max-width: 1023px) {
+  .kortex-slash-menu {
+    width: min(280px, calc(100vw - 24px));
+    max-width: calc(100vw - 24px);
+  }
+}
+
 .kortex-menu-label {
   font-size: 0.68rem;
   font-weight: 600;
