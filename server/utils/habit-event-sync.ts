@@ -13,6 +13,7 @@ interface LinkedHabitEvent {
   linkId: string | null
   eventId: string
   archivedAt: string | null
+  startAt: string
 }
 
 function getRowValue<T = unknown>(row: Record<string, unknown>, camelKey: string, snakeKey: string): T | null {
@@ -84,6 +85,11 @@ function getTodayInTimeZone(timeZone: string): { date: string, weekday: number }
   }
 }
 
+function getDateInTimeZone(isoDateTime: string, timeZone: string): string {
+  const parts = getTimeZoneParts(new Date(isoDateTime), timeZone)
+  return `${String(parts.year).padStart(4, '0')}-${String(parts.month).padStart(2, '0')}-${String(parts.day).padStart(2, '0')}`
+}
+
 function getScheduledDays(frequency: 'daily' | 'weekly' | 'custom', customDays: number[]): number[] {
   if (frequency === 'daily') {
     return [0, 1, 2, 3, 4, 5, 6]
@@ -132,13 +138,17 @@ function buildHabitRRule(frequency: 'daily' | 'weekly' | 'custom', customDays: n
   return `FREQ=WEEKLY;BYDAY=${scheduledDays.map(day => DAY_CODES[day]).join(',')}`
 }
 
-function buildHabitEventPayload(habit: Record<string, unknown>, timeZone: string, calendarId: string) {
+function buildHabitEventPayload(habit: Record<string, unknown>, timeZone: string, calendarId: string, anchorDate?: string) {
   const scheduledTime = getHabitScheduledTime(habit)
   if (!scheduledTime) return null
 
   const frequency = getHabitFrequency(habit)
   const customDays = getHabitCustomDays(habit)
-  const firstOccurrenceDate = getFirstOccurrenceDate(frequency, customDays, timeZone)
+  // Reuses the linked event's existing start date on re-sync (anchorDate) rather than
+  // recomputing it to "today" — otherwise every habit edit would push DTSTART forward
+  // and the recurrence expansion (which never generates occurrences before DTSTART)
+  // would silently drop everything before today from past calendar views.
+  const firstOccurrenceDate = anchorDate ?? getFirstOccurrenceDate(frequency, customDays, timeZone)
   const startAt = zonedDateTimeToUtcIso(firstOccurrenceDate, scheduledTime, timeZone)
 
   const scheduledEndTime = getHabitScheduledEndTime(habit)
@@ -265,7 +275,7 @@ async function getLinkedHabitEvents(supabase: SupabaseClient, userId: string, ha
 
   const { data: events, error: eventsError } = await supabase
     .from('events')
-    .select('id, archived_at')
+    .select('id, archived_at, start_at')
     .in('id', eventIds)
     .eq('owner_user_id', userId)
 
@@ -278,7 +288,8 @@ async function getLinkedHabitEvents(supabase: SupabaseClient, userId: string, ha
       String(event.id),
       {
         eventId: String(event.id),
-        archivedAt: (event.archived_at as string | null) ?? null
+        archivedAt: (event.archived_at as string | null) ?? null,
+        startAt: String(event.start_at ?? '')
       }
     ])
   )
@@ -290,7 +301,8 @@ async function getLinkedHabitEvents(supabase: SupabaseClient, userId: string, ha
     return {
       linkId: link.id ? String(link.id) : null,
       eventId: event.eventId,
-      archivedAt: event.archivedAt
+      archivedAt: event.archivedAt,
+      startAt: event.startAt
     }
   })
 
@@ -450,7 +462,8 @@ export async function syncHabitLinkedEvent(
 
   const timeZone = getHabitTimezone(habit) ?? await getUserTimezone(supabase, userId)
   const calendarId = await resolveTargetCalendarId(supabase, userId, getHabitCalendarId(habit))
-  const payload = buildHabitEventPayload(habit, timeZone, calendarId)
+  const anchorDate = activeEvent?.startAt ? getDateInTimeZone(activeEvent.startAt, timeZone) : undefined
+  const payload = buildHabitEventPayload(habit, timeZone, calendarId, anchorDate)
 
   if (!payload) return
 

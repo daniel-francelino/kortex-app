@@ -683,7 +683,7 @@ onMounted(() => {
     icon="i-lucide-plus"
     size="xl"
     square
-    class="fixed z-30 size-14 rounded-full shadow-lg shadow-black/30"
+    class="fixed z-30 size-14 items-center justify-center rounded-full shadow-lg shadow-black/30"
     :style="{
       right: 'calc(1rem + var(--safe-area-right, 0px))',
       bottom: 'calc(var(--mobile-bottom-nav-height, 4.75rem) + 1rem)'
