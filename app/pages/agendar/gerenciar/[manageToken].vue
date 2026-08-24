@@ -23,7 +23,7 @@ const guestTimezone = computed(() => booking.value?.guestTimezone || Intl.DateTi
 
 function formatDateTime(iso: string | null): string {
   if (!iso) return ''
-  return new Date(iso).toLocaleDateString('pt-BR', {
+  const raw = new Date(iso).toLocaleDateString('pt-BR', {
     weekday: 'long',
     day: '2-digit',
     month: 'long',
@@ -31,21 +31,27 @@ function formatDateTime(iso: string | null): string {
     minute: '2-digit',
     timeZone: guestTimezone.value
   })
+  return raw.charAt(0).toUpperCase() + raw.slice(1)
 }
 
 // ─── Cancel ──────────────────────────────────────────────────────────────────
 const cancelling = ref(false)
 const cancelConfirmOpen = ref(false)
+const cancelReason = ref('')
 
 async function onCancel() {
   cancelling.value = true
   try {
-    await $fetch(`/api/schedule/manage/${manageToken}/cancel`, { method: 'POST' })
+    await $fetch(`/api/schedule/manage/${manageToken}/cancel`, {
+      method: 'POST',
+      body: { reason: cancelReason.value.trim() || undefined }
+    })
     toast.add({ title: 'Reserva cancelada', color: 'success' })
     await refreshBooking()
     cancelConfirmOpen.value = false
-  } catch {
-    toast.add({ title: 'Erro', description: 'Não foi possível cancelar.', color: 'error' })
+  } catch (err: unknown) {
+    const message = (err as { data?: { statusMessage?: string } })?.data?.statusMessage
+    toast.add({ title: 'Erro', description: message ?? 'Não foi possível cancelar.', color: 'error' })
   } finally {
     cancelling.value = false
   }
@@ -148,7 +154,7 @@ async function confirmReschedule() {
 
             <div class="flex items-start gap-3 text-sm">
               <UIcon name="i-lucide-clock" class="mt-0.5 size-4 shrink-0 text-muted" />
-              <span class="capitalize">{{ formatDateTime(booking.startAt) }}</span>
+              <span>{{ formatDateTime(booking.startAt) }}</span>
             </div>
 
             <div v-if="locationMeta" class="flex items-center gap-3 text-sm">
@@ -165,6 +171,7 @@ async function confirmReschedule() {
 
         <div v-if="booking.status !== BookingStatus.Cancelled && !rescheduleMode" class="mt-4 flex flex-wrap justify-end gap-2">
           <UButton
+            v-if="booking.rescheduleEnabled"
             label="Reagendar"
             icon="i-lucide-calendar-clock"
             color="neutral"
@@ -172,11 +179,12 @@ async function confirmReschedule() {
             @click="startReschedule"
           />
           <UButton
+            v-if="booking.cancellationEnabled"
             label="Cancelar reserva"
             icon="i-lucide-x"
             color="error"
             variant="outline"
-            @click="cancelConfirmOpen = true"
+            @click="cancelReason = ''; cancelConfirmOpen = true"
           />
         </div>
 
@@ -230,9 +238,14 @@ async function confirmReschedule() {
 
         <UModal v-model:open="cancelConfirmOpen" title="Cancelar reserva?">
           <template #body>
-            <p class="text-sm text-muted">
-              Isso libera o horário e avisa que o compromisso não vai mais acontecer. Não pode ser desfeito.
-            </p>
+            <div class="space-y-3">
+              <p class="text-sm text-muted">
+                Isso libera o horário e avisa que o compromisso não vai mais acontecer. Não pode ser desfeito.
+              </p>
+              <UFormField v-if="booking?.cancellationReasonRequired" label="Motivo do cancelamento" required>
+                <UTextarea v-model="cancelReason" :rows="2" class="w-full" />
+              </UFormField>
+            </div>
           </template>
           <template #footer>
             <div class="flex w-full justify-end gap-2">
@@ -246,6 +259,7 @@ async function confirmReschedule() {
                 label="Cancelar reserva"
                 color="error"
                 :loading="cancelling"
+                :disabled="Boolean(booking?.cancellationReasonRequired) && !cancelReason.trim()"
                 @click="onCancel"
               />
             </div>

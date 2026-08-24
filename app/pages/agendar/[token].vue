@@ -79,7 +79,8 @@ function formatSlotTime(iso: string): string {
 
 function formatSelectedDate(): string {
   if (!selectedDate.value) return ''
-  return new Date(`${selectedDate.value}T12:00:00Z`).toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' })
+  const raw = new Date(`${selectedDate.value}T12:00:00Z`).toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' })
+  return raw.charAt(0).toUpperCase() + raw.slice(1)
 }
 
 // ─── Booking form ────────────────────────────────────────────────────────────
@@ -190,7 +191,7 @@ async function copyManageUrl() {
           />
 
           <div class="space-y-2">
-            <p v-if="selectedDate" class="text-sm font-medium capitalize text-highlighted">
+            <p v-if="selectedDate" class="text-sm font-medium text-highlighted">
               {{ formatSelectedDate() }}
             </p>
             <p v-else class="text-sm text-muted">

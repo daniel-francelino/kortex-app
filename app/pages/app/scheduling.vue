@@ -1,12 +1,22 @@
 <script setup lang="ts">
 import type { SchedulingPage } from '~/types/scheduling'
+import { LOCATION_TYPE_META } from '~/types/scheduling'
 
 definePageMeta({ layout: 'app' })
 
 useSeoMeta({ title: 'Agendamento' })
 
+const router = useRouter()
 const { calendars, calendarsStatus, refreshCalendars } = useAppointments()
-const { pages, pagesStatus, refreshPages, archiveSchedulingPage, regenerateShareToken } = useSchedulingPages()
+const {
+  pages,
+  pagesStatus,
+  refreshPages,
+  archiveSchedulingPage,
+  regenerateShareToken,
+  updateSchedulingPage,
+  duplicateSchedulingPage
+} = useSchedulingPages()
 
 onMounted(() => {
   if (calendarsStatus.value === 'idle') refreshCalendars()
@@ -20,18 +30,31 @@ useMobileContextNav().registerMobileContextNav('scheduling', [
   { label: 'Link', value: 'scheduling-link', icon: 'i-lucide-calendar-clock' }
 ], ref('scheduling-link'))
 
-const createModalOpen = ref(false)
-const pageToEdit = ref<SchedulingPage | null>(null)
+const quickCreateOpen = ref(false)
 const toast = useToast()
+const duplicatingId = ref<string | null>(null)
 
 function onCreate() {
-  pageToEdit.value = null
-  createModalOpen.value = true
+  quickCreateOpen.value = true
 }
 
-function onEdit(page: SchedulingPage) {
-  pageToEdit.value = page
-  createModalOpen.value = true
+function onCreated(pageId: string) {
+  router.push(`/app/scheduling/${pageId}`)
+}
+
+function onOpenEditor(page: SchedulingPage) {
+  router.push(`/app/scheduling/${page.id}`)
+}
+
+async function onToggleActive(page: SchedulingPage, value: boolean) {
+  await updateSchedulingPage(page.id, { isActive: value })
+}
+
+async function onDuplicate(page: SchedulingPage) {
+  duplicatingId.value = page.id
+  const created = await duplicateSchedulingPage(page.id)
+  duplicatingId.value = null
+  if (created) router.push(`/app/scheduling/${created.id}`)
 }
 
 async function onArchive(page: SchedulingPage) {
@@ -55,6 +78,10 @@ async function copyLink(page: SchedulingPage) {
   } catch {
     toast.add({ title: 'Erro', description: 'Não foi possível copiar o link.', color: 'error' })
   }
+}
+
+function openPreview(page: SchedulingPage) {
+  window.open(shareUrl(page), '_blank')
 }
 </script>
 
@@ -87,62 +114,98 @@ async function copyLink(page: SchedulingPage) {
         </div>
 
         <div v-else class="space-y-3">
-          <UCard v-for="page in pages" :key="page.id">
-            <div class="flex items-start justify-between gap-3">
-              <div class="min-w-0 flex-1">
-                <div class="flex items-center gap-2">
-                  <p class="font-medium text-highlighted">
-                    {{ page.title }}
-                  </p>
-                  <UBadge
-                    v-if="!page.isActive"
-                    color="neutral"
-                    variant="subtle"
-                    size="sm"
-                  >
-                    Inativa
-                  </UBadge>
+          <UCard
+            v-for="page in pages"
+            :key="page.id"
+            class="cursor-pointer overflow-hidden transition-shadow hover:shadow-md"
+            :ui="{ root: 'p-0', body: 'p-0 sm:p-0' }"
+            @click="onOpenEditor(page)"
+          >
+            <div class="flex items-stretch">
+              <div class="w-1.5 shrink-0" :style="{ backgroundColor: page.color || 'var(--ui-border)' }" />
+              <div class="flex min-w-0 flex-1 items-start justify-between gap-3 p-4">
+                <div class="min-w-0 flex-1">
+                  <div class="flex items-center gap-2">
+                    <p class="font-medium text-highlighted">
+                      {{ page.title }}
+                    </p>
+                    <UBadge
+                      v-if="!page.isActive"
+                      color="neutral"
+                      variant="subtle"
+                      size="sm"
+                    >
+                      Pausada
+                    </UBadge>
+                  </div>
+                  <div class="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted">
+                    <span class="flex items-center gap-1">
+                      <UIcon name="i-lucide-clock" class="size-3.5" />
+                      {{ page.durationMinutes }} min
+                    </span>
+                    <span class="flex items-center gap-1">
+                      <UIcon :name="LOCATION_TYPE_META[page.locationType].icon" class="size-3.5" />
+                      {{ LOCATION_TYPE_META[page.locationType].label }}
+                    </span>
+                    <span v-if="page.bookingsCount" class="flex items-center gap-1">
+                      <UIcon name="i-lucide-users" class="size-3.5" />
+                      {{ page.bookingsCount }} {{ page.bookingsCount === 1 ? 'reserva' : 'reservas' }}
+                    </span>
+                  </div>
+                  <div class="mt-2 flex items-center gap-2" @click.stop>
+                    <UInput
+                      :model-value="shareUrl(page)"
+                      readonly
+                      size="sm"
+                      class="max-w-sm flex-1"
+                    />
+                    <UTooltip text="Copiar link">
+                      <UButton
+                        icon="i-lucide-copy"
+                        size="sm"
+                        color="neutral"
+                        variant="subtle"
+                        @click="copyLink(page)"
+                      />
+                    </UTooltip>
+                    <UTooltip text="Abrir página">
+                      <UButton
+                        icon="i-lucide-external-link"
+                        size="sm"
+                        color="neutral"
+                        variant="subtle"
+                        @click="openPreview(page)"
+                      />
+                    </UTooltip>
+                  </div>
                 </div>
-                <p class="mt-0.5 text-sm text-muted">
-                  {{ page.durationMinutes }} min
-                </p>
-                <div class="mt-2 flex items-center gap-2">
-                  <UInput
-                    :model-value="shareUrl(page)"
-                    readonly
-                    size="sm"
-                    class="max-w-sm flex-1"
-                  />
-                  <UButton
-                    icon="i-lucide-copy"
-                    size="sm"
-                    color="neutral"
-                    variant="subtle"
-                    @click="copyLink(page)"
-                  />
+                <div class="flex shrink-0 items-center gap-1" @click.stop>
+                  <USwitch :model-value="page.isActive" @update:model-value="(v: boolean) => onToggleActive(page, v)" />
+                  <UDropdownMenu
+                    :items="[
+                      [
+                        { label: 'Duplicar', icon: 'i-lucide-copy-plus', onSelect: () => onDuplicate(page) },
+                        { label: 'Ver reservas', icon: 'i-lucide-list', to: `/app/scheduling-bookings/${page.id}` }
+                      ],
+                      [
+                        { label: 'Regenerar link', icon: 'i-lucide-refresh-cw', onSelect: () => onRegenerateToken(page) }
+                      ],
+                      [
+                        { label: 'Arquivar', icon: 'i-lucide-archive', color: 'error' as const, onSelect: () => onArchive(page) }
+                      ]
+                    ]"
+                    :content="{ align: 'end' }"
+                  >
+                    <UButton
+                      icon="i-lucide-ellipsis-vertical"
+                      color="neutral"
+                      variant="ghost"
+                      size="sm"
+                      :loading="duplicatingId === page.id"
+                    />
+                  </UDropdownMenu>
                 </div>
               </div>
-              <UDropdownMenu
-                :items="[
-                  [
-                    { label: 'Editar', icon: 'i-lucide-pencil', onSelect: () => onEdit(page) },
-                    { label: 'Ver reservas', icon: 'i-lucide-list', to: `/app/scheduling-bookings/${page.id}` }
-                  ],
-                  [
-                    { label: 'Regenerar link', icon: 'i-lucide-refresh-cw', onSelect: () => onRegenerateToken(page) }
-                  ],
-                  [
-                    { label: 'Arquivar', icon: 'i-lucide-archive', color: 'error' as const, onSelect: () => onArchive(page) }
-                  ]
-                ]"
-              >
-                <UButton
-                  icon="i-lucide-ellipsis-vertical"
-                  color="neutral"
-                  variant="ghost"
-                  size="sm"
-                />
-              </UDropdownMenu>
             </div>
           </UCard>
         </div>
@@ -150,11 +213,10 @@ async function copyLink(page: SchedulingPage) {
     </template>
   </UDashboardPanel>
 
-  <AppointmentsSchedulingPageCreateModal
-    :open="createModalOpen"
+  <AppointmentsSchedulingQuickCreateModal
+    :open="quickCreateOpen"
     :calendars="calendars"
-    :page="pageToEdit"
-    @update:open="createModalOpen = $event"
-    @saved="refreshPages"
+    @update:open="quickCreateOpen = $event"
+    @created="onCreated"
   />
 </template>

@@ -73,9 +73,15 @@ export default eventHandler(async (event) => {
 
   const endAt = new Date(requestedStart.getTime() + (page.duration_minutes as number) * 60000).toISOString()
 
+  const titleTemplate = (page.calendar_event_title_template as string | null) || '{titulo} com {convidado}'
+  const eventTitle = titleTemplate
+    .replaceAll('{titulo}', page.title as string)
+    .replaceAll('{convidado}', payload.guestName)
+    .replaceAll('{email}', payload.guestEmail)
+
   const newEvent = await createEventInternal(supabase, page.user_id as string, {
     calendarId: page.calendar_id as string,
-    title: `${page.title as string} com ${payload.guestName}`,
+    title: eventTitle,
     location: page.location_details as string | null,
     startAt: payload.startAt,
     endAt,

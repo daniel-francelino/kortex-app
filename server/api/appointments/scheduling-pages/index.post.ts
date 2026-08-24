@@ -14,9 +14,13 @@ const questionSchema = z.object({
   label: z.string().min(1).max(200),
   type: z.enum(['text', 'textarea', 'select']).default('text'),
   isRequired: z.boolean().default(false),
+  isHidden: z.boolean().default(false),
   options: z.array(z.string().max(100)).max(20).optional(),
   sortOrder: z.number().int().min(0).default(0)
-})
+}).refine(
+  q => q.type !== 'select' || (q.options?.length ?? 0) >= 2,
+  { message: 'Perguntas de seleção precisam de ao menos 2 opções', path: ['options'] }
+)
 
 const bodySchema = z.object({
   calendarId: z.string().uuid(),
@@ -26,12 +30,19 @@ const bodySchema = z.object({
   locationType: z.enum(['video_link', 'phone', 'in_person', 'custom']).default('video_link'),
   locationDetails: z.string().max(500).optional(),
   timezone: z.string().min(1).max(100),
+  color: z.string().max(20).nullable().optional(),
   bufferBeforeMinutes: z.number().int().min(0).max(120).default(0),
   bufferAfterMinutes: z.number().int().min(0).max(120).default(0),
   slotIncrementMinutes: z.number().int().min(5).max(120).default(15),
   minNoticeHours: z.number().int().min(0).max(720).default(4),
   maxAdvanceDays: z.number().int().min(1).max(365).default(60),
   maxBookingsPerDay: z.number().int().min(1).max(100).nullable().optional(),
+  calendarEventTitleTemplate: z.string().max(300).nullable().optional(),
+  cancellationEnabled: z.boolean().default(true),
+  rescheduleEnabled: z.boolean().default(true),
+  cancellationMinNoticeHours: z.number().int().min(0).max(720).nullable().optional(),
+  cancellationReasonRequired: z.boolean().default(false),
+  hideDetailsOnManagePage: z.boolean().default(false),
   availabilityRules: z.array(availabilityRuleSchema).min(1, 'Defina ao menos uma janela de disponibilidade'),
   questions: z.array(questionSchema).max(20).optional()
 })
@@ -66,12 +77,19 @@ export default eventHandler(async (event) => {
       location_type: payload.locationType,
       location_details: payload.locationDetails ?? null,
       timezone: payload.timezone,
+      color: payload.color ?? null,
       buffer_before_minutes: payload.bufferBeforeMinutes,
       buffer_after_minutes: payload.bufferAfterMinutes,
       slot_increment_minutes: payload.slotIncrementMinutes,
       min_notice_hours: payload.minNoticeHours,
       max_advance_days: payload.maxAdvanceDays,
       max_bookings_per_day: payload.maxBookingsPerDay ?? null,
+      calendar_event_title_template: payload.calendarEventTitleTemplate ?? null,
+      cancellation_enabled: payload.cancellationEnabled,
+      reschedule_enabled: payload.rescheduleEnabled,
+      cancellation_min_notice_hours: payload.cancellationMinNoticeHours ?? null,
+      cancellation_reason_required: payload.cancellationReasonRequired,
+      hide_details_on_manage_page: payload.hideDetailsOnManagePage,
       share_token: createShareToken()
     })
     .select('*')
@@ -104,6 +122,7 @@ export default eventHandler(async (event) => {
         label: q.label,
         type: q.type,
         is_required: q.isRequired,
+        is_hidden: q.isHidden,
         options: q.options ?? null,
         sort_order: q.sortOrder
       })))

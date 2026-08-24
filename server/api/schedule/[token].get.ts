@@ -28,6 +28,7 @@ export default eventHandler(async (event) => {
     .from('scheduling_questions')
     .select('*')
     .eq('scheduling_page_id', page.id)
+    .eq('is_hidden', false)
     .order('sort_order', { ascending: true })
 
   const { data: hostData } = await supabase.auth.admin.getUserById(page.user_id as string)

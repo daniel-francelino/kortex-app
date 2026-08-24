@@ -11,7 +11,15 @@ export default eventHandler(async (event) => {
 
   const { data: booking } = await supabase
     .from('bookings')
-    .select('*, page:scheduling_pages(title, user_id, location_type, location_details, share_token), event:events(start_at, end_at)')
+    .select(`
+      *,
+      page:scheduling_pages(
+        title, user_id, location_type, location_details, share_token,
+        cancellation_enabled, reschedule_enabled, cancellation_min_notice_hours,
+        cancellation_reason_required, hide_details_on_manage_page
+      ),
+      event:events(start_at, end_at)
+    `)
     .eq('manage_token', manageToken)
     .maybeSingle()
 
@@ -40,7 +48,12 @@ export default eventHandler(async (event) => {
     pageTitle: page?.title ?? '',
     hostName,
     locationType: page?.location_type ?? 'video_link',
-    locationDetails: page?.location_details ?? null,
-    schedulingPageToken: page?.share_token ?? ''
+    locationDetails: page?.hide_details_on_manage_page ? null : (page?.location_details ?? null),
+    schedulingPageToken: page?.share_token ?? '',
+    cancellationEnabled: page?.cancellation_enabled ?? true,
+    rescheduleEnabled: page?.reschedule_enabled ?? true,
+    cancellationMinNoticeHours: page?.cancellation_min_notice_hours ?? null,
+    cancellationReasonRequired: Boolean(page?.cancellation_reason_required),
+    hideDetailsOnManagePage: Boolean(page?.hide_details_on_manage_page)
   }
 })

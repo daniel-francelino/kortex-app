@@ -40,6 +40,7 @@ export interface SchedulingQuestion {
   label: string
   type: SchedulingQuestionType
   isRequired: boolean
+  isHidden: boolean
   options: string[] | null
   sortOrder: number
 }
@@ -54,12 +55,19 @@ export interface SchedulingPage {
   locationType: SchedulingLocationType
   locationDetails: string | null
   timezone: string
+  color: string | null
   bufferBeforeMinutes: number
   bufferAfterMinutes: number
   slotIncrementMinutes: number
   minNoticeHours: number
   maxAdvanceDays: number
   maxBookingsPerDay: number | null
+  calendarEventTitleTemplate: string | null
+  cancellationEnabled: boolean
+  rescheduleEnabled: boolean
+  cancellationMinNoticeHours: number | null
+  cancellationReasonRequired: boolean
+  hideDetailsOnManagePage: boolean
   shareToken: string
   isActive: boolean
   createdAt: string
@@ -67,6 +75,7 @@ export interface SchedulingPage {
   archivedAt: string | null
   availabilityRules?: AvailabilityRule[]
   questions?: SchedulingQuestion[]
+  bookingsCount?: number
 }
 
 export interface Booking {
@@ -79,6 +88,7 @@ export interface Booking {
   answers: Record<string, string>
   status: BookingStatus
   manageToken: string
+  cancellationReason: string | null
   createdAt: string
   updatedAt: string
   cancelledAt: string | null
@@ -96,6 +106,7 @@ export interface SchedulingQuestionInput {
   label: string
   type: SchedulingQuestionType
   isRequired?: boolean
+  isHidden?: boolean
   options?: string[]
   sortOrder?: number
 }
@@ -108,12 +119,19 @@ export interface CreateSchedulingPagePayload {
   locationType?: SchedulingLocationType
   locationDetails?: string
   timezone: string
+  color?: string | null
   bufferBeforeMinutes?: number
   bufferAfterMinutes?: number
   slotIncrementMinutes?: number
   minNoticeHours?: number
   maxAdvanceDays?: number
   maxBookingsPerDay?: number | null
+  calendarEventTitleTemplate?: string | null
+  cancellationEnabled?: boolean
+  rescheduleEnabled?: boolean
+  cancellationMinNoticeHours?: number | null
+  cancellationReasonRequired?: boolean
+  hideDetailsOnManagePage?: boolean
   availabilityRules: AvailabilityRuleInput[]
   questions?: SchedulingQuestionInput[]
 }
@@ -162,4 +180,9 @@ export interface PublicBookingDetail {
   locationType: SchedulingLocationType
   locationDetails: string | null
   schedulingPageToken: string
+  cancellationEnabled: boolean
+  rescheduleEnabled: boolean
+  cancellationMinNoticeHours: number | null
+  cancellationReasonRequired: boolean
+  hideDetailsOnManagePage: boolean
 }

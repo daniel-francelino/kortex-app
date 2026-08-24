@@ -24,6 +24,7 @@ function normalizeQuestion(input: unknown): SchedulingQuestion {
     label: String(q.label ?? ''),
     type: (q.type ?? 'text') as SchedulingQuestion['type'],
     isRequired: Boolean(q.isRequired ?? q.is_required),
+    isHidden: Boolean(q.isHidden ?? q.is_hidden),
     options: (q.options as string[] | null) ?? null,
     sortOrder: Number(q.sortOrder ?? q.sort_order ?? 0)
   }
@@ -41,19 +42,27 @@ function normalizeSchedulingPage(input: unknown): SchedulingPage {
     locationType: (page.locationType ?? page.location_type ?? 'video_link') as SchedulingPage['locationType'],
     locationDetails: (page.locationDetails as string | null) ?? (page.location_details as string | null) ?? null,
     timezone: String(page.timezone ?? ''),
+    color: (page.color as string | null) ?? null,
     bufferBeforeMinutes: Number(page.bufferBeforeMinutes ?? page.buffer_before_minutes ?? 0),
     bufferAfterMinutes: Number(page.bufferAfterMinutes ?? page.buffer_after_minutes ?? 0),
     slotIncrementMinutes: Number(page.slotIncrementMinutes ?? page.slot_increment_minutes ?? 15),
     minNoticeHours: Number(page.minNoticeHours ?? page.min_notice_hours ?? 4),
     maxAdvanceDays: Number(page.maxAdvanceDays ?? page.max_advance_days ?? 60),
     maxBookingsPerDay: (page.maxBookingsPerDay as number | null) ?? (page.max_bookings_per_day as number | null) ?? null,
+    calendarEventTitleTemplate: (page.calendarEventTitleTemplate as string | null) ?? (page.calendar_event_title_template as string | null) ?? null,
+    cancellationEnabled: Boolean(page.cancellationEnabled ?? page.cancellation_enabled ?? true),
+    rescheduleEnabled: Boolean(page.rescheduleEnabled ?? page.reschedule_enabled ?? true),
+    cancellationMinNoticeHours: (page.cancellationMinNoticeHours as number | null) ?? (page.cancellation_min_notice_hours as number | null) ?? null,
+    cancellationReasonRequired: Boolean(page.cancellationReasonRequired ?? page.cancellation_reason_required),
+    hideDetailsOnManagePage: Boolean(page.hideDetailsOnManagePage ?? page.hide_details_on_manage_page),
     shareToken: String(page.shareToken ?? page.share_token ?? ''),
     isActive: Boolean(page.isActive ?? page.is_active),
     createdAt: String(page.createdAt ?? page.created_at ?? ''),
     updatedAt: String(page.updatedAt ?? page.updated_at ?? ''),
     archivedAt: (page.archivedAt as string | null) ?? (page.archived_at as string | null) ?? null,
     availabilityRules: Array.isArray(page.availabilityRules) ? page.availabilityRules.map(normalizeAvailabilityRule) : undefined,
-    questions: Array.isArray(page.questions) ? page.questions.map(normalizeQuestion) : undefined
+    questions: Array.isArray(page.questions) ? page.questions.map(normalizeQuestion) : undefined,
+    bookingsCount: typeof page.bookingsCount === 'number' ? page.bookingsCount : undefined
   }
 }
 
@@ -69,6 +78,7 @@ function normalizeBooking(input: unknown): Booking {
     answers: (b.answers as Record<string, string>) ?? {},
     status: (b.status ?? 'confirmed') as Booking['status'],
     manageToken: String(b.manageToken ?? b.manage_token ?? ''),
+    cancellationReason: (b.cancellationReason as string | null) ?? (b.cancellation_reason as string | null) ?? null,
     createdAt: String(b.createdAt ?? b.created_at ?? ''),
     updatedAt: String(b.updatedAt ?? b.updated_at ?? ''),
     cancelledAt: (b.cancelledAt as string | null) ?? (b.cancelled_at as string | null) ?? null
@@ -154,6 +164,47 @@ export function useSchedulingPages() {
     }
   }
 
+  async function duplicateSchedulingPage(pageId: string): Promise<SchedulingPage | null> {
+    const full = await fetchSchedulingPage(pageId)
+    if (!full) return null
+
+    return createSchedulingPage({
+      calendarId: full.calendarId,
+      title: `${full.title} (cópia)`,
+      description: full.description ?? undefined,
+      durationMinutes: full.durationMinutes,
+      locationType: full.locationType,
+      locationDetails: full.locationDetails ?? undefined,
+      timezone: full.timezone,
+      color: full.color,
+      bufferBeforeMinutes: full.bufferBeforeMinutes,
+      bufferAfterMinutes: full.bufferAfterMinutes,
+      slotIncrementMinutes: full.slotIncrementMinutes,
+      minNoticeHours: full.minNoticeHours,
+      maxAdvanceDays: full.maxAdvanceDays,
+      maxBookingsPerDay: full.maxBookingsPerDay,
+      calendarEventTitleTemplate: full.calendarEventTitleTemplate,
+      cancellationEnabled: full.cancellationEnabled,
+      rescheduleEnabled: full.rescheduleEnabled,
+      cancellationMinNoticeHours: full.cancellationMinNoticeHours,
+      cancellationReasonRequired: full.cancellationReasonRequired,
+      hideDetailsOnManagePage: full.hideDetailsOnManagePage,
+      availabilityRules: (full.availabilityRules ?? []).map(r => ({
+        dayOfWeek: r.dayOfWeek,
+        startTime: r.startTime,
+        endTime: r.endTime
+      })),
+      questions: (full.questions ?? []).map(q => ({
+        label: q.label,
+        type: q.type,
+        isRequired: q.isRequired,
+        isHidden: q.isHidden,
+        options: q.options ?? undefined,
+        sortOrder: q.sortOrder
+      }))
+    })
+  }
+
   async function fetchBookings(pageId: string): Promise<Booking[]> {
     try {
       const data = await $fetch<unknown[]>(`/api/appointments/scheduling-pages/${pageId}/bookings`)
@@ -172,6 +223,7 @@ export function useSchedulingPages() {
     updateSchedulingPage,
     archiveSchedulingPage,
     regenerateShareToken,
+    duplicateSchedulingPage,
     fetchBookings
   }
 }

@@ -34,6 +34,10 @@ export default eventHandler(async (event) => {
     throw createError({ statusCode: 404, statusMessage: 'Página de agendamento não encontrada' })
   }
 
+  if (page.reschedule_enabled === false) {
+    throw createError({ statusCode: 403, statusMessage: 'O reagendamento está desabilitado para este tipo de reserva.' })
+  }
+
   const { data: rulesData } = await supabase
     .from('scheduling_availability_rules')
     .select('day_of_week, start_time, end_time')

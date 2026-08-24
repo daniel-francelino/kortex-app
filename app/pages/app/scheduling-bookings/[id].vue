@@ -63,6 +63,9 @@ function formatDate(iso: string): string {
                 <p class="mt-1 text-xs text-muted">
                   Criada em {{ formatDate(booking.createdAt) }}
                 </p>
+                <p v-if="booking.cancellationReason" class="mt-1 text-xs text-muted">
+                  Motivo do cancelamento: {{ booking.cancellationReason }}
+                </p>
               </div>
               <UBadge :color="STATUS_META[booking.status].color" variant="subtle" size="sm">
                 {{ STATUS_META[booking.status].label }}
