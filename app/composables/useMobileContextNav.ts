@@ -4,6 +4,7 @@ export interface MobileContextNavItem {
   value: string
   label: string
   icon: string
+  to?: string
 }
 
 interface MobileContextNavState {

@@ -50,6 +50,14 @@ function navigateTo(to: string) {
   }
 }
 
+function handleContextClick(item: MobileContextNavItem) {
+  if (item.to) {
+    router.push(item.to)
+    return
+  }
+  selectMobileContextNav(item.value)
+}
+
 watchEffect(() => {
   if (!import.meta.client) return
 
@@ -108,7 +116,7 @@ onUnmounted(() => {
         <motion.div
           v-if="hasContextItems"
           key="context"
-          class="mobile-context-nav flex items-center justify-around overflow-x-auto"
+          class="mobile-context-nav flex items-center overflow-x-auto"
           :initial="{ opacity: 0, y: 8 }"
           :animate="{ opacity: 1, y: 0 }"
           :exit="{ opacity: 0, y: -6 }"
@@ -118,7 +126,7 @@ onUnmounted(() => {
             v-for="(item, index) in contextItems"
             :key="item.value"
             type="button"
-            class="flex min-h-14 min-w-[4.25rem] flex-col items-center justify-center gap-0.5 rounded-xl px-3 text-center transition-colors"
+            class="flex min-h-14 flex-1 basis-0 flex-col items-center justify-center gap-0.5 rounded-xl px-3 text-center transition-colors"
             :class="
               active === item.value
                 ? 'text-primary'
@@ -129,7 +137,7 @@ onUnmounted(() => {
             :transition="{ duration: 0.16, delay: Math.min(index * 0.025, 0.1), ease: 'easeOut' }"
             :while-tap="{ scale: 0.98 }"
             :aria-pressed="active === item.value"
-            @click="selectMobileContextNav(item.value)"
+            @click="handleContextClick(item)"
           >
             <UIcon :name="item.icon" class="size-5 shrink-0" />
             <span class="max-w-full truncate text-[10px] font-medium leading-tight">{{ item.label }}</span>

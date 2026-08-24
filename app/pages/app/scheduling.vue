@@ -13,6 +13,13 @@ onMounted(() => {
   if (pagesStatus.value === 'idle') refreshPages()
 })
 
+useMobileContextNav().registerMobileContextNav('scheduling', [
+  { label: 'Dia', value: 'day', icon: 'i-lucide-square', to: '/app/appointments?view=day' },
+  { label: 'Semana', value: 'week', icon: 'i-lucide-columns-3', to: '/app/appointments?view=week' },
+  { label: 'Mês', value: 'month', icon: 'i-lucide-grid-3x3', to: '/app/appointments?view=month' },
+  { label: 'Link', value: 'scheduling-link', icon: 'i-lucide-calendar-clock' }
+], ref('scheduling-link'))
+
 const createModalOpen = ref(false)
 const pageToEdit = ref<SchedulingPage | null>(null)
 const toast = useToast()

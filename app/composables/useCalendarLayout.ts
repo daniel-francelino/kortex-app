@@ -98,9 +98,7 @@ export function getCurrentTimePx(): number {
 
 export function formatHourLabel(hour: number): string {
   if (hour === 0) return ''
-  const suffix = hour < 12 ? 'AM' : 'PM'
-  const h = hour % 12 === 0 ? 12 : hour % 12
-  return `${h} ${suffix}`
+  return `${String(hour).padStart(2, '0')}:00`
 }
 
 export function snapMinutes(minutes: number, snap = 15): number {

@@ -3,6 +3,7 @@ import type { Calendar, CalendarEvent, CreateEventPayload } from '~/types/appoin
 import { CalendarVisibility } from '~/types/appointments'
 import { getMoodOption } from '~/types/journal'
 import type { JournalEntry } from '~/types/journal'
+import { useSwipe } from '@vueuse/core'
 
 definePageMeta({
   layout: 'app'
@@ -37,9 +38,14 @@ const {
 // ─── View mode (Day / Week / Month) ─────────────────────────────────────
 type CalendarViewMode = 'day' | 'week' | 'month'
 
+const route = useRoute()
 const STORAGE_KEY = 'sb-calendar-view'
 const savedView = (typeof localStorage !== 'undefined' ? localStorage.getItem(STORAGE_KEY) : null) as CalendarViewMode | null
-const activeView = ref<CalendarViewMode>(savedView && ['day', 'week', 'month'].includes(savedView) ? savedView : 'month')
+const queryView = typeof route.query.view === 'string' ? route.query.view : null
+const initialView = queryView && ['day', 'week', 'month'].includes(queryView)
+  ? queryView as CalendarViewMode
+  : (savedView && ['day', 'week', 'month'].includes(savedView) ? savedView : 'month')
+const activeView = ref<CalendarViewMode>(initialView)
 
 watch(activeView, (v) => {
   if (typeof localStorage !== 'undefined') {
@@ -53,7 +59,12 @@ const viewModes: { label: string, value: CalendarViewMode, icon: string }[] = [
   { label: 'Mês', value: 'month', icon: 'i-lucide-grid-3x3' }
 ]
 
-useMobileContextNav().registerMobileContextNav('appointments', viewModes, activeView)
+const mobileNavItems: MobileContextNavItem[] = [
+  ...viewModes,
+  { label: 'Link', value: 'scheduling-link', icon: 'i-lucide-calendar-clock', to: '/app/scheduling' }
+]
+
+useMobileContextNav().registerMobileContextNav('appointments', mobileNavItems, activeView)
 
 // ─── Navigation state ───────────────────────────────────────────────────
 const today = new Date()
@@ -69,25 +80,29 @@ function getWeekStart(date: Date): Date {
   return d
 }
 
+function capitalizeFirst(s: string): string {
+  return s.charAt(0).toUpperCase() + s.slice(1)
+}
+
 const headerLabel = computed(() => {
   if (activeView.value === 'month') {
     const d = new Date(viewYear.value, viewMonth.value, 1)
-    return d.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })
+    return capitalizeFirst(d.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }))
   }
   if (activeView.value === 'week') {
     const start = viewWeekStart.value
     const end = new Date(start)
     end.setDate(end.getDate() + 6)
-    const sStr = start.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })
+    const sStr = capitalizeFirst(start.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' }))
     const eStr = end.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })
     return `${sStr} — ${eStr}`
   }
-  return viewDayDate.value.toLocaleDateString('pt-BR', {
+  return capitalizeFirst(viewDayDate.value.toLocaleDateString('pt-BR', {
     weekday: 'long',
     day: '2-digit',
     month: 'long',
     year: 'numeric'
-  })
+  }))
 })
 
 function goPrev() {
@@ -135,6 +150,17 @@ function goToday() {
   viewWeekStart.value = getWeekStart(now)
   viewDayDate.value = new Date(now)
 }
+
+// ─── Mobile swipe navigation ────────────────────────────────────────────
+const calendarBodyRef = ref<HTMLElement | null>(null)
+
+useSwipe(calendarBodyRef, {
+  threshold: 50,
+  onSwipeEnd(_event, direction) {
+    if (direction === 'left') goNext()
+    else if (direction === 'right') goPrev()
+  }
+})
 
 // ─── Modals / Popovers ─────────────────────────────────────────────────
 const calendarCreateOpen = ref(false)
@@ -444,6 +470,16 @@ onMounted(() => {
         <template #default>
           <!-- Navigation: today + arrows + period label -->
           <div class="flex items-center gap-1">
+            <UTooltip text="Hoje">
+              <UButton
+                icon="i-lucide-calendar-1"
+                variant="outline"
+                size="sm"
+                square
+                class="flex sm:hidden"
+                @click="goToday"
+              />
+            </UTooltip>
             <UButton
               label="Hoje"
               variant="outline"
@@ -455,15 +491,17 @@ onMounted(() => {
               icon="i-lucide-chevron-left"
               variant="ghost"
               size="sm"
+              class="hidden sm:flex"
               @click="goPrev"
             />
             <UButton
               icon="i-lucide-chevron-right"
               variant="ghost"
               size="sm"
+              class="hidden sm:flex"
               @click="goNext"
             />
-            <h2 class="ml-1 min-w-36 text-sm font-semibold capitalize text-highlighted">
+            <h2 class="ml-1 min-w-36 text-sm font-semibold text-highlighted">
               {{ headerLabel }}
             </h2>
           </div>
@@ -519,10 +557,9 @@ onMounted(() => {
           <UTooltip text="Novo evento">
             <UButton
               square
+              icon="i-lucide-plus"
               @click="eventCreateOpen = true; eventCreatePrefill = null"
-            >
-              <UIcon name="i-lucide-plus" class="size-5 shrink-0" />
-            </UButton>
+            />
           </UTooltip>
 
           <!-- Notifications always last -->
@@ -553,7 +590,7 @@ onMounted(() => {
         </div>
 
         <!-- Main calendar area -->
-        <div class="min-w-0 flex-1 overflow-auto p-0 lg:p-2">
+        <div ref="calendarBodyRef" class="min-w-0 flex-1 overflow-auto p-0 lg:p-2">
           <!-- Month view -->
           <AppointmentsMonthView
             v-if="activeView === 'month'"
