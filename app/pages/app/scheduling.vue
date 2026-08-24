@@ -16,7 +16,10 @@ const {
   archiveSchedulingPage,
   regenerateShareToken,
   updateSchedulingPage,
-  duplicateSchedulingPage
+  duplicateSchedulingPage,
+  isOnline,
+  pendingSyncCount,
+  syncingOffline
 } = useSchedulingPages()
 
 onMounted(() => {
@@ -101,6 +104,22 @@ function openPreview(page: SchedulingPage) {
         <p class="text-sm text-muted">
           Crie um link público onde qualquer pessoa pode marcar um horário com você, sem precisar de conta.
         </p>
+
+        <!-- Offline / pending sync indicator -->
+        <div
+          v-if="!isOnline || pendingSyncCount > 0"
+          class="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs"
+          :class="!isOnline ? 'text-warning bg-warning/5' : 'text-muted bg-elevated/40'"
+        >
+          <UIcon
+            :name="!isOnline ? 'i-lucide-cloud-off' : syncingOffline ? 'i-lucide-loader-2' : 'i-lucide-cloud-upload'"
+            class="size-3.5 shrink-0"
+            :class="syncingOffline ? 'animate-spin' : ''"
+          />
+          <span v-if="!isOnline">Offline — as alterações serão sincronizadas ao reconectar</span>
+          <span v-else-if="syncingOffline">Sincronizando alterações offline...</span>
+          <span v-else>{{ pendingSyncCount }} alteração(ões) pendente(s) de sincronização</span>
+        </div>
 
         <div v-if="pagesStatus === 'pending'" class="space-y-3">
           <USkeleton v-for="i in 3" :key="i" class="h-24 w-full rounded-xl" />

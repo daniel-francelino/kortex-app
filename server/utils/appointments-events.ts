@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 export interface CreateEventInternalPayload {
+  id?: string
   calendarId: string
   title: string
   description?: string | null
@@ -30,22 +31,42 @@ export async function createEventInternal(
     throw createError({ statusCode: 400, statusMessage: 'A data de término deve ser posterior à data de início' })
   }
 
+  const insertRow: Record<string, unknown> = {
+    calendar_id: payload.calendarId,
+    owner_user_id: ownerUserId,
+    title: payload.title,
+    description: payload.description ?? null,
+    location: payload.location ?? null,
+    start_at: payload.startAt,
+    end_at: payload.endAt,
+    event_timezone: payload.eventTimezone,
+    all_day: payload.allDay ?? false,
+    rrule: payload.rrule ?? null
+  }
+  if (payload.id) insertRow.id = payload.id
+
   const { data: newEvent, error: eventError } = await supabase
     .from('events')
-    .insert({
-      calendar_id: payload.calendarId,
-      owner_user_id: ownerUserId,
-      title: payload.title,
-      description: payload.description ?? null,
-      location: payload.location ?? null,
-      start_at: payload.startAt,
-      end_at: payload.endAt,
-      event_timezone: payload.eventTimezone,
-      all_day: payload.allDay ?? false,
-      rrule: payload.rrule ?? null
-    })
+    .insert(insertRow)
     .select()
     .single()
+
+  // A client-supplied id lets an offline-queued create be replayed safely: if
+  // it already landed (e.g. the sync engine retried after a response was
+  // received but the local dequeue didn't persist), this is the same request
+  // arriving twice, not a real duplicate — return the row that already exists
+  // instead of erroring.
+  if (eventError?.code === '23505' && payload.id) {
+    const { data: existing, error: fetchError } = await supabase
+      .from('events')
+      .select()
+      .eq('id', payload.id)
+      .eq('owner_user_id', ownerUserId)
+      .single()
+
+    if (existing) return existing as Record<string, unknown>
+    if (fetchError) throw createError({ statusCode: 500, statusMessage: fetchError.message })
+  }
 
   if (eventError || !newEvent) {
     throw createError({ statusCode: 500, statusMessage: eventError?.message ?? 'Erro ao criar evento' })

@@ -34,7 +34,10 @@ const {
   updateEvent,
   archiveEvent,
   archiveCalendar,
-  restoreCalendar
+  restoreCalendar,
+  isOnline,
+  pendingSyncCount,
+  syncingOffline
 } = useAppointments()
 
 // ─── View mode (Day / Week / Month) ─────────────────────────────────────
@@ -602,76 +605,94 @@ onMounted(() => {
     </template>
 
     <template #body>
-      <div class="flex h-full">
-        <!-- Sidebar: Calendar list (desktop only — a bottom drawer takes over on mobile below) -->
+      <div class="flex h-full flex-col">
+        <!-- Offline / pending sync indicator -->
         <div
-          v-if="calendarsExpanded && !isMobile"
-          class="w-56 shrink-0 border-r border-default p-3 overflow-y-auto"
+          v-if="!isOnline || pendingSyncCount > 0"
+          class="flex shrink-0 items-center gap-1.5 px-4 py-1.5 text-xs"
+          :class="!isOnline ? 'text-warning bg-warning/5' : 'text-muted bg-elevated/40'"
         >
-          <AppointmentsCalendarList
-            :calendars="calendars"
-            :archived-calendars="archivedCalendars"
-            :loading="calendarsStatus === 'pending'"
-            :archived-loading="archivedCalendarsStatus === 'pending'"
-            :active-calendar-id="selectedCalendarId"
-            @create="onCreateCalendar"
-            @toggle="onToggleCalendar"
-            @archive="onArchiveCalendar"
-            @edit="onEditCalendar"
-            @restore="onRestoreCalendar"
+          <UIcon
+            :name="!isOnline ? 'i-lucide-cloud-off' : syncingOffline ? 'i-lucide-loader-2' : 'i-lucide-cloud-upload'"
+            class="size-3.5 shrink-0"
+            :class="syncingOffline ? 'animate-spin' : ''"
           />
+          <span v-if="!isOnline">Offline — as alterações serão sincronizadas ao reconectar</span>
+          <span v-else-if="syncingOffline">Sincronizando alterações offline...</span>
+          <span v-else>{{ pendingSyncCount }} alteração(ões) pendente(s) de sincronização</span>
         </div>
 
-        <!-- Main calendar area -->
-        <div ref="calendarBodyRef" class="relative min-w-0 flex-1 overflow-hidden">
-          <AnimatePresence mode="wait">
-            <motion.div
-              :key="calendarViewKey"
-              class="h-full overflow-auto p-0 lg:p-2"
-              :initial="calendarSlideInitial"
-              :animate="{ opacity: 1, x: 0 }"
-              :exit="calendarSlideExit"
-              :transition="calendarSlideTransition"
-            >
-              <!-- Month view -->
-              <AppointmentsMonthView
-                v-if="activeView === 'month'"
-                :events="eventsList"
-                :loading="eventsStatus === 'pending'"
-                :current-date="new Date()"
-                :view-year="viewYear"
-                :view-month="viewMonth"
-                @select-event="onSelectEvent"
-                @select-slot="onSelectSlot"
-                @month-change="onMonthChange"
-                @drop-event="onMonthEventDrop"
-              />
+        <div class="flex min-h-0 flex-1">
+          <!-- Sidebar: Calendar list (desktop only — a bottom drawer takes over on mobile below) -->
+          <div
+            v-if="calendarsExpanded && !isMobile"
+            class="w-56 shrink-0 border-r border-default p-3 overflow-y-auto"
+          >
+            <AppointmentsCalendarList
+              :calendars="calendars"
+              :archived-calendars="archivedCalendars"
+              :loading="calendarsStatus === 'pending'"
+              :archived-loading="archivedCalendarsStatus === 'pending'"
+              :active-calendar-id="selectedCalendarId"
+              @create="onCreateCalendar"
+              @toggle="onToggleCalendar"
+              @archive="onArchiveCalendar"
+              @edit="onEditCalendar"
+              @restore="onRestoreCalendar"
+            />
+          </div>
 
-              <!-- Week view -->
-              <AppointmentsWeekView
-                v-if="activeView === 'week'"
-                :events="eventsList"
-                :loading="eventsStatus === 'pending'"
-                :week-start-date="viewWeekStart"
-                @select-event="onSelectEvent"
-                @select-slot="onSelectSlot"
-                @week-change="onWeekChange"
-                @drop-event="onEventDrop"
-              />
+          <!-- Main calendar area -->
+          <div ref="calendarBodyRef" class="relative min-w-0 flex-1 overflow-hidden">
+            <AnimatePresence mode="wait">
+              <motion.div
+                :key="calendarViewKey"
+                class="h-full overflow-auto p-0 lg:p-2"
+                :initial="calendarSlideInitial"
+                :animate="{ opacity: 1, x: 0 }"
+                :exit="calendarSlideExit"
+                :transition="calendarSlideTransition"
+              >
+                <!-- Month view -->
+                <AppointmentsMonthView
+                  v-if="activeView === 'month'"
+                  :events="eventsList"
+                  :loading="eventsStatus === 'pending'"
+                  :current-date="new Date()"
+                  :view-year="viewYear"
+                  :view-month="viewMonth"
+                  @select-event="onSelectEvent"
+                  @select-slot="onSelectSlot"
+                  @month-change="onMonthChange"
+                  @drop-event="onMonthEventDrop"
+                />
 
-              <!-- Day view -->
-              <AppointmentsDayView
-                v-if="activeView === 'day'"
-                :events="eventsList"
-                :loading="eventsStatus === 'pending'"
-                :current-date="viewDayDate"
-                @select-event="onSelectEvent"
-                @select-slot="onDaySlotSelect"
-                @day-change="onDayChange"
-                @drop-event="onEventDrop"
-              />
-            </motion.div>
-          </AnimatePresence>
+                <!-- Week view -->
+                <AppointmentsWeekView
+                  v-if="activeView === 'week'"
+                  :events="eventsList"
+                  :loading="eventsStatus === 'pending'"
+                  :week-start-date="viewWeekStart"
+                  @select-event="onSelectEvent"
+                  @select-slot="onSelectSlot"
+                  @week-change="onWeekChange"
+                  @drop-event="onEventDrop"
+                />
+
+                <!-- Day view -->
+                <AppointmentsDayView
+                  v-if="activeView === 'day'"
+                  :events="eventsList"
+                  :loading="eventsStatus === 'pending'"
+                  :current-date="viewDayDate"
+                  @select-event="onSelectEvent"
+                  @select-slot="onDaySlotSelect"
+                  @day-change="onDayChange"
+                  @drop-event="onEventDrop"
+                />
+              </motion.div>
+            </AnimatePresence>
+          </div>
         </div>
       </div>
     </template>

@@ -10,6 +10,7 @@ const reminderSchema = z.object({
 })
 
 const bodySchema = z.object({
+  id: z.string().uuid().optional(),
   calendarId: z.string().uuid(),
   title: z.string().min(1).max(200),
   description: z.string().max(2000).optional(),

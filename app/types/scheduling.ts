@@ -136,7 +136,7 @@ export interface CreateSchedulingPagePayload {
   questions?: SchedulingQuestionInput[]
 }
 
-export type UpdateSchedulingPagePayload = Partial<CreateSchedulingPagePayload>
+export type UpdateSchedulingPagePayload = Partial<CreateSchedulingPagePayload> & { isActive?: boolean }
 
 // ─── Public-facing shapes ───────────────────────────────────────────────────
 

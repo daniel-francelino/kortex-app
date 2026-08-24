@@ -1,4 +1,5 @@
 import { useDebounceFn } from '@vueuse/core'
+import { CalendarVisibility } from '~/types/appointments'
 import type {
   Calendar,
   CalendarEvent,
@@ -7,7 +8,6 @@ import type {
   EventParticipant,
   EventReminder,
   ExceptionType,
-  CalendarVisibility,
   CreateCalendarPayload,
   CreateEventPayload,
   UpdateCalendarPayload,
@@ -25,6 +25,8 @@ interface EventsResponse {
   page: number
   pageSize: number
 }
+
+const APPOINTMENTS_ENTITIES = ['event', 'calendar'] as const
 
 function normalizeCalendar(input: unknown): Calendar {
   const calendar = (input ?? {}) as Record<string, unknown>
@@ -138,10 +140,45 @@ function normalizeEvent(input: unknown): CalendarEvent {
 
 export function useAppointments() {
   const toast = useToast()
+  const { runOptimisticAction } = useOptimisticAction()
+
+  // ─── Local reactive stores ──────────────────────────────────────────────
+  // Same idea as useNotes.ts/useJournal.ts: fetch results are upserted into
+  // these instead of replacing state wholesale, so an optimistic mutation
+  // shows up instantly and a background refetch never clobbers it.
+  const calendarsById = reactive(new Map<string, Calendar>())
+  const eventsById = reactive(new Map<string, CalendarEvent>())
+
+  function upsertCalendarInStore(calendar: Calendar) {
+    calendarsById.set(calendar.id, { ...calendarsById.get(calendar.id), ...calendar })
+  }
+
+  function upsertEventInStore(evt: CalendarEvent) {
+    eventsById.set(evt.id, { ...eventsById.get(evt.id), ...evt })
+  }
+
+  // ─── Date range / filter state ─────────────────────────────────────────────
+  const viewFrom = ref('')
+  const viewTo = ref('')
+  const activeCalendarIds = ref<string[]>([])
+  const searchQuery = ref('')
+
+  function isEventInCurrentView(evt: CalendarEvent): boolean {
+    if (activeCalendarIds.value.length > 0 && !activeCalendarIds.value.includes(evt.calendarId)) return false
+    if (!viewFrom.value && !viewTo.value) return true
+    const start = new Date(evt.startAt).getTime()
+    const end = new Date(evt.endAt).getTime()
+    const rangeStart = viewFrom.value ? new Date(viewFrom.value).getTime() : -Infinity
+    const rangeEnd = viewTo.value ? new Date(viewTo.value).getTime() : Infinity
+    return start <= rangeEnd && end >= rangeStart
+  }
 
   // ─── Calendars ────────────────────────────────────────────────────────────
+  const calendarIds = ref<string[]>([])
+  const archivedCalendarIds = ref<string[]>([])
+
   const {
-    data: calendars,
+    data: calendarsFetchResult,
     status: calendarsStatus,
     refresh: refreshCalendars
   } = useFetch<Calendar[]>('/api/appointments/calendars', {
@@ -152,8 +189,16 @@ export function useAppointments() {
     transform: data => (data ?? []).map(normalizeCalendar)
   })
 
+  watch(calendarsFetchResult, (list) => {
+    if (!list) return
+    for (const c of list) upsertCalendarInStore(c)
+    calendarIds.value = list.map(c => c.id)
+  }, { immediate: true })
+
+  const calendars = computed(() => calendarIds.value.map(id => calendarsById.get(id)).filter((c): c is Calendar => !!c))
+
   const {
-    data: archivedCalendars,
+    data: archivedCalendarsFetchResult,
     status: archivedCalendarsStatus,
     refresh: refreshArchivedCalendars
   } = useFetch<Calendar[]>('/api/appointments/calendars', {
@@ -165,18 +210,24 @@ export function useAppointments() {
     transform: data => (data ?? []).map(normalizeCalendar)
   })
 
-  // ─── Date range state ─────────────────────────────────────────────────────
-  const viewFrom = ref('')
-  const viewTo = ref('')
-  const activeCalendarIds = ref<string[]>([])
-  const searchQuery = ref('')
+  watch(archivedCalendarsFetchResult, (list) => {
+    if (!list) return
+    for (const c of list) upsertCalendarInStore(c)
+    archivedCalendarIds.value = list.map(c => c.id)
+  }, { immediate: true })
+
+  const archivedCalendars = computed(() => archivedCalendarIds.value.map(id => calendarsById.get(id)).filter((c): c is Calendar => !!c))
 
   // ─── Events (paginated, filtered by date range) ───────────────────────────
   const eventsPage = ref(1)
   const eventsPageSize = ref(500)
+  const viewEventIds = ref<string[]>([])
+  const lastKnownEventsTotal = ref(0)
+  const lastKnownEventsPage = ref(1)
+  const lastKnownEventsPageSize = ref(eventsPageSize.value)
 
   const {
-    data: eventsData,
+    data: eventsFetchResult,
     status: eventsStatus,
     refresh: refreshEvents
   } = useFetch<EventsResponse>('/api/appointments/events', {
@@ -205,6 +256,22 @@ export function useAppointments() {
       pageSize: response?.pageSize ?? eventsPageSize.value
     })
   })
+
+  watch(eventsFetchResult, (res) => {
+    if (!res) return
+    for (const e of res.data) upsertEventInStore(e)
+    viewEventIds.value = res.data.map(e => e.id)
+    lastKnownEventsTotal.value = res.total
+    lastKnownEventsPage.value = res.page
+    lastKnownEventsPageSize.value = res.pageSize
+  }, { immediate: true })
+
+  const eventsData = computed<EventsResponse>(() => ({
+    data: viewEventIds.value.map(id => eventsById.get(id)).filter((e): e is CalendarEvent => !!e),
+    total: lastKnownEventsTotal.value,
+    page: lastKnownEventsPage.value,
+    pageSize: lastKnownEventsPageSize.value
+  }))
 
   const debouncedRefreshEvents = useDebounceFn(() => {
     if (!viewFrom.value && !viewTo.value) {
@@ -238,53 +305,169 @@ export function useAppointments() {
 
   // ─── Calendar actions ─────────────────────────────────────────────────────
   async function createCalendar(payload: CreateCalendarPayload): Promise<Calendar | null> {
-    try {
-      const data = await $fetch<Calendar>('/api/appointments/calendars', {
-        method: 'POST',
-        body: payload
-      })
-      toast.add({ title: 'Calendário criado', color: 'success' })
-      await refreshCalendars()
-      return normalizeCalendar(data)
-    } catch {
-      toast.add({ title: 'Erro', description: 'Não foi possível criar o calendário', color: 'error' })
-      return null
+    const id = crypto.randomUUID()
+    const now = new Date().toISOString()
+
+    const optimisticCalendar: Calendar = {
+      id,
+      ownerUserId: '',
+      name: payload.name,
+      description: payload.description ?? null,
+      color: payload.color ?? null,
+      visibility: payload.visibility ?? CalendarVisibility.Private,
+      subscribeToken: null,
+      subscribeEnabled: false,
+      createdAt: now,
+      updatedAt: now,
+      archivedAt: null
     }
+
+    const result = await runOptimisticAction<Calendar>({
+      apply: () => {
+        upsertCalendarInStore(optimisticCalendar)
+        calendarIds.value = [...calendarIds.value, id]
+      },
+      rollback: () => {
+        calendarsById.delete(id)
+        calendarIds.value = calendarIds.value.filter(i => i !== id)
+      },
+      request: () => $fetch<Calendar>('/api/appointments/calendars', {
+        method: 'POST',
+        body: { ...payload, id }
+      }).then(normalizeCalendar),
+      reconcile: serverCalendar => upsertCalendarInStore(serverCalendar),
+      errorMessage: 'Não foi possível criar o calendário',
+      offline: {
+        entity: 'calendar',
+        action: 'create',
+        method: 'POST',
+        url: '/api/appointments/calendars',
+        body: { ...payload, id },
+        tempId: id,
+        optimisticResult: optimisticCalendar
+      }
+    })
+
+    if (result) toast.add({ title: 'Calendário criado', color: 'success' })
+    return result
   }
 
   async function updateCalendar(id: string, payload: UpdateCalendarPayload): Promise<boolean> {
-    try {
-      await $fetch(`/api/appointments/calendars/${id}`, {
+    const previous = calendarsById.get(id)
+    const now = new Date().toISOString()
+
+    const optimisticCalendar: Calendar = {
+      id,
+      ownerUserId: previous?.ownerUserId ?? '',
+      name: payload.name !== undefined ? payload.name : (previous?.name ?? ''),
+      description: payload.description !== undefined ? payload.description : (previous?.description ?? null),
+      color: payload.color !== undefined ? payload.color : (previous?.color ?? null),
+      visibility: payload.visibility !== undefined ? payload.visibility : (previous?.visibility ?? CalendarVisibility.Private),
+      subscribeToken: previous?.subscribeToken ?? null,
+      subscribeEnabled: payload.subscribeEnabled !== undefined ? payload.subscribeEnabled : (previous?.subscribeEnabled ?? false),
+      createdAt: previous?.createdAt ?? now,
+      updatedAt: now,
+      archivedAt: previous?.archivedAt ?? null
+    }
+
+    const result = await runOptimisticAction<Calendar>({
+      apply: () => upsertCalendarInStore(optimisticCalendar),
+      rollback: () => { if (previous) upsertCalendarInStore(previous) },
+      request: () => $fetch<Calendar>(`/api/appointments/calendars/${id}`, {
         method: 'PATCH',
         body: payload
-      })
-      toast.add({ title: 'Calendário atualizado', color: 'success' })
-      await refreshCalendars()
-      await refreshArchivedCalendars()
-      return true
-    } catch {
-      toast.add({ title: 'Erro', description: 'Não foi possível atualizar o calendário', color: 'error' })
-      return false
-    }
+      }).then(normalizeCalendar),
+      reconcile: serverCalendar => upsertCalendarInStore(serverCalendar),
+      errorMessage: 'Não foi possível atualizar o calendário',
+      offline: {
+        entity: 'calendar',
+        action: 'update',
+        method: 'PATCH',
+        url: `/api/appointments/calendars/${id}`,
+        body: payload,
+        tempId: id,
+        optimisticResult: optimisticCalendar
+      }
+    })
+
+    if (result) toast.add({ title: 'Calendário atualizado', color: 'success' })
+    return result !== null
   }
 
   async function archiveCalendar(id: string): Promise<boolean> {
-    try {
-      await $fetch(`/api/appointments/calendars/${id}/archive`, {
-        method: 'POST'
-      })
+    const previous = calendarsById.get(id)
+    const wasActive = calendarIds.value.includes(id)
+    const now = new Date().toISOString()
+
+    const result = await runOptimisticAction<{ success: true }>({
+      apply: () => {
+        if (previous) upsertCalendarInStore({ ...previous, archivedAt: now })
+        calendarIds.value = calendarIds.value.filter(i => i !== id)
+        if (!archivedCalendarIds.value.includes(id)) archivedCalendarIds.value = [id, ...archivedCalendarIds.value]
+        // Events under this calendar drop out of the current view too — the
+        // eventual refreshEvents() below is what fully reconciles this, this
+        // just avoids a stale-looking flash in the meantime.
+        viewEventIds.value = viewEventIds.value.filter(eid => eventsById.get(eid)?.calendarId !== id)
+      },
+      rollback: () => {
+        if (previous) upsertCalendarInStore(previous)
+        archivedCalendarIds.value = archivedCalendarIds.value.filter(i => i !== id)
+        if (wasActive && !calendarIds.value.includes(id)) calendarIds.value = [...calendarIds.value, id]
+      },
+      request: () => $fetch(`/api/appointments/calendars/${id}/archive`, { method: 'POST' }).then(() => ({ success: true as const })),
+      errorMessage: 'Não foi possível arquivar o calendário',
+      offline: {
+        entity: 'calendar',
+        action: 'delete',
+        method: 'POST',
+        url: `/api/appointments/calendars/${id}/archive`,
+        tempId: id,
+        optimisticResult: { success: true }
+      }
+    })
+
+    if (result) {
       toast.add({ title: 'Calendário arquivado', color: 'success' })
-      await refreshCalendars()
-      await refreshArchivedCalendars()
-      await refreshEvents()
-      return true
-    } catch {
-      toast.add({ title: 'Erro', description: 'Não foi possível arquivar o calendário', color: 'error' })
-      return false
+      refreshEvents()
     }
+    return result !== null
   }
 
-  // ─── Calendar sharing ─────────────────────────────────────────────────────
+  async function restoreCalendar(id: string): Promise<boolean> {
+    const previous = calendarsById.get(id)
+    const wasArchived = archivedCalendarIds.value.includes(id)
+
+    const result = await runOptimisticAction<{ success: true }>({
+      apply: () => {
+        if (previous) upsertCalendarInStore({ ...previous, archivedAt: null })
+        archivedCalendarIds.value = archivedCalendarIds.value.filter(i => i !== id)
+        if (!calendarIds.value.includes(id)) calendarIds.value = [...calendarIds.value, id]
+      },
+      rollback: () => {
+        if (previous) upsertCalendarInStore(previous)
+        calendarIds.value = calendarIds.value.filter(i => i !== id)
+        if (wasArchived && !archivedCalendarIds.value.includes(id)) archivedCalendarIds.value = [...archivedCalendarIds.value, id]
+      },
+      request: () => $fetch(`/api/appointments/calendars/${id}/restore`, { method: 'POST' }).then(() => ({ success: true as const })),
+      errorMessage: 'Não foi possível restaurar o calendário',
+      offline: {
+        entity: 'calendar',
+        action: 'update',
+        method: 'POST',
+        url: `/api/appointments/calendars/${id}/restore`,
+        tempId: id,
+        optimisticResult: { success: true }
+      }
+    })
+
+    if (result) {
+      toast.add({ title: 'Calendário restaurado', color: 'success' })
+      refreshEvents()
+    }
+    return result !== null
+  }
+
+  // ─── Calendar sharing (unchanged — out of offline scope) ──────────────────
   async function fetchCalendarShares(calendarId: string): Promise<CalendarShare[]> {
     try {
       const data = await $fetch<unknown[]>(`/api/appointments/calendars/${calendarId}/shares`)
@@ -339,82 +522,186 @@ export function useAppointments() {
         method: 'PATCH',
         body: { subscribeEnabled: enabled }
       })
-      await refreshCalendars()
-      return normalizeCalendar(data)
+      const normalized = normalizeCalendar(data)
+      upsertCalendarInStore(normalized)
+      return normalized
     } catch {
       toast.add({ title: 'Erro', description: 'Não foi possível atualizar a assinatura.', color: 'error' })
       return null
     }
   }
 
-  async function restoreCalendar(id: string): Promise<boolean> {
-    try {
-      await $fetch(`/api/appointments/calendars/${id}/restore`, {
-        method: 'POST'
-      })
-      toast.add({ title: 'Calendário restaurado', color: 'success' })
-      await refreshCalendars()
-      await refreshArchivedCalendars()
-      await refreshEvents()
-      return true
-    } catch {
-      toast.add({ title: 'Erro', description: 'Não foi possível restaurar o calendário', color: 'error' })
-      return false
-    }
-  }
-
   // ─── Event actions ────────────────────────────────────────────────────────
   async function createEvent(payload: CreateEventPayload): Promise<CalendarEvent | null> {
-    try {
-      const data = await $fetch<CalendarEvent>('/api/appointments/events', {
-        method: 'POST',
-        body: payload
-      })
-      toast.add({ title: 'Evento criado', color: 'success' })
-      return normalizeEvent(data)
-    } catch {
-      toast.add({ title: 'Erro', description: 'Não foi possível criar o evento', color: 'error' })
-      return null
+    const id = crypto.randomUUID()
+    const now = new Date().toISOString()
+
+    const optimisticEvent: CalendarEvent = {
+      id,
+      calendarId: payload.calendarId,
+      ownerUserId: '',
+      title: payload.title,
+      description: payload.description ?? null,
+      location: payload.location ?? null,
+      startAt: payload.startAt,
+      endAt: payload.endAt,
+      eventTimezone: payload.eventTimezone,
+      allDay: payload.allDay ?? false,
+      rrule: payload.rrule ?? null,
+      exdate: null,
+      createdAt: now,
+      updatedAt: now,
+      archivedAt: null,
+      calendar: calendarsById.get(payload.calendarId),
+      isRecurring: Boolean(payload.rrule),
+      isCancelled: false
     }
+
+    const result = await runOptimisticAction<CalendarEvent>({
+      apply: () => {
+        upsertEventInStore(optimisticEvent)
+        // Only the event's own first occurrence is reflected here — a
+        // recurring event's later occurrences are expanded server-side (see
+        // server/utils/recurrence.ts), so they only show up once
+        // reconcile()/refreshEvents() brings the real expanded list back.
+        if (isEventInCurrentView(optimisticEvent)) {
+          viewEventIds.value = [...viewEventIds.value, id]
+        }
+      },
+      rollback: () => {
+        eventsById.delete(id)
+        viewEventIds.value = viewEventIds.value.filter(i => i !== id)
+      },
+      request: () => $fetch<CalendarEvent>('/api/appointments/events', {
+        method: 'POST',
+        body: { ...payload, id }
+      }).then(normalizeEvent),
+      reconcile: serverEvent => upsertEventInStore(serverEvent),
+      errorMessage: 'Não foi possível criar o evento',
+      offline: {
+        entity: 'event',
+        action: 'create',
+        method: 'POST',
+        url: '/api/appointments/events',
+        body: { ...payload, id },
+        tempId: id,
+        optimisticResult: optimisticEvent
+      }
+    })
+
+    if (result) toast.add({ title: 'Evento criado', color: 'success' })
+    return result
   }
 
   async function updateEvent(id: string, payload: UpdateEventPayload): Promise<boolean> {
-    try {
-      await $fetch(`/api/appointments/events/${id}`, {
+    const previous = eventsById.get(id)
+    const wasInView = viewEventIds.value.includes(id)
+    const now = new Date().toISOString()
+
+    const optimisticEvent: CalendarEvent = {
+      id,
+      calendarId: payload.calendarId !== undefined ? payload.calendarId : (previous?.calendarId ?? ''),
+      ownerUserId: previous?.ownerUserId ?? '',
+      title: payload.title !== undefined ? payload.title : (previous?.title ?? ''),
+      description: payload.description !== undefined ? payload.description : (previous?.description ?? null),
+      location: payload.location !== undefined ? payload.location : (previous?.location ?? null),
+      startAt: payload.startAt !== undefined ? payload.startAt : (previous?.startAt ?? ''),
+      endAt: payload.endAt !== undefined ? payload.endAt : (previous?.endAt ?? ''),
+      eventTimezone: payload.eventTimezone !== undefined ? payload.eventTimezone : (previous?.eventTimezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone),
+      allDay: payload.allDay !== undefined ? payload.allDay : (previous?.allDay ?? false),
+      rrule: payload.rrule !== undefined ? payload.rrule : (previous?.rrule ?? null),
+      exdate: previous?.exdate ?? null,
+      createdAt: previous?.createdAt ?? now,
+      updatedAt: now,
+      archivedAt: previous?.archivedAt ?? null,
+      calendar: payload.calendarId !== undefined ? calendarsById.get(payload.calendarId) : previous?.calendar,
+      reminders: previous?.reminders,
+      exceptions: previous?.exceptions,
+      recurrenceId: previous?.recurrenceId,
+      isRecurring: Boolean(payload.rrule !== undefined ? payload.rrule : previous?.rrule),
+      isCancelled: previous?.isCancelled
+    }
+
+    const result = await runOptimisticAction<CalendarEvent>({
+      apply: () => {
+        upsertEventInStore(optimisticEvent)
+        const nowInView = isEventInCurrentView(optimisticEvent)
+        if (nowInView && !wasInView) viewEventIds.value = [...viewEventIds.value, id]
+        else if (!nowInView && wasInView) viewEventIds.value = viewEventIds.value.filter(i => i !== id)
+      },
+      rollback: () => {
+        if (previous) upsertEventInStore(previous)
+        const stillInView = viewEventIds.value.includes(id)
+        if (wasInView && !stillInView) viewEventIds.value = [...viewEventIds.value, id]
+        else if (!wasInView && stillInView) viewEventIds.value = viewEventIds.value.filter(i => i !== id)
+      },
+      request: () => $fetch<CalendarEvent>(`/api/appointments/events/${id}`, {
         method: 'PATCH',
         body: payload
-      })
-      toast.add({ title: 'Evento atualizado', color: 'success' })
-      return true
-    } catch {
-      toast.add({ title: 'Erro', description: 'Não foi possível atualizar o evento', color: 'error' })
-      return false
-    }
+      }).then(normalizeEvent),
+      reconcile: serverEvent => upsertEventInStore(serverEvent),
+      errorMessage: 'Não foi possível atualizar o evento',
+      offline: {
+        entity: 'event',
+        action: 'update',
+        method: 'PATCH',
+        url: `/api/appointments/events/${id}`,
+        body: payload,
+        tempId: id,
+        optimisticResult: optimisticEvent
+      }
+    })
+
+    if (result) toast.add({ title: 'Evento atualizado', color: 'success' })
+    return result !== null
   }
 
   async function archiveEvent(id: string): Promise<boolean> {
-    try {
-      await $fetch(`/api/appointments/events/${id}/archive`, {
-        method: 'POST'
-      })
-      toast.add({ title: 'Evento arquivado', color: 'success' })
-      return true
-    } catch {
-      toast.add({ title: 'Erro', description: 'Não foi possível arquivar o evento', color: 'error' })
-      return false
-    }
+    const previous = eventsById.get(id)
+    const wasInView = viewEventIds.value.includes(id)
+    const now = new Date().toISOString()
+
+    const result = await runOptimisticAction<{ success: true }>({
+      apply: () => {
+        if (previous) upsertEventInStore({ ...previous, archivedAt: now })
+        viewEventIds.value = viewEventIds.value.filter(i => i !== id)
+      },
+      rollback: () => {
+        if (previous) upsertEventInStore(previous)
+        if (wasInView && !viewEventIds.value.includes(id)) viewEventIds.value = [...viewEventIds.value, id]
+      },
+      request: () => $fetch(`/api/appointments/events/${id}/archive`, { method: 'POST' }).then(() => ({ success: true as const })),
+      errorMessage: 'Não foi possível arquivar o evento',
+      offline: {
+        entity: 'event',
+        action: 'delete',
+        method: 'POST',
+        url: `/api/appointments/events/${id}/archive`,
+        tempId: id,
+        optimisticResult: { success: true }
+      }
+    })
+
+    if (result) toast.add({ title: 'Evento arquivado', color: 'success' })
+    return result !== null
   }
 
   async function fetchEventDetail(id: string): Promise<CalendarEvent | null> {
     try {
       const data = await $fetch<CalendarEvent>(`/api/appointments/events/${id}`)
-      return normalizeEvent(data)
+      const normalized = normalizeEvent(data)
+      upsertEventInStore(normalized)
+      return normalized
     } catch {
+      // Already-seen event, connection just dropped — fall back to what we have.
+      const cached = eventsById.get(id)
+      if (cached) return cached
       toast.add({ title: 'Erro', description: 'Não foi possível carregar o evento', color: 'error' })
       return null
     }
   }
 
+  // ─── Recurring-event edits, reminders, participants (unchanged — out of offline scope) ──
   async function cancelOccurrence(eventId: string, payload: CancelOccurrencePayload): Promise<boolean> {
     try {
       await $fetch(`/api/appointments/events/${eventId}/cancel-occurrence`, {
@@ -471,7 +758,7 @@ export function useAppointments() {
     }
   }
 
-  // ─── Participants ─────────────────────────────────────────────────────────
+  // ─── Participants (unchanged — out of offline scope) ──────────────────────
   async function fetchParticipants(eventId: string): Promise<EventParticipant[]> {
     try {
       const data = await $fetch<unknown[]>(`/api/appointments/events/${eventId}/participants`)
@@ -577,6 +864,62 @@ export function useAppointments() {
     { label: 'Mensalmente', value: 'FREQ=MONTHLY' }
   ]
 
+  // ─── Offline sync ───────────────────────────────────────────────────────────
+  // Same drain-and-converge approach as useNotes.ts/useJournal.ts: replay
+  // each queued request in order, then let a full refetch settle the store
+  // rather than trying to reapply each mutation's own (long-gone) reconcile
+  // closure. Filters to this composable's own entities since the queue is
+  // shared across modules.
+  const { pendingMutations, pendingCount, dequeue: dequeueMutation, markRetry, ensureLoaded: ensureQueueLoaded } = useMutationQueue()
+  const { isOnline, onReconnect } = useConnectionStatus()
+  const syncingOffline = ref(false)
+
+  async function drainMutationQueue(): Promise<void> {
+    if (syncingOffline.value) return
+    await ensureQueueLoaded()
+    const relevant = pendingMutations.value.filter(m => (APPOINTMENTS_ENTITIES as readonly string[]).includes(m.entity))
+    if (relevant.length === 0) return
+
+    syncingOffline.value = true
+    let replayedAny = false
+
+    try {
+      const queue = [...relevant]
+
+      for (const mutation of queue) {
+        // Coalesced/cancelled by a later action since the snapshot was taken.
+        if (!pendingMutations.value.some(m => m.id === mutation.id)) continue
+        if (!isOnline.value) break
+
+        try {
+          await $fetch(mutation.url, {
+            method: mutation.method,
+            body: mutation.body as Record<string, unknown> | undefined
+          })
+          await dequeueMutation(mutation.id)
+          replayedAny = true
+        } catch (err) {
+          if (!isOnline.value) break // connection dropped mid-replay, not a real rejection
+          console.error('[offline-sync] appointments mutation failed', mutation, err)
+          await markRetry(mutation.id)
+        }
+      }
+    } finally {
+      syncingOffline.value = false
+      if (replayedAny) {
+        await Promise.all([refreshEvents(), refreshCalendars(), refreshArchivedCalendars()])
+        toast.add({ title: 'Sincronizado', description: 'Suas alterações offline na agenda foram salvas.', color: 'success' })
+      }
+    }
+  }
+
+  onReconnect(() => {
+    void drainMutationQueue()
+  })
+  onMounted(() => {
+    if (isOnline.value) void drainMutationQueue()
+  })
+
   return {
     // Calendars
     calendars,
@@ -627,6 +970,11 @@ export function useAppointments() {
     // Recurrence
     getRecurrenceLabel,
     recurrenceOptions,
-    NONE_RECURRENCE_VALUE
+    NONE_RECURRENCE_VALUE,
+
+    // Offline
+    isOnline,
+    pendingSyncCount: pendingCount,
+    syncingOffline
   }
 }

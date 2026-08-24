@@ -23,6 +23,7 @@ const questionSchema = z.object({
 )
 
 const bodySchema = z.object({
+  id: z.string().uuid().optional(),
   calendarId: z.string().uuid(),
   title: z.string().min(1, 'Título é obrigatório').max(200),
   description: z.string().max(2000).optional(),
@@ -66,41 +67,68 @@ export default eventHandler(async (event) => {
     throw createError({ statusCode: 404, statusMessage: 'Calendário não encontrado' })
   }
 
-  const { data: page, error } = await supabase
+  const insertRow: Record<string, unknown> = {
+    user_id: user.id,
+    calendar_id: payload.calendarId,
+    title: payload.title,
+    description: payload.description ?? null,
+    duration_minutes: payload.durationMinutes,
+    location_type: payload.locationType,
+    location_details: payload.locationDetails ?? null,
+    timezone: payload.timezone,
+    color: payload.color ?? null,
+    buffer_before_minutes: payload.bufferBeforeMinutes,
+    buffer_after_minutes: payload.bufferAfterMinutes,
+    slot_increment_minutes: payload.slotIncrementMinutes,
+    min_notice_hours: payload.minNoticeHours,
+    max_advance_days: payload.maxAdvanceDays,
+    max_bookings_per_day: payload.maxBookingsPerDay ?? null,
+    calendar_event_title_template: payload.calendarEventTitleTemplate ?? null,
+    cancellation_enabled: payload.cancellationEnabled,
+    reschedule_enabled: payload.rescheduleEnabled,
+    cancellation_min_notice_hours: payload.cancellationMinNoticeHours ?? null,
+    cancellation_reason_required: payload.cancellationReasonRequired,
+    hide_details_on_manage_page: payload.hideDetailsOnManagePage,
+    share_token: createShareToken()
+  }
+  if (payload.id) insertRow.id = payload.id
+
+  const { data: insertedPage, error } = await supabase
     .from('scheduling_pages')
-    .insert({
-      user_id: user.id,
-      calendar_id: payload.calendarId,
-      title: payload.title,
-      description: payload.description ?? null,
-      duration_minutes: payload.durationMinutes,
-      location_type: payload.locationType,
-      location_details: payload.locationDetails ?? null,
-      timezone: payload.timezone,
-      color: payload.color ?? null,
-      buffer_before_minutes: payload.bufferBeforeMinutes,
-      buffer_after_minutes: payload.bufferAfterMinutes,
-      slot_increment_minutes: payload.slotIncrementMinutes,
-      min_notice_hours: payload.minNoticeHours,
-      max_advance_days: payload.maxAdvanceDays,
-      max_bookings_per_day: payload.maxBookingsPerDay ?? null,
-      calendar_event_title_template: payload.calendarEventTitleTemplate ?? null,
-      cancellation_enabled: payload.cancellationEnabled,
-      reschedule_enabled: payload.rescheduleEnabled,
-      cancellation_min_notice_hours: payload.cancellationMinNoticeHours ?? null,
-      cancellation_reason_required: payload.cancellationReasonRequired,
-      hide_details_on_manage_page: payload.hideDetailsOnManagePage,
-      share_token: createShareToken()
-    })
+    .insert(insertRow)
     .select('*')
     .single()
 
-  if (error || !page) {
-    throw createError({ statusCode: 500, statusMessage: 'Falha ao criar página de agendamento', data: error?.message })
+  let page = insertedPage as Record<string, unknown> | null
+
+  // Same replay-safety as events/calendars: a retried offline-queued create
+  // with the same client-supplied id lands on the row that's already there
+  // instead of erroring. The rule/question inserts below always run as
+  // delete-then-reinsert, so re-running them against that existing page is
+  // safe too — this is what makes the whole 3-way create idempotent, not
+  // just the page row itself.
+  if (error?.code === '23505' && payload.id) {
+    const { data: existing, error: fetchError } = await supabase
+      .from('scheduling_pages')
+      .select('*')
+      .eq('id', payload.id)
+      .eq('user_id', user.id)
+      .single()
+
+    if (existing) page = existing as Record<string, unknown>
+    else if (fetchError) throw createError({ statusCode: 500, statusMessage: fetchError.message })
+  }
+
+  if (error && !page) {
+    throw createError({ statusCode: 500, statusMessage: 'Falha ao criar página de agendamento', data: error.message })
+  }
+  if (!page) {
+    throw createError({ statusCode: 500, statusMessage: 'Falha ao criar página de agendamento' })
   }
 
   const pageId = page.id as string
 
+  await supabase.from('scheduling_availability_rules').delete().eq('scheduling_page_id', pageId)
   const { error: rulesError } = await supabase
     .from('scheduling_availability_rules')
     .insert(payload.availabilityRules.map(rule => ({
@@ -114,6 +142,7 @@ export default eventHandler(async (event) => {
     throw createError({ statusCode: 500, statusMessage: 'Falha ao salvar disponibilidade', data: rulesError.message })
   }
 
+  await supabase.from('scheduling_questions').delete().eq('scheduling_page_id', pageId)
   if (payload.questions && payload.questions.length > 0) {
     const { error: questionsError } = await supabase
       .from('scheduling_questions')
@@ -133,5 +162,5 @@ export default eventHandler(async (event) => {
   }
 
   setResponseStatus(event, 201)
-  return mapSchedulingPage(page as Record<string, unknown>)
+  return mapSchedulingPage(page)
 })
