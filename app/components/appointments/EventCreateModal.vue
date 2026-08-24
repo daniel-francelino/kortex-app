@@ -34,6 +34,10 @@ const schema = z.object({
 
 type FormState = z.infer<typeof schema>
 
+function formatLocalDate(date: Date): string {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+}
+
 function buildDefaults(): FormState {
   const base = props.prefill?.startAt ?? new Date()
   const h = base.getHours()
@@ -47,9 +51,9 @@ function buildDefaults(): FormState {
     title: props.prefill?.title ?? '',
     description: '',
     location: props.prefill?.location ?? '',
-    startDate: base.toISOString().split('T')[0] ?? '',
+    startDate: formatLocalDate(base),
     startTime: `${String(startH).padStart(2, '0')}:${String(startM).padStart(2, '0')}`,
-    endDate: base.toISOString().split('T')[0] ?? '',
+    endDate: formatLocalDate(base),
     endTime: `${String(endH).padStart(2, '0')}:${String(startM).padStart(2, '0')}`,
     allDay: false,
     rrule: '',

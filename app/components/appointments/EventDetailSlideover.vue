@@ -303,13 +303,13 @@ function formatDate(dateStr: string, allDay: boolean): string {
   if (Number.isNaN(date.getTime())) return 'Data inválida'
   const d = date.toLocaleDateString('pt-BR', { timeZone: getEventTimeZone(props.event), weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })
   if (allDay) return d
-  return `${d} às ${date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`
+  return `${d} às ${date.toLocaleTimeString('pt-BR', { timeZone: getEventTimeZone(props.event), hour: '2-digit', minute: '2-digit' })}`
 }
 
 function formatTimeRange(evt: CalendarEvent): string {
   if (evt.allDay) return 'Dia inteiro'
-  const start = new Date(evt.startAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
-  const end = new Date(evt.endAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+  const start = formatEventTime(evt)
+  const end = formatEventTime(evt, 'endAt')
   return `${start} – ${end}`
 }
 </script>
