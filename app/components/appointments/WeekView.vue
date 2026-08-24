@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { CalendarEvent } from '~/types/appointments'
+import { getEventTimeZone, getZonedDate, zonedDateTimeToUtcIso } from '~/utils/calendarEventTime'
 import {
   layoutTimedEvents,
   getEventTopPx,
@@ -63,8 +64,9 @@ const weekDays = computed((): DayColumn[] => {
 
     const dayEvents = (props.events ?? []).filter((evt: CalendarEvent) => {
       if (!evt.startAt || !evt.endAt) return false
-      const evtStart = new Date(evt.startAt)
-      const evtEnd = new Date(evt.endAt)
+      const timeZone = getEventTimeZone(evt)
+      const evtStart = getZonedDate(evt.startAt, timeZone)
+      const evtEnd = getZonedDate(evt.endAt, timeZone)
       return evtStart < dayEnd && evtEnd > dayStart
     })
 
@@ -147,7 +149,8 @@ function startDrag(evt: CalendarEvent, e: PointerEvent) {
   drag.active = true
   drag.event = evt
   drag.originalStart = evt.startAt
-  drag.durationMs = new Date(evt.endAt).getTime() - new Date(evt.startAt).getTime()
+  const timeZone = getEventTimeZone(evt)
+  drag.durationMs = getZonedDate(evt.endAt, timeZone).getTime() - getZonedDate(evt.startAt, timeZone).getTime()
   drag.pointerId = e.pointerId
   drag.targetDayIndex = getColIndexFromPointer(e)
   drag.targetMinutes = getSnappedMinutes(e)
@@ -181,9 +184,13 @@ function commitDrop() {
     0,
     drag.targetMinutes
   )
-  if (newStart.getTime() === new Date(drag.originalStart).getTime()) return
+  const timeZone = getEventTimeZone(drag.event)
+  if (newStart.getTime() === getZonedDate(drag.originalStart, timeZone).getTime()) return
   const newEnd = new Date(newStart.getTime() + drag.durationMs)
-  emit('dropEvent', drag.event.id, newStart.toISOString(), newEnd.toISOString())
+  const dateStr = formatDate(newStart)
+  const startTime = `${String(newStart.getHours()).padStart(2, '0')}:${String(newStart.getMinutes()).padStart(2, '0')}`
+  const endTime = `${String(newEnd.getHours()).padStart(2, '0')}:${String(newEnd.getMinutes()).padStart(2, '0')}`
+  emit('dropEvent', drag.event.id, zonedDateTimeToUtcIso(dateStr, startTime, timeZone), zonedDateTimeToUtcIso(formatDate(newEnd), endTime, timeZone))
 }
 
 function endDrag() {

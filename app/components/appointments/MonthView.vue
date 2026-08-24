@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { CalendarEvent } from '~/types/appointments'
+import { formatEventTime as formatCalendarEventTime, formatZonedDateKey, getEventTimeZone, getZonedDate } from '~/utils/calendarEventTime'
 
 const props = defineProps<{
   events: CalendarEvent[]
@@ -87,8 +88,9 @@ function getDayEvents(date: Date): CalendarEvent[] {
 
   return props.events.filter((evt: CalendarEvent) => {
     if (!evt.startAt || !evt.endAt) return false
-    const evtStart = new Date(evt.startAt)
-    const evtEnd = new Date(evt.endAt)
+    const timeZone = getEventTimeZone(evt)
+    const evtStart = getZonedDate(evt.startAt, timeZone)
+    const evtEnd = getZonedDate(evt.endAt, timeZone)
     return evtStart < dayEnd && evtEnd > dayStart
   })
 }
@@ -98,10 +100,7 @@ function getEventColor(evt: CalendarEvent): string {
 }
 
 function formatEventTime(evt: CalendarEvent): string {
-  return new Date(evt.startAt).toLocaleTimeString('pt-BR', {
-    hour: '2-digit',
-    minute: '2-digit'
-  })
+  return formatCalendarEventTime(evt)
 }
 
 // ─── Drag state (Pointer Events — works on touch, unlike native HTML5 DnD) ──
@@ -118,7 +117,7 @@ function targetDateFromPoint(x: number, y: number): string | null {
 function startDrag(evt: CalendarEvent, e: PointerEvent) {
   dragEvent.value = evt
   dragPointerId.value = e.pointerId
-  dragOver.value = formatDate(new Date(evt.startAt))
+  dragOver.value = formatZonedDateKey(evt.startAt, getEventTimeZone(evt))
   ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
 }
 
@@ -131,7 +130,7 @@ function onPointerMove(e: PointerEvent) {
 function onPointerUp(e: PointerEvent) {
   if (!dragEvent.value || e.pointerId !== dragPointerId.value) return
   const targetDate = targetDateFromPoint(e.clientX, e.clientY)
-  const original = formatDate(new Date(dragEvent.value.startAt))
+  const original = formatZonedDateKey(dragEvent.value.startAt, getEventTimeZone(dragEvent.value))
   if (targetDate && targetDate !== original) {
     emit('dropEvent', dragEvent.value.id, targetDate)
   }

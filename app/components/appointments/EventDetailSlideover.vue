@@ -3,6 +3,7 @@ import { z } from 'zod'
 import type { Calendar, CalendarEvent, EventParticipant } from '~/types/appointments'
 import { RsvpStatus } from '~/types/appointments'
 import { strToDateValue, dateValueToStr, strToTimeValue, timeValueToStr, type TimeValue } from '~/utils/calendarDate'
+import { formatEventDate, formatEventTime, getEventTimeZone, getZonedDateParts, zonedDateTimeToUtcIso } from '~/utils/calendarEventTime'
 
 const props = defineProps<{
   open: boolean
@@ -181,29 +182,26 @@ watch(() => props.event, (event) => {
 }, { immediate: true })
 
 function toDateInput(dateStr: string): string {
-  const date = new Date(dateStr)
-  if (Number.isNaN(date.getTime())) return ''
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+  if (Number.isNaN(new Date(dateStr).getTime())) return ''
+  return formatEventDate({ ...props.event!, startAt: dateStr }, 'startAt')
 }
 
 function toTimeInput(dateStr: string): string {
-  const date = new Date(dateStr)
-  if (Number.isNaN(date.getTime())) return '09:00'
-  return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
+  if (Number.isNaN(new Date(dateStr).getTime())) return '09:00'
+  const parts = getZonedDateParts(dateStr, getEventTimeZone(props.event))
+  return `${String(parts.hour).padStart(2, '0')}:${String(parts.minute).padStart(2, '0')}`
 }
 
 async function saveEdit() {
   if (!props.event || saving.value) return
-  const startAt = `${state.startDate}T${state.allDay ? '00:00:00' : `${state.startTime || '00:00'}:00`}`
-  const endAt = `${state.endDate}T${state.allDay ? '23:59:59' : `${state.endTime || '00:00'}:00`}`
+  const editTimeZone = props.event.eventTimezone || timezone
+  const startAtIso = zonedDateTimeToUtcIso(state.startDate, state.allDay ? '00:00' : state.startTime || '00:00', editTimeZone)
+  const endAtIso = zonedDateTimeToUtcIso(state.endDate, state.allDay ? '23:59' : state.endTime || '00:00', editTimeZone)
 
-  if (new Date(endAt) <= new Date(startAt)) {
+  if (new Date(endAtIso) <= new Date(startAtIso)) {
     toast.add({ title: 'Erro', description: 'A data de término deve ser posterior ao início', color: 'error' })
     return
   }
-
-  const startAtIso = new Date(startAt).toISOString()
-  const endAtIso = new Date(endAt).toISOString()
 
   // Editing a single occurrence of a recurring series — ask which scope
   // applies before saving, instead of silently editing the whole series.
@@ -303,7 +301,7 @@ async function onCancelOccurrence(recurrenceId: string) {
 function formatDate(dateStr: string, allDay: boolean): string {
   const date = new Date(dateStr)
   if (Number.isNaN(date.getTime())) return 'Data inválida'
-  const d = date.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })
+  const d = date.toLocaleDateString('pt-BR', { timeZone: getEventTimeZone(props.event), weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })
   if (allDay) return d
   return `${d} às ${date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`
 }

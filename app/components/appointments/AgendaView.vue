@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { CalendarEvent } from '~/types/appointments'
+import { formatEventDate, formatEventTime } from '~/utils/calendarEventTime'
 
 const props = defineProps<{
   events: CalendarEvent[]
@@ -26,7 +27,7 @@ const groupedEvents = computed((): EventGroup[] => {
   const groups: Record<string, CalendarEvent[]> = {}
 
   for (const evt of props.events) {
-    const dateStr = formatDate(new Date(evt.startAt))
+    const dateStr = formatEventDate(evt)
     if (!groups[dateStr]) {
       groups[dateStr] = []
     }
@@ -61,14 +62,8 @@ function formatDateLabel(d: Date): string {
 
 function getTimeRange(evt: CalendarEvent): string {
   if (evt.allDay) return 'Dia inteiro'
-  const start = new Date(evt.startAt).toLocaleTimeString('pt-BR', {
-    hour: '2-digit',
-    minute: '2-digit'
-  })
-  const end = new Date(evt.endAt).toLocaleTimeString('pt-BR', {
-    hour: '2-digit',
-    minute: '2-digit'
-  })
+  const start = formatEventTime(evt)
+  const end = formatEventTime(evt, 'endAt')
   return `${start} — ${end}`
 }
 

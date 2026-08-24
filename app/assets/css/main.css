@@ -273,6 +273,12 @@ body.keyboard-open .mobile-bottom-nav {
   width: 100%;
 }
 
+@media (min-width: 1024px) {
+  .mobile-bottom-nav {
+    display: none;
+  }
+}
+
 .app-content-with-bottom-nav {
   min-height: 0;
 }

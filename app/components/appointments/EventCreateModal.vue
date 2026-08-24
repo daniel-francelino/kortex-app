@@ -3,6 +3,7 @@ import { z } from 'zod'
 import type { Calendar } from '~/types/appointments'
 import { ReminderType } from '~/types/appointments'
 import { strToDateValue, dateValueToStr, strToTimeValue, timeValueToStr, type TimeValue } from '~/utils/calendarDate'
+import { zonedDateTimeToUtcIso } from '~/utils/calendarEventTime'
 
 const props = defineProps<{
   open: boolean
@@ -113,6 +114,8 @@ async function onSubmit() {
   const startAt = `${state.startDate}T${state.allDay ? '00:00:00' : state.startTime + ':00'}`
   const endAt = `${state.endDate}T${state.allDay ? '23:59:59' : state.endTime + ':00'}`
   if (new Date(endAt) <= new Date(startAt)) return
+  const startAtIso = zonedDateTimeToUtcIso(state.startDate, state.allDay ? '00:00' : state.startTime, timezone)
+  const endAtIso = zonedDateTimeToUtcIso(state.endDate, state.allDay ? '23:59' : state.endTime, timezone)
 
   loading.value = true
   try {
@@ -121,8 +124,8 @@ async function onSubmit() {
       title: state.title,
       description: state.description || undefined,
       location: state.location || undefined,
-      startAt: new Date(startAt).toISOString(),
-      endAt: new Date(endAt).toISOString(),
+      startAt: startAtIso,
+      endAt: endAtIso,
       eventTimezone: timezone,
       allDay: state.allDay,
       rrule: state.rrule || undefined,

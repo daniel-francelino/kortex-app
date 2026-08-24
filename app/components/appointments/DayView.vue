@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { CalendarEvent } from '~/types/appointments'
+import { getEventTimeZone, getZonedDate, zonedDateTimeToUtcIso } from '~/utils/calendarEventTime'
 import {
   layoutTimedEvents,
   getEventTopPx,
@@ -51,7 +52,8 @@ function isOnDay(evt: CalendarEvent): boolean {
   const dayStart = new Date(viewDate.value.getFullYear(), viewDate.value.getMonth(), viewDate.value.getDate())
   const dayEnd = new Date(dayStart)
   dayEnd.setDate(dayEnd.getDate() + 1)
-  return new Date(evt.startAt) < dayEnd && new Date(evt.endAt) > dayStart
+  const timeZone = getEventTimeZone(evt)
+  return getZonedDate(evt.startAt, timeZone) < dayEnd && getZonedDate(evt.endAt, timeZone) > dayStart
 }
 
 const allDayEvents = computed(() => props.events.filter(e => e.allDay && isOnDay(e)))
@@ -123,7 +125,8 @@ function startDrag(evt: CalendarEvent, e: PointerEvent) {
   drag.active = true
   drag.event = evt
   drag.originalStart = evt.startAt
-  drag.durationMs = new Date(evt.endAt).getTime() - new Date(evt.startAt).getTime()
+  const timeZone = getEventTimeZone(evt)
+  drag.durationMs = getZonedDate(evt.endAt, timeZone).getTime() - getZonedDate(evt.startAt, timeZone).getTime()
   drag.pointerId = e.pointerId
   drag.targetMinutes = getSnappedMinutes(e)
   ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
@@ -153,9 +156,13 @@ function commitDrop() {
     0,
     drag.targetMinutes
   )
-  if (newStart.getTime() === new Date(drag.originalStart).getTime()) return
+  const timeZone = getEventTimeZone(drag.event)
+  if (newStart.getTime() === getZonedDate(drag.originalStart, timeZone).getTime()) return
   const newEnd = new Date(newStart.getTime() + drag.durationMs)
-  emit('dropEvent', drag.event.id, newStart.toISOString(), newEnd.toISOString())
+  const dateStr = formatDate(newStart)
+  const startTime = `${String(newStart.getHours()).padStart(2, '0')}:${String(newStart.getMinutes()).padStart(2, '0')}`
+  const endTime = `${String(newEnd.getHours()).padStart(2, '0')}:${String(newEnd.getMinutes()).padStart(2, '0')}`
+  emit('dropEvent', drag.event.id, zonedDateTimeToUtcIso(dateStr, startTime, timeZone), zonedDateTimeToUtcIso(formatDate(newEnd), endTime, timeZone))
 }
 
 function endDrag() {

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { CalendarEvent } from '~/types/appointments'
+import { formatEventTime, getEventTimeZone } from '~/utils/calendarEventTime'
 
 const props = defineProps<{
   event: CalendarEvent | null
@@ -42,10 +43,12 @@ const popoverStyle = computed(() => {
 
 function formatDateTime(dateStr: string, allDay: boolean): string {
   const date = new Date(dateStr)
+  const timeZone = getEventTimeZone(props.event)
   if (Number.isNaN(date.getTime())) return 'Data inválida'
 
   if (allDay) {
     return date.toLocaleDateString('pt-BR', {
+      timeZone,
       weekday: 'short',
       day: '2-digit',
       month: 'short'
@@ -53,22 +56,17 @@ function formatDateTime(dateStr: string, allDay: boolean): string {
   }
 
   return date.toLocaleDateString('pt-BR', {
+    timeZone,
     weekday: 'short',
     day: '2-digit',
     month: 'short'
-  }) + ' ' + date.toLocaleTimeString('pt-BR', {
-    hour: '2-digit',
-    minute: '2-digit'
-  })
+  }) + ' ' + (props.event ? formatEventTime(props.event) : '')
 }
 
 function getTimeRange(evt: CalendarEvent): string {
   if (evt.allDay) return 'Dia inteiro'
   const start = formatDateTime(evt.startAt, false)
-  const endTime = new Date(evt.endAt).toLocaleTimeString('pt-BR', {
-    hour: '2-digit',
-    minute: '2-digit'
-  })
+  const endTime = formatEventTime(evt, 'endAt')
   return `${start} — ${endTime}`
 }
 

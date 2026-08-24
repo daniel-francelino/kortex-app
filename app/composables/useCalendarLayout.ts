@@ -1,4 +1,5 @@
 import type { CalendarEvent } from '~/types/appointments'
+import { getEventTimeZone, getZonedDate } from '~/utils/calendarEventTime'
 
 export interface PositionedEvent extends CalendarEvent {
   leftRatio: number
@@ -9,15 +10,16 @@ export const HOUR_HEIGHT = 48 // px per hour
 
 export function getEventTopPx(event: CalendarEvent, dayDate: Date): number {
   const dayStart = new Date(dayDate.getFullYear(), dayDate.getMonth(), dayDate.getDate())
-  const evtStart = new Date(event.startAt)
+  const evtStart = getZonedDate(event.startAt, getEventTimeZone(event))
   const startMinutes = Math.max(0, (evtStart.getTime() - dayStart.getTime()) / 60000)
   return (startMinutes / 60) * HOUR_HEIGHT
 }
 
 export function getEventHeightPx(event: CalendarEvent, dayDate: Date): number {
   const dayStart = new Date(dayDate.getFullYear(), dayDate.getMonth(), dayDate.getDate())
-  const evtStart = new Date(event.startAt)
-  const evtEnd = new Date(event.endAt)
+  const timeZone = getEventTimeZone(event)
+  const evtStart = getZonedDate(event.startAt, timeZone)
+  const evtEnd = getZonedDate(event.endAt, timeZone)
   const startMinutes = Math.max(0, (evtStart.getTime() - dayStart.getTime()) / 60000)
   const endMinutes = Math.min(1440, (evtEnd.getTime() - dayStart.getTime()) / 60000)
   const duration = Math.max(endMinutes - startMinutes, 15)
@@ -28,7 +30,9 @@ export function layoutTimedEvents(events: CalendarEvent[]): PositionedEvent[] {
   if (events.length === 0) return []
 
   const sorted = [...events].sort(
-    (a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime()
+    (a, b) =>
+      getZonedDate(a.startAt, getEventTimeZone(a)).getTime()
+      - getZonedDate(b.startAt, getEventTimeZone(b)).getTime()
   )
 
   // Build groups of overlapping events
@@ -37,8 +41,9 @@ export function layoutTimedEvents(events: CalendarEvent[]): PositionedEvent[] {
   let groupEnd: Date | null = null
 
   for (const evt of sorted) {
-    const start = new Date(evt.startAt)
-    const end = new Date(evt.endAt)
+    const timeZone = getEventTimeZone(evt)
+    const start = getZonedDate(evt.startAt, timeZone)
+    const end = getZonedDate(evt.endAt, timeZone)
 
     if (groupEnd === null || start >= groupEnd) {
       if (currentGroup.length > 0) groups.push(currentGroup)
@@ -58,12 +63,12 @@ export function layoutTimedEvents(events: CalendarEvent[]): PositionedEvent[] {
     const columns: CalendarEvent[][] = []
 
     for (const evt of group) {
-      const evtStart = new Date(evt.startAt)
+      const evtStart = getZonedDate(evt.startAt, getEventTimeZone(evt))
       let placed = false
 
       for (const col of columns) {
         const lastInCol = col[col.length - 1]!
-        if (evtStart >= new Date(lastInCol.endAt)) {
+        if (evtStart >= getZonedDate(lastInCol.endAt, getEventTimeZone(lastInCol))) {
           col.push(evt)
           placed = true
           break

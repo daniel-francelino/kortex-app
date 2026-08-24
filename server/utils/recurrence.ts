@@ -2,6 +2,8 @@
  * Simple RRULE expansion utility for MVP.
  * Supports: FREQ=DAILY|WEEKLY|MONTHLY, INTERVAL, COUNT, UNTIL, BYDAY
  * Generates occurrence start dates within a given range.
+ *
+ * MANTENHA EM SINCRONIA COM kortex-api/src/utils/recurrence.ts
  */
 import { fromZonedTime, toZonedTime } from 'date-fns-tz'
 

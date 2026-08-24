@@ -4,6 +4,8 @@ import { CalendarVisibility } from '~/types/appointments'
 import { getMoodOption } from '~/types/journal'
 import type { JournalEntry } from '~/types/journal'
 import { useSwipe } from '@vueuse/core'
+import { AnimatePresence, motion } from 'motion-v'
+import { getEventTimeZone, getZonedDate, zonedDateTimeToUtcIso } from '~/utils/calendarEventTime'
 
 definePageMeta({
   layout: 'app'
@@ -46,8 +48,11 @@ const initialView = queryView && ['day', 'week', 'month'].includes(queryView)
   ? queryView as CalendarViewMode
   : (savedView && ['day', 'week', 'month'].includes(savedView) ? savedView : 'month')
 const activeView = ref<CalendarViewMode>(initialView)
+const calendarSlideDirection = ref<-1 | 0 | 1>(0)
 
 watch(activeView, (v) => {
+  calendarSlideDirection.value = 0
+
   if (typeof localStorage !== 'undefined') {
     localStorage.setItem(STORAGE_KEY, v)
   }
@@ -105,7 +110,30 @@ const headerLabel = computed(() => {
   }))
 })
 
+const calendarViewKey = computed(() => {
+  if (activeView.value === 'month') return `month-${viewYear.value}-${viewMonth.value}`
+  if (activeView.value === 'week') return `week-${viewWeekStart.value.toISOString()}`
+  return `day-${viewDayDate.value.toISOString()}`
+})
+
+const calendarSlideInitial = computed(() => ({
+  opacity: 0,
+  x: calendarSlideDirection.value * 36
+}))
+
+const calendarSlideExit = computed(() => ({
+  opacity: 0,
+  x: calendarSlideDirection.value * -36
+}))
+
+const calendarSlideTransition = {
+  duration: 0.22,
+  ease: 'easeOut'
+}
+
 function goPrev() {
+  calendarSlideDirection.value = -1
+
   if (activeView.value === 'month') {
     if (viewMonth.value === 0) {
       viewMonth.value = 11
@@ -125,6 +153,8 @@ function goPrev() {
 }
 
 function goNext() {
+  calendarSlideDirection.value = 1
+
   if (activeView.value === 'month') {
     if (viewMonth.value === 11) {
       viewMonth.value = 0
@@ -144,6 +174,8 @@ function goNext() {
 }
 
 function goToday() {
+  calendarSlideDirection.value = 0
+
   const now = new Date()
   viewYear.value = now.getFullYear()
   viewMonth.value = now.getMonth()
@@ -284,14 +316,11 @@ async function onPopoverDuplicate(evt: CalendarEvent) {
 async function onQuickCreate(data: { title: string, date: string, calendarId: string }) {
   closeQuickCreate()
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone
-  const startAt = `${data.date}T09:00:00`
-  const endAt = `${data.date}T10:00:00`
-
   const payload: CreateEventPayload = {
     calendarId: data.calendarId,
     title: data.title,
-    startAt: new Date(startAt).toISOString(),
-    endAt: new Date(endAt).toISOString(),
+    startAt: zonedDateTimeToUtcIso(data.date, '09:00', timezone),
+    endAt: zonedDateTimeToUtcIso(data.date, '10:00', timezone),
     eventTimezone: timezone
   }
 
@@ -441,13 +470,19 @@ async function onMonthEventDrop(eventId: string, newDate: string) {
   if (eventId.startsWith('journal-')) return
   const event = eventsList.value.find(e => e.id === eventId)
   if (!event) return
-  const origStart = new Date(event.startAt)
-  const origEnd = new Date(event.endAt)
+  const timeZone = getEventTimeZone(event)
+  const origStart = getZonedDate(event.startAt, timeZone)
+  const origEnd = getZonedDate(event.endAt, timeZone)
   const durationMs = origEnd.getTime() - origStart.getTime()
-  const [y, m, d] = newDate.split('-').map(Number)
-  const newStart = new Date(y!, m! - 1, d!, origStart.getHours(), origStart.getMinutes(), origStart.getSeconds())
+  const startTime = `${String(origStart.getHours()).padStart(2, '0')}:${String(origStart.getMinutes()).padStart(2, '0')}`
+  const newStart = getZonedDate(zonedDateTimeToUtcIso(newDate, startTime, timeZone), timeZone)
   const newEnd = new Date(newStart.getTime() + durationMs)
-  const success = await updateEvent(eventId, { startAt: newStart.toISOString(), endAt: newEnd.toISOString() })
+  const endDate = `${newEnd.getFullYear()}-${String(newEnd.getMonth() + 1).padStart(2, '0')}-${String(newEnd.getDate()).padStart(2, '0')}`
+  const endTime = `${String(newEnd.getHours()).padStart(2, '0')}:${String(newEnd.getMinutes()).padStart(2, '0')}`
+  const success = await updateEvent(eventId, {
+    startAt: zonedDateTimeToUtcIso(newDate, startTime, timeZone),
+    endAt: zonedDateTimeToUtcIso(endDate, endTime, timeZone)
+  })
   if (success) refreshEvents()
 }
 
@@ -588,44 +623,55 @@ onMounted(() => {
         </div>
 
         <!-- Main calendar area -->
-        <div ref="calendarBodyRef" class="min-w-0 flex-1 overflow-auto p-0 lg:p-2">
-          <!-- Month view -->
-          <AppointmentsMonthView
-            v-if="activeView === 'month'"
-            :events="eventsList"
-            :loading="eventsStatus === 'pending'"
-            :current-date="new Date()"
-            :view-year="viewYear"
-            :view-month="viewMonth"
-            @select-event="onSelectEvent"
-            @select-slot="onSelectSlot"
-            @month-change="onMonthChange"
-            @drop-event="onMonthEventDrop"
-          />
+        <div ref="calendarBodyRef" class="relative min-w-0 flex-1 overflow-hidden">
+          <AnimatePresence mode="wait">
+            <motion.div
+              :key="calendarViewKey"
+              class="h-full overflow-auto p-0 lg:p-2"
+              :initial="calendarSlideInitial"
+              :animate="{ opacity: 1, x: 0 }"
+              :exit="calendarSlideExit"
+              :transition="calendarSlideTransition"
+            >
+              <!-- Month view -->
+              <AppointmentsMonthView
+                v-if="activeView === 'month'"
+                :events="eventsList"
+                :loading="eventsStatus === 'pending'"
+                :current-date="new Date()"
+                :view-year="viewYear"
+                :view-month="viewMonth"
+                @select-event="onSelectEvent"
+                @select-slot="onSelectSlot"
+                @month-change="onMonthChange"
+                @drop-event="onMonthEventDrop"
+              />
 
-          <!-- Week view -->
-          <AppointmentsWeekView
-            v-if="activeView === 'week'"
-            :events="eventsList"
-            :loading="eventsStatus === 'pending'"
-            :week-start-date="viewWeekStart"
-            @select-event="onSelectEvent"
-            @select-slot="onSelectSlot"
-            @week-change="onWeekChange"
-            @drop-event="onEventDrop"
-          />
+              <!-- Week view -->
+              <AppointmentsWeekView
+                v-if="activeView === 'week'"
+                :events="eventsList"
+                :loading="eventsStatus === 'pending'"
+                :week-start-date="viewWeekStart"
+                @select-event="onSelectEvent"
+                @select-slot="onSelectSlot"
+                @week-change="onWeekChange"
+                @drop-event="onEventDrop"
+              />
 
-          <!-- Day view -->
-          <AppointmentsDayView
-            v-if="activeView === 'day'"
-            :events="eventsList"
-            :loading="eventsStatus === 'pending'"
-            :current-date="viewDayDate"
-            @select-event="onSelectEvent"
-            @select-slot="onDaySlotSelect"
-            @day-change="onDayChange"
-            @drop-event="onEventDrop"
-          />
+              <!-- Day view -->
+              <AppointmentsDayView
+                v-if="activeView === 'day'"
+                :events="eventsList"
+                :loading="eventsStatus === 'pending'"
+                :current-date="viewDayDate"
+                @select-event="onSelectEvent"
+                @select-slot="onDaySlotSelect"
+                @day-change="onDayChange"
+                @drop-event="onEventDrop"
+              />
+            </motion.div>
+          </AnimatePresence>
         </div>
       </div>
     </template>
