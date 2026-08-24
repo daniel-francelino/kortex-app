@@ -56,6 +56,12 @@ export function useUserPreferences() {
     appConfig.ui.colors.primary = theme.primary_color
     appConfig.ui.colors.neutral = theme.neutral_color
     colorMode.preference = theme.color_mode
+    // @nuxtjs/color-mode marks SSR state `unknown: true` when it couldn't read a
+    // stored preference. Its `app:mounted` hook then "corrects" `unknown` state
+    // by resetting preference/value from the browser's actual stored preference —
+    // silently reverting the explicit brand theme we just set above. Clearing the
+    // flag here tells that hook our preference is intentional, not a guess.
+    colorMode.unknown = false
   }
 
   async function load() {

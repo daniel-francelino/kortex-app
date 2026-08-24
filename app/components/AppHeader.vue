@@ -51,15 +51,6 @@ const items = computed(() => [{
 
     <template #right>
       <UButton
-        icon="i-lucide-log-in"
-        color="neutral"
-        variant="ghost"
-        to="/login"
-        class="lg:hidden"
-        @click="trackNavigation('Login', '/login', 'header')"
-      />
-
-      <UButton
         label="Entrar"
         color="neutral"
         variant="outline"
@@ -72,7 +63,6 @@ const items = computed(() => [{
         label="Criar conta"
         color="neutral"
         trailing-icon="i-lucide-arrow-right"
-        class="hidden lg:inline-flex"
         to="/signup"
         @click="trackNavigation('Signup', '/signup', 'header')"
       />

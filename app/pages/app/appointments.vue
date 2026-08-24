@@ -53,7 +53,14 @@ const viewModes: { label: string, value: CalendarViewMode, icon: string }[] = [
   { label: 'Mês', value: 'month', icon: 'i-lucide-grid-3x3' }
 ]
 
-useMobileContextNav().registerMobileContextNav('appointments', viewModes, activeView)
+// Same three view-mode tabs shown on mobile, plus a 4th entry that links out
+// to the public scheduling page instead of switching the active tab.
+const mobileNavItems = [
+  ...viewModes,
+  { label: 'Link', value: 'scheduling-link', icon: 'i-lucide-calendar-clock', to: '/app/scheduling' }
+]
+
+useMobileContextNav().registerMobileContextNav('appointments', mobileNavItems, activeView)
 
 // ─── Navigation state ───────────────────────────────────────────────────
 const today = new Date()
@@ -443,42 +450,13 @@ onMounted(() => {
         </template>
 
         <template #default>
-          <!-- Navigation: today + arrows + period label -->
-          <div class="flex min-w-0 items-center gap-1">
-            <!-- "Hoje": icon-only on mobile so it's always reachable, labeled from sm: up -->
-            <UTooltip text="Hoje" class="sm:hidden">
-              <UButton
-                square
-                variant="outline"
-                size="sm"
-                icon="i-lucide-calendar-1"
-                aria-label="Ir para hoje"
-                @click="goToday"
-              />
-            </UTooltip>
-            <UButton
-              label="Hoje"
-              variant="outline"
-              size="sm"
-              class="hidden sm:flex"
-              @click="goToday"
-            />
-            <UButton
-              icon="i-lucide-chevron-left"
-              variant="ghost"
-              size="sm"
-              @click="goPrev"
-            />
-            <UButton
-              icon="i-lucide-chevron-right"
-              variant="ghost"
-              size="sm"
-              @click="goNext"
-            />
-            <h2 class="ml-1 min-w-0 truncate text-sm font-semibold capitalize text-highlighted sm:min-w-36">
-              {{ headerLabel }}
-            </h2>
-          </div>
+          <!-- Navigation: today + arrows + period label (desktop; mobile gets its own row below) -->
+          <AppointmentsDateNav
+            :label="headerLabel"
+            @prev="goPrev"
+            @next="goNext"
+            @today="goToday"
+          />
         </template>
 
         <template #right>
@@ -528,8 +506,7 @@ onMounted(() => {
           <UDropdownMenu
             class="lg:hidden"
             :items="[[
-              { label: 'Calendários', icon: 'i-lucide-calendar-range', onSelect: () => toggleCalendarsPanel() },
-              { label: 'Link de agendamento', icon: 'i-lucide-calendar-clock', to: '/app/scheduling' }
+              { label: 'Calendários', icon: 'i-lucide-calendar-range', onSelect: () => toggleCalendarsPanel() }
             ]]"
             :content="{ align: 'end' }"
           >
@@ -545,8 +522,8 @@ onMounted(() => {
           <!-- Quick add (natural language) -->
           <AppointmentsQuickAddPopover @parsed="onQuickAddParsed" />
 
-          <!-- New event -->
-          <UTooltip text="Novo evento">
+          <!-- New event (mobile: a floating action button takes over instead, see below) -->
+          <UTooltip text="Novo evento" class="hidden lg:flex">
             <UButton
               square
               @click="eventCreateOpen = true; eventCreatePrefill = null"
@@ -559,6 +536,16 @@ onMounted(() => {
           <NotificationsButton />
         </template>
       </UDashboardNavbar>
+
+      <!-- Mobile: date navigation gets its own row (hidden in the crowded navbar's #default) -->
+      <div class="flex items-center border-b border-default px-4 py-2 lg:hidden">
+        <AppointmentsDateNav
+          :label="headerLabel"
+          @prev="goPrev"
+          @next="goNext"
+          @today="goToday"
+        />
+      </div>
     </template>
 
     <template #body>
@@ -625,6 +612,21 @@ onMounted(() => {
       </div>
     </template>
   </UDashboardPanel>
+
+  <!-- Mobile: floating "new event" button, replaces the navbar action -->
+  <UButton
+    v-if="isMobile"
+    icon="i-lucide-plus"
+    size="xl"
+    square
+    class="fixed z-30 size-14 rounded-full shadow-lg shadow-black/30"
+    :style="{
+      right: 'calc(1rem + var(--safe-area-right, 0px))',
+      bottom: 'calc(var(--mobile-bottom-nav-height, 4.75rem) + 1rem)'
+    }"
+    aria-label="Novo evento"
+    @click="eventCreateOpen = true; eventCreatePrefill = null"
+  />
 
   <!-- Calendar list: bottom drawer on mobile (mirrors the desktop sidebar above) -->
   <UDrawer
