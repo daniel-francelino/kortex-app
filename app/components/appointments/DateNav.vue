@@ -18,6 +18,7 @@ const emit = defineEmits<{
         square
         variant="outline"
         size="sm"
+        class="justify-center"
         icon="i-lucide-calendar-1"
         aria-label="Ir para hoje"
         @click="emit('today')"
