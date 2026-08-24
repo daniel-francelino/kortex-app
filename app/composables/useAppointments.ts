@@ -147,14 +147,35 @@ export function useAppointments() {
   // these instead of replacing state wholesale, so an optimistic mutation
   // shows up instantly and a background refetch never clobbers it.
   const calendarsById = reactive(new Map<string, Calendar>())
-  const eventsById = reactive(new Map<string, CalendarEvent>())
+
+  // Keyed by recurrenceId when present, falling back to id — NOT keyed by
+  // plain `id` alone. The events list endpoint expands a recurring event
+  // into one row per occurrence, and every occurrence of the same series
+  // shares the master event's `id` (only startAt/endAt/recurrenceId differ
+  // per row). Keying this map by `id` alone would collapse every occurrence
+  // of a series into a single map entry, each upsert overwriting the last —
+  // the whole series then renders bunched onto whichever occurrence was
+  // processed last instead of one entry per day.
+  const eventsByKey = reactive(new Map<string, CalendarEvent>())
+
+  function eventStoreKey(evt: Pick<CalendarEvent, 'id' | 'recurrenceId'>): string {
+    return evt.recurrenceId ?? evt.id
+  }
 
   function upsertCalendarInStore(calendar: Calendar) {
     calendarsById.set(calendar.id, { ...calendarsById.get(calendar.id), ...calendar })
   }
 
   function upsertEventInStore(evt: CalendarEvent) {
-    eventsById.set(evt.id, { ...eventsById.get(evt.id), ...evt })
+    const key = eventStoreKey(evt)
+    eventsByKey.set(key, { ...eventsByKey.get(key), ...evt })
+  }
+
+  /** Any occurrence currently in the store for a given master event id — used
+   * by update/archive, which always act on the whole series (see
+   * modifyOccurrence/splitSeries for the actual per-occurrence edit paths). */
+  function findEventEntriesById(id: string): CalendarEvent[] {
+    return [...eventsByKey.values()].filter(e => e.id === id)
   }
 
   // ─── Date range / filter state ─────────────────────────────────────────────
@@ -221,7 +242,7 @@ export function useAppointments() {
   // ─── Events (paginated, filtered by date range) ───────────────────────────
   const eventsPage = ref(1)
   const eventsPageSize = ref(500)
-  const viewEventIds = ref<string[]>([])
+  const viewEventKeys = ref<string[]>([])
   const lastKnownEventsTotal = ref(0)
   const lastKnownEventsPage = ref(1)
   const lastKnownEventsPageSize = ref(eventsPageSize.value)
@@ -260,14 +281,14 @@ export function useAppointments() {
   watch(eventsFetchResult, (res) => {
     if (!res) return
     for (const e of res.data) upsertEventInStore(e)
-    viewEventIds.value = res.data.map(e => e.id)
+    viewEventKeys.value = res.data.map(eventStoreKey)
     lastKnownEventsTotal.value = res.total
     lastKnownEventsPage.value = res.page
     lastKnownEventsPageSize.value = res.pageSize
   }, { immediate: true })
 
   const eventsData = computed<EventsResponse>(() => ({
-    data: viewEventIds.value.map(id => eventsById.get(id)).filter((e): e is CalendarEvent => !!e),
+    data: viewEventKeys.value.map(k => eventsByKey.get(k)).filter((e): e is CalendarEvent => !!e),
     total: lastKnownEventsTotal.value,
     page: lastKnownEventsPage.value,
     pageSize: lastKnownEventsPageSize.value
@@ -407,7 +428,7 @@ export function useAppointments() {
         // Events under this calendar drop out of the current view too — the
         // eventual refreshEvents() below is what fully reconciles this, this
         // just avoids a stale-looking flash in the meantime.
-        viewEventIds.value = viewEventIds.value.filter(eid => eventsById.get(eid)?.calendarId !== id)
+        viewEventKeys.value = viewEventKeys.value.filter(key => eventsByKey.get(key)?.calendarId !== id)
       },
       rollback: () => {
         if (previous) upsertCalendarInStore(previous)
@@ -553,9 +574,11 @@ export function useAppointments() {
       updatedAt: now,
       archivedAt: null,
       calendar: calendarsById.get(payload.calendarId),
+      recurrenceId: null,
       isRecurring: Boolean(payload.rrule),
       isCancelled: false
     }
+    const key = eventStoreKey(optimisticEvent)
 
     const result = await runOptimisticAction<CalendarEvent>({
       apply: () => {
@@ -565,12 +588,12 @@ export function useAppointments() {
         // server/utils/recurrence.ts), so they only show up once
         // reconcile()/refreshEvents() brings the real expanded list back.
         if (isEventInCurrentView(optimisticEvent)) {
-          viewEventIds.value = [...viewEventIds.value, id]
+          viewEventKeys.value = [...viewEventKeys.value, key]
         }
       },
       rollback: () => {
-        eventsById.delete(id)
-        viewEventIds.value = viewEventIds.value.filter(i => i !== id)
+        eventsByKey.delete(key)
+        viewEventKeys.value = viewEventKeys.value.filter(k => k !== key)
       },
       request: () => $fetch<CalendarEvent>('/api/appointments/events', {
         method: 'POST',
@@ -594,8 +617,13 @@ export function useAppointments() {
   }
 
   async function updateEvent(id: string, payload: UpdateEventPayload): Promise<boolean> {
-    const previous = eventsById.get(id)
-    const wasInView = viewEventIds.value.includes(id)
+    // update/archive always act on the whole series (see modifyOccurrence /
+    // splitSeries for the actual per-occurrence edit paths), so any occurrence
+    // of this event currently in the store is a fine base for the optimistic
+    // merge — its recurrenceId (hence store key) is unaffected by this payload.
+    const previous = findEventEntriesById(id)[0]
+    const key = previous ? eventStoreKey(previous) : id
+    const wasInView = viewEventKeys.value.includes(key)
     const now = new Date().toISOString()
 
     const optimisticEvent: CalendarEvent = {
@@ -626,14 +654,14 @@ export function useAppointments() {
       apply: () => {
         upsertEventInStore(optimisticEvent)
         const nowInView = isEventInCurrentView(optimisticEvent)
-        if (nowInView && !wasInView) viewEventIds.value = [...viewEventIds.value, id]
-        else if (!nowInView && wasInView) viewEventIds.value = viewEventIds.value.filter(i => i !== id)
+        if (nowInView && !wasInView) viewEventKeys.value = [...viewEventKeys.value, key]
+        else if (!nowInView && wasInView) viewEventKeys.value = viewEventKeys.value.filter(k => k !== key)
       },
       rollback: () => {
         if (previous) upsertEventInStore(previous)
-        const stillInView = viewEventIds.value.includes(id)
-        if (wasInView && !stillInView) viewEventIds.value = [...viewEventIds.value, id]
-        else if (!wasInView && stillInView) viewEventIds.value = viewEventIds.value.filter(i => i !== id)
+        const stillInView = viewEventKeys.value.includes(key)
+        if (wasInView && !stillInView) viewEventKeys.value = [...viewEventKeys.value, key]
+        else if (!wasInView && stillInView) viewEventKeys.value = viewEventKeys.value.filter(k => k !== key)
       },
       request: () => $fetch<CalendarEvent>(`/api/appointments/events/${id}`, {
         method: 'PATCH',
@@ -657,18 +685,22 @@ export function useAppointments() {
   }
 
   async function archiveEvent(id: string): Promise<boolean> {
-    const previous = eventsById.get(id)
-    const wasInView = viewEventIds.value.includes(id)
+    // Archiving removes the whole series from view, not just one occurrence —
+    // every occurrence of this event currently in the store needs to go.
+    const matches = findEventEntriesById(id)
+    const matchedKeys = matches.map(eventStoreKey)
+    const previousViewKeys = matchedKeys.filter(k => viewEventKeys.value.includes(k))
     const now = new Date().toISOString()
 
     const result = await runOptimisticAction<{ success: true }>({
       apply: () => {
-        if (previous) upsertEventInStore({ ...previous, archivedAt: now })
-        viewEventIds.value = viewEventIds.value.filter(i => i !== id)
+        for (const evt of matches) upsertEventInStore({ ...evt, archivedAt: now })
+        viewEventKeys.value = viewEventKeys.value.filter(k => !matchedKeys.includes(k))
       },
       rollback: () => {
-        if (previous) upsertEventInStore(previous)
-        if (wasInView && !viewEventIds.value.includes(id)) viewEventIds.value = [...viewEventIds.value, id]
+        for (const evt of matches) upsertEventInStore(evt)
+        const restored = new Set([...viewEventKeys.value, ...previousViewKeys])
+        viewEventKeys.value = [...restored]
       },
       request: () => $fetch(`/api/appointments/events/${id}/archive`, { method: 'POST' }).then(() => ({ success: true as const })),
       errorMessage: 'Não foi possível arquivar o evento',
@@ -694,7 +726,7 @@ export function useAppointments() {
       return normalized
     } catch {
       // Already-seen event, connection just dropped — fall back to what we have.
-      const cached = eventsById.get(id)
+      const cached = findEventEntriesById(id)[0]
       if (cached) return cached
       toast.add({ title: 'Erro', description: 'Não foi possível carregar o evento', color: 'error' })
       return null
