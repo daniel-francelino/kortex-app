@@ -13,6 +13,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   selectEvent: [event: CalendarEvent, mouseEvent: MouseEvent]
   selectSlot: [date: string, mouseEvent: MouseEvent]
+  expandDay: [date: string, events: CalendarEvent[], mouseEvent: MouseEvent]
   monthChange: [from: string, to: string]
   dropEvent: [eventId: string, newDate: string]
 }>()
@@ -157,6 +158,10 @@ function onEventClick(evt: CalendarEvent, e: MouseEvent) {
   emit('selectEvent', evt, e)
 }
 
+function onExpandDay(cell: DayCell, e: MouseEvent) {
+  emit('expandDay', cell.dateStr, cell.events, e)
+}
+
 const MAX_VISIBLE = 4
 </script>
 
@@ -279,7 +284,7 @@ const MAX_VISIBLE = 4
               <div
                 v-if="cell.events.length > MAX_VISIBLE"
                 class="cursor-pointer px-1 text-[10px] font-medium text-muted hover:text-highlighted"
-                @click.stop="onDayClick(cell, $event)"
+                @click.stop="onExpandDay(cell, $event)"
               >
                 +{{ cell.events.length - MAX_VISIBLE }}
               </div>
@@ -316,7 +321,7 @@ const MAX_VISIBLE = 4
               <div
                 v-if="cell.events.length > MAX_VISIBLE"
                 class="cursor-pointer px-1 text-[11px] font-medium text-muted hover:text-highlighted"
-                @click.stop="onDayClick(cell, $event)"
+                @click.stop="onExpandDay(cell, $event)"
               >
                 +{{ cell.events.length - MAX_VISIBLE }} mais
               </div>

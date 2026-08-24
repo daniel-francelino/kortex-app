@@ -224,6 +224,12 @@ const quickCreateVisible = ref(false)
 const quickCreateDate = ref('')
 const quickCreatePosition = ref({ x: 0, y: 0 })
 
+// Day events (month view "+X mais") popover state
+const dayEventsVisible = ref(false)
+const dayEventsDate = ref('')
+const dayEventsList = ref<CalendarEvent[]>([])
+const dayEventsPosition = ref({ x: 0, y: 0 })
+
 const selectedCalendarId = computed(() => activeCalendarIds.value[0] ?? '')
 
 function onSelectEvent(evt: CalendarEvent, mouseEvent: MouseEvent) {
@@ -232,8 +238,9 @@ function onSelectEvent(evt: CalendarEvent, mouseEvent: MouseEvent) {
     return
   }
 
-  // Close quick create if open
+  // Close quick create / day-events popovers if open
   quickCreateVisible.value = false
+  dayEventsVisible.value = false
 
   eventPopoverEvent.value = evt
   eventPopoverPosition.value = { x: mouseEvent.clientX, y: mouseEvent.clientY }
@@ -247,6 +254,25 @@ function onSelectSlot(date: string, mouseEvent: MouseEvent) {
   quickCreateDate.value = date
   quickCreatePosition.value = { x: mouseEvent.clientX, y: mouseEvent.clientY }
   quickCreateVisible.value = true
+}
+
+function onExpandDay(date: string, events: CalendarEvent[], mouseEvent: MouseEvent) {
+  eventPopoverVisible.value = false
+  quickCreateVisible.value = false
+
+  dayEventsDate.value = date
+  dayEventsList.value = events
+  dayEventsPosition.value = { x: mouseEvent.clientX, y: mouseEvent.clientY }
+  dayEventsVisible.value = true
+}
+
+function closeDayEvents() {
+  dayEventsVisible.value = false
+}
+
+function onDayEventsSelectEvent(evt: CalendarEvent, mouseEvent: MouseEvent) {
+  dayEventsVisible.value = false
+  onSelectEvent(evt, mouseEvent)
 }
 
 function onDaySlotSelect(_date: string, time: string, mouseEvent: MouseEvent) {
@@ -663,6 +689,7 @@ onMounted(() => {
                   :view-month="viewMonth"
                   @select-event="onSelectEvent"
                   @select-slot="onSelectSlot"
+                  @expand-day="onExpandDay"
                   @month-change="onMonthChange"
                   @drop-event="onMonthEventDrop"
                 />
@@ -748,6 +775,16 @@ onMounted(() => {
     @edit="onPopoverEdit"
     @archive="onPopoverArchive"
     @duplicate="onPopoverDuplicate"
+  />
+
+  <!-- Day events popover (month view "+X mais", Google Calendar style) -->
+  <AppointmentsDayEventsPopover
+    :date="dayEventsDate"
+    :events="dayEventsList"
+    :position="dayEventsPosition"
+    :visible="dayEventsVisible"
+    @close="closeDayEvents"
+    @select-event="onDayEventsSelectEvent"
   />
 
   <!-- Quick create popover -->
