@@ -16,8 +16,10 @@ const emit = defineEmits<{
 
 const popoverRef = ref<HTMLElement | null>(null)
 const inputRef = ref<HTMLInputElement | null>(null)
+const mobileInputRef = ref<HTMLInputElement | null>(null)
 const title = ref('')
 const calendarId = ref('')
+const isMobile = useMediaQuery('(max-width: 1023px)')
 
 // ─── Position ─────────────────────────────────────────────────────────────
 const CARD_W = 320
@@ -72,6 +74,10 @@ watch(() => props.visible, async (val) => {
       calendarId.value = props.calendars[0]?.id ?? ''
     }
     await nextTick()
+    if (isMobile.value) {
+      mobileInputRef.value?.focus()
+      return
+    }
     inputRef.value?.focus()
     setTimeout(() => document.addEventListener('mousedown', onClickOutside), 10)
   } else {
@@ -101,7 +107,8 @@ function onKeydown(e: KeyboardEvent) {
 </script>
 
 <template>
-  <Teleport to="body">
+  <!-- Desktop: small floating card positioned next to the click -->
+  <Teleport v-if="!isMobile" to="body">
     <Transition
       enter-active-class="transition duration-150 ease-out"
       enter-from-class="opacity-0 translate-y-1 scale-[0.98]"
@@ -145,7 +152,7 @@ function onKeydown(e: KeyboardEvent) {
             placeholder="Adicionar título"
             class="w-full border-0 border-b border-default bg-transparent pb-1.5 text-sm font-medium text-highlighted placeholder:font-normal placeholder:text-muted/50 outline-none focus:border-primary transition-colors"
             @keydown="onKeydown"
-          />
+          >
         </div>
 
         <!-- Calendar selector (only if multiple) -->
@@ -186,4 +193,59 @@ function onKeydown(e: KeyboardEvent) {
       </div>
     </Transition>
   </Teleport>
+
+  <!-- Mobile: a card positioned near the tap point doesn't work once the
+       keyboard opens and resizes the viewport — use a bottom sheet instead. -->
+  <UDrawer
+    v-else
+    :open="visible"
+    direction="bottom"
+    :title="dateLabel"
+    :ui="{ title: 'capitalize' }"
+    @update:open="(value: boolean) => { if (!value) emit('close') }"
+  >
+    <template #body>
+      <div class="flex items-center gap-2.5 pb-4">
+        <span
+          class="inline-block size-3 shrink-0 rounded-full transition-colors duration-200"
+          :style="{ backgroundColor: calendarColor }"
+        />
+        <USelect
+          v-if="calendarOptions.length > 1"
+          v-model="calendarId"
+          :items="calendarOptions"
+          variant="none"
+          size="md"
+          class="flex-1"
+        />
+        <span v-else class="text-sm text-muted">{{ selectedCalendar?.name }}</span>
+      </div>
+
+      <input
+        ref="mobileInputRef"
+        v-model="title"
+        type="text"
+        placeholder="Adicionar título"
+        class="w-full border-0 border-b border-default bg-transparent pb-2 text-base font-medium text-highlighted placeholder:font-normal placeholder:text-muted/50 outline-none focus:border-primary transition-colors"
+        @keydown="onKeydown"
+      >
+    </template>
+
+    <template #footer>
+      <div class="flex w-full items-center justify-between">
+        <UButton
+          label="Mais opções"
+          icon="i-lucide-expand"
+          color="neutral"
+          variant="ghost"
+          @click="emit('moreOptions', date)"
+        />
+        <UButton
+          label="Salvar"
+          :disabled="!title.trim()"
+          @click="onQuickCreate"
+        />
+      </div>
+    </template>
+  </UDrawer>
 </template>
