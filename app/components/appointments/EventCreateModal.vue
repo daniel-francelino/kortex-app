@@ -207,7 +207,7 @@ function formatDateDisplay(dateStr: string): string {
           <!-- Left: close + title -->
           <div class="flex items-center gap-3">
             <button
-              class="rounded-full p-1.5 text-muted transition-colors hover:bg-elevated hover:text-highlighted"
+              class="flex size-10 shrink-0 items-center justify-center rounded-full text-muted transition-colors hover:bg-elevated hover:text-highlighted active:bg-elevated"
               @click="close"
             >
               <UIcon name="i-lucide-x" class="size-5" />
@@ -218,6 +218,7 @@ function formatDateDisplay(dateStr: string): string {
           <!-- Right: save -->
           <UButton
             label="Salvar"
+            size="lg"
             :loading="loading"
             :disabled="!state.title.trim() || loading"
             @click="onSubmit"
@@ -255,33 +256,43 @@ function formatDateDisplay(dateStr: string): string {
                     @update:model-value="state.allDay = Boolean($event)"
                   />
 
-                  <!-- Date/time row -->
-                  <div class="flex flex-wrap items-center gap-2">
-                    <UInputDate
-                      v-model="startDateValue"
-                      size="sm"
-                      :leading-icon="null"
-                    />
-                    <UInputTime
-                      v-if="!state.allDay"
-                      v-model="startTimeValue"
-                      granularity="minute"
-                      size="sm"
-                    />
+                  <!-- Date/time: start and end stack as two rows on mobile
+                       (each control full-width and easy to tap) and sit
+                       side by side from `sm` up. -->
+                  <div class="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+                    <div class="flex items-center gap-2">
+                      <UInputDate
+                        v-model="startDateValue"
+                        size="md"
+                        class="flex-1 sm:flex-none"
+                        :leading-icon="null"
+                      />
+                      <UInputTime
+                        v-if="!state.allDay"
+                        v-model="startTimeValue"
+                        granularity="minute"
+                        size="md"
+                        class="flex-1 sm:flex-none"
+                      />
+                    </div>
 
-                    <UIcon name="i-lucide-arrow-right" class="size-3.5 shrink-0 text-muted" />
+                    <UIcon name="i-lucide-arrow-right" class="hidden size-3.5 shrink-0 text-muted sm:block" />
 
-                    <UInputDate
-                      v-model="endDateValue"
-                      size="sm"
-                      :leading-icon="null"
-                    />
-                    <UInputTime
-                      v-if="!state.allDay"
-                      v-model="endTimeValue"
-                      granularity="minute"
-                      size="sm"
-                    />
+                    <div class="flex items-center gap-2">
+                      <UInputDate
+                        v-model="endDateValue"
+                        size="md"
+                        class="flex-1 sm:flex-none"
+                        :leading-icon="null"
+                      />
+                      <UInputTime
+                        v-if="!state.allDay"
+                        v-model="endTimeValue"
+                        granularity="minute"
+                        size="md"
+                        class="flex-1 sm:flex-none"
+                      />
+                    </div>
                   </div>
 
                   <!-- Friendly date summary -->
@@ -305,7 +316,7 @@ function formatDateDisplay(dateStr: string): string {
                   v-model="state.location"
                   type="text"
                   placeholder="Adicionar local ou link da videochamada"
-                  class="flex-1 bg-transparent text-sm text-highlighted placeholder:text-muted/50 outline-none"
+                  class="flex-1 bg-transparent text-base text-highlighted placeholder:text-muted/50 outline-none sm:text-sm"
                 >
               </div>
             </div>
@@ -320,7 +331,7 @@ function formatDateDisplay(dateStr: string): string {
                   v-model="state.description"
                   placeholder="Adicionar descrição"
                   rows="3"
-                  class="flex-1 resize-none bg-transparent text-sm text-highlighted placeholder:text-muted/50 outline-none"
+                  class="flex-1 resize-none bg-transparent text-base text-highlighted placeholder:text-muted/50 outline-none sm:text-sm"
                 />
               </div>
             </div>
@@ -338,16 +349,17 @@ function formatDateDisplay(dateStr: string): string {
                   v-model="state.calendarId"
                   :items="calendarOptions"
                   variant="none"
-                  size="sm"
-                  class="w-56 text-sm"
+                  size="md"
+                  class="w-full sm:w-56"
                 />
               </div>
             </div>
 
             <div class="border-t border-default/40" />
 
-            <!-- Recurrence + Reminder row -->
-            <div class="flex flex-wrap gap-6 py-4">
+            <!-- Recurrence + Reminder: stack full-width on mobile, side by
+                 side from `sm` up. -->
+            <div class="flex flex-col gap-4 py-4 sm:flex-row sm:flex-wrap sm:gap-6">
               <!-- Recurrence -->
               <div class="flex items-center gap-4">
                 <UIcon name="i-lucide-repeat" class="size-5 shrink-0 text-muted" />
@@ -356,8 +368,8 @@ function formatDateDisplay(dateStr: string): string {
                   :items="recurrenceOptions"
                   value-key="value"
                   variant="none"
-                  size="sm"
-                  class="w-52 text-sm"
+                  size="md"
+                  class="w-full sm:w-52"
                 />
               </div>
 
@@ -369,8 +381,8 @@ function formatDateDisplay(dateStr: string): string {
                   :items="reminderOptions"
                   value-key="value"
                   variant="none"
-                  size="sm"
-                  class="w-44 text-sm"
+                  size="md"
+                  class="w-full sm:w-44"
                 />
               </div>
             </div>
