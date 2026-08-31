@@ -88,6 +88,7 @@ function updateNavDebugInfo() {
     `rect.top=${Math.round(rect.top)}`,
     `rect.bottom=${Math.round(rect.bottom)}`,
     `rect.height=${Math.round(rect.height)}`,
+    `overflowBottom=${Math.round(rect.bottom - window.innerHeight)}`,
     `app.bottom=${Math.round(appContentRect?.bottom ?? 0)}`,
     `body.bottom=${Math.round(panelBodyRect?.bottom ?? 0)}`,
     `child.bottom=${Math.round(panelBodyChildRect?.bottom ?? 0)}`,

@@ -40,7 +40,7 @@ html {
   --mobile-sidebar-safe-area-top: var(--safe-area-top);
   --mobile-sidebar-safe-area-bottom: 0px;
   --mobile-bottom-nav-bar-height: 4.75rem;
-  --mobile-bottom-nav-safe-padding: 0px;
+  --mobile-bottom-nav-safe-padding: min(var(--safe-area-bottom), 0.75rem);
   --mobile-bottom-nav-height: calc(var(--mobile-bottom-nav-bar-height) + var(--mobile-bottom-nav-safe-padding));
   scrollbar-color: color-mix(in srgb, var(--ui-primary) 55%, transparent) color-mix(in srgb, var(--ui-bg-elevated) 72%, transparent);
   scrollbar-width: thin;
@@ -219,6 +219,7 @@ body.keyboard-open .mobile-bottom-nav {
 @media (max-width: 1023px) {
   html.pwa-standalone {
     --pwa-standalone-bottom-bleed: env(safe-area-inset-bottom, 0px);
+    --mobile-bottom-nav-safe-padding: var(--pwa-standalone-bottom-bleed);
     --mobile-bottom-nav-extra-background: 0px;
   }
 
@@ -226,6 +227,10 @@ body.keyboard-open .mobile-bottom-nav {
   html.capacitor-native .mobile-bottom-nav {
     top: auto;
     bottom: 0;
+  }
+
+  html.pwa-standalone .mobile-bottom-nav {
+    bottom: calc(0px - var(--pwa-standalone-bottom-bleed));
   }
 
   html.pwa-standalone .kortex-app-shell,
