@@ -4,6 +4,7 @@ import { CalendarVisibility } from '~/types/appointments'
 import { getMoodOption } from '~/types/journal'
 import type { JournalEntry } from '~/types/journal'
 import { useSwipe } from '@vueuse/core'
+import { addDays, addMilliseconds, addMonths, addWeeks, format, startOfWeek, subDays, subMonths, subWeeks } from 'date-fns'
 import { AnimatePresence, motion } from 'motion-v'
 import { getEventTimeZone, getZonedDate, zonedDateTimeToUtcIso } from '~/utils/calendarEventTime'
 
@@ -84,10 +85,7 @@ const viewWeekStart = ref(getWeekStart(today))
 const viewDayDate = ref(new Date(today))
 
 function getWeekStart(date: Date): Date {
-  const d = new Date(date)
-  d.setDate(d.getDate() - d.getDay())
-  d.setHours(0, 0, 0, 0)
-  return d
+  return startOfWeek(date, { weekStartsOn: 0 })
 }
 
 function capitalizeFirst(s: string): string {
@@ -141,20 +139,13 @@ function goPrev() {
   calendarSlideDirection.value = -1
 
   if (activeView.value === 'month') {
-    if (viewMonth.value === 0) {
-      viewMonth.value = 11
-      viewYear.value--
-    } else {
-      viewMonth.value--
-    }
+    const prev = subMonths(new Date(viewYear.value, viewMonth.value, 1), 1)
+    viewYear.value = prev.getFullYear()
+    viewMonth.value = prev.getMonth()
   } else if (activeView.value === 'week') {
-    const d = new Date(viewWeekStart.value)
-    d.setDate(d.getDate() - 7)
-    viewWeekStart.value = d
+    viewWeekStart.value = subWeeks(viewWeekStart.value, 1)
   } else {
-    const d = new Date(viewDayDate.value)
-    d.setDate(d.getDate() - 1)
-    viewDayDate.value = d
+    viewDayDate.value = subDays(viewDayDate.value, 1)
   }
 }
 
@@ -163,20 +154,13 @@ function goNext() {
   calendarSlideDirection.value = 1
 
   if (activeView.value === 'month') {
-    if (viewMonth.value === 11) {
-      viewMonth.value = 0
-      viewYear.value++
-    } else {
-      viewMonth.value++
-    }
+    const next = addMonths(new Date(viewYear.value, viewMonth.value, 1), 1)
+    viewYear.value = next.getFullYear()
+    viewMonth.value = next.getMonth()
   } else if (activeView.value === 'week') {
-    const d = new Date(viewWeekStart.value)
-    d.setDate(d.getDate() + 7)
-    viewWeekStart.value = d
+    viewWeekStart.value = addWeeks(viewWeekStart.value, 1)
   } else {
-    const d = new Date(viewDayDate.value)
-    d.setDate(d.getDate() + 1)
-    viewDayDate.value = d
+    viewDayDate.value = addDays(viewDayDate.value, 1)
   }
 }
 
@@ -534,11 +518,11 @@ async function onMonthEventDrop(eventId: string, newDate: string) {
   const origStart = getZonedDate(event.startAt, timeZone)
   const origEnd = getZonedDate(event.endAt, timeZone)
   const durationMs = origEnd.getTime() - origStart.getTime()
-  const startTime = `${String(origStart.getHours()).padStart(2, '0')}:${String(origStart.getMinutes()).padStart(2, '0')}`
+  const startTime = format(origStart, 'HH:mm')
   const newStart = getZonedDate(zonedDateTimeToUtcIso(newDate, startTime, timeZone), timeZone)
-  const newEnd = new Date(newStart.getTime() + durationMs)
-  const endDate = `${newEnd.getFullYear()}-${String(newEnd.getMonth() + 1).padStart(2, '0')}-${String(newEnd.getDate()).padStart(2, '0')}`
-  const endTime = `${String(newEnd.getHours()).padStart(2, '0')}:${String(newEnd.getMinutes()).padStart(2, '0')}`
+  const newEnd = addMilliseconds(newStart, durationMs)
+  const endDate = format(newEnd, 'yyyy-MM-dd')
+  const endTime = format(newEnd, 'HH:mm')
   await updateEvent(eventId, {
     startAt: zonedDateTimeToUtcIso(newDate, startTime, timeZone),
     endAt: zonedDateTimeToUtcIso(endDate, endTime, timeZone)

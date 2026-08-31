@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { addDays, endOfMonth, endOfWeek, format, isAfter, isSameDay, isSameMonth, startOfDay, startOfMonth, startOfWeek } from 'date-fns'
 import type { CalendarEvent } from '~/types/appointments'
 import { formatEventTime as formatCalendarEventTime, formatZonedDateKey, getEventTimeZone, getZonedDate, sortDayEvents } from '~/utils/calendarEventTime'
 
@@ -20,17 +21,14 @@ const emit = defineEmits<{
 
 // ─── Helpers ──────────────────────────────────────────────────────────────
 function formatDate(date: Date): string {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+  return format(date, 'yyyy-MM-dd')
 }
 
 function emitRange() {
-  const first = new Date(props.viewYear, props.viewMonth, 1)
-  const last = new Date(props.viewYear, props.viewMonth + 1, 0)
-  const startDay = first.getDay()
-  const gridStart = new Date(first)
-  gridStart.setDate(gridStart.getDate() - startDay)
-  const gridEnd = new Date(last)
-  gridEnd.setDate(gridEnd.getDate() + (6 - last.getDay()))
+  const first = startOfMonth(new Date(props.viewYear, props.viewMonth, 1))
+  const last = endOfMonth(first)
+  const gridStart = startOfWeek(first, { weekStartsOn: 0 })
+  const gridEnd = endOfWeek(last, { weekStartsOn: 0 })
   emit('monthChange', formatDate(gridStart), formatDate(gridEnd))
 }
 
@@ -50,32 +48,28 @@ interface DayCell {
 }
 
 const calendarGrid = computed((): DayCell[][] => {
-  const first = new Date(props.viewYear, props.viewMonth, 1)
-  const last = new Date(props.viewYear, props.viewMonth + 1, 0)
-  const startDay = first.getDay()
+  const first = startOfMonth(new Date(props.viewYear, props.viewMonth, 1))
+  const last = endOfMonth(first)
   const today = new Date()
-  const todayStr = formatDate(today)
 
   const weeks: DayCell[][] = []
-  const currentDate = new Date(first)
-  currentDate.setDate(currentDate.getDate() - startDay)
+  let currentDate = startOfWeek(first, { weekStartsOn: 0 })
 
   for (let w = 0; w < 6; w++) {
     const week: DayCell[] = []
     for (let d = 0; d < 7; d++) {
-      const dateStr = formatDate(currentDate)
       week.push({
-        date: new Date(currentDate),
-        dateStr,
+        date: currentDate,
+        dateStr: formatDate(currentDate),
         day: currentDate.getDate(),
-        isCurrentMonth: currentDate.getMonth() === props.viewMonth,
-        isToday: dateStr === todayStr,
+        isCurrentMonth: isSameMonth(currentDate, first),
+        isToday: isSameDay(currentDate, today),
         events: getDayEvents(currentDate)
       })
-      currentDate.setDate(currentDate.getDate() + 1)
+      currentDate = addDays(currentDate, 1)
     }
     weeks.push(week)
-    if (currentDate > last && currentDate.getDay() === 0) break
+    if (isAfter(currentDate, last) && currentDate.getDay() === 0) break
   }
 
   return weeks
@@ -83,9 +77,8 @@ const calendarGrid = computed((): DayCell[][] => {
 
 function getDayEvents(date: Date): CalendarEvent[] {
   if (!props.events?.length) return []
-  const dayStart = new Date(date.getFullYear(), date.getMonth(), date.getDate())
-  const dayEnd = new Date(dayStart)
-  dayEnd.setDate(dayEnd.getDate() + 1)
+  const dayStart = startOfDay(date)
+  const dayEnd = addDays(dayStart, 1)
 
   const dayEvents = props.events.filter((evt: CalendarEvent) => {
     if (!evt.startAt || !evt.endAt) return false

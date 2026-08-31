@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { addDays, addMilliseconds, format, isSameDay, startOfDay } from 'date-fns'
 import type { CalendarEvent } from '~/types/appointments'
 import { getEventTimeZone, getZonedDate, zonedDateTimeToUtcIso } from '~/utils/calendarEventTime'
 import {
@@ -26,13 +27,12 @@ const emit = defineEmits<{
 
 // ─── Helpers ──────────────────────────────────────────────────────────────
 function formatDate(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  return format(d, 'yyyy-MM-dd')
 }
 
 function emitRange() {
   const from = formatDate(props.weekStartDate)
-  const end = new Date(props.weekStartDate)
-  end.setDate(end.getDate() + 6)
+  const end = addDays(props.weekStartDate, 6)
   emit('weekChange', from, formatDate(end))
 }
 
@@ -50,17 +50,13 @@ interface DayColumn {
   timedEvents: PositionedEvent[]
 }
 
-const todayStr = computed(() => formatDate(new Date()))
-
 const weekDays = computed((): DayColumn[] => {
-  return Array.from({ length: 7 }, (_, i) => {
-    const date = new Date(props.weekStartDate)
-    date.setDate(date.getDate() + i)
-    const dateStr = formatDate(date)
+  const today = new Date()
 
-    const dayStart = new Date(date.getFullYear(), date.getMonth(), date.getDate())
-    const dayEnd = new Date(dayStart)
-    dayEnd.setDate(dayEnd.getDate() + 1)
+  return Array.from({ length: 7 }, (_, i) => {
+    const date = addDays(props.weekStartDate, i)
+    const dayStart = startOfDay(date)
+    const dayEnd = addDays(dayStart, 1)
 
     const dayEvents = (props.events ?? []).filter((evt: CalendarEvent) => {
       if (!evt.startAt || !evt.endAt) return false
@@ -72,10 +68,10 @@ const weekDays = computed((): DayColumn[] => {
 
     return {
       date,
-      dateStr,
+      dateStr: formatDate(date),
       label: date.toLocaleDateString('pt-BR', { weekday: 'short' }),
       dayNumber: date.getDate(),
-      isToday: dateStr === todayStr.value,
+      isToday: isSameDay(date, today),
       allDayEvents: dayEvents.filter(e => e.allDay),
       timedEvents: layoutTimedEvents(dayEvents.filter(e => !e.allDay))
     }
@@ -253,10 +249,10 @@ function commitDrop() {
   )
   const timeZone = getEventTimeZone(drag.event)
   if (newStart.getTime() === getZonedDate(drag.originalStart, timeZone).getTime()) return
-  const newEnd = new Date(newStart.getTime() + drag.durationMs)
+  const newEnd = addMilliseconds(newStart, drag.durationMs)
   const dateStr = formatDate(newStart)
-  const startTime = `${String(newStart.getHours()).padStart(2, '0')}:${String(newStart.getMinutes()).padStart(2, '0')}`
-  const endTime = `${String(newEnd.getHours()).padStart(2, '0')}:${String(newEnd.getMinutes()).padStart(2, '0')}`
+  const startTime = format(newStart, 'HH:mm')
+  const endTime = format(newEnd, 'HH:mm')
   emit('dropEvent', drag.event.id, zonedDateTimeToUtcIso(dateStr, startTime, timeZone), zonedDateTimeToUtcIso(formatDate(newEnd), endTime, timeZone))
 }
 

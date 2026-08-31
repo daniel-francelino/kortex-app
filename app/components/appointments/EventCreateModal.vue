@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { format } from 'date-fns'
 import { z } from 'zod'
 import type { Calendar } from '~/types/appointments'
 import { ReminderType } from '~/types/appointments'
@@ -35,7 +36,7 @@ const schema = z.object({
 type FormState = z.infer<typeof schema>
 
 function formatLocalDate(date: Date): string {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+  return format(date, 'yyyy-MM-dd')
 }
 
 function buildDefaults(): FormState {

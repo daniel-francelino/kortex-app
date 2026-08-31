@@ -1,3 +1,4 @@
+import { formatInTimeZone, fromZonedTime, toZonedTime } from 'date-fns-tz'
 import type { CalendarEvent } from '~/types/appointments'
 
 interface ZonedDateParts {
@@ -13,48 +14,32 @@ export function getEventTimeZone(event?: Pick<CalendarEvent, 'eventTimezone'> | 
   return event?.eventTimezone || Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
 }
 
+/** A Date whose *local* getters (getFullYear/getMonth/getDate/getHours/...) read
+ * as the wall-clock time in `timeZone` — the convention every calendar view
+ * relies on for grid positioning/comparisons, regardless of the viewer's own
+ * system timezone. `date-fns-tz`'s toZonedTime does exactly this. */
+export function getZonedDate(dateInput: string | Date, timeZone: string): Date {
+  return toZonedTime(dateInput, timeZone)
+}
+
 export function getZonedDateParts(dateInput: string | Date, timeZone: string): ZonedDateParts {
-  const date = typeof dateInput === 'string' ? new Date(dateInput) : dateInput
-  const formatter = new Intl.DateTimeFormat('en-CA', {
-    timeZone,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hourCycle: 'h23'
-  })
-
-  const parts = formatter.formatToParts(date)
-  const map = Object.fromEntries(parts.map(part => [part.type, part.value]))
-
+  const zoned = getZonedDate(dateInput, timeZone)
   return {
-    year: Number(map.year),
-    month: Number(map.month),
-    day: Number(map.day),
-    hour: Number(map.hour),
-    minute: Number(map.minute),
-    second: Number(map.second)
+    year: zoned.getFullYear(),
+    month: zoned.getMonth() + 1,
+    day: zoned.getDate(),
+    hour: zoned.getHours(),
+    minute: zoned.getMinutes(),
+    second: zoned.getSeconds()
   }
 }
 
-export function getZonedDate(dateInput: string | Date, timeZone: string): Date {
-  const parts = getZonedDateParts(dateInput, timeZone)
-  return new Date(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute, parts.second)
-}
-
 export function formatZonedDateKey(dateInput: string | Date, timeZone: string): string {
-  const parts = getZonedDateParts(dateInput, timeZone)
-  return `${parts.year}-${String(parts.month).padStart(2, '0')}-${String(parts.day).padStart(2, '0')}`
+  return formatInTimeZone(dateInput, timeZone, 'yyyy-MM-dd')
 }
 
 export function formatEventTime(event: CalendarEvent, field: 'startAt' | 'endAt' = 'startAt'): string {
-  return new Date(event[field]).toLocaleTimeString('pt-BR', {
-    timeZone: getEventTimeZone(event),
-    hour: '2-digit',
-    minute: '2-digit'
-  })
+  return formatInTimeZone(event[field], getEventTimeZone(event), 'HH:mm')
 }
 
 export function formatEventDate(event: CalendarEvent, field: 'startAt' | 'endAt' = 'startAt'): string {
@@ -75,13 +60,12 @@ export function sortDayEvents(events: CalendarEvent[]): CalendarEvent[] {
   })
 }
 
+/** Inverse of getZonedDate: given wall-clock date/time strings meant as local
+ * time in `timeZone`, returns the equivalent UTC instant as an ISO string —
+ * what every create/update/drag-drop payload sends the API. */
 export function zonedDateTimeToUtcIso(dateStr: string, timeStr: string, timeZone: string): string {
   const [year, month, day] = dateStr.split('-').map(Number)
   const [hour, minute] = timeStr.split(':').map(Number)
-  const utcGuess = Date.UTC(year ?? 0, (month ?? 1) - 1, day ?? 1, hour ?? 0, minute ?? 0, 0)
-  const parts = getZonedDateParts(new Date(utcGuess), timeZone)
-  const asUtc = Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute, parts.second)
-  const offset = asUtc - utcGuess
-
-  return new Date(utcGuess - offset).toISOString()
+  const wallClock = new Date(year ?? 0, (month ?? 1) - 1, day ?? 1, hour ?? 0, minute ?? 0, 0)
+  return fromZonedTime(wallClock, timeZone).toISOString()
 }

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { addDays, addMilliseconds, format, isSameDay, startOfDay } from 'date-fns'
 import type { CalendarEvent } from '~/types/appointments'
 import { getEventTimeZone, getZonedDate, zonedDateTimeToUtcIso } from '~/utils/calendarEventTime'
 import {
@@ -30,7 +31,7 @@ const viewDate = ref(new Date(props.currentDate))
 const dayStr = computed(() => formatDate(viewDate.value))
 
 function formatDate(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  return format(d, 'yyyy-MM-dd')
 }
 
 function emitRange() {
@@ -49,9 +50,8 @@ const hours = Array.from({ length: 24 }, (_, i) => i)
 // ─── All-day vs timed events ──────────────────────────────────────────────
 function isOnDay(evt: CalendarEvent): boolean {
   if (!evt.startAt || !evt.endAt) return false
-  const dayStart = new Date(viewDate.value.getFullYear(), viewDate.value.getMonth(), viewDate.value.getDate())
-  const dayEnd = new Date(dayStart)
-  dayEnd.setDate(dayEnd.getDate() + 1)
+  const dayStart = startOfDay(viewDate.value)
+  const dayEnd = addDays(dayStart, 1)
   const timeZone = getEventTimeZone(evt)
   return getZonedDate(evt.startAt, timeZone) < dayEnd && getZonedDate(evt.endAt, timeZone) > dayStart
 }
@@ -60,7 +60,7 @@ const allDayEvents = computed(() => props.events.filter(e => e.allDay && isOnDay
 const timedEvents = computed(() => layoutTimedEvents(props.events.filter(e => !e.allDay && isOnDay(e))))
 
 // ─── Current time ─────────────────────────────────────────────────────────
-const isToday = computed(() => formatDate(new Date()) === dayStr.value)
+const isToday = computed(() => isSameDay(viewDate.value, new Date()))
 
 const currentTimePx = ref(getCurrentTimePx())
 let timerId: ReturnType<typeof setInterval>
@@ -229,10 +229,10 @@ function commitDrop() {
   )
   const timeZone = getEventTimeZone(drag.event)
   if (newStart.getTime() === getZonedDate(drag.originalStart, timeZone).getTime()) return
-  const newEnd = new Date(newStart.getTime() + drag.durationMs)
+  const newEnd = addMilliseconds(newStart, drag.durationMs)
   const dateStr = formatDate(newStart)
-  const startTime = `${String(newStart.getHours()).padStart(2, '0')}:${String(newStart.getMinutes()).padStart(2, '0')}`
-  const endTime = `${String(newEnd.getHours()).padStart(2, '0')}:${String(newEnd.getMinutes()).padStart(2, '0')}`
+  const startTime = format(newStart, 'HH:mm')
+  const endTime = format(newEnd, 'HH:mm')
   emit('dropEvent', drag.event.id, zonedDateTimeToUtcIso(dateStr, startTime, timeZone), zonedDateTimeToUtcIso(formatDate(newEnd), endTime, timeZone))
 }
 
