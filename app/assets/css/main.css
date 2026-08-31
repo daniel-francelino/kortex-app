@@ -121,12 +121,6 @@ body,
   }
 }
 
-@supports (-webkit-touch-callout: none) {
-  @media (max-width: 1023px) {
-    .kortex-mobile-sidebar-content {
-    }
-  }
-}
 
 /* ─── Mobile touch & interaction improvements ───────────────────── */
 @media (max-width: 768px) {
