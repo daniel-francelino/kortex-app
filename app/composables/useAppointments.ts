@@ -193,13 +193,29 @@ function _useAppointments() {
   const activeCalendarIds = ref<string[]>([])
   const searchQuery = ref('')
 
+  // viewFrom/viewTo are plain `yyyy-MM-dd` calendar-day strings (in Day view
+  // they're the *same* day). `new Date('yyyy-MM-dd')` parses that as UTC
+  // midnight, not the viewer's local midnight — for Day view that collapsed
+  // the "range" to a zero-width instant, so an event's actual start time
+  // (anywhere in the local day) almost always fell after it. Every optimistic
+  // update (drag, edit) then evaluated the event as out of view and dropped
+  // it from viewEventKeys — it only came back after a full refetch corrected
+  // the list from scratch. Parsing with the local constructor instead of the
+  // Date-string UTC shortcut fixes that: these are local calendar days.
+  function parseLocalDayBoundary(dateStr: string, end: boolean): number {
+    const [y, m, d] = dateStr.split('-').map(Number)
+    return end
+      ? new Date(y!, (m ?? 1) - 1, d ?? 1, 23, 59, 59, 999).getTime()
+      : new Date(y!, (m ?? 1) - 1, d ?? 1, 0, 0, 0, 0).getTime()
+  }
+
   function isEventInCurrentView(evt: CalendarEvent): boolean {
     if (activeCalendarIds.value.length > 0 && !activeCalendarIds.value.includes(evt.calendarId)) return false
     if (!viewFrom.value && !viewTo.value) return true
     const start = new Date(evt.startAt).getTime()
     const end = new Date(evt.endAt).getTime()
-    const rangeStart = viewFrom.value ? new Date(viewFrom.value).getTime() : -Infinity
-    const rangeEnd = viewTo.value ? new Date(viewTo.value).getTime() : Infinity
+    const rangeStart = viewFrom.value ? parseLocalDayBoundary(viewFrom.value, false) : -Infinity
+    const rangeEnd = viewTo.value ? parseLocalDayBoundary(viewTo.value, true) : Infinity
     return start <= rangeEnd && end >= rangeStart
   }
 
@@ -685,7 +701,18 @@ function _useAppointments() {
         method: 'PATCH',
         body: payload
       }).then(normalizeEvent),
-      reconcile: serverEvent => upsertEventInStore(serverEvent),
+      // Re-checks view membership against the server's confirmed event, not
+      // just the optimistic guess apply() made — a safety net for whenever
+      // those two disagree (e.g. the server expands recurrence differently),
+      // so a successful save can't silently leave the event stuck out of view.
+      reconcile: (serverEvent) => {
+        upsertEventInStore(serverEvent)
+        const serverKey = eventStoreKey(serverEvent)
+        const nowInView = isEventInCurrentView(serverEvent)
+        const currentlyInView = viewEventKeys.value.includes(serverKey)
+        if (nowInView && !currentlyInView) viewEventKeys.value = [...viewEventKeys.value, serverKey]
+        else if (!nowInView && currentlyInView) viewEventKeys.value = viewEventKeys.value.filter(k => k !== serverKey)
+      },
       errorMessage: 'Não foi possível atualizar o evento',
       offline: {
         entity: 'event',
