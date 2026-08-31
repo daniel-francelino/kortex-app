@@ -9,13 +9,10 @@ useSeoMeta({
 
 const {
   dashboard,
-  dashboardStatus,
+  dashboardInitialLoading,
   insights,
-  insightsStatus
+  insightsInitialLoading
 } = useLifeOS()
-
-const isLoading = computed(() => dashboardStatus.value === 'pending')
-const isInsightsLoading = computed(() => insightsStatus.value === 'pending')
 const todayFormatted = useState('life-os-today-formatted', () =>
   new Intl.DateTimeFormat('pt-BR', {
     weekday: 'long',
@@ -43,7 +40,7 @@ const todayFormatted = useState('life-os-today-formatted', () =>
 
     <template #body>
       <!-- Loading skeleton -->
-      <DashboardSkeleton v-if="isLoading && !dashboard" />
+      <DashboardSkeleton v-if="dashboardInitialLoading" />
 
       <div v-else class="space-y-6 p-4 md:p-6">
         <!-- Greeting -->
@@ -135,12 +132,12 @@ const todayFormatted = useState('life-os-today-formatted', () =>
             Insights de produtividade
           </h3>
 
-          <div v-if="isInsightsLoading && !insights" class="grid gap-4 md:grid-cols-2">
+          <div v-if="insightsInitialLoading" class="grid gap-4 md:grid-cols-2">
             <USkeleton v-for="i in 4" :key="i" class="h-44 w-full rounded-lg" />
           </div>
 
           <DashboardInsights
-            v-else-if="insights"
+            v-else
             :insights="insights"
           />
         </div>

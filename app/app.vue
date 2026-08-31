@@ -146,8 +146,6 @@ provide('navigation', navigation)
 
 <template>
   <UApp :locale="pt_br">
-    <AppLaunchSplash />
-
     <NuxtLoadingIndicator
       color="linear-gradient(90deg, #12E39A 0%, #5EF2BF 45%, #12E39A 100%)"
       error-color="#fb7185"

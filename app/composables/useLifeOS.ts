@@ -25,6 +25,18 @@ export function useLifeOS() {
     })
   })
 
+  // `data` above is never null/undefined — the `default` factory populates it
+  // with zeroed-out placeholder values synchronously, before the request even
+  // resolves. A page checking `!dashboard` to decide whether to show a loading
+  // skeleton would never see it as falsy, so the skeleton never renders — the
+  // placeholder (zero habits, zero events...) flashes instead. This tracks the
+  // first real resolution instead, same idea as useAppointments' eventsLoadedOnce.
+  const dashboardLoadedOnce = ref(false)
+  watch(dashboardStatus, (status) => {
+    if (status === 'success' || status === 'error') dashboardLoadedOnce.value = true
+  }, { immediate: true })
+  const dashboardInitialLoading = computed(() => !dashboardLoadedOnce.value && dashboardStatus.value === 'pending')
+
   // ─── Insights ───────────────────────────────────────────────────────────
   const {
     data: insights,
@@ -40,6 +52,13 @@ export function useLifeOS() {
       journal: { entriesLast7d: 0, entriesLast30d: 0, currentStreak: 0 }
     })
   })
+
+  // Same issue as dashboardLoadedOnce above — `insights` is never falsy either.
+  const insightsLoadedOnce = ref(false)
+  watch(insightsStatus, (status) => {
+    if (status === 'success' || status === 'error') insightsLoadedOnce.value = true
+  }, { immediate: true })
+  const insightsInitialLoading = computed(() => !insightsLoadedOnce.value && insightsStatus.value === 'pending')
 
   // ─── Life Areas ─────────────────────────────────────────────────────────
   const {
@@ -126,10 +145,12 @@ export function useLifeOS() {
     // Dashboard
     dashboard,
     dashboardStatus,
+    dashboardInitialLoading,
     refreshDashboard,
     // Insights
     insights,
     insightsStatus,
+    insightsInitialLoading,
     refreshInsights,
     // Life Areas
     areas,
