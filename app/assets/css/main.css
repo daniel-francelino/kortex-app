@@ -255,6 +255,36 @@ body.keyboard-open .mobile-bottom-nav {
   min-height: 0;
 }
 
+@media (max-width: 1023px) {
+  .app-content-with-bottom-nav [data-slot="body"] {
+    padding-bottom: 0 !important;
+    scroll-padding-bottom: calc(var(--mobile-bottom-nav-height, 4.75rem) + 1rem);
+  }
+}
+
+body.mobile-nav-debug .app-content-with-bottom-nav {
+  outline: 4px solid orange !important;
+  outline-offset: -4px;
+}
+
+body.mobile-nav-debug .app-content-with-bottom-nav [data-slot="body"] {
+  outline: 4px solid dodgerblue !important;
+  outline-offset: -8px;
+  background:
+    repeating-linear-gradient(
+      135deg,
+      rgba(30, 144, 255, 0.12),
+      rgba(30, 144, 255, 0.12) 10px,
+      rgba(255, 255, 255, 0.04) 10px,
+      rgba(255, 255, 255, 0.04) 20px
+    ) !important;
+}
+
+body.mobile-nav-debug .app-content-with-bottom-nav [data-slot="body"] > * {
+  outline: 3px solid purple !important;
+  outline-offset: -12px;
+}
+
 /* ─── Note outline: temporary highlight on scroll-to-heading ────── */
 .kortex-block-flash {
   animation: kortex-block-flash 1.2s ease-out;

@@ -73,16 +73,24 @@ function updateNavDebugInfo() {
   const rect = el.getBoundingClientRect()
   const styles = window.getComputedStyle(el)
   const rootStyles = window.getComputedStyle(document.documentElement)
+  const appContent = document.querySelector<HTMLElement>('.app-content-with-bottom-nav')
+  const appContentRect = appContent?.getBoundingClientRect()
   const panelBody = document.querySelector<HTMLElement>('.app-content-with-bottom-nav [data-slot="body"]')
+  const panelBodyRect = panelBody?.getBoundingClientRect()
   const panelBodyStyles = panelBody ? window.getComputedStyle(panelBody) : null
   const panelBodyChild = panelBody?.firstElementChild instanceof HTMLElement ? panelBody.firstElementChild : null
+  const panelBodyChildRect = panelBodyChild?.getBoundingClientRect()
   const panelBodyChildStyles = panelBodyChild ? window.getComputedStyle(panelBodyChild) : null
   const viewport = window.visualViewport
 
   navDebugInfo.value = [
+    'debug=v3',
     `rect.top=${Math.round(rect.top)}`,
     `rect.bottom=${Math.round(rect.bottom)}`,
     `rect.height=${Math.round(rect.height)}`,
+    `app.bottom=${Math.round(appContentRect?.bottom ?? 0)}`,
+    `body.bottom=${Math.round(panelBodyRect?.bottom ?? 0)}`,
+    `child.bottom=${Math.round(panelBodyChildRect?.bottom ?? 0)}`,
     `css.top=${styles.top}`,
     `css.bottom=${styles.bottom}`,
     `css.height=${styles.height}`,
