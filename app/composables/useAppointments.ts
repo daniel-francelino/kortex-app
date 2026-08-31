@@ -705,10 +705,21 @@ function _useAppointments() {
       // just the optimistic guess apply() made — a safety net for whenever
       // those two disagree (e.g. the server expands recurrence differently),
       // so a successful save can't silently leave the event stuck out of view.
+      //
+      // `PATCH /events/:id` always returns the raw master row (no
+      // `recurrence_id` column exists on `events` — it's only ever computed
+      // during list expansion), so `serverEvent.recurrenceId` is always null
+      // here even when editing a recurring series. Keying off it directly
+      // would upsert under a *different* map key than the occurrence this
+      // edit started from (recurrenceId vs plain id) and add that new key to
+      // viewEventKeys without ever removing the old one — the same event then
+      // renders twice, once per key. Carrying `previous`'s recurrenceId
+      // forward keeps this on the same key apply() used.
       reconcile: (serverEvent) => {
-        upsertEventInStore(serverEvent)
-        const serverKey = eventStoreKey(serverEvent)
-        const nowInView = isEventInCurrentView(serverEvent)
+        const reconciledEvent: CalendarEvent = { ...serverEvent, recurrenceId: previous?.recurrenceId ?? serverEvent.recurrenceId }
+        upsertEventInStore(reconciledEvent)
+        const serverKey = eventStoreKey(reconciledEvent)
+        const nowInView = isEventInCurrentView(reconciledEvent)
         const currentlyInView = viewEventKeys.value.includes(serverKey)
         if (nowInView && !currentlyInView) viewEventKeys.value = [...viewEventKeys.value, serverKey]
         else if (!nowInView && currentlyInView) viewEventKeys.value = viewEventKeys.value.filter(k => k !== serverKey)
