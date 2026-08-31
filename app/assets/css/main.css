@@ -218,7 +218,7 @@ body.keyboard-open .mobile-bottom-nav {
 
 @media (max-width: 1023px) {
   html.pwa-standalone {
-    --pwa-standalone-bottom-bleed: max(env(safe-area-inset-bottom, 0px), env(safe-area-inset-top, 0px), 2rem);
+    --pwa-standalone-bottom-bleed: env(safe-area-inset-bottom, 0px);
     --mobile-bottom-nav-extra-background: var(--pwa-standalone-bottom-bleed);
   }
 
@@ -226,10 +226,6 @@ body.keyboard-open .mobile-bottom-nav {
   html.capacitor-native .mobile-bottom-nav {
     top: auto;
     bottom: 0;
-  }
-
-  html.pwa-standalone .mobile-bottom-nav {
-    bottom: calc(0px - var(--pwa-standalone-bottom-bleed));
   }
 
   html.pwa-standalone .kortex-app-shell,

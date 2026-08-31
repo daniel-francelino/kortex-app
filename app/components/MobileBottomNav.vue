@@ -79,6 +79,7 @@ function updateNavDebugInfo() {
     `rect.top=${Math.round(rect.top)}`,
     `rect.bottom=${Math.round(rect.bottom)}`,
     `rect.height=${Math.round(rect.height)}`,
+    `css.top=${styles.top}`,
     `css.bottom=${styles.bottom}`,
     `css.height=${styles.height}`,
     `innerHeight=${window.innerHeight}`,
