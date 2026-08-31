@@ -100,7 +100,6 @@ body,
   @media (display-mode: standalone) and (max-width: 1023px) {
     html {
       --mobile-sidebar-safe-area-top: max(env(safe-area-inset-top, 0px), 2.75rem);
-      --mobile-sidebar-safe-area-bottom: min(env(safe-area-inset-bottom, 0px), 0.75rem);
     }
   }
 }
@@ -113,23 +112,18 @@ body,
 @media (max-width: 1023px) {
   .kortex-app-shell {
     box-sizing: border-box;
-    height: var(--app-visual-height);
     padding-top: var(--safe-area-top);
     overflow: hidden;
   }
 
   .kortex-mobile-sidebar-content {
     box-sizing: border-box;
-    height: var(--app-visual-height);
-    max-height: var(--app-visual-height);
   }
 }
 
 @supports (-webkit-touch-callout: none) {
   @media (max-width: 1023px) {
     .kortex-mobile-sidebar-content {
-      height: var(--app-visual-height);
-      max-height: var(--app-visual-height);
     }
   }
 }
