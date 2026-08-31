@@ -262,6 +262,17 @@ body.keyboard-open .mobile-bottom-nav {
   }
 }
 
+@media (max-width: 1023px) {
+  html.capacitor-native .mobile-bottom-nav {
+    top: auto;
+    bottom: 0;
+  }
+
+  html.capacitor-native .kortex-app-shell {
+    height: 100dvh;
+  }
+}
+
 .mobile-bottom-nav > nav {
   display: flex;
   min-height: 0;

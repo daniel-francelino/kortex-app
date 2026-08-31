@@ -11,6 +11,9 @@ const isNative = Capacitor.isNativePlatform()
 onMounted(async () => {
   if (!isNative) return
 
+  document.documentElement.classList.add('capacitor-native')
+  document.body.classList.add('capacitor-native')
+
   const runtimeConfig = useRuntimeConfig()
   const { StatusBar, Style } = await import('@capacitor/status-bar')
   const { Keyboard } = await import('@capacitor/keyboard')
@@ -59,6 +62,13 @@ onMounted(async () => {
 
   // Hide splash screen
   await SplashScreen.hide()
+})
+
+onUnmounted(() => {
+  if (!isNative) return
+
+  document.documentElement.classList.remove('capacitor-native')
+  document.body.classList.remove('capacitor-native')
 })
 </script>
 

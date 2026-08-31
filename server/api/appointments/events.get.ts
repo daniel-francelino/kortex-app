@@ -24,27 +24,37 @@ export default eventHandler(async (event) => {
 
   const supabase = getSupabaseAdminClient()
 
-  // First get user's calendar IDs (own calendars + calendars shared with them)
+  // Always resolve the user's own calendar IDs (own + shared-and-accepted) first —
+  // getSupabaseAdminClient() uses the service-role key (bypasses RLS), so this
+  // membership check is the *only* thing standing between a `calendarId` query
+  // param and reading a stranger's events. Never trust `params.calendarId` on
+  // its own, even though it's a plain UUID: it must always be a subset of what
+  // this user can actually see.
+  const [{ data: cals }, { data: shares }] = await Promise.all([
+    supabase
+      .from('calendars')
+      .select('id')
+      .eq('owner_user_id', user.id)
+      .is('archived_at', null),
+    supabase
+      .from('calendar_shares')
+      .select('calendar_id')
+      .eq('invited_user_id', user.id)
+      .eq('status', 'accepted')
+  ])
+
+  const ownIds = (cals ?? []).map((c: Record<string, unknown>) => c.id as string)
+  const sharedIds = (shares ?? []).map((s: Record<string, unknown>) => s.calendar_id as string)
+  const accessibleCalendarIds = new Set([...ownIds, ...sharedIds])
+
   let calendarIds: string[] = []
   if (params.calendarId) {
+    if (!accessibleCalendarIds.has(params.calendarId)) {
+      throw createError({ statusCode: 403, statusMessage: 'Você não tem acesso a este calendário' })
+    }
     calendarIds = [params.calendarId]
   } else {
-    const [{ data: cals }, { data: shares }] = await Promise.all([
-      supabase
-        .from('calendars')
-        .select('id')
-        .eq('owner_user_id', user.id)
-        .is('archived_at', null),
-      supabase
-        .from('calendar_shares')
-        .select('calendar_id')
-        .eq('invited_user_id', user.id)
-        .eq('status', 'accepted')
-    ])
-
-    const ownIds = (cals ?? []).map((c: Record<string, unknown>) => c.id as string)
-    const sharedIds = (shares ?? []).map((s: Record<string, unknown>) => s.calendar_id as string)
-    calendarIds = [...new Set([...ownIds, ...sharedIds])]
+    calendarIds = [...accessibleCalendarIds]
   }
 
   // Events the user was invited to (as a participant, not an owner) also show
@@ -234,7 +244,22 @@ export default eventHandler(async (event) => {
 
         if (!isCancelled) {
           const occEnd = new Date(occ.getTime() + duration)
-          if (occEnd < rangeStart || occ > rangeEnd) {
+
+          // Apply the per-occurrence override (if any) *before* deciding
+          // range membership — an occurrence moved outside its original slot
+          // (via "somente esta ocorrência") must be included/excluded based
+          // on where it actually ended up, not on the recurrence math's
+          // unmodified original slot. Using the unmodified `occ`/`occEnd`
+          // here made a moved occurrence vanish from the range it moved into,
+          // or linger in the range it moved out of.
+          const effectiveStart = (exception && (exception.override_start_at as string | null))
+            ? new Date(exception.override_start_at as string)
+            : occ
+          const effectiveEnd = (exception && (exception.override_end_at as string | null))
+            ? new Date(exception.override_end_at as string)
+            : occEnd
+
+          if (effectiveEnd < rangeStart || effectiveStart > rangeEnd) {
             continue
           }
 
@@ -251,12 +276,8 @@ export default eventHandler(async (event) => {
             location: (exception && (exception.override_location as string | null))
               ? (exception.override_location as string)
               : (e.location as string | null),
-            start_at: (exception && (exception.override_start_at as string | null))
-              ? (exception.override_start_at as string)
-              : occ.toISOString(),
-            end_at: (exception && (exception.override_end_at as string | null))
-              ? (exception.override_end_at as string)
-              : occEnd.toISOString(),
+            start_at: effectiveStart.toISOString(),
+            end_at: effectiveEnd.toISOString(),
             event_timezone: e.event_timezone as string,
             all_day: e.all_day as boolean,
             rrule: e.rrule as string,
