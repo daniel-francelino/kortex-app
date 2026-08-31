@@ -272,7 +272,7 @@ const MAX_VISIBLE = 4
               <div
                 v-for="(evt, ei) in cell.events.slice(0, MAX_VISIBLE)"
                 :key="ei"
-                class="h-[15px] min-w-0 touch-manipulation overflow-hidden rounded-[3px] px-1 text-[10px] font-medium leading-[15px] text-white transition-opacity"
+                class="h-[15px] min-w-0 touch-none overflow-hidden rounded-[3px] px-1 text-[10px] font-medium leading-[15px] text-white transition-opacity"
                 :class="dragEvent?.id === evt.id ? 'opacity-40' : ''"
                 :style="{ backgroundColor: getEventColor(evt) }"
                 :title="`${formatEventTime(evt)} ${evt.title}`"
@@ -296,7 +296,7 @@ const MAX_VISIBLE = 4
               <div
                 v-for="(evt, ei) in cell.events.slice(0, MAX_VISIBLE)"
                 :key="ei"
-                class="flex h-4 min-w-0 cursor-grab touch-manipulation items-center gap-1 overflow-hidden rounded-sm px-1 text-[11px] leading-4 font-medium transition-opacity"
+                class="flex h-4 min-w-0 cursor-grab touch-none items-center gap-1 overflow-hidden rounded-sm px-1 text-[11px] leading-4 font-medium transition-opacity"
                 :class="[evt.allDay ? 'text-white' : '', dragEvent?.id === evt.id ? 'opacity-40' : '']"
                 :style="evt.allDay
                   ? { backgroundColor: getEventColor(evt) }

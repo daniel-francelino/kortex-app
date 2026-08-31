@@ -700,10 +700,15 @@ onMounted(() => {
 
           <!-- Main calendar area -->
           <div ref="calendarBodyRef" class="relative min-w-0 flex-1 overflow-hidden">
-            <AnimatePresence mode="wait">
+            <!-- No `mode="wait"` here on purpose: it made the outgoing view fully
+                 fade/slide out before the incoming one even started, so every single
+                 prev/next/day tap paid the full transition duration twice in a row.
+                 Default (simultaneous) mode crossfades both at once — `absolute inset-0`
+                 on each is what lets them overlap the same space while that happens. -->
+            <AnimatePresence>
               <motion.div
                 :key="calendarViewKey"
-                class="h-full overflow-auto p-0 lg:p-2"
+                class="absolute inset-0 overflow-auto p-0 lg:p-2"
                 :initial="calendarSlideInitial"
                 :animate="{ opacity: 1, x: 0 }"
                 :exit="calendarSlideExit"

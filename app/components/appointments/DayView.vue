@@ -72,11 +72,22 @@ onMounted(() => {
 onUnmounted(() => clearInterval(timerId))
 
 // ─── Drag state ───────────────────────────────────────────────────────────
+// `active` only flips true once the pointer has moved past DRAG_ACTIVATION_PX
+// from where it went down (see onPointerMove) — a plain tap-to-open never
+// crosses it, so the ghost/ ~30% opacity dip no longer flashes on every tap,
+// and `touch-none` on the event tile (template) stops the browser's own
+// touch-scroll from fighting the drag on the very same vertical axis.
+const DRAG_ACTIVATION_PX = 6
+const EDGE_SCROLL_ZONE_PX = 44
+const MAX_AUTOSCROLL_SPEED = 16
+
 interface DragState {
   active: boolean
   event: CalendarEvent | null
   durationMs: number
   pointerId: number
+  pointerStartX: number
+  pointerStartY: number
   targetMinutes: number
   originalStart: string
 }
@@ -86,11 +97,60 @@ const drag = reactive<DragState>({
   event: null,
   durationMs: 0,
   pointerId: -1,
+  pointerStartX: 0,
+  pointerStartY: 0,
   targetMinutes: 0,
   originalStart: ''
 })
 
 const gridRef = ref<HTMLElement | null>(null)
+
+// Auto-scroll while dragging near the top/bottom edge of the time grid —
+// without this, rescheduling to an hour outside the currently visible slice
+// meant abandoning the drag, scrolling manually, then starting over.
+let lastPointerClientY = 0
+let autoScrollRAF: number | null = null
+
+function autoScrollTick() {
+  if (!drag.active) {
+    autoScrollRAF = null
+    return
+  }
+
+  const scrollEl = gridRef.value?.querySelector<HTMLElement>('[data-scroll-body]')
+  if (scrollEl) {
+    const rect = scrollEl.getBoundingClientRect()
+    const distTop = lastPointerClientY - rect.top
+    const distBottom = rect.bottom - lastPointerClientY
+    let scrolled = false
+
+    if (distTop < EDGE_SCROLL_ZONE_PX && scrollEl.scrollTop > 0) {
+      const strength = 1 - Math.max(distTop, 0) / EDGE_SCROLL_ZONE_PX
+      scrollEl.scrollTop = Math.max(0, scrollEl.scrollTop - MAX_AUTOSCROLL_SPEED * strength)
+      scrolled = true
+    } else if (distBottom < EDGE_SCROLL_ZONE_PX && scrollEl.scrollTop < scrollEl.scrollHeight - scrollEl.clientHeight) {
+      const strength = 1 - Math.max(distBottom, 0) / EDGE_SCROLL_ZONE_PX
+      scrollEl.scrollTop = Math.min(scrollEl.scrollHeight - scrollEl.clientHeight, scrollEl.scrollTop + MAX_AUTOSCROLL_SPEED * strength)
+      scrolled = true
+    }
+
+    if (scrolled) drag.targetMinutes = getSnappedMinutes(lastPointerClientY)
+  }
+
+  autoScrollRAF = requestAnimationFrame(autoScrollTick)
+}
+
+function startAutoScroll() {
+  if (autoScrollRAF !== null) return
+  autoScrollRAF = requestAnimationFrame(autoScrollTick)
+}
+
+function stopAutoScroll() {
+  if (autoScrollRAF !== null) {
+    cancelAnimationFrame(autoScrollRAF)
+    autoScrollRAF = null
+  }
+}
 
 const ghostStyle = computed(() => {
   if (!drag.active || !drag.event) return { display: 'none' }
@@ -122,24 +182,35 @@ const ghostStyle = computed(() => {
 
 function startDrag(evt: CalendarEvent, e: PointerEvent) {
   e.stopPropagation()
-  drag.active = true
+  drag.active = false
   drag.event = evt
   drag.originalStart = evt.startAt
   const timeZone = getEventTimeZone(evt)
   drag.durationMs = getZonedDate(evt.endAt, timeZone).getTime() - getZonedDate(evt.startAt, timeZone).getTime()
   drag.pointerId = e.pointerId
-  drag.targetMinutes = getSnappedMinutes(e)
+  drag.pointerStartX = e.clientX
+  drag.pointerStartY = e.clientY
   ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
 }
 
 function onPointerMove(e: PointerEvent) {
-  if (!drag.active || e.pointerId !== drag.pointerId) return
-  drag.targetMinutes = getSnappedMinutes(e)
+  if (!drag.event || e.pointerId !== drag.pointerId) return
+
+  if (!drag.active) {
+    const dx = e.clientX - drag.pointerStartX
+    const dy = e.clientY - drag.pointerStartY
+    if (Math.hypot(dx, dy) < DRAG_ACTIVATION_PX) return
+    drag.active = true
+    startAutoScroll()
+  }
+
+  lastPointerClientY = e.clientY
+  drag.targetMinutes = getSnappedMinutes(e.clientY)
 }
 
 function onPointerUp(e: PointerEvent) {
-  if (!drag.active || e.pointerId !== drag.pointerId) return
-  commitDrop()
+  if (!drag.event || e.pointerId !== drag.pointerId) return
+  if (drag.active) commitDrop()
   endDrag()
 }
 
@@ -169,14 +240,15 @@ function endDrag() {
   drag.active = false
   drag.event = null
   drag.pointerId = -1
+  stopAutoScroll()
 }
 
-function getSnappedMinutes(e: PointerEvent): number {
+function getSnappedMinutes(clientY: number): number {
   const scrollEl = gridRef.value?.querySelector<HTMLElement>('[data-scroll-body]')
   if (!scrollEl) return 0
   const rect = scrollEl.getBoundingClientRect()
   const scrollTop = scrollEl.scrollTop
-  const relY = e.clientY - rect.top + scrollTop
+  const relY = clientY - rect.top + scrollTop
   return Math.max(0, Math.min(1425, snapMinutes((relY / HOUR_HEIGHT) * 60)))
 }
 
@@ -334,7 +406,7 @@ defineExpose({ viewDate })
             <div
               v-for="evt in timedEvents"
               :key="`${evt.id}-${evt.recurrenceId ?? ''}`"
-              class="overflow-hidden px-1 py-0.5 text-xs"
+              class="touch-none overflow-hidden px-1 py-0.5 text-xs"
               :style="getEventStyle(evt)"
               @click.stop="onEventClick(evt, $event)"
               @pointerdown.stop="startDrag(evt, $event)"
