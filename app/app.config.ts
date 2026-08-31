@@ -20,19 +20,30 @@ export default defineAppConfig({
         content: 'z-[320]'
       }
     },
+    // `item`/`itemLeadingIcon` here are the dropdown OPTIONS (the popup list
+    // that opens on tap), not the closed select field itself — those default
+    // to `p-1.5 text-sm` (~28px rows) even at size="md", well under the
+    // ~44px touch target every option should have on mobile. Applies to
+    // every USelect/USelectMenu/UInputMenu app-wide, not just one modal.
     select: {
       slots: {
-        content: 'z-[320]'
+        content: 'z-[320]',
+        item: 'max-lg:p-3 max-lg:text-base max-lg:gap-3',
+        itemLeadingIcon: 'max-lg:size-6'
       }
     },
     selectMenu: {
       slots: {
-        content: 'z-[320]'
+        content: 'z-[320]',
+        item: 'max-lg:p-3 max-lg:text-base max-lg:gap-3',
+        itemLeadingIcon: 'max-lg:size-6'
       }
     },
     inputMenu: {
       slots: {
-        content: 'z-[320]'
+        content: 'z-[320]',
+        item: 'max-lg:p-3 max-lg:text-base max-lg:gap-3',
+        itemLeadingIcon: 'max-lg:size-6'
       }
     },
     modal: {
