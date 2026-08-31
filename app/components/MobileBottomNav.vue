@@ -4,6 +4,8 @@ import { isNavPathActive } from '~/utils/navigation'
 
 const route = useRoute()
 const router = useRouter()
+const navDebugEnabled = ref(true)
+const navDebugInfo = ref('')
 const {
   active,
   hasItems: hasContextItems,
@@ -62,26 +64,95 @@ function navigateTo(to: string) {
   }
 }
 
+function updateNavDebugInfo() {
+  if (!import.meta.client || !navDebugEnabled.value) return
+
+  const el = document.querySelector<HTMLElement>('.mobile-bottom-nav')
+  if (!el) return
+
+  const rect = el.getBoundingClientRect()
+  const styles = window.getComputedStyle(el)
+  const rootStyles = window.getComputedStyle(document.documentElement)
+  const viewport = window.visualViewport
+
+  navDebugInfo.value = [
+    `rect.top=${Math.round(rect.top)}`,
+    `rect.bottom=${Math.round(rect.bottom)}`,
+    `rect.height=${Math.round(rect.height)}`,
+    `css.bottom=${styles.bottom}`,
+    `css.height=${styles.height}`,
+    `innerHeight=${window.innerHeight}`,
+    `vv.height=${Math.round(viewport?.height ?? 0)}`,
+    `safeBottom=${rootStyles.getPropertyValue('--safe-area-bottom').trim() || 'n/a'}`,
+    `bleed=${rootStyles.getPropertyValue('--pwa-standalone-bottom-bleed').trim() || 'n/a'}`
+  ].join(' | ')
+}
+
+function applyNavDebugPreference() {
+  if (!import.meta.client) return
+
+  const queryValue = Array.isArray(route.query.navDebug)
+    ? route.query.navDebug[0]
+    : route.query.navDebug
+
+  if (queryValue === '1') {
+    window.localStorage.setItem('kortex-mobile-nav-debug', '1')
+  } else if (queryValue === '0') {
+    window.localStorage.setItem('kortex-mobile-nav-debug', '0')
+  }
+
+  navDebugEnabled.value = window.localStorage.getItem('kortex-mobile-nav-debug') !== '0'
+  document.documentElement.classList.toggle('mobile-nav-debug', navDebugEnabled.value)
+  document.body.classList.toggle('mobile-nav-debug', navDebugEnabled.value)
+  updateNavDebugInfo()
+}
+
 watchEffect(() => {
   if (!import.meta.client) return
 
+  applyNavDebugPreference()
+
   document.documentElement.style.setProperty(
     '--mobile-bottom-nav-height',
-    'calc(var(--mobile-bottom-nav-bar-height, 4.75rem) + var(--mobile-bottom-nav-safe-padding, 0px))'
+    'var(--mobile-bottom-nav-bar-height, 4.75rem)'
   )
+})
+
+onMounted(() => {
+  if (!import.meta.client) return
+
+  updateNavDebugInfo()
+  window.addEventListener('resize', updateNavDebugInfo, { passive: true })
+  window.visualViewport?.addEventListener('resize', updateNavDebugInfo, { passive: true })
+  window.visualViewport?.addEventListener('scroll', updateNavDebugInfo, { passive: true })
 })
 
 onUnmounted(() => {
   if (!import.meta.client) return
+  document.documentElement.classList.remove('mobile-nav-debug')
+  document.body.classList.remove('mobile-nav-debug')
+  window.removeEventListener('resize', updateNavDebugInfo)
+  window.visualViewport?.removeEventListener('resize', updateNavDebugInfo)
+  window.visualViewport?.removeEventListener('scroll', updateNavDebugInfo)
   document.documentElement.style.setProperty(
     '--mobile-bottom-nav-height',
-    'calc(var(--mobile-bottom-nav-bar-height, 4.75rem) + var(--mobile-bottom-nav-safe-padding, 0px))'
+    'var(--mobile-bottom-nav-bar-height, 4.75rem)'
   )
 })
 </script>
 
 <template>
-  <div class="mobile-bottom-nav lg:hidden">
+  <div
+    class="mobile-bottom-nav lg:hidden"
+    :class="{ 'mobile-bottom-nav--debug': navDebugEnabled }"
+  >
+    <div
+      v-if="navDebugEnabled"
+      class="mobile-bottom-nav__debug-panel"
+    >
+      {{ navDebugInfo }}
+    </div>
+
     <!-- More menu overlay -->
     <Transition name="slide-up">
       <div
@@ -186,6 +257,72 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
+.mobile-bottom-nav--debug {
+  outline: 3px solid red !important;
+  outline-offset: -3px;
+  background:
+    repeating-linear-gradient(
+      45deg,
+      rgba(255, 0, 0, 0.24),
+      rgba(255, 0, 0, 0.24) 8px,
+      rgba(255, 255, 0, 0.16) 8px,
+      rgba(255, 255, 0, 0.16) 16px
+    ),
+    var(--ui-bg) !important;
+}
+
+.mobile-bottom-nav--debug::after {
+  outline: 3px dashed fuchsia !important;
+  outline-offset: -3px;
+  background:
+    repeating-linear-gradient(
+      -45deg,
+      rgba(255, 0, 255, 0.3),
+      rgba(255, 0, 255, 0.3) 8px,
+      rgba(0, 255, 255, 0.16) 8px,
+      rgba(0, 255, 255, 0.16) 16px
+    ) !important;
+}
+
+.mobile-bottom-nav--debug > nav {
+  outline: 3px solid yellow !important;
+  outline-offset: -6px;
+  background: rgba(255, 255, 0, 0.16) !important;
+}
+
+.mobile-bottom-nav--debug :deep(.mobile-context-nav),
+.mobile-bottom-nav--debug :deep(nav > div) {
+  outline: 2px solid cyan !important;
+  outline-offset: -4px;
+  background: rgba(0, 255, 255, 0.12) !important;
+}
+
+.mobile-bottom-nav--debug :deep(a),
+.mobile-bottom-nav--debug :deep(button) {
+  outline: 2px solid lime !important;
+  outline-offset: -2px;
+  background-color: rgba(0, 255, 0, 0.12) !important;
+}
+
+.mobile-bottom-nav__debug-panel {
+  position: absolute;
+  right: 0;
+  bottom: 100%;
+  left: 0;
+  z-index: 60;
+  max-height: 40vh;
+  overflow: auto;
+  border: 2px solid red;
+  background: rgba(0, 0, 0, 0.88);
+  color: white;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-size: 10px;
+  line-height: 1.35;
+  padding: 6px 8px;
+  pointer-events: none;
+  white-space: normal;
+}
+
 .slide-up-enter-active,
 .slide-up-leave-active {
   transition: transform 0.2s ease, opacity 0.2s ease;

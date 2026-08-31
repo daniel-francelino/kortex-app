@@ -36,6 +36,7 @@ html {
   --app-visual-height: 100%;
   --app-visual-offset-top: 0px;
   --pwa-standalone-bottom-bleed: 0px;
+  --mobile-bottom-nav-extra-background: 0px;
   --mobile-sidebar-safe-area-top: var(--safe-area-top);
   --mobile-sidebar-safe-area-bottom: 0px;
   --mobile-bottom-nav-bar-height: 4.75rem;
@@ -163,7 +164,7 @@ body.keyboard-open .mobile-bottom-nav {
 /* ─── Mobile bottom navigation ──────────────────────────────────── */
 .mobile-bottom-nav {
   position: fixed;
-  top: calc(var(--app-visual-height, 100dvh) - var(--mobile-bottom-nav-height));
+  top: auto;
   bottom: 0;
   left: 0;
   right: 0;
@@ -173,10 +174,21 @@ body.keyboard-open .mobile-bottom-nav {
   height: var(--mobile-bottom-nav-height);
   flex-direction: column;
   padding-right: var(--safe-area-right);
-  padding-bottom: var(--mobile-bottom-nav-safe-padding);
+  padding-bottom: 0;
   padding-left: var(--safe-area-left);
   background: var(--ui-bg);
   border-top: 1px solid var(--ui-border-default, var(--ui-color-neutral-200));
+}
+
+.mobile-bottom-nav::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  right: 0;
+  left: 0;
+  height: var(--mobile-bottom-nav-extra-background);
+  background: inherit;
+  pointer-events: none;
 }
 
 .dark .mobile-bottom-nav {
@@ -193,11 +205,6 @@ body.keyboard-open .mobile-bottom-nav {
    entirely and lets the browser position it correctly. */
 @supports (-webkit-touch-callout: none) {
   @media (display-mode: standalone) and (max-width: 1023px) {
-    .mobile-bottom-nav {
-      top: auto;
-      bottom: 0;
-    }
-
     /* `.kortex-app-shell`'s height also depends on the same mismatched
        `--app-visual-height` JS value (see above) — a shell shorter than the
        real screen left a gap of raw `body` background between its bottom
@@ -212,6 +219,7 @@ body.keyboard-open .mobile-bottom-nav {
 @media (max-width: 1023px) {
   html.pwa-standalone {
     --pwa-standalone-bottom-bleed: max(env(safe-area-inset-bottom, 0px), env(safe-area-inset-top, 0px), 2rem);
+    --mobile-bottom-nav-extra-background: var(--pwa-standalone-bottom-bleed);
   }
 
   html.pwa-standalone .mobile-bottom-nav,
@@ -222,8 +230,6 @@ body.keyboard-open .mobile-bottom-nav {
 
   html.pwa-standalone .mobile-bottom-nav {
     bottom: calc(0px - var(--pwa-standalone-bottom-bleed));
-    height: calc(var(--mobile-bottom-nav-height) + var(--pwa-standalone-bottom-bleed));
-    padding-bottom: var(--pwa-standalone-bottom-bleed);
   }
 
   html.pwa-standalone .kortex-app-shell,
