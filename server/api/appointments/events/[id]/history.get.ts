@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { getSupabaseAdminClient } from '../../../../utils/supabase'
 import { requireAuthUser } from '../../../../utils/require-auth'
+import { parseOrThrow } from '../../../../utils/validation'
 
 const querySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
@@ -16,7 +17,7 @@ export default eventHandler(async (event) => {
   }
 
   const query = getQuery(event)
-  const params = querySchema.parse(query)
+  const params = parseOrThrow(querySchema, query)
 
   const supabase = getSupabaseAdminClient()
 

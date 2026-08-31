@@ -951,6 +951,18 @@ function _useAppointments() {
   const { isOnline, onReconnect } = useConnectionStatus()
   const syncingOffline = ref(false)
 
+  // A mutation that keeps failing used to retry forever, silently, with
+  // nothing but a console.error — the optimistic UI state kept showing
+  // "saved" indefinitely even once the server had permanently rejected it.
+  // MAX_MUTATION_RETRIES caps transient (network/5xx) retries, and any 4xx
+  // is treated as permanent immediately (retrying a genuinely invalid
+  // request forever can never succeed). Note: this still doesn't roll back
+  // the local optimistic state on permanent failure — that would need the
+  // queue to carry a rollback snapshot per mutation, which it doesn't today
+  // — it stops the silent infinite retry and tells the user, which is the
+  // main gap this closes.
+  const MAX_MUTATION_RETRIES = 5
+
   async function drainMutationQueue(): Promise<void> {
     if (syncingOffline.value) return
     await ensureQueueLoaded()
@@ -959,6 +971,7 @@ function _useAppointments() {
 
     syncingOffline.value = true
     let replayedAny = false
+    let permanentFailureCount = 0
 
     try {
       const queue = [...relevant]
@@ -977,8 +990,20 @@ function _useAppointments() {
           replayedAny = true
         } catch (err) {
           if (!isOnline.value) break // connection dropped mid-replay, not a real rejection
-          console.error('[offline-sync] appointments mutation failed', mutation, err)
-          await markRetry(mutation.id)
+
+          const statusCode = (err as { statusCode?: number, response?: { status?: number } })?.statusCode
+            ?? (err as { statusCode?: number, response?: { status?: number } })?.response?.status
+          const isClientError = typeof statusCode === 'number' && statusCode >= 400 && statusCode < 500
+          const outOfRetries = mutation.retryCount + 1 >= MAX_MUTATION_RETRIES
+
+          if (isClientError || outOfRetries) {
+            console.error('[offline-sync] appointments mutation permanently failed, dropping', mutation, err)
+            await dequeueMutation(mutation.id)
+            permanentFailureCount++
+          } else {
+            console.error('[offline-sync] appointments mutation failed, will retry', mutation, err)
+            await markRetry(mutation.id)
+          }
         }
       }
     } finally {
@@ -986,6 +1011,17 @@ function _useAppointments() {
       if (replayedAny) {
         await Promise.all([refreshEvents(), refreshCalendars(), refreshArchivedCalendars()])
         toast.add({ title: 'Sincronizado', description: 'Suas alterações offline na agenda foram salvas.', color: 'success' })
+      }
+      if (permanentFailureCount > 0) {
+        // Local state may still show the optimistic change as if it saved —
+        // a full refetch at least surfaces the server's real, authoritative
+        // state instead of leaving a permanently-stale optimistic view.
+        await Promise.all([refreshEvents(), refreshCalendars(), refreshArchivedCalendars()])
+        toast.add({
+          title: 'Não foi possível sincronizar',
+          description: `${permanentFailureCount} alteração(ões) na agenda não puderam ser salvas e foram descartadas.`,
+          color: 'error'
+        })
       }
     }
   }

@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { addDays, endOfMonth, endOfWeek, format, isAfter, isSameDay, isSameMonth, startOfDay, startOfMonth, startOfWeek } from 'date-fns'
+import { addDays, endOfMonth, endOfWeek, format, isAfter, isSameDay, isSameMonth, startOfMonth, startOfWeek } from 'date-fns'
 import type { CalendarEvent } from '~/types/appointments'
-import { formatEventTime as formatCalendarEventTime, formatZonedDateKey, getEventTimeZone, getZonedDate, sortDayEvents } from '~/utils/calendarEventTime'
+import { formatEventTime as formatCalendarEventTime, formatZonedDateKey, getEventTimeZone, sortDayEvents, zonedDateTimeToUtcIso } from '~/utils/calendarEventTime'
 
 const props = defineProps<{
   events: CalendarEvent[]
@@ -77,14 +77,26 @@ const calendarGrid = computed((): DayCell[][] => {
 
 function getDayEvents(date: Date): CalendarEvent[] {
   if (!props.events?.length) return []
-  const dayStart = startOfDay(date)
-  const dayEnd = addDays(dayStart, 1)
+  const dateStr = formatDate(date)
+  const nextDateStr = formatDate(addDays(date, 1))
 
   const dayEvents = props.events.filter((evt: CalendarEvent) => {
     if (!evt.startAt || !evt.endAt) return false
+    // Real UTC instants on both sides, not `getZonedDate`'s "fake local"
+    // Date (whose local getters read as the event's own zone's wall clock,
+    // built for extracting hour/minute for display — not for comparing
+    // against a plain local-constructor Date). `dayStart`/`dayEnd` used to
+    // be built from the *viewer's* system timezone via `startOfDay`, then
+    // compared straight against the event's own-zone reading — the two only
+    // lined up when the event's `eventTimezone` matched the viewer's system
+    // zone. Computing the day boundary in the event's own zone (once per
+    // event, since different events can carry different zones) keeps every
+    // comparison in the same real-instant space.
     const timeZone = getEventTimeZone(evt)
-    const evtStart = getZonedDate(evt.startAt, timeZone)
-    const evtEnd = getZonedDate(evt.endAt, timeZone)
+    const dayStart = new Date(zonedDateTimeToUtcIso(dateStr, '00:00', timeZone)).getTime()
+    const dayEnd = new Date(zonedDateTimeToUtcIso(nextDateStr, '00:00', timeZone)).getTime()
+    const evtStart = new Date(evt.startAt).getTime()
+    const evtEnd = new Date(evt.endAt).getTime()
     return evtStart < dayEnd && evtEnd > dayStart
   })
 

@@ -2,14 +2,16 @@ import { z } from 'zod'
 import { getSupabaseAdminClient } from '../../../../utils/supabase'
 import { requireAuthUser } from '../../../../utils/require-auth'
 import { expandRecurrence, formatRRuleUntil, parseRRule } from '../../../../utils/recurrence'
+import { resolveCalendarForWrite } from '../../../../utils/calendar-access'
+import { parseOrThrow } from '../../../../utils/validation'
 
 const bodySchema = z.object({
   recurrenceId: z.string().min(1),
   title: z.string().min(1).max(200).optional(),
   description: z.string().max(2000).nullable().optional(),
   location: z.string().max(500).nullable().optional(),
-  startAt: z.string().datetime().optional(),
-  endAt: z.string().datetime().optional()
+  startAt: z.string().datetime({ offset: true }).optional(),
+  endAt: z.string().datetime({ offset: true }).optional()
 })
 
 /**
@@ -31,7 +33,7 @@ export default eventHandler(async (event) => {
   }
 
   const body = await readBody(event)
-  const payload = bodySchema.parse(body)
+  const payload = parseOrThrow(bodySchema, body)
 
   const supabase = getSupabaseAdminClient()
 
@@ -39,7 +41,6 @@ export default eventHandler(async (event) => {
     .from('events')
     .select('*')
     .eq('id', id)
-    .eq('owner_user_id', user.id)
     .single()
 
   if (fetchError || !original) {
@@ -47,6 +48,18 @@ export default eventHandler(async (event) => {
   }
 
   const originalRow = original as Record<string, unknown>
+
+  // Same access rule as the plain PATCH (events/[id].patch.ts): owner or an
+  // accepted edit-permission collaborator — this endpoint used to check only
+  // `owner_user_id`. `access.ownerId` (the calendar's real owner, which may
+  // differ from `user.id` for a collaborator) is also what the new split-off
+  // row's own `owner_user_id` must be set to below — events always belong to
+  // the calendar owner, never to whoever happened to edit them.
+  const access = await resolveCalendarForWrite(supabase, originalRow.calendar_id as string, user.id)
+  if (!access) {
+    throw createError({ statusCode: 404, statusMessage: 'Evento não encontrado' })
+  }
+
   const originalRrule = originalRow.rrule as string | null
 
   if (!originalRrule) {
@@ -100,7 +113,7 @@ export default eventHandler(async (event) => {
     .from('events')
     .insert({
       calendar_id: originalRow.calendar_id,
-      owner_user_id: user.id,
+      owner_user_id: access.ownerId,
       title: payload.title ?? originalRow.title,
       description: payload.description !== undefined ? payload.description : originalRow.description,
       location: payload.location !== undefined ? payload.location : originalRow.location,

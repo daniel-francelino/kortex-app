@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { getSupabaseAdminClient } from '../../utils/supabase'
 import { requireAuthUser } from '../../utils/require-auth'
 import { expandRecurrence } from '../../utils/recurrence'
+import { parseOrThrow } from '../../utils/validation'
 
 const querySchema = z.object({
   calendarId: z.string().uuid().optional(),
@@ -15,12 +16,18 @@ const querySchema = z.object({
 export default eventHandler(async (event) => {
   const user = await requireAuthUser(event)
   const query = getQuery(event)
-  const params = querySchema.parse(query)
+  const params = parseOrThrow(querySchema, query)
   const rangeStart = params.from ? new Date(`${params.from}T00:00:00.000`) : null
   const rangeEnd = params.to ? new Date(`${params.to}T23:59:59.999`) : null
   const rangeStartIso = rangeStart?.toISOString()
   const rangeEndIso = rangeEnd?.toISOString()
   const shouldExpandRange = Boolean(rangeStart && rangeEnd)
+  // `,`, `.`, `(`, `)` are PostgREST .or()-filter syntax — a raw `params.q`
+  // containing any of those breaks out of the intended ilike pattern (extra
+  // clauses, malformed filter). Replacing with spaces keeps the search
+  // usable (word boundaries survive) without letting user input reshape the
+  // filter's structure.
+  const sanitizedQ = params.q?.replace(/[,().]/g, ' ').trim() || undefined
 
   const supabase = getSupabaseAdminClient()
 
@@ -105,8 +112,8 @@ export default eventHandler(async (event) => {
         `and(rrule.not.is.null,start_at.lte.${rangeEndIso})`
       ].join(','))
     }
-    if (params.q) {
-      queryBuilder = queryBuilder.or(`title.ilike.%${params.q}%,description.ilike.%${params.q}%,location.ilike.%${params.q}%`)
+    if (sanitizedQ) {
+      queryBuilder = queryBuilder.or(`title.ilike.%${sanitizedQ}%,description.ilike.%${sanitizedQ}%,location.ilike.%${sanitizedQ}%`)
     }
 
     queryBuilder = queryBuilder.order('start_at', { ascending: true })
@@ -149,8 +156,8 @@ export default eventHandler(async (event) => {
         `and(rrule.not.is.null,start_at.lte.${rangeEndIso})`
       ].join(','))
     }
-    if (params.q) {
-      invitedQueryBuilder = invitedQueryBuilder.or(`title.ilike.%${params.q}%,description.ilike.%${params.q}%,location.ilike.%${params.q}%`)
+    if (sanitizedQ) {
+      invitedQueryBuilder = invitedQueryBuilder.or(`title.ilike.%${sanitizedQ}%,description.ilike.%${sanitizedQ}%,location.ilike.%${sanitizedQ}%`)
     }
 
     invitedQueryBuilder = invitedQueryBuilder.order('start_at', { ascending: true })

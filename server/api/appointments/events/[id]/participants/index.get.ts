@@ -1,10 +1,11 @@
 import { z } from 'zod'
 import { getSupabaseAdminClient } from '../../../../../utils/supabase'
 import { requireAuthUser } from '../../../../../utils/require-auth'
+import { parseOrThrow } from '../../../../../utils/validation'
 
 export default eventHandler(async (event) => {
   const user = await requireAuthUser(event)
-  const eventId = z.string().uuid().parse(getRouterParam(event, 'id'))
+  const eventId = parseOrThrow(z.string().uuid(), getRouterParam(event, 'id'))
   const supabase = getSupabaseAdminClient()
 
   // Owner or an invited participant can list the guest list.

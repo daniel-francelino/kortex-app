@@ -45,7 +45,20 @@ function ensureLoaded(): Promise<void> {
 
 async function persist(): Promise<void> {
   if (!import.meta.client) return
-  await set(QUEUE_KEY, pendingMutations.value)
+  try {
+    await set(QUEUE_KEY, pendingMutations.value)
+  } catch (err) {
+    // Swallowed on purpose: a storage write failure (IndexedDB quota, browser
+    // policy) here is not the same thing as the *mutation itself* failing —
+    // letting it propagate uncaught used to bubble up through
+    // dequeue()/markRetry() into the sync loop's own try/catch, where it got
+    // misread as "this mutation's replay failed" and re-queued/retried, even
+    // though the request had already succeeded. Logging is what the caller
+    // can't do anything about anyway; in-memory state stays correct either
+    // way, only the IndexedDB mirror may be stale until the next successful
+    // persist() (which happens on every subsequent enqueue/dequeue/markRetry).
+    console.error('[useMutationQueue] failed to persist queue to IndexedDB', err)
+  }
 }
 
 export function useMutationQueue() {
@@ -119,11 +132,13 @@ export function useMutationQueue() {
   }
 
   async function dequeue(id: string): Promise<void> {
+    await ensureLoaded()
     pendingMutations.value = pendingMutations.value.filter(m => m.id !== id)
     await persist()
   }
 
   async function markRetry(id: string): Promise<void> {
+    await ensureLoaded()
     pendingMutations.value = pendingMutations.value.map(m =>
       m.id === id ? { ...m, retryCount: m.retryCount + 1 } : m
     )

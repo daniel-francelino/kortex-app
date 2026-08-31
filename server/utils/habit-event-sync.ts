@@ -243,16 +243,19 @@ async function resolveTargetCalendarId(
   userId: string,
   preferredCalendarId: string | null
 ): Promise<string> {
-  const calendarIds = await getExistingUserCalendarIds(supabase, userId)
-
-  if (preferredCalendarId && calendarIds.includes(preferredCalendarId)) {
-    return preferredCalendarId
+  if (preferredCalendarId) {
+    const calendarIds = await getExistingUserCalendarIds(supabase, userId)
+    if (calendarIds.includes(preferredCalendarId)) {
+      return preferredCalendarId
+    }
   }
 
-  if (calendarIds.length > 0) {
-    return calendarIds[0]!
-  }
-
+  // No explicit calendar chosen for this habit — always use the reserved
+  // "Hábitos" calendar (found or created on first use), never the user's
+  // first-created regular calendar. Falling back to "the first calendar by
+  // creation order" meant any user who already had at least one calendar
+  // (the common case) had their habit events silently inherit that
+  // calendar's color instead of the reserved habit color.
   return getOrCreateHabitsCalendar(supabase, userId)
 }
 

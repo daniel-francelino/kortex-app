@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { getSupabaseAdminClient } from '../../../../../utils/supabase'
 import { requireAuthUser } from '../../../../../utils/require-auth'
+import { parseOrThrow } from '../../../../../utils/validation'
 
 const bodySchema = z.object({
   permission: z.enum(['view', 'edit'])
@@ -8,10 +9,10 @@ const bodySchema = z.object({
 
 export default eventHandler(async (event) => {
   const user = await requireAuthUser(event)
-  const calendarId = z.string().uuid().parse(getRouterParam(event, 'id'))
-  const shareId = z.string().uuid().parse(getRouterParam(event, 'shareId'))
+  const calendarId = parseOrThrow(z.string().uuid(), getRouterParam(event, 'id'))
+  const shareId = parseOrThrow(z.string().uuid(), getRouterParam(event, 'shareId'))
   const body = await readBody(event)
-  const payload = bodySchema.parse(body)
+  const payload = parseOrThrow(bodySchema, body)
   const supabase = getSupabaseAdminClient()
 
   const { data, error } = await supabase

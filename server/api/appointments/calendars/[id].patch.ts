@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { randomBytes } from 'node:crypto'
 import { getSupabaseAdminClient } from '../../../utils/supabase'
 import { requireAuthUser } from '../../../utils/require-auth'
+import { parseOrThrow } from '../../../utils/validation'
 
 const bodySchema = z.object({
   name: z.string().min(1).max(100).optional(),
@@ -20,7 +21,7 @@ export default eventHandler(async (event) => {
   }
 
   const body = await readBody(event)
-  const payload = bodySchema.parse(body)
+  const payload = parseOrThrow(bodySchema, body)
 
   const supabase = getSupabaseAdminClient()
 

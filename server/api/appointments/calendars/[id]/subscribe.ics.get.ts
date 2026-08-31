@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { getSupabaseAdminClient } from '../../../../utils/supabase'
 import { buildIcsCalendar, type IcsEventRow, type IcsExceptionRow } from '../../../../utils/ics'
+import { parseOrThrow } from '../../../../utils/validation'
 
 const querySchema = z.object({
   token: z.string().min(1, 'Token é obrigatório')
@@ -13,7 +14,7 @@ const querySchema = z.object({
  */
 export default eventHandler(async (event) => {
   const id = getRouterParam(event, 'id')
-  const { token } = querySchema.parse(getQuery(event))
+  const { token } = parseOrThrow(querySchema, getQuery(event))
 
   if (!id) {
     throw createError({ statusCode: 400, statusMessage: 'ID do calendário é obrigatório' })

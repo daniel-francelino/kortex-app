@@ -4,6 +4,7 @@ import { getSupabaseAdminClient } from '../../utils/supabase'
 import { requireCronSecret } from '../../utils/require-cron-secret'
 import { createNotification } from '../../utils/notifications'
 import { expandRecurrence } from '../../utils/recurrence'
+import { parseOrThrow } from '../../utils/validation'
 
 /**
  * Scans `event_reminders` for reminders due in the next `windowMinutes` and
@@ -24,7 +25,7 @@ const querySchema = z.object({
 export default eventHandler(async (event) => {
   requireCronSecret(event)
 
-  const { windowMinutes } = querySchema.parse(getQuery(event))
+  const { windowMinutes } = parseOrThrow(querySchema, getQuery(event))
   const supabase = getSupabaseAdminClient()
 
   const now = new Date()

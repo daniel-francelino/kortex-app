@@ -3,6 +3,7 @@ import { getSupabaseAdminClient } from '../../utils/supabase'
 import { requireAuthUser } from '../../utils/require-auth'
 import { createEventInternal } from '../../utils/appointments-events'
 import { resolveCalendarForWrite } from '../../utils/calendar-access'
+import { parseOrThrow } from '../../utils/validation'
 
 const reminderSchema = z.object({
   type: z.enum(['popup', 'email', 'push']).default('popup'),
@@ -15,8 +16,8 @@ const bodySchema = z.object({
   title: z.string().min(1).max(200),
   description: z.string().max(2000).optional(),
   location: z.string().max(500).optional(),
-  startAt: z.string().datetime(),
-  endAt: z.string().datetime(),
+  startAt: z.string().datetime({ offset: true }),
+  endAt: z.string().datetime({ offset: true }),
   eventTimezone: z.string().min(1).max(100),
   allDay: z.boolean().default(false),
   rrule: z.string().max(500).optional(),
@@ -26,7 +27,7 @@ const bodySchema = z.object({
 export default eventHandler(async (event) => {
   const user = await requireAuthUser(event)
   const body = await readBody(event)
-  const payload = bodySchema.parse(body)
+  const payload = parseOrThrow(bodySchema, body)
 
   const supabase = getSupabaseAdminClient()
 

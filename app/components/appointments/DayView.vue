@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { addDays, addMilliseconds, format, isSameDay, startOfDay } from 'date-fns'
+import { addDays, addMilliseconds, format, isSameDay } from 'date-fns'
 import type { CalendarEvent } from '~/types/appointments'
 import { getEventTimeZone, getZonedDate, zonedDateTimeToUtcIso } from '~/utils/calendarEventTime'
 import {
@@ -50,12 +50,21 @@ onMounted(() => emitRange())
 const hours = Array.from({ length: 24 }, (_, i) => i)
 
 // ─── All-day vs timed events ──────────────────────────────────────────────
+// Real UTC instants on both sides, day boundaries computed in the *event's
+// own* zone — see the matching comment in MonthView.vue's getDayEvents().
+// `dayStart`/`dayEnd` used to be built from the viewer's system timezone via
+// `startOfDay`, then compared against `getZonedDate`'s event-zone reading —
+// only correct when eventTimezone matched the viewer's own zone.
 function isOnDay(evt: CalendarEvent): boolean {
   if (!evt.startAt || !evt.endAt) return false
-  const dayStart = startOfDay(viewDate.value)
-  const dayEnd = addDays(dayStart, 1)
   const timeZone = getEventTimeZone(evt)
-  return getZonedDate(evt.startAt, timeZone) < dayEnd && getZonedDate(evt.endAt, timeZone) > dayStart
+  const dateStr = formatDate(viewDate.value)
+  const nextDateStr = formatDate(addDays(viewDate.value, 1))
+  const dayStart = new Date(zonedDateTimeToUtcIso(dateStr, '00:00', timeZone)).getTime()
+  const dayEnd = new Date(zonedDateTimeToUtcIso(nextDateStr, '00:00', timeZone)).getTime()
+  const evtStart = new Date(evt.startAt).getTime()
+  const evtEnd = new Date(evt.endAt).getTime()
+  return evtStart < dayEnd && evtEnd > dayStart
 }
 
 const allDayEvents = computed(() => props.events.filter(e => e.allDay && isOnDay(e)))

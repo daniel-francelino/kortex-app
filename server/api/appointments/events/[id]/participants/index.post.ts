@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { getSupabaseAdminClient } from '../../../../../utils/supabase'
 import { requireAuthUser } from '../../../../../utils/require-auth'
 import { createNotification } from '../../../../../utils/notifications'
+import { parseOrThrow } from '../../../../../utils/validation'
 
 const bodySchema = z.object({
   email: z.string().email().max(320)
@@ -9,9 +10,9 @@ const bodySchema = z.object({
 
 export default eventHandler(async (event) => {
   const user = await requireAuthUser(event)
-  const eventId = z.string().uuid().parse(getRouterParam(event, 'id'))
+  const eventId = parseOrThrow(z.string().uuid(), getRouterParam(event, 'id'))
   const body = await readBody(event)
-  const payload = bodySchema.parse(body)
+  const payload = parseOrThrow(bodySchema, body)
   const supabase = getSupabaseAdminClient()
 
   const { data: eventRow } = await supabase

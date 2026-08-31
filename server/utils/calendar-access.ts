@@ -38,3 +38,40 @@ export async function resolveCalendarForWrite(
 
   return { ownerId }
 }
+
+/**
+ * Resolves whether `userId` may *view* `calendarId` — owner, or any accepted
+ * calendar_shares grant regardless of permission level ('view' or 'edit').
+ * Broader than resolveCalendarForWrite on purpose: reading doesn't require
+ * edit access. Returns the calendar's actual owner id, or null if the
+ * calendar doesn't exist/isn't visible to this user.
+ */
+export async function resolveCalendarForRead(
+  supabase: SupabaseClient,
+  calendarId: string,
+  userId: string
+): Promise<{ ownerId: string } | null> {
+  const { data: calendar } = await supabase
+    .from('calendars')
+    .select('id, owner_user_id')
+    .eq('id', calendarId)
+    .is('archived_at', null)
+    .maybeSingle()
+
+  if (!calendar) return null
+
+  const ownerId = calendar.owner_user_id as string
+  if (ownerId === userId) return { ownerId }
+
+  const { data: share } = await supabase
+    .from('calendar_shares')
+    .select('id')
+    .eq('calendar_id', calendarId)
+    .eq('invited_user_id', userId)
+    .eq('status', 'accepted')
+    .maybeSingle()
+
+  if (!share) return null
+
+  return { ownerId }
+}

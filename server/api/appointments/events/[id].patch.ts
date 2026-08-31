@@ -2,13 +2,14 @@ import { z } from 'zod'
 import { getSupabaseAdminClient } from '../../../utils/supabase'
 import { requireAuthUser } from '../../../utils/require-auth'
 import { resolveCalendarForWrite } from '../../../utils/calendar-access'
+import { parseOrThrow } from '../../../utils/validation'
 
 const bodySchema = z.object({
   title: z.string().min(1).max(200).optional(),
   description: z.string().max(2000).nullable().optional(),
   location: z.string().max(500).nullable().optional(),
-  startAt: z.string().datetime().optional(),
-  endAt: z.string().datetime().optional(),
+  startAt: z.string().datetime({ offset: true }).optional(),
+  endAt: z.string().datetime({ offset: true }).optional(),
   eventTimezone: z.string().min(1).max(100).optional(),
   allDay: z.boolean().optional(),
   rrule: z.string().max(500).nullable().optional(),
@@ -24,7 +25,7 @@ export default eventHandler(async (event) => {
   }
 
   const body = await readBody(event)
-  const payload = bodySchema.parse(body)
+  const payload = parseOrThrow(bodySchema, body)
 
   const supabase = getSupabaseAdminClient()
 

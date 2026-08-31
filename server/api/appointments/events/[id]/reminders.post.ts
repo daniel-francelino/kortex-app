@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { getSupabaseAdminClient } from '../../../../utils/supabase'
 import { requireAuthUser } from '../../../../utils/require-auth'
+import { parseOrThrow } from '../../../../utils/validation'
 
 const reminderSchema = z.object({
   type: z.enum(['popup', 'email', 'push']).default('popup'),
@@ -20,7 +21,7 @@ export default eventHandler(async (event) => {
   }
 
   const body = await readBody(event)
-  const payload = bodySchema.parse(body)
+  const payload = parseOrThrow(bodySchema, body)
 
   const supabase = getSupabaseAdminClient()
 

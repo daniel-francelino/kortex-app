@@ -2,10 +2,11 @@ import { z } from 'zod'
 import { getSupabaseAdminClient } from '../../../../utils/supabase'
 import { requireAuthUser } from '../../../../utils/require-auth'
 import { mapSchedulingPage } from '../../../../utils/scheduling'
+import { parseOrThrow } from '../../../../utils/validation'
 
 export default eventHandler(async (event) => {
   const user = await requireAuthUser(event)
-  const id = z.string().uuid().parse(getRouterParam(event, 'id'))
+  const id = parseOrThrow(z.string().uuid(), getRouterParam(event, 'id'))
   const supabase = getSupabaseAdminClient()
 
   const { data, error } = await supabase

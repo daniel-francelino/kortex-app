@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { getSupabaseAdminClient } from '../../../../../../utils/supabase'
 import { requireAuthUser } from '../../../../../../utils/require-auth'
 import { createNotification } from '../../../../../../utils/notifications'
+import { parseOrThrow } from '../../../../../../utils/validation'
 
 const bodySchema = z.object({
   rsvpStatus: z.enum(['accepted', 'declined', 'tentative'])
@@ -9,10 +10,10 @@ const bodySchema = z.object({
 
 export default eventHandler(async (event) => {
   const user = await requireAuthUser(event)
-  const eventId = z.string().uuid().parse(getRouterParam(event, 'id'))
-  const participantId = z.string().uuid().parse(getRouterParam(event, 'participantId'))
+  const eventId = parseOrThrow(z.string().uuid(), getRouterParam(event, 'id'))
+  const participantId = parseOrThrow(z.string().uuid(), getRouterParam(event, 'participantId'))
   const body = await readBody(event)
-  const payload = bodySchema.parse(body)
+  const payload = parseOrThrow(bodySchema, body)
   const supabase = getSupabaseAdminClient()
 
   const { data, error } = await supabase

@@ -3,6 +3,7 @@ import { getSupabaseAdminClient } from '../../../utils/supabase'
 import { requireAuthUser } from '../../../utils/require-auth'
 import { createShareToken } from '../../../utils/share-token'
 import { mapSchedulingPage } from '../../../utils/scheduling'
+import { parseOrThrow } from '../../../utils/validation'
 
 const availabilityRuleSchema = z.object({
   dayOfWeek: z.number().int().min(0).max(6),
@@ -51,7 +52,7 @@ const bodySchema = z.object({
 export default eventHandler(async (event) => {
   const user = await requireAuthUser(event)
   const body = await readBody(event)
-  const payload = bodySchema.parse(body)
+  const payload = parseOrThrow(bodySchema, body)
 
   const supabase = getSupabaseAdminClient()
 

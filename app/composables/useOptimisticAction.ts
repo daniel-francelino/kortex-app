@@ -39,7 +39,17 @@ export interface OptimisticActionOptions<T> {
 function looksLikeNetworkFailure(err: unknown): boolean {
   if (typeof navigator !== 'undefined' && !navigator.onLine) return true
   const message = err instanceof Error ? err.message : String(err)
-  return /fetch failed|network|failed to fetch|ECONNREFUSED/i.test(message)
+  // A captive portal (airport wifi, hotel login page) answers every request
+  // with `200 OK` and an HTML login page instead of failing at the network
+  // level — `$fetch` then throws a JSON-parse error on that HTML body, not
+  // a network-sounding message, and this heuristic used to miss it entirely:
+  // the mutation got rolled back with a visible error toast instead of
+  // queued offline, even though the user is offline in every way that
+  // matters. `err instanceof SyntaxError` covers `JSON.parse` failures;
+  // ofetch also surfaces "Unexpected token"/"is not valid JSON" in the
+  // message for the same case even when it doesn't throw a SyntaxError.
+  if (err instanceof SyntaxError) return true
+  return /fetch failed|network|failed to fetch|ECONNREFUSED|unexpected token|not valid json/i.test(message)
 }
 
 /**

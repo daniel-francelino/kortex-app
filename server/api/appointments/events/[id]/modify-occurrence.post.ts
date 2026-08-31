@@ -1,14 +1,16 @@
 import { z } from 'zod'
 import { getSupabaseAdminClient } from '../../../../utils/supabase'
 import { requireAuthUser } from '../../../../utils/require-auth'
+import { resolveCalendarForWrite } from '../../../../utils/calendar-access'
+import { parseOrThrow } from '../../../../utils/validation'
 
 const bodySchema = z.object({
   recurrenceId: z.string().min(1),
   title: z.string().min(1).max(200).optional(),
   description: z.string().max(2000).nullable().optional(),
   location: z.string().max(500).nullable().optional(),
-  startAt: z.string().datetime().optional(),
-  endAt: z.string().datetime().optional()
+  startAt: z.string().datetime({ offset: true }).optional(),
+  endAt: z.string().datetime({ offset: true }).optional()
 })
 
 /**
@@ -26,18 +28,26 @@ export default eventHandler(async (event) => {
   }
 
   const body = await readBody(event)
-  const payload = bodySchema.parse(body)
+  const payload = parseOrThrow(bodySchema, body)
 
   const supabase = getSupabaseAdminClient()
 
   const { data: eventData, error: eventError } = await supabase
     .from('events')
-    .select('id, rrule')
+    .select('id, rrule, calendar_id')
     .eq('id', id)
-    .eq('owner_user_id', user.id)
     .single()
 
   if (eventError || !eventData) {
+    throw createError({ statusCode: 404, statusMessage: 'Evento não encontrado' })
+  }
+
+  // Same access rule as the plain PATCH (events/[id].patch.ts): owner or an
+  // accepted edit-permission collaborator — this endpoint used to check only
+  // `owner_user_id`, so a shared-calendar collaborator could edit the whole
+  // series via PATCH but got a 404 trying to edit a single occurrence.
+  const access = await resolveCalendarForWrite(supabase, (eventData as Record<string, unknown>).calendar_id as string, user.id)
+  if (!access) {
     throw createError({ statusCode: 404, statusMessage: 'Evento não encontrado' })
   }
 

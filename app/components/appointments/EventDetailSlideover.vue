@@ -3,11 +3,16 @@ import { z } from 'zod'
 import type { Calendar, CalendarEvent, EventParticipant } from '~/types/appointments'
 import { RsvpStatus } from '~/types/appointments'
 import { strToDateValue, dateValueToStr, strToTimeValue, timeValueToStr, type TimeValue } from '~/utils/calendarDate'
-import { formatEventDate, formatEventTime, getEventTimeZone, getZonedDateParts, zonedDateTimeToUtcIso } from '~/utils/calendarEventTime'
+import { formatEventDate, formatEventTime, getEventTimeZone, getZonedDate, getZonedDateParts, zonedDateTimeToUtcIso } from '~/utils/calendarEventTime'
 
 const props = defineProps<{
   open: boolean
   event: CalendarEvent | null
+  // The recurring series' actual master row (real DTSTART/DTEND) — `event`
+  // shows the clicked occurrence's own date/time instead, which is what the
+  // edit form must reflect; this is only used by the "todas as ocorrências"
+  // scope, to shift the series' real anchor rather than overwrite it.
+  seriesRoot?: CalendarEvent | null
   calendars: Calendar[] | null | undefined
   loading?: boolean
 }>()
@@ -268,12 +273,36 @@ async function saveWithScope(scope: 'this' | 'this-and-following' | 'all') {
       success = await splitSeries(props.event.id, { recurrenceId, ...pending })
       needsRefetch = success
     } else {
+      // "Todas as ocorrências": `pending.startAt`/`endAt` is the *clicked
+      // occurrence's* new date/time, not the series' DTSTART/DTEND — sending
+      // it straight through would move the whole series' anchor to whatever
+      // occurrence happened to be open, and expandRecurrence() never
+      // generates occurrences before DTSTART, so every earlier occurrence in
+      // the series would silently vanish. Instead, shift the series' real
+      // start/end (`seriesRoot`) by the same amount the user shifted this
+      // occurrence — same idea as moving one instance of a recurring event
+      // in Google Calendar and choosing "this and all events".
+      const editTimeZone = props.event.eventTimezone || timezone
+      let startAt = pending.startAt
+      let endAt = pending.endAt
+
+      if (props.seriesRoot) {
+        const deltaMs = new Date(pending.startAt).getTime()
+          - getZonedDate(props.event.startAt, editTimeZone).getTime()
+        startAt = new Date(new Date(props.seriesRoot.startAt).getTime() + deltaMs).toISOString()
+        endAt = new Date(new Date(props.seriesRoot.endAt).getTime() + deltaMs).toISOString()
+      }
+
       success = await updateEvent(props.event.id, {
         calendarId: state.calendarId,
-        eventTimezone: props.event.eventTimezone || timezone,
+        eventTimezone: editTimeZone,
         allDay: state.allDay,
         rrule: state.rrule || null,
-        ...pending
+        title: pending.title,
+        description: pending.description,
+        location: pending.location,
+        startAt,
+        endAt
       })
     }
 

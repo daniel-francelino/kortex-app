@@ -202,6 +202,13 @@ const eventDetailLoading = ref(false)
 const calendarsExpanded = ref(false)
 const isMobile = useMediaQuery('(max-width: 1023px)')
 const selectedEvent = ref<CalendarEvent | null>(null)
+// The recurring series' actual master row (real DTSTART/DTEND) — GET
+// /events/[id] always returns the master, never a specific occurrence's
+// time (see server/api/appointments/events/[id].get.ts), so this is kept
+// separately from `selectedEvent` (which shows the *clicked occurrence's*
+// date/time) purely so "editar todas as ocorrências" can shift the series'
+// real anchor instead of overwriting it with whichever occurrence was open.
+const selectedEventSeriesRoot = ref<CalendarEvent | null>(null)
 
 // Event popover state
 const eventPopoverVisible = ref(false)
@@ -211,6 +218,10 @@ const eventPopoverPosition = ref({ x: 0, y: 0 })
 // Quick create popover state
 const quickCreateVisible = ref(false)
 const quickCreateDate = ref('')
+// Only set when creation started from a Day-view slot click — Month/Week
+// slots have no time granularity, so this stays null and onQuickCreate()
+// falls back to a default time.
+const quickCreateTime = ref<string | null>(null)
 const quickCreatePosition = ref({ x: 0, y: 0 })
 
 // Day events (month view "+X mais") popover state
@@ -241,6 +252,7 @@ function onSelectSlot(date: string, mouseEvent: MouseEvent) {
   eventPopoverVisible.value = false
 
   quickCreateDate.value = date
+  quickCreateTime.value = null
   quickCreatePosition.value = { x: mouseEvent.clientX, y: mouseEvent.clientY }
   quickCreateVisible.value = true
 }
@@ -264,9 +276,10 @@ function onDayEventsSelectEvent(evt: CalendarEvent, mouseEvent: MouseEvent) {
   onSelectEvent(evt, mouseEvent)
 }
 
-function onDaySlotSelect(_date: string, time: string, mouseEvent: MouseEvent) {
+function onDaySlotSelect(date: string, time: string, mouseEvent: MouseEvent) {
   eventPopoverVisible.value = false
-  quickCreateDate.value = _date
+  quickCreateDate.value = date
+  quickCreateTime.value = time
   quickCreatePosition.value = { x: mouseEvent.clientX, y: mouseEvent.clientY }
   quickCreateVisible.value = true
 }
@@ -305,14 +318,26 @@ onBeforeUnmount(() => {
 async function onPopoverEdit(evt: CalendarEvent) {
   closeEventPopover()
   selectedEvent.value = evt
+  selectedEventSeriesRoot.value = null
   eventDetailOpen.value = true
   eventDetailLoading.value = true
 
   try {
     const detail = await fetchEventDetail(evt.id)
     if (detail && selectedEvent.value?.id === evt.id) {
+      selectedEventSeriesRoot.value = detail
       selectedEvent.value = {
         ...detail,
+        // Keep the CLICKED OCCURRENCE's own date/time, not the series'
+        // master row's — `detail.startAt`/`endAt` is always the recurring
+        // series' real DTSTART/DTEND (see events/[id].get.ts, which reads
+        // the master row directly), never the specific occurrence that was
+        // opened. The edit form has to reflect what was actually clicked, or
+        // "somente esta ocorrência"/"esta e as seguintes" silently apply
+        // against the wrong date. `selectedEventSeriesRoot` carries the real
+        // DTSTART/DTEND separately, for the "todas as ocorrências" scope.
+        startAt: evt.startAt,
+        endAt: evt.endAt,
         recurrenceId: evt.recurrenceId ?? detail.recurrenceId ?? null,
         isRecurring: evt.isRecurring ?? detail.isRecurring,
         isCancelled: evt.isCancelled ?? detail.isCancelled
@@ -353,14 +378,26 @@ async function onPopoverDuplicate(evt: CalendarEvent) {
   }
 }
 
+// One hour after `time`, clamped to 23:59 same day — quick-create keeps
+// the event on the day the user clicked rather than rolling into tomorrow.
+function addOneHourClamped(time: string): string {
+  const [h, m] = time.split(':').map(Number)
+  const totalMinutes = Math.min((h ?? 0) * 60 + (m ?? 0) + 60, 23 * 60 + 59)
+  return `${String(Math.floor(totalMinutes / 60)).padStart(2, '0')}:${String(totalMinutes % 60).padStart(2, '0')}`
+}
+
 async function onQuickCreate(data: { title: string, date: string, calendarId: string }) {
   closeQuickCreate()
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone
+  // Day-view slot clicks carry the actual clicked time; Month/Week slots have
+  // no time granularity and fall back to the previous fixed 09:00-10:00 default.
+  const startTime = quickCreateTime.value ?? '09:00'
+  const endTime = quickCreateTime.value ? addOneHourClamped(quickCreateTime.value) : '10:00'
   const payload: CreateEventPayload = {
     calendarId: data.calendarId,
     title: data.title,
-    startAt: zonedDateTimeToUtcIso(data.date, '09:00', timezone),
-    endAt: zonedDateTimeToUtcIso(data.date, '10:00', timezone),
+    startAt: zonedDateTimeToUtcIso(data.date, startTime, timezone),
+    endAt: zonedDateTimeToUtcIso(data.date, endTime, timezone),
     eventTimezone: timezone
   }
 
@@ -862,6 +899,7 @@ onMounted(() => {
   <AppointmentsEventDetailSlideover
     :open="eventDetailOpen"
     :event="selectedEvent"
+    :series-root="selectedEventSeriesRoot"
     :loading="eventDetailLoading"
     :calendars="calendars"
     @update:open="eventDetailOpen = $event"
