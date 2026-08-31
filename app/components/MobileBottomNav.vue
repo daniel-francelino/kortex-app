@@ -101,6 +101,7 @@ function updateNavDebugInfo() {
     `innerHeight=${window.innerHeight}`,
     `vv.height=${Math.round(viewport?.height ?? 0)}`,
     `safeBottom=${rootStyles.getPropertyValue('--safe-area-bottom').trim() || 'n/a'}`,
+    `navSafe=${rootStyles.getPropertyValue('--mobile-bottom-nav-safe-padding').trim() || 'n/a'}`,
     `bleed=${rootStyles.getPropertyValue('--pwa-standalone-bottom-bleed').trim() || 'n/a'}`
   ].join(' | ')
 }
@@ -131,7 +132,7 @@ watchEffect(() => {
 
   document.documentElement.style.setProperty(
     '--mobile-bottom-nav-height',
-    'var(--mobile-bottom-nav-bar-height, 4.75rem)'
+    'calc(var(--mobile-bottom-nav-bar-height, 4.75rem) + var(--mobile-bottom-nav-safe-padding, 0px))'
   )
 })
 
@@ -153,7 +154,7 @@ onUnmounted(() => {
   window.visualViewport?.removeEventListener('scroll', updateNavDebugInfo)
   document.documentElement.style.setProperty(
     '--mobile-bottom-nav-height',
-    'var(--mobile-bottom-nav-bar-height, 4.75rem)'
+    'calc(var(--mobile-bottom-nav-bar-height, 4.75rem) + var(--mobile-bottom-nav-safe-padding, 0px))'
   )
 })
 </script>
