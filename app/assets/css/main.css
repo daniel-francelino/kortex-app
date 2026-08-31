@@ -218,8 +218,8 @@ body.keyboard-open .mobile-bottom-nav {
 
 @media (max-width: 1023px) {
   html.pwa-standalone {
-    --pwa-standalone-bottom-bleed: env(safe-area-inset-bottom, 0px);
-    --mobile-bottom-nav-extra-background: var(--pwa-standalone-bottom-bleed);
+    --pwa-standalone-bottom-bleed: 0px;
+    --mobile-bottom-nav-extra-background: 0px;
   }
 
   html.pwa-standalone .mobile-bottom-nav,
