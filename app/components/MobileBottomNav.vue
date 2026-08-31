@@ -91,6 +91,7 @@ function updateNavDebugInfo() {
     `app.bottom=${Math.round(appContentRect?.bottom ?? 0)}`,
     `body.bottom=${Math.round(panelBodyRect?.bottom ?? 0)}`,
     `child.bottom=${Math.round(panelBodyChildRect?.bottom ?? 0)}`,
+    `body/nav=${Math.round((panelBodyRect?.bottom ?? 0) - rect.top)}`,
     `css.top=${styles.top}`,
     `css.bottom=${styles.bottom}`,
     `css.height=${styles.height}`,

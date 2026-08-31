@@ -256,9 +256,15 @@ body.keyboard-open .mobile-bottom-nav {
 }
 
 @media (max-width: 1023px) {
+  .app-content-with-bottom-nav {
+    height: calc(100dvh - var(--safe-area-top, 0px) - var(--mobile-bottom-nav-height, 4.75rem));
+    max-height: calc(100dvh - var(--safe-area-top, 0px) - var(--mobile-bottom-nav-height, 4.75rem));
+    flex: 0 0 calc(100dvh - var(--safe-area-top, 0px) - var(--mobile-bottom-nav-height, 4.75rem));
+  }
+
   .app-content-with-bottom-nav [data-slot="body"] {
     padding-bottom: 0 !important;
-    scroll-padding-bottom: calc(var(--mobile-bottom-nav-height, 4.75rem) + 1rem);
+    scroll-padding-bottom: 1rem;
   }
 }
 
