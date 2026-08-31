@@ -50,7 +50,7 @@ html,
 body,
 #__nuxt {
   min-height: 100%;
-  background: #020618;
+  background: var(--ui-bg, #020618);
 }
 
 * {
@@ -218,7 +218,8 @@ body.keyboard-open .mobile-bottom-nav {
 
 @media (max-width: 1023px) {
   html.pwa-standalone {
-    --pwa-standalone-bottom-bleed: 0px;
+    --pwa-standalone-bottom-bleed: env(safe-area-inset-bottom, 0px);
+    --mobile-bottom-nav-safe-padding: var(--pwa-standalone-bottom-bleed);
     --mobile-bottom-nav-extra-background: 0px;
   }
 
@@ -226,6 +227,10 @@ body.keyboard-open .mobile-bottom-nav {
   html.capacitor-native .mobile-bottom-nav {
     top: auto;
     bottom: 0;
+  }
+
+  html.pwa-standalone .mobile-bottom-nav {
+    bottom: calc(0px - var(--pwa-standalone-bottom-bleed));
   }
 
   html.pwa-standalone .kortex-app-shell,
@@ -256,10 +261,6 @@ body.keyboard-open .mobile-bottom-nav {
 }
 
 @media (max-width: 1023px) {
-  .app-content-with-bottom-nav {
-    padding-bottom: var(--mobile-bottom-nav-height, 4.75rem);
-  }
-
   .app-content-with-bottom-nav [data-slot="body"] {
     padding-bottom: 0 !important;
     scroll-padding-bottom: calc(var(--mobile-bottom-nav-height, 4.75rem) + 1rem);
