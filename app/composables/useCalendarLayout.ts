@@ -6,24 +6,34 @@ export interface PositionedEvent extends CalendarEvent {
   widthRatio: number
 }
 
-export const HOUR_HEIGHT = 48 // px per hour
+// Default and clamp range for the pinch-to-zoom time grid (see
+// useCalendarZoom.ts) — `DEFAULT_HOUR_HEIGHT` is also the fallback for any
+// caller that doesn't pass an explicit `hourHeight`.
+export const DEFAULT_HOUR_HEIGHT = 48 // px per hour
+export const MIN_HOUR_HEIGHT = 24
+export const MAX_HOUR_HEIGHT = 200
 
-export function getEventTopPx(event: CalendarEvent, dayDate: Date): number {
+export function getEventTopPx(event: CalendarEvent, dayDate: Date, hourHeight: number = DEFAULT_HOUR_HEIGHT): number {
   const dayStart = new Date(dayDate.getFullYear(), dayDate.getMonth(), dayDate.getDate())
   const evtStart = getZonedDate(event.startAt, getEventTimeZone(event))
   const startMinutes = Math.max(0, (evtStart.getTime() - dayStart.getTime()) / 60000)
-  return (startMinutes / 60) * HOUR_HEIGHT
+  return (startMinutes / 60) * hourHeight
 }
 
-export function getEventHeightPx(event: CalendarEvent, dayDate: Date): number {
+export function getEventHeightPx(event: CalendarEvent, dayDate: Date, hourHeight: number = DEFAULT_HOUR_HEIGHT): number {
   const dayStart = new Date(dayDate.getFullYear(), dayDate.getMonth(), dayDate.getDate())
   const timeZone = getEventTimeZone(event)
   const evtStart = getZonedDate(event.startAt, timeZone)
   const evtEnd = getZonedDate(event.endAt, timeZone)
   const startMinutes = Math.max(0, (evtStart.getTime() - dayStart.getTime()) / 60000)
   const endMinutes = Math.min(1440, (evtEnd.getTime() - dayStart.getTime()) / 60000)
+  // Duration is already floored at 15min below — no extra pixel-based
+  // minimum on top of that. A hardcoded floor (used to be 20px) was
+  // inflating a genuine 15-minute event well past its real proportion of
+  // the hour; zooming in is the correct way to make a short block legible,
+  // not stretching it out of proportion at every zoom level.
   const duration = Math.max(endMinutes - startMinutes, 15)
-  return Math.max((duration / 60) * HOUR_HEIGHT, 20)
+  return (duration / 60) * hourHeight
 }
 
 export function layoutTimedEvents(events: CalendarEvent[]): PositionedEvent[] {
@@ -96,9 +106,9 @@ export function layoutTimedEvents(events: CalendarEvent[]): PositionedEvent[] {
   return result
 }
 
-export function getCurrentTimePx(): number {
+export function getCurrentTimePx(hourHeight: number = DEFAULT_HOUR_HEIGHT): number {
   const now = new Date()
-  return ((now.getHours() * 60 + now.getMinutes()) / 60) * HOUR_HEIGHT
+  return ((now.getHours() * 60 + now.getMinutes()) / 60) * hourHeight
 }
 
 export function formatHourLabel(hour: number): string {

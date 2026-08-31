@@ -9,9 +9,11 @@ import {
   getCurrentTimePx,
   formatHourLabel,
   snapMinutes,
-  HOUR_HEIGHT,
   type PositionedEvent
 } from '~/composables/useCalendarLayout'
+import { usePinchZoom, useCalendarZoom } from '~/composables/useCalendarZoom'
+
+const { hourHeight, setHourHeight } = useCalendarZoom()
 
 const props = defineProps<{
   events: CalendarEvent[]
@@ -62,11 +64,17 @@ const timedEvents = computed(() => layoutTimedEvents(props.events.filter(e => !e
 // ─── Current time ─────────────────────────────────────────────────────────
 const isToday = computed(() => isSameDay(viewDate.value, new Date()))
 
-const currentTimePx = ref(getCurrentTimePx())
+// Depends on hourHeight directly (recomputes on zoom) and on nowTick (bumped
+// every minute) since plain elapsed time isn't itself a reactive trigger.
+const nowTick = ref(Date.now())
+const currentTimePx = computed(() => {
+  void nowTick.value
+  return getCurrentTimePx(hourHeight.value)
+})
 let timerId: ReturnType<typeof setInterval>
 onMounted(() => {
   timerId = setInterval(() => {
-    currentTimePx.value = getCurrentTimePx()
+    nowTick.value = Date.now()
   }, 60_000)
 })
 onUnmounted(() => clearInterval(timerId))
@@ -162,7 +170,7 @@ const ghostStyle = computed(() => {
   const scrollTop = scrollEl?.scrollTop ?? 0
   const bodyRect = scrollEl?.getBoundingClientRect()
   const topInViewport = bodyRect
-    ? bodyRect.top + (drag.targetMinutes / 60) * HOUR_HEIGHT - scrollTop
+    ? bodyRect.top + (drag.targetMinutes / 60) * hourHeight.value - scrollTop
     : 0
 
   return {
@@ -170,7 +178,7 @@ const ghostStyle = computed(() => {
     left: `${colRect.left + 2}px`,
     top: `${topInViewport}px`,
     width: `${colRect.width - 4}px`,
-    height: `${Math.max((drag.durationMs / 3_600_000) * HOUR_HEIGHT, 20)}px`,
+    height: `${(drag.durationMs / 3_600_000) * hourHeight.value}px`,
     backgroundColor: color + '30',
     borderLeft: `3px solid ${color}`,
     borderRadius: '4px',
@@ -249,7 +257,7 @@ function getSnappedMinutes(clientY: number): number {
   const rect = scrollEl.getBoundingClientRect()
   const scrollTop = scrollEl.scrollTop
   const relY = clientY - rect.top + scrollTop
-  return Math.max(0, Math.min(1425, snapMinutes((relY / HOUR_HEIGHT) * 60)))
+  return Math.max(0, Math.min(1425, snapMinutes((relY / hourHeight.value) * 60)))
 }
 
 function onKeydown(e: KeyboardEvent) {
@@ -264,7 +272,7 @@ function onSlotClick(hour: number, e: MouseEvent) {
   if (drag.active) return
   const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
   const offsetY = e.clientY - rect.top
-  const minutes = snapMinutes(Math.floor((offsetY / HOUR_HEIGHT) * 60))
+  const minutes = snapMinutes(Math.floor((offsetY / hourHeight.value) * 60))
   const h = String(hour).padStart(2, '0')
   const m = String(minutes % 60).padStart(2, '0')
   emit('selectSlot', dayStr.value, `${h}:${m}`, e)
@@ -282,8 +290,8 @@ function getEventColor(evt: CalendarEvent): string {
 
 function getEventStyle(evt: PositionedEvent) {
   const color = getEventColor(evt)
-  const top = getEventTopPx(evt, viewDate.value)
-  const height = getEventHeightPx(evt, viewDate.value)
+  const top = getEventTopPx(evt, viewDate.value, hourHeight.value)
+  const height = getEventHeightPx(evt, viewDate.value, hourHeight.value)
   const isDragging = drag.active && drag.event?.id === evt.id
 
   // Day column occupies (100% - 3rem). leftRatio/widthRatio are fractions of that column.
@@ -302,6 +310,23 @@ function getEventStyle(evt: PositionedEvent) {
     userSelect: 'none' as const
   }
 }
+
+// ─── Pinch-to-zoom (mobile) ─────────────────────────────────────────────────
+const scrollBodyRef = ref<HTMLElement | null>(null)
+const { attach: attachPinchZoom, detach: detachPinchZoom } = usePinchZoom({
+  scrollEl: scrollBodyRef,
+  hourHeight,
+  setHourHeight
+})
+
+onMounted(() => {
+  scrollBodyRef.value = gridRef.value?.querySelector<HTMLElement>('[data-scroll-body]') ?? null
+  if (scrollBodyRef.value) attachPinchZoom(scrollBodyRef.value)
+})
+
+onUnmounted(() => {
+  if (scrollBodyRef.value) detachPinchZoom(scrollBodyRef.value)
+})
 
 defineExpose({ viewDate })
 </script>
@@ -332,7 +357,7 @@ defineExpose({ viewDate })
             v-for="hour in hours"
             :key="hour"
             class="flex border-b border-default/30"
-            :style="{ height: `${HOUR_HEIGHT}px` }"
+            :style="{ height: `${hourHeight}px` }"
           >
             <div class="w-10 shrink-0 pr-1 text-right sm:w-12 sm:pr-2">
               <USkeleton class="ml-auto mt-0 h-2 w-7" />
@@ -374,14 +399,14 @@ defineExpose({ viewDate })
           class="overflow-y-auto"
           style="max-height: calc(var(--app-visual-height, 100vh) - var(--ui-header-height) - var(--mobile-bottom-nav-height, 4.75rem) - 2.5rem)"
         >
-          <div class="relative" :style="{ minHeight: `${24 * HOUR_HEIGHT}px` }">
+          <div class="relative" :style="{ minHeight: `${24 * hourHeight}px` }">
             <!-- Hour rows -->
             <div
               v-for="hour in hours"
               :key="hour"
               class="flex cursor-pointer hover:bg-elevated/20"
               :class="hour < 23 ? 'border-b border-default/30' : ''"
-              :style="{ height: `${HOUR_HEIGHT}px` }"
+              :style="{ height: `${hourHeight}px` }"
               @click="onSlotClick(hour, $event)"
             >
               <div class="w-10 shrink-0 pr-1 text-right sm:w-12 sm:pr-2">
@@ -412,7 +437,7 @@ defineExpose({ viewDate })
               @pointerdown.stop="startDrag(evt, $event)"
             >
               <div
-                class="truncate font-semibold leading-tight"
+                class="wrap-break-word font-semibold leading-tight"
                 :style="{ color: getEventColor(evt) }"
               >
                 {{ evt.title }}
