@@ -12,7 +12,7 @@ export default defineAppConfig({
     dashboardPanel: {
       slots: {
         root: 'max-lg:min-h-0',
-        body: 'max-lg:scroll-pb-[calc(var(--mobile-bottom-nav-height,4.75rem)+1rem)]',
+        body: 'max-lg:pb-0 max-lg:scroll-pb-[calc(var(--mobile-bottom-nav-height,4.75rem)+1rem)]',
       }
     },
     popover: {

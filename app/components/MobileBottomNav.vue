@@ -75,6 +75,8 @@ function updateNavDebugInfo() {
   const rootStyles = window.getComputedStyle(document.documentElement)
   const panelBody = document.querySelector<HTMLElement>('.app-content-with-bottom-nav [data-slot="body"]')
   const panelBodyStyles = panelBody ? window.getComputedStyle(panelBody) : null
+  const panelBodyChild = panelBody?.firstElementChild instanceof HTMLElement ? panelBody.firstElementChild : null
+  const panelBodyChildStyles = panelBodyChild ? window.getComputedStyle(panelBodyChild) : null
   const viewport = window.visualViewport
 
   navDebugInfo.value = [
@@ -85,6 +87,7 @@ function updateNavDebugInfo() {
     `css.bottom=${styles.bottom}`,
     `css.height=${styles.height}`,
     `body.pb=${panelBodyStyles?.paddingBottom ?? 'n/a'}`,
+    `child.pb=${panelBodyChildStyles?.paddingBottom ?? 'n/a'}`,
     `body.scrollPb=${panelBodyStyles?.scrollPaddingBottom ?? 'n/a'}`,
     `innerHeight=${window.innerHeight}`,
     `vv.height=${Math.round(viewport?.height ?? 0)}`,
