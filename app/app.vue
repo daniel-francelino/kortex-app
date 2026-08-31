@@ -6,8 +6,8 @@ const colorMode = useColorMode()
 const { state: preferencesState, applyBrandTheme, applyPublicTheme, applyStoredTheme } = useUserPreferences()
 const runtimeConfig = useRuntimeConfig()
 
-const color = computed(() => colorMode.value === 'dark' ? '#020618' : 'white')
 const isAppRoute = computed(() => route.path.startsWith('/app'))
+const color = computed(() => isAppRoute.value || colorMode.value === 'dark' ? '#020618' : 'white')
 const siteUrl = runtimeConfig.public.siteUrl?.replace(/\/$/, '') || 'https://kortex.app'
 const defaultOgImage = `${siteUrl}/icons/icon-512x512.png`
 const appleSplashLinks = [
@@ -86,6 +86,18 @@ useHead({
     { rel: 'apple-touch-icon', href: '/icons/apple-touch-icon.png' },
     { rel: 'mask-icon', href: '/icons/kortex-mono.svg', color: '#12E39A' },
     ...appleSplashLinks
+  ],
+  style: [
+    {
+      key: 'critical-app-background',
+      innerHTML: 'html,body,#__nuxt{min-height:100%;background:#020618;color-scheme:dark;}'
+    }
+  ],
+  script: [
+    {
+      key: 'standalone-runtime-class',
+      innerHTML: 'try{if(window.matchMedia?.("(display-mode: standalone)")?.matches||window.navigator?.standalone===true){document.documentElement.classList.add("pwa-standalone")}}catch(e){}'
+    }
   ],
   htmlAttrs: {
     lang: 'pt-BR'

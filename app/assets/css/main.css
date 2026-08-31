@@ -251,11 +251,13 @@ body.keyboard-open .mobile-bottom-nav {
 }
 
 @media (max-width: 1023px) {
+  html.pwa-standalone .mobile-bottom-nav,
   html.capacitor-native .mobile-bottom-nav {
     top: auto;
     bottom: 0;
   }
 
+  html.pwa-standalone .kortex-app-shell,
   html.capacitor-native .kortex-app-shell {
     height: 100dvh;
   }

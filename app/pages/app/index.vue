@@ -11,14 +11,11 @@ const {
   dashboard,
   dashboardStatus,
   insights,
-  insightsStatus,
-  refreshDashboard,
-  refreshInsights
+  insightsStatus
 } = useLifeOS()
 
 const isLoading = computed(() => dashboardStatus.value === 'pending')
 const isInsightsLoading = computed(() => insightsStatus.value === 'pending')
-const isRefreshing = computed(() => isLoading.value || isInsightsLoading.value)
 const todayFormatted = useState('life-os-today-formatted', () =>
   new Intl.DateTimeFormat('pt-BR', {
     weekday: 'long',
@@ -28,11 +25,6 @@ const todayFormatted = useState('life-os-today-formatted', () =>
     timeZone: 'America/Fortaleza'
   }).format(new Date())
 )
-
-async function handleRefresh() {
-  if (isRefreshing.value) return
-  await Promise.all([refreshDashboard(), refreshInsights()])
-}
 </script>
 
 <template>
@@ -45,17 +37,6 @@ async function handleRefresh() {
 
         <template #right>
           <NotificationsButton />
-          <UTooltip text="Atualizar">
-            <UButton
-              color="neutral"
-              variant="ghost"
-              icon="i-lucide-refresh-cw"
-              square
-              :loading="isRefreshing"
-              :disabled="isRefreshing"
-              @click="handleRefresh"
-            />
-          </UTooltip>
         </template>
       </UDashboardNavbar>
     </template>
