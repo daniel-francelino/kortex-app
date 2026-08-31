@@ -35,6 +35,7 @@ html {
   --safe-area-right: env(safe-area-inset-right, 0px);
   --app-visual-height: 100%;
   --app-visual-offset-top: 0px;
+  --pwa-standalone-bottom-bleed: 0px;
   --mobile-sidebar-safe-area-top: var(--safe-area-top);
   --mobile-sidebar-safe-area-bottom: 0px;
   --mobile-bottom-nav-bar-height: 4.75rem;
@@ -94,6 +95,12 @@ body,
     -webkit-user-select: none;
     user-select: text;
   }
+}
+
+body.pwa-standalone {
+  overscroll-behavior-y: contain;
+  -webkit-user-select: none;
+  user-select: text;
 }
 
 @supports (-webkit-touch-callout: none) {
@@ -203,10 +210,20 @@ body.keyboard-open .mobile-bottom-nav {
 }
 
 @media (max-width: 1023px) {
+  html.pwa-standalone {
+    --pwa-standalone-bottom-bleed: max(env(safe-area-inset-bottom, 0px), env(safe-area-inset-top, 0px), 2rem);
+  }
+
   html.pwa-standalone .mobile-bottom-nav,
   html.capacitor-native .mobile-bottom-nav {
     top: auto;
     bottom: 0;
+  }
+
+  html.pwa-standalone .mobile-bottom-nav {
+    bottom: calc(0px - var(--pwa-standalone-bottom-bleed));
+    height: calc(var(--mobile-bottom-nav-height) + var(--pwa-standalone-bottom-bleed));
+    padding-bottom: var(--pwa-standalone-bottom-bleed);
   }
 
   html.pwa-standalone .kortex-app-shell,
