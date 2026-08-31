@@ -61,6 +61,20 @@ export function formatEventDate(event: CalendarEvent, field: 'startAt' | 'endAt'
   return formatZonedDateKey(event[field], getEventTimeZone(event))
 }
 
+/** Orders a day's events the way the day/week views already lay them out:
+ * all-day items (the journal marker included) first — they have no time
+ * of their own, so they read as the day's "header" items — then timed
+ * events chronologically. */
+export function sortDayEvents(events: CalendarEvent[]): CalendarEvent[] {
+  return [...events].sort((a, b) => {
+    if (a.allDay !== b.allDay) return a.allDay ? -1 : 1
+    if (a.allDay && b.allDay) return 0
+    const timeA = getZonedDate(a.startAt, getEventTimeZone(a)).getTime()
+    const timeB = getZonedDate(b.startAt, getEventTimeZone(b)).getTime()
+    return timeA - timeB
+  })
+}
+
 export function zonedDateTimeToUtcIso(dateStr: string, timeStr: string, timeZone: string): string {
   const [year, month, day] = dateStr.split('-').map(Number)
   const [hour, minute] = timeStr.split(':').map(Number)

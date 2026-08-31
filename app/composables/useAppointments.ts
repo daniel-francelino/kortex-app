@@ -1,4 +1,4 @@
-import { useDebounceFn } from '@vueuse/core'
+import { createSharedComposable, useDebounceFn } from '@vueuse/core'
 import { CalendarVisibility } from '~/types/appointments'
 import type {
   Calendar,
@@ -138,7 +138,16 @@ function normalizeEvent(input: unknown): CalendarEvent {
   }
 }
 
-export function useAppointments() {
+// Shared across every call site (the Agenda page, EventDetailSlideover,
+// EventCreateModal, CalendarCreateModal, the scheduling pages...) — same
+// idea as useDashboard/useNotifications. Without this, each component got
+// its own private `eventsByKey`/`calendarsById` store: an optimistic edit
+// made from the slideover updated a store nobody's view was reading from,
+// so the only way for the Agenda grid to ever see it was a full
+// refreshEvents() round trip. Sharing one store means an optimistic
+// mutation from *any* component is instantly visible everywhere, matching
+// how useNotes.ts (a single call site) behaves without even having to try.
+function _useAppointments() {
   const toast = useToast()
   const { runOptimisticAction } = useOptimisticAction()
 
@@ -246,6 +255,7 @@ export function useAppointments() {
   const lastKnownEventsTotal = ref(0)
   const lastKnownEventsPage = ref(1)
   const lastKnownEventsPageSize = ref(eventsPageSize.value)
+  const eventsLoadedOnce = ref(false)
 
   const {
     data: eventsFetchResult,
@@ -285,6 +295,7 @@ export function useAppointments() {
     lastKnownEventsTotal.value = res.total
     lastKnownEventsPage.value = res.page
     lastKnownEventsPageSize.value = res.pageSize
+    eventsLoadedOnce.value = true
   }, { immediate: true })
 
   const eventsData = computed<EventsResponse>(() => ({
@@ -293,6 +304,13 @@ export function useAppointments() {
     page: lastKnownEventsPage.value,
     pageSize: lastKnownEventsPageSize.value
   }))
+
+  // Same idea as notes' `notesListInitialLoading`: the calendar views swap
+  // their whole body for a full skeleton on this flag, so it must only be
+  // true for the very first load — never for a background refetch after an
+  // optimistic mutation (drag-and-drop, editing a time), or the user loses
+  // their place mid-interaction every time they change something.
+  const eventsInitialLoading = computed(() => !eventsLoadedOnce.value && eventsStatus.value === 'pending')
 
   const debouncedRefreshEvents = useDebounceFn(() => {
     if (!viewFrom.value && !viewTo.value) {
@@ -974,6 +992,7 @@ export function useAppointments() {
     // Events
     eventsData,
     eventsStatus,
+    eventsInitialLoading,
     eventsPage,
     eventsPageSize,
     refreshEvents,
@@ -1010,3 +1029,5 @@ export function useAppointments() {
     syncingOffline
   }
 }
+
+export const useAppointments = createSharedComposable(_useAppointments)

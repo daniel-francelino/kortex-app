@@ -22,6 +22,7 @@ const {
   archivedCalendarsStatus,
   eventsData,
   eventsStatus,
+  eventsInitialLoading,
   activeCalendarIds,
   viewFrom,
   viewTo,
@@ -54,6 +55,7 @@ const activeView = ref<CalendarViewMode>(initialView)
 const calendarSlideDirection = ref<-1 | 0 | 1>(0)
 
 watch(activeView, (v) => {
+  closeAllPopovers()
   calendarSlideDirection.value = 0
 
   if (typeof localStorage !== 'undefined') {
@@ -135,6 +137,7 @@ const calendarSlideTransition = {
 }
 
 function goPrev() {
+  closeAllPopovers()
   calendarSlideDirection.value = -1
 
   if (activeView.value === 'month') {
@@ -156,6 +159,7 @@ function goPrev() {
 }
 
 function goNext() {
+  closeAllPopovers()
   calendarSlideDirection.value = 1
 
   if (activeView.value === 'month') {
@@ -177,6 +181,7 @@ function goNext() {
 }
 
 function goToday() {
+  closeAllPopovers()
   calendarSlideDirection.value = 0
 
   const now = new Date()
@@ -290,6 +295,28 @@ function closeEventPopover() {
 function closeQuickCreate() {
   quickCreateVisible.value = false
 }
+
+// Any popover left open while the user scrolls the calendar area is anchored
+// to a stale click position (or a day cell that's since scrolled away) — it
+// makes no sense to land on a new date/week and still see the old popup, so
+// scrolling anywhere inside the calendar body closes all of them. Attached
+// with `capture: true` on the calendar body wrapper: the `scroll` event
+// doesn't bubble, but a capture-phase listener on an ancestor still sees it
+// fire on any scrollable descendant (the month/week/day view's own
+// `overflow-auto`/`overflow-y-auto` containers included).
+function closeAllPopovers() {
+  eventPopoverVisible.value = false
+  quickCreateVisible.value = false
+  dayEventsVisible.value = false
+}
+
+onMounted(() => {
+  calendarBodyRef.value?.addEventListener('scroll', closeAllPopovers, true)
+})
+
+onBeforeUnmount(() => {
+  calendarBodyRef.value?.removeEventListener('scroll', closeAllPopovers, true)
+})
 
 async function onPopoverEdit(evt: CalendarEvent) {
   closeEventPopover()
@@ -491,8 +518,12 @@ async function onRestoreCalendar(calendar: Calendar) {
 
 async function onEventDrop(eventId: string, newStartAt: string, newEndAt: string) {
   if (eventId.startsWith('journal-')) return
-  const success = await updateEvent(eventId, { startAt: newStartAt, endAt: newEndAt })
-  if (success) refreshEvents()
+  // Like useNotes' updateNote(), updateEvent() already applies the change to
+  // the local store optimistically and reconciles it with the server's
+  // response — no refreshEvents() needed here. A drag-and-drop refetch used
+  // to flip eventsStatus to 'pending' and swap the whole calendar body for a
+  // loading skeleton mid-drag.
+  await updateEvent(eventId, { startAt: newStartAt, endAt: newEndAt })
 }
 
 async function onMonthEventDrop(eventId: string, newDate: string) {
@@ -508,11 +539,10 @@ async function onMonthEventDrop(eventId: string, newDate: string) {
   const newEnd = new Date(newStart.getTime() + durationMs)
   const endDate = `${newEnd.getFullYear()}-${String(newEnd.getMonth() + 1).padStart(2, '0')}-${String(newEnd.getDate()).padStart(2, '0')}`
   const endTime = `${String(newEnd.getHours()).padStart(2, '0')}:${String(newEnd.getMinutes()).padStart(2, '0')}`
-  const success = await updateEvent(eventId, {
+  await updateEvent(eventId, {
     startAt: zonedDateTimeToUtcIso(newDate, startTime, timeZone),
     endAt: zonedDateTimeToUtcIso(endDate, endTime, timeZone)
   })
-  if (success) refreshEvents()
 }
 
 onMounted(() => {
@@ -683,7 +713,7 @@ onMounted(() => {
                 <AppointmentsMonthView
                   v-if="activeView === 'month'"
                   :events="eventsList"
-                  :loading="eventsStatus === 'pending'"
+                  :loading="eventsInitialLoading"
                   :current-date="new Date()"
                   :view-year="viewYear"
                   :view-month="viewMonth"
@@ -698,7 +728,7 @@ onMounted(() => {
                 <AppointmentsWeekView
                   v-if="activeView === 'week'"
                   :events="eventsList"
-                  :loading="eventsStatus === 'pending'"
+                  :loading="eventsInitialLoading"
                   :week-start-date="viewWeekStart"
                   @select-event="onSelectEvent"
                   @select-slot="onSelectSlot"
@@ -710,7 +740,7 @@ onMounted(() => {
                 <AppointmentsDayView
                   v-if="activeView === 'day'"
                   :events="eventsList"
-                  :loading="eventsStatus === 'pending'"
+                  :loading="eventsInitialLoading"
                   :current-date="viewDayDate"
                   @select-event="onSelectEvent"
                   @select-slot="onDaySlotSelect"

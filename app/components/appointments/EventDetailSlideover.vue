@@ -230,9 +230,15 @@ async function saveEdit() {
       allDay: state.allDay,
       rrule: state.rrule || null
     })
+    // No `emit('updated')` here — updateEvent() already applies the change
+    // optimistically to the shared appointments store (useAppointments() is
+    // a shared composable, so every view reads the same store), so the
+    // Agenda grid updates itself instantly. Forcing a refreshEvents() round
+    // trip here used to be the only way for the parent to see the edit
+    // (each component had its own private store) and it flipped the whole
+    // calendar to a loading skeleton mid-edit.
     if (success) {
       editing.value = false
-      emit('updated')
     }
   } finally {
     saving.value = false
@@ -249,11 +255,18 @@ async function saveWithScope(scope: 'this' | 'this-and-following' | 'all') {
   saving.value = true
   try {
     let success = false
+    // modifyOccurrence/splitSeries hit the API directly with no optimistic
+    // local update (out of the offline-optimistic scope, see useAppointments.ts),
+    // so the parent genuinely needs a refetch to see the result — unlike the
+    // `all` scope below, which goes through the shared, optimistic updateEvent().
+    let needsRefetch = false
 
     if (scope === 'this') {
       success = await modifyOccurrence(props.event.id, { recurrenceId, ...pending })
+      needsRefetch = success
     } else if (scope === 'this-and-following') {
       success = await splitSeries(props.event.id, { recurrenceId, ...pending })
+      needsRefetch = success
     } else {
       success = await updateEvent(props.event.id, {
         calendarId: state.calendarId,
@@ -268,7 +281,7 @@ async function saveWithScope(scope: 'this' | 'this-and-following' | 'all') {
       editing.value = false
       scopeModalOpen.value = false
       pendingEditPayload.value = null
-      emit('updated')
+      if (needsRefetch) emit('updated')
     }
   } finally {
     saving.value = false

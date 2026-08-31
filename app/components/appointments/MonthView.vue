@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { CalendarEvent } from '~/types/appointments'
-import { formatEventTime as formatCalendarEventTime, formatZonedDateKey, getEventTimeZone, getZonedDate } from '~/utils/calendarEventTime'
+import { formatEventTime as formatCalendarEventTime, formatZonedDateKey, getEventTimeZone, getZonedDate, sortDayEvents } from '~/utils/calendarEventTime'
 
 const props = defineProps<{
   events: CalendarEvent[]
@@ -87,13 +87,15 @@ function getDayEvents(date: Date): CalendarEvent[] {
   const dayEnd = new Date(dayStart)
   dayEnd.setDate(dayEnd.getDate() + 1)
 
-  return props.events.filter((evt: CalendarEvent) => {
+  const dayEvents = props.events.filter((evt: CalendarEvent) => {
     if (!evt.startAt || !evt.endAt) return false
     const timeZone = getEventTimeZone(evt)
     const evtStart = getZonedDate(evt.startAt, timeZone)
     const evtEnd = getZonedDate(evt.endAt, timeZone)
     return evtStart < dayEnd && evtEnd > dayStart
   })
+
+  return sortDayEvents(dayEvents)
 }
 
 function getEventColor(evt: CalendarEvent): string {
