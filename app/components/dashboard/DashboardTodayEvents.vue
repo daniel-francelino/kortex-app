@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { formatInTimeZone } from 'date-fns-tz'
 import type { DashboardEvent } from '~/types/life-os'
 
 defineProps<{
@@ -6,10 +7,17 @@ defineProps<{
   totalCount: number
 }>()
 
+// Same fixed zone the dashboard's own "today" is computed against
+// server-side (see server/api/life/dashboard.get.ts) — a single-tenant app,
+// so no per-event timezone plumbing here. Explicit zone (not
+// `new Date(iso).toLocaleTimeString()`, which used the *server's* zone
+// during SSR and the *browser's* zone on the client — different results,
+// a hydration mismatch) keeps this deterministic either way.
+const DASHBOARD_TIMEZONE = 'America/Fortaleza'
+
 function formatTime(isoDate: string, allDay: boolean): string {
   if (allDay) return 'Dia inteiro'
-  const d = new Date(isoDate)
-  return d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+  return formatInTimeZone(isoDate, DASHBOARD_TIMEZONE, 'HH:mm')
 }
 </script>
 

@@ -12,13 +12,8 @@ const {
   dashboardStatus,
   insights,
   insightsStatus,
-  areas,
-  areasStatus,
   refreshDashboard,
-  refreshInsights,
-  createArea,
-  updateArea,
-  deleteArea
+  refreshInsights
 } = useLifeOS()
 
 const isLoading = computed(() => dashboardStatus.value === 'pending')
@@ -147,28 +142,11 @@ async function handleRefresh() {
             :completed-count="dashboard.habits.completedCount"
             :total-count="dashboard.habits.totalCount"
           />
-          <DashboardTodayTasks
-            :tasks="dashboard.tasks.items"
-            :pending-count="dashboard.tasks.pendingCount"
-            :overdue-count="dashboard.tasks.overdueCount"
-          />
           <DashboardTodayEvents
             :events="dashboard.events.items"
             :total-count="dashboard.events.totalCount"
           />
-          <DashboardQuickJournal
-            :journal="dashboard.journal"
-          />
         </div>
-
-        <!-- Life Areas -->
-        <DashboardLifeAreas
-          :areas="areas"
-          :loading="areasStatus === 'pending'"
-          @create="name => createArea({ name })"
-          @update="(id, name) => updateArea(id, { name })"
-          @remove="id => deleteArea(id)"
-        />
 
         <!-- Insights section -->
         <div>
