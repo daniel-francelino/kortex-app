@@ -80,6 +80,7 @@ function applyPageToState(page: NonNullable<Awaited<ReturnType<typeof fetchSched
   state.bufferAfterMinutes = page.bufferAfterMinutes
   state.slotIncrementMinutes = page.slotIncrementMinutes
   state.minNoticeHours = page.minNoticeHours
+  minNoticeUnit.value = detectMinNoticeUnit(page.minNoticeHours)
   state.maxAdvanceDays = page.maxAdvanceDays
   state.maxBookingsPerDayEnabled = page.maxBookingsPerDay !== null
   state.maxBookingsPerDay = page.maxBookingsPerDay ?? 5
@@ -188,14 +189,79 @@ function removeWindow(day: number, index: number) {
 function toggleDay(day: number) {
   dayWindows[day] = dayWindows[day]!.length > 0 ? [] : [{ startTime: '09:00', endTime: '18:00' }]
 }
-function copyToWeekdays(day: number) {
+// Popover "copiar horários para…" — substitui o antigo copyToWeekdays (que só
+// cobria dias úteis fixos) por uma seleção arbitrária de dias de destino.
+const copyTargetsByDay = reactive<Record<number, number[]>>({})
+
+function onCopyPopoverOpen(day: number, open: boolean) {
+  if (!open) return
+  // Pré-seleciona os dias úteis (exceto a origem) como ponto de partida útil
+  // — o caso mais comum continua sendo 1 clique, sem obrigar a marcar tudo.
+  copyTargetsByDay[day] = weekdayIndexes.filter(d => d !== day)
+}
+
+function toggleCopyTarget(day: number, target: number, checked: boolean) {
+  const current = copyTargetsByDay[day] ?? []
+  copyTargetsByDay[day] = checked ? [...current, target] : current.filter(d => d !== target)
+}
+
+function applyCopyToTargets(day: number) {
+  const targets = copyTargetsByDay[day] ?? []
+  if (targets.length === 0) return
   const source = dayWindows[day]!.map(w => ({ ...w }))
-  for (const target of weekdayIndexes) {
-    if (target === day) continue
+  for (const target of targets) {
     dayWindows[target] = source.map(w => ({ ...w }))
   }
-  toast.add({ title: 'Horários copiados para os dias úteis', color: 'success' })
+  toast.add({ title: `Horários copiados para ${targets.length} dia(s)`, color: 'success' })
 }
+
+// "Antecedência mínima" — sempre guardada em horas no banco (state.minNoticeHours),
+// a unidade (Horas/Dias) é só apresentação (docs/appointments/AUDITORIA_LINK_AGENDAMENTO_UX.md §1.2).
+const minNoticeUnit = ref<'hours' | 'days'>('hours')
+function detectMinNoticeUnit(hours: number): 'hours' | 'days' {
+  return hours > 0 && hours % 24 === 0 ? 'days' : 'hours'
+}
+const minNoticeUnitOptions = [
+  { label: 'Horas', value: 'hours' as const },
+  { label: 'Dias', value: 'days' as const }
+]
+const minNoticeDisplayValue = computed({
+  get: () => minNoticeUnit.value === 'days' ? Math.round(state.minNoticeHours / 24) : state.minNoticeHours,
+  set: (value: number) => {
+    state.minNoticeHours = minNoticeUnit.value === 'days' ? value * 24 : value
+  }
+})
+
+// ─── Limites — buffers e incremento como valores discretos (padrão Cal.com,
+// docs/appointments/AUDITORIA_LINK_AGENDAMENTO_UX.md §1.2) em vez de um
+// UInputNumber livre. Cada `buildOptions` inclui o valor atual mesmo que ele
+// não esteja na lista fixa (ex.: uma página antiga com buffer de 7 min) — sem
+// isso o USelect ficaria em branco em vez de mostrar o valor real salvo.
+const BUFFER_MINUTE_OPTIONS = [0, 5, 10, 15, 20, 30, 45, 60]
+function buildBufferOptions(current: number) {
+  const values = BUFFER_MINUTE_OPTIONS.includes(current) ? BUFFER_MINUTE_OPTIONS : [...BUFFER_MINUTE_OPTIONS, current].sort((a, b) => a - b)
+  return values.map(v => ({ label: v === 0 ? 'Sem intervalo' : `${v} min`, value: v }))
+}
+const bufferBeforeOptions = computed(() => buildBufferOptions(state.bufferBeforeMinutes))
+const bufferAfterOptions = computed(() => buildBufferOptions(state.bufferAfterMinutes))
+
+// "Usar a duração do evento" não é um valor persistido à parte — selecioná-la
+// só copia state.durationMinutes para state.slotIncrementMinutes na hora
+// (atalho, não um vínculo permanente: se a duração mudar depois, o incremento
+// não re-sincroniza sozinho, evitando um campo derivado "mágico" no schema).
+const SLOT_INCREMENT_MINUTE_OPTIONS = [5, 10, 15, 20, 30, 45, 60]
+const slotIncrementOptions = computed(() => {
+  const useDurationLabel = `Usar a duração do evento (${state.durationMinutes} min)`
+  const opts = [{ label: useDurationLabel, value: state.durationMinutes }]
+  for (const v of SLOT_INCREMENT_MINUTE_OPTIONS) {
+    if (v === state.durationMinutes) continue
+    opts.push({ label: `${v} min`, value: v })
+  }
+  if (!opts.some(o => o.value === state.slotIncrementMinutes)) {
+    opts.push({ label: `${state.slotIncrementMinutes} min`, value: state.slotIncrementMinutes })
+  }
+  return opts
+})
 
 // ─── Formulário ──────────────────────────────────────────────────────────────
 const questionSlideoverOpen = ref(false)
@@ -593,15 +659,39 @@ if (import.meta.client) {
                       @update:model-value="toggleDay(day - 1)"
                     />
                     <div v-if="dayWindows[day - 1]!.length > 0" class="ml-auto flex items-center gap-1">
-                      <UTooltip text="Copiar para os dias úteis">
+                      <UPopover :content="{ align: 'end' }" @update:open="(v: boolean) => onCopyPopoverOpen(day - 1, v)">
                         <UButton
                           icon="i-lucide-copy"
                           size="xs"
                           color="neutral"
                           variant="ghost"
-                          @click="copyToWeekdays(day - 1)"
+                          aria-label="Copiar horários para outros dias"
                         />
-                      </UTooltip>
+                        <template #content>
+                          <div class="w-56 space-y-2 p-3">
+                            <p class="text-xs font-medium text-highlighted">
+                              Copiar horários de {{ dayLabels[day - 1] }} para:
+                            </p>
+                            <div class="space-y-1.5">
+                              <UCheckbox
+                                v-for="target in 7"
+                                v-show="target - 1 !== day - 1"
+                                :key="target"
+                                :label="dayLabels[target - 1]"
+                                :model-value="(copyTargetsByDay[day - 1] ?? []).includes(target - 1)"
+                                @update:model-value="(v: boolean) => toggleCopyTarget(day - 1, target - 1, v)"
+                              />
+                            </div>
+                            <UButton
+                              label="Copiar"
+                              size="xs"
+                              block
+                              class="mt-1"
+                              @click="applyCopyToTargets(day - 1)"
+                            />
+                          </div>
+                        </template>
+                      </UPopover>
                       <UButton
                         icon="i-lucide-plus"
                         size="xs"
@@ -647,13 +737,21 @@ if (import.meta.client) {
               </p>
             </template>
             <div class="space-y-4">
-              <UFormField label="Antecedência mínima (horas)" description="Impede reservas de última hora.">
-                <UInputNumber
-                  v-model="state.minNoticeHours"
-                  :min="0"
-                  :max="720"
-                  class="w-full sm:w-40"
-                />
+              <UFormField label="Antecedência mínima" description="Impede reservas de última hora.">
+                <div class="flex items-center gap-2">
+                  <UInputNumber
+                    v-model="minNoticeDisplayValue"
+                    :min="0"
+                    :max="minNoticeUnit === 'days' ? 30 : 720"
+                    class="w-32"
+                  />
+                  <USelect
+                    v-model="minNoticeUnit"
+                    :items="minNoticeUnitOptions"
+                    value-key="value"
+                    class="w-28"
+                  />
+                </div>
               </UFormField>
               <UFormField label="Reservas até quantos dias no futuro">
                 <UInputNumber
@@ -787,30 +885,27 @@ if (import.meta.client) {
               </p>
             </template>
             <div class="grid gap-4 sm:grid-cols-3">
-              <UFormField label="Antes do evento (min)">
-                <UInputNumber
+              <UFormField label="Antes do evento">
+                <USelect
                   v-model="state.bufferBeforeMinutes"
-                  :min="0"
-                  :max="120"
-                  :step="5"
+                  :items="bufferBeforeOptions"
+                  value-key="value"
                   class="w-full"
                 />
               </UFormField>
-              <UFormField label="Após o evento (min)">
-                <UInputNumber
+              <UFormField label="Após o evento">
+                <USelect
                   v-model="state.bufferAfterMinutes"
-                  :min="0"
-                  :max="120"
-                  :step="5"
+                  :items="bufferAfterOptions"
+                  value-key="value"
                   class="w-full"
                 />
               </UFormField>
-              <UFormField label="Intervalo entre horários (min)" description="Ex.: 30 = oferece 9:00, 9:30, 10:00…">
-                <UInputNumber
+              <UFormField label="Intervalo entre horários" description="Ex.: 30 min = oferece 9:00, 9:30, 10:00…">
+                <USelect
                   v-model="state.slotIncrementMinutes"
-                  :min="5"
-                  :max="120"
-                  :step="5"
+                  :items="slotIncrementOptions"
+                  value-key="value"
                   class="w-full"
                 />
               </UFormField>

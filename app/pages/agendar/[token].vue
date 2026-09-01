@@ -337,7 +337,7 @@ const icsDataUrl = computed(() => {
           @click="step = 'pick-time'"
         />
 
-        <div class="rounded-xl border border-default p-3 text-sm">
+        <div class="sticky top-0 z-10 -mx-4 border-b border-default bg-default px-4 py-3 text-sm sm:static sm:mx-0 sm:rounded-xl sm:border sm:p-3">
           <p class="font-medium text-highlighted">
             {{ formatSelectedDate() }}
           </p>

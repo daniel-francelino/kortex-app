@@ -44,6 +44,10 @@ async function onSubmit() {
       durationMinutes: durationMinutes.value,
       locationType: SchedulingLocationType.VideoLink,
       timezone: detectBrowserTimeZone() ?? 'UTC',
+      // Incremento = duração por padrão (docs/appointments/AUDITORIA_LINK_AGENDAMENTO_UX.md
+      // §1.2) — sem isso o padrão anterior (15 min fixo) oferecia horários
+      // sobrepostos para reuniões de 30/45/60 min sem motivo aparente.
+      slotIncrementMinutes: durationMinutes.value,
       availabilityRules: [1, 2, 3, 4, 5].map(day => ({ dayOfWeek: day, startTime: '09:00', endTime: '18:00' }))
     })
 
