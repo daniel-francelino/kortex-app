@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { formatDisplay } from '#shared/utils/dateTime'
+import { detectBrowserTimeZone, formatDisplay } from '#shared/utils/dateTime'
 
 definePageMeta({
   layout: 'app'
@@ -16,17 +16,20 @@ const {
   insightsInitialLoading
 } = useLifeOS()
 
-// Regra 1 (docs/timezone/ANALISE_TIMEZONE.md): `useUserPreferences`'s
-// `state.timezone` (not a direct `Intl` read) — this is SSR-rendered, and a
-// `useState` factory only runs once, so a raw `Intl.DateTimeFormat().
-// resolvedOptions().timeZone` here would permanently bake in the *server's*
-// zone from the very first render. Using the shared preference state instead
-// keeps server/client renders consistent and updates reactively once Regra 2
-// resolves the real zone.
-const { state: preferencesState } = useUserPreferences()
-const todayFormatted = computed(() => formatDisplay(new Date(), 'EEEE, d \'de\' MMMM \'de\' yyyy', {
-  timeZone: preferencesState.value.timezone
-}))
+// Regra 1 (docs/timezone/ANALISE_TIMEZONE.md): browser's own zone, read only
+// once mounted. This page is SSR-rendered, so a raw `Intl.DateTimeFormat().
+// resolvedOptions().timeZone` read during `<script setup>`'s synchronous
+// execution would capture the *server's* zone and bake it into the SSR HTML.
+// `clientTimezone` stays `null` through SSR and the client's first render
+// (server and client agree, so no hydration mismatch), then resolves to the
+// real zone right as the page mounts.
+const clientTimezone = ref<string | null>(null)
+onMounted(() => {
+  clientTimezone.value = detectBrowserTimeZone() ?? null
+})
+const todayFormatted = computed(() => clientTimezone.value
+  ? formatDisplay(new Date(), 'EEEE, d \'de\' MMMM \'de\' yyyy', { timeZone: clientTimezone.value })
+  : '')
 </script>
 
 <template>

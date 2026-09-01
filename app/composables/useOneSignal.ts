@@ -1,5 +1,6 @@
 import { Capacitor } from '@capacitor/core'
 import { createSharedComposable } from '@vueuse/core'
+import { detectBrowserTimeZone } from '#shared/utils/dateTime'
 import type { AuthUser } from '~/composables/useAuth'
 import type {
   NotificationAppContext,
@@ -394,7 +395,7 @@ const _useOneSignal = () => {
       appVersion: null,
       deviceModel: import.meta.client ? navigator.userAgent : null,
       language: import.meta.client ? navigator.language : null,
-      timezone: import.meta.client ? Intl.DateTimeFormat().resolvedOptions().timeZone : null,
+      timezone: detectBrowserTimeZone() ?? null,
       metadata: {
         currentPath: route.fullPath
       }

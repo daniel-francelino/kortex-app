@@ -1,3 +1,5 @@
+import { detectBrowserTimeZone } from '#shared/utils/dateTime'
+
 enum ThemeContext {
   Public = 'public',
   App = 'app'
@@ -99,8 +101,8 @@ export function useUserPreferences() {
       // any later change only happens if they explicitly pick one in
       // Configurações. Never do this for the public/unauthenticated theme
       // context, where there's no real user preference to seed.
-      if (data.timezone === null && import.meta.client) {
-        const browserTz = Intl.DateTimeFormat().resolvedOptions().timeZone
+      if (data.timezone === null) {
+        const browserTz = detectBrowserTimeZone()
         if (browserTz) void setTimezone(browserTz)
       }
     } catch {

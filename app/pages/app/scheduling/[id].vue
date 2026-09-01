@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { SchedulingQuestion } from '~/types/scheduling'
 import { SchedulingLocationType, LOCATION_TYPE_META } from '~/types/scheduling'
+import { detectBrowserTimeZone } from '#shared/utils/dateTime'
 
 definePageMeta({ layout: 'app' })
 
@@ -45,7 +46,7 @@ const state = reactive({
   locationType: SchedulingLocationType.VideoLink,
   locationDetails: '',
   color: null as string | null,
-  timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+  timezone: detectBrowserTimeZone() ?? 'UTC',
   bufferBeforeMinutes: 0,
   bufferAfterMinutes: 0,
   slotIncrementMinutes: 15,

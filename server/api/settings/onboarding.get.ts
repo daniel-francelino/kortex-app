@@ -21,6 +21,10 @@ export default eventHandler(async (event) => {
 
   return {
     onboarding: data ? parseOnboardingState(data.onboarding_state) : getDefaultOnboardingState(),
-    timezone: data?.timezone ?? 'UTC'
+    // Passed through as-is (not coerced to 'UTC') — see
+    // docs/timezone/ANALISE_TIMEZONE.md, Regra 2: `null` here has to reach
+    // the client genuinely, or nothing can tell "never chosen" apart from
+    // "explicitly UTC" and the one-time browser auto-fill never fires.
+    timezone: data?.timezone ?? null
   }
 })

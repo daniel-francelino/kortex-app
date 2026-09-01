@@ -130,22 +130,9 @@ const productTourCards = [
   }
 ]
 
-const timezoneOptions = computed(() => {
-  const builtInTimezones = typeof Intl.supportedValuesOf === 'function'
-    ? Intl.supportedValuesOf('timeZone')
-    : ['UTC', 'America/Fortaleza', 'America/Sao_Paulo', 'America/New_York', 'Europe/London']
-  const browserTimezone = import.meta.client
-    ? Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
-    : 'UTC'
-
-  return Array.from(new Set([...builtInTimezones, browserTimezone, state.value.timezone]))
-    .filter(Boolean)
-    .sort((a, b) => a.localeCompare(b))
-    .map(timezone => ({
-      label: timezone,
-      value: timezone
-    }))
-})
+// Shared with Settings/Scheduling (docs/timezone/ANALISE_TIMEZONE.md, seção 5)
+// instead of a third independent copy of this list-building logic.
+const { browserTimezone, options: timezoneOptions } = useTimezoneOptions(selectedTimezone)
 
 const currentStep = computed<OnboardingStep>(() => state.value.onboarding.currentStep)
 const currentStepIndex = computed(() => ONBOARDING_STEPS.indexOf(currentStep.value))
@@ -211,7 +198,11 @@ function hydrateLocalState() {
   profile.primaryGoal = state.value.onboarding.profile.primaryGoal
   profile.experienceLevel = state.value.onboarding.profile.experienceLevel
   profile.guidanceStyle = state.value.onboarding.profile.guidanceStyle
-  selectedTimezone.value = state.value.timezone
+  // `state.value.timezone` can be `null` (never chosen yet — Regra 2) —
+  // fall back to the detected browser zone rather than a hardcoded 'UTC',
+  // so the very first save (any step, not just the dedicated timezone one)
+  // doesn't lock in the wrong value.
+  selectedTimezone.value = state.value.timezone || browserTimezone.value
 }
 
 function getNextStep(step: OnboardingStep): OnboardingStep {

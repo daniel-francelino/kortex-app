@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { Calendar } from '~/types/appointments'
 import { SchedulingLocationType } from '~/types/scheduling'
+import { detectBrowserTimeZone } from '#shared/utils/dateTime'
 
 const props = defineProps<{
   open: boolean
@@ -42,7 +43,7 @@ async function onSubmit() {
       title: title.value.trim(),
       durationMinutes: durationMinutes.value,
       locationType: SchedulingLocationType.VideoLink,
-      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      timezone: detectBrowserTimeZone() ?? 'UTC',
       availabilityRules: [1, 2, 3, 4, 5].map(day => ({ dayOfWeek: day, startTime: '09:00', endTime: '18:00' }))
     })
 

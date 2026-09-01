@@ -5,7 +5,7 @@ import type { Calendar } from '~/types/appointments'
 import { ReminderType } from '~/types/appointments'
 import { strToDateValue, dateValueToStr, strToTimeValue, timeValueToStr, type TimeValue } from '~/utils/calendarDate'
 import { zonedDateTimeToUtcIso } from '~/utils/calendarEventTime'
-import { formatDisplay } from '#shared/utils/dateTime'
+import { detectBrowserTimeZone, formatDisplay } from '#shared/utils/dateTime'
 
 const props = defineProps<{
   open: boolean
@@ -112,7 +112,7 @@ watch(() => props.calendars, (cals) => {
   if (cals?.length && !state.calendarId) state.calendarId = cals[0]?.id ?? ''
 }, { immediate: true })
 
-const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone
+const timezone = detectBrowserTimeZone() ?? 'UTC'
 
 async function onSubmit() {
   if (loading.value || !state.title.trim()) return

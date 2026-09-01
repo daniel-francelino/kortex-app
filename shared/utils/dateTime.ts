@@ -20,6 +20,18 @@ export function isValidTimeZone(tz: unknown): tz is string {
   return typeof tz === 'string' && IANA_ZONES.has(tz)
 }
 
+/** The browser's own detected zone — `undefined` server-side, where there's
+ * no browser to ask (docs/timezone/ANALISE_TIMEZONE.md, Regra 1). The single
+ * call site every "what zone is the client in" spot in the app should go
+ * through, instead of repeating the `Intl.DateTimeFormat()...` call inline.
+ * Neither `date-fns` nor `date-fns-tz` detect a runtime's own timezone —
+ * only convert/format given one — so `Intl` is the correct tool here, not
+ * something to route around. */
+export function detectBrowserTimeZone(): string | undefined {
+  if (!import.meta.client) return undefined
+  return Intl.DateTimeFormat().resolvedOptions().timeZone || undefined
+}
+
 /** A Date whose *local* getters (getFullYear/getMonth/getDate/getHours/...) read
  * as the wall-clock time in `timeZone` — the convention every calendar view
  * relies on for grid positioning/comparisons, regardless of the viewer's own
@@ -67,7 +79,14 @@ export function todayInZone(timeZone: string): string {
  * with a real UTC instant or a `getZonedDate` result. To turn a calendar day
  * back into a real UTC instant, use `startOfDayInZone`/`endOfDayInZone`. */
 export function parseCalendarDate(dateStr: string): Date {
-  return parse(dateStr, 'yyyy-MM-dd', new Date())
+  // `parse()` fills in any unit the format string doesn't specify (here,
+  // hour/minute/second) from `referenceDate` — passing `new Date()` would
+  // silently attach the *current* wall-clock time instead of midnight.
+  // Every current call site only reads the date portion back out, so that
+  // never showed up as a bug in practice, but the function's own contract
+  // (a bare calendar day) should hold regardless of what a future caller
+  // does with the result.
+  return parse(dateStr, 'yyyy-MM-dd', new Date(0, 0, 1, 0, 0, 0, 0))
 }
 
 /** Inverse of `parseCalendarDate` — a calendar-day `Date` → its `yyyy-MM-dd`
@@ -79,15 +98,28 @@ export function formatCalendarDate(date: Date): string {
 
 /** A `yyyy-MM-dd` calendar day, interpreted as a day in `timeZone` → the real
  * UTC instant its midnight (00:00:00.000) falls on. Use for the lower bound
- * of a "this calendar day" DB range query. */
+ * of a "this calendar day" DB range query.
+ *
+ * Deliberately builds a `Date` via the local-component constructor
+ * (`new Date(y, m, d, ...)`) rather than handing `fromZonedTime` an ISO
+ * *string* — a date-time string with no offset is ambiguous per spec (parsed
+ * as local time in whatever zone the *process* happens to be running in),
+ * so on a server whose system TZ isn't UTC, string input could silently
+ * apply the zone shift twice. The local-component constructor has no such
+ * ambiguity: its getters are guaranteed to read back exactly y/m/d/h/mi/s
+ * regardless of the system zone, which is what `fromZonedTime` needs. */
 export function startOfDayInZone(dateStr: string, timeZone: string): Date {
-  return fromZonedTime(`${dateStr}T00:00:00.000`, timeZone)
+  const day = parseCalendarDate(dateStr)
+  const wallClock = new Date(day.getFullYear(), day.getMonth(), day.getDate(), 0, 0, 0, 0)
+  return fromZonedTime(wallClock, timeZone)
 }
 
 /** Same as `startOfDayInZone`, but the day's last instant (23:59:59.999) —
  * the upper bound of a "this calendar day" DB range query. */
 export function endOfDayInZone(dateStr: string, timeZone: string): Date {
-  return fromZonedTime(`${dateStr}T23:59:59.999`, timeZone)
+  const day = parseCalendarDate(dateStr)
+  const wallClock = new Date(day.getFullYear(), day.getMonth(), day.getDate(), 23, 59, 59, 999)
+  return fromZonedTime(wallClock, timeZone)
 }
 
 /** Inverse of `getZonedDate`: given wall-clock date/time strings meant as

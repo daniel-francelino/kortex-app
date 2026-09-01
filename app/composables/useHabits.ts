@@ -1,5 +1,5 @@
 import { useDebounceFn } from '@vueuse/core'
-import { todayInZone } from '#shared/utils/dateTime'
+import { detectBrowserTimeZone, todayInZone } from '#shared/utils/dateTime'
 import type {
   CalendarDay,
   CreateHabitPayload,
@@ -81,7 +81,7 @@ export function useHabits() {
   // Regra 1 (docs/timezone/ANALISE_TIMEZONE.md): sent on every request below
   // that needs the server to know "today" — `undefined` during SSR, where
   // there's no browser to ask (the server falls back to the stored preference).
-  const clientTimezone = import.meta.client ? Intl.DateTimeFormat().resolvedOptions().timeZone : undefined
+  const clientTimezone = detectBrowserTimeZone()
 
   // ─── Today habits ────────────────────────────────────────────────────────────
   const todayDate = ref(clientTimezone ? todayInZone(clientTimezone) : new Date().toISOString().split('T')[0])

@@ -5,7 +5,7 @@ import type {
   JournalListResponse,
   UpsertEntryPayload
 } from '~/types/journal'
-import { todayInZone } from '#shared/utils/dateTime'
+import { detectBrowserTimeZone, todayInZone } from '#shared/utils/dateTime'
 
 interface TodayResponse {
   entryDate: string
@@ -33,7 +33,7 @@ export function useJournal() {
   // resolves "today" (see server/api/journal/today.get.ts) — otherwise this
   // key can miss the entry the fetch below just stored under the server's
   // (correct) date.
-  const clientTimezone = import.meta.client ? Intl.DateTimeFormat().resolvedOptions().timeZone : undefined
+  const clientTimezone = detectBrowserTimeZone()
   const todayDate = clientTimezone ? todayInZone(clientTimezone) : (new Date().toISOString().split('T')[0] ?? '')
 
   // ─── Local reactive store ───────────────────────────────────────────────────

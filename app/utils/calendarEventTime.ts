@@ -1,6 +1,6 @@
 import { formatInTimeZone } from 'date-fns-tz'
 import type { CalendarEvent } from '~/types/appointments'
-import { formatZonedDateKey, getZonedDate, getZonedDateParts, zonedDateTimeToUtcIso } from '#shared/utils/dateTime'
+import { detectBrowserTimeZone, formatZonedDateKey, getZonedDate, getZonedDateParts, zonedDateTimeToUtcIso } from '#shared/utils/dateTime'
 
 // getZonedDate/getZonedDateParts/formatZonedDateKey/zonedDateTimeToUtcIso now
 // live in shared/utils/dateTime.ts (usable from server/ too) — re-exported
@@ -8,7 +8,7 @@ import { formatZonedDateKey, getZonedDate, getZonedDateParts, zonedDateTimeToUtc
 export { formatZonedDateKey, getZonedDate, getZonedDateParts, zonedDateTimeToUtcIso }
 
 export function getEventTimeZone(event?: Pick<CalendarEvent, 'eventTimezone'> | null): string {
-  return event?.eventTimezone || Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
+  return event?.eventTimezone || detectBrowserTimeZone() || 'UTC'
 }
 
 export function formatEventTime(event: CalendarEvent, field: 'startAt' | 'endAt' = 'startAt'): string {

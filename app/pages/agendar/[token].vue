@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { PublicSchedulingPage, AvailabilitySlot, BookingConfirmation } from '~/types/scheduling'
 import { LOCATION_TYPE_META } from '~/types/scheduling'
-import { formatDisplay } from '#shared/utils/dateTime'
+import { detectBrowserTimeZone, formatDisplay } from '#shared/utils/dateTime'
 
 definePageMeta({ layout: false, ssr: true })
 
@@ -28,7 +28,7 @@ useSeoMeta({
 const locationMeta = computed(() => LOCATION_TYPE_META[publicPage.value.locationType])
 
 // ─── Guest timezone ─────────────────────────────────────────────────────────
-const detectedTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone
+const detectedTimezone = detectBrowserTimeZone() ?? 'UTC'
 const guestTimezone = ref(detectedTimezone)
 const timezoneOptions = (typeof Intl.supportedValuesOf === 'function' ? Intl.supportedValuesOf('timeZone') : [detectedTimezone])
   .map(tz => ({ label: tz, value: tz }))

@@ -4,7 +4,7 @@ import type { Calendar, CalendarEvent, EventParticipant } from '~/types/appointm
 import { RsvpStatus } from '~/types/appointments'
 import { strToDateValue, dateValueToStr, strToTimeValue, timeValueToStr, type TimeValue } from '~/utils/calendarDate'
 import { formatEventDate, formatEventTime, getEventTimeZone, getZonedDate, getZonedDateParts, zonedDateTimeToUtcIso } from '~/utils/calendarEventTime'
-import { formatDisplay } from '#shared/utils/dateTime'
+import { detectBrowserTimeZone, formatDisplay } from '#shared/utils/dateTime'
 
 const props = defineProps<{
   open: boolean
@@ -44,7 +44,7 @@ const toast = useToast()
 const editing = ref(false)
 const saving = ref(false)
 const archiving = ref(false)
-const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone
+const timezone = detectBrowserTimeZone() ?? 'UTC'
 
 const isOwner = computed(() => Boolean(props.event) && props.event?.ownerUserId === user.value?.id)
 

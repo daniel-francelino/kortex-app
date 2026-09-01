@@ -7,7 +7,7 @@ import { useSwipe } from '@vueuse/core'
 import { addDays, addMilliseconds, addMonths, addWeeks, format, startOfWeek, subDays, subMonths, subWeeks } from 'date-fns'
 import { AnimatePresence, motion } from 'motion-v'
 import { getEventTimeZone, getZonedDate, zonedDateTimeToUtcIso } from '~/utils/calendarEventTime'
-import { formatDisplay } from '#shared/utils/dateTime'
+import { detectBrowserTimeZone, formatDisplay } from '#shared/utils/dateTime'
 
 definePageMeta({
   layout: 'app'
@@ -354,7 +354,7 @@ async function onPopoverArchive(evt: CalendarEvent) {
 
 async function onPopoverDuplicate(evt: CalendarEvent) {
   closeEventPopover()
-  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone
+  const timezone = detectBrowserTimeZone() ?? 'UTC'
 
   const payload: CreateEventPayload = {
     calendarId: evt.calendarId,
@@ -384,7 +384,7 @@ function addOneHourClamped(time: string): string {
 
 async function onQuickCreate(data: { title: string, date: string, calendarId: string }) {
   closeQuickCreate()
-  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone
+  const timezone = detectBrowserTimeZone() ?? 'UTC'
   // Day-view slot clicks carry the actual clicked time; Month/Week slots have
   // no time granularity and fall back to the previous fixed 09:00-10:00 default.
   const startTime = quickCreateTime.value ?? '09:00'

@@ -23,7 +23,11 @@ type OnboardingStore = {
   loading: boolean
   open: boolean
   onboarding: OnboardingState
-  timezone: string
+  // `null` = never explicitly chosen (docs/timezone/ANALISE_TIMEZONE.md,
+  // Regra 2) — consumers (FlowModal) fall back to the detected browser zone
+  // for display, but must never treat `null` as "already UTC" when deciding
+  // what to send back on save, or they'd lock that fallback in permanently.
+  timezone: string | null
 }
 
 export function useOnboarding() {
@@ -32,7 +36,7 @@ export function useOnboarding() {
     loading: false,
     open: false,
     onboarding: createDefaultOnboardingState(),
-    timezone: 'UTC'
+    timezone: null
   }))
   const pendingHabitHandoff = useState<boolean>('user-onboarding-habits-handoff', () => false)
   const requestFetch = useRequestFetch()

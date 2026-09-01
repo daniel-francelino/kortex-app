@@ -14,6 +14,7 @@ import type {
   UpdateTaskPayload
 } from '~/types/tasks'
 import { TaskPriority, TaskStatus } from '~/types/tasks'
+import { detectBrowserTimeZone } from '#shared/utils/dateTime'
 
 type BadgeColor = 'success' | 'error' | 'primary' | 'secondary' | 'info' | 'warning' | 'neutral'
 
@@ -23,7 +24,7 @@ export function useTasks() {
   // Regra 1 (docs/timezone/ANALISE_TIMEZONE.md): sent so the server can
   // resolve "today" (overdue filter, insights) against the browser's zone
   // instead of its stored fallback — undefined during SSR (no browser there).
-  const clientTimezone = import.meta.client ? Intl.DateTimeFormat().resolvedOptions().timeZone : undefined
+  const clientTimezone = detectBrowserTimeZone()
 
   // ─── Tasks list (paginated) ─────────────────────────────────────────────────
   const listPage = ref(1)

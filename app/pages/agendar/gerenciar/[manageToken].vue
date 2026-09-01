@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { PublicBookingDetail, AvailabilitySlot } from '~/types/scheduling'
 import { BookingStatus, LOCATION_TYPE_META } from '~/types/scheduling'
-import { formatDisplay } from '#shared/utils/dateTime'
+import { detectBrowserTimeZone, formatDisplay } from '#shared/utils/dateTime'
 
 definePageMeta({ layout: false, ssr: true })
 
@@ -20,7 +20,7 @@ if (!booking.value) {
 useSeoMeta({ title: 'Gerenciar reserva', robots: 'noindex' })
 
 const locationMeta = computed(() => booking.value ? LOCATION_TYPE_META[booking.value.locationType] : null)
-const guestTimezone = computed(() => booking.value?.guestTimezone || Intl.DateTimeFormat().resolvedOptions().timeZone)
+const guestTimezone = computed(() => booking.value?.guestTimezone || detectBrowserTimeZone() || 'UTC')
 
 function formatDateTime(iso: string | null): string {
   if (!iso) return ''

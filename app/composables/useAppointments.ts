@@ -18,6 +18,7 @@ import type {
   ReminderInput,
   RsvpStatus
 } from '~/types/appointments'
+import { detectBrowserTimeZone } from '#shared/utils/dateTime'
 
 interface EventsResponse {
   data: CalendarEvent[]
@@ -122,7 +123,7 @@ function normalizeEvent(input: unknown): CalendarEvent {
     location: (event.location as string | null) ?? null,
     startAt: String(event.startAt ?? event.start_at ?? ''),
     endAt: String(event.endAt ?? event.end_at ?? ''),
-    eventTimezone: String(event.eventTimezone ?? event.event_timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone),
+    eventTimezone: String(event.eventTimezone ?? event.event_timezone ?? detectBrowserTimeZone() ?? 'UTC'),
     allDay: Boolean(event.allDay ?? event.all_day),
     rrule: (event.rrule as string | null) ?? null,
     exdate: (event.exdate as string[] | null) ?? null,
@@ -669,7 +670,7 @@ function _useAppointments() {
       location: payload.location !== undefined ? payload.location : (previous?.location ?? null),
       startAt: payload.startAt !== undefined ? payload.startAt : (previous?.startAt ?? ''),
       endAt: payload.endAt !== undefined ? payload.endAt : (previous?.endAt ?? ''),
-      eventTimezone: payload.eventTimezone !== undefined ? payload.eventTimezone : (previous?.eventTimezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone),
+      eventTimezone: payload.eventTimezone !== undefined ? payload.eventTimezone : (previous?.eventTimezone ?? detectBrowserTimeZone() ?? 'UTC'),
       allDay: payload.allDay !== undefined ? payload.allDay : (previous?.allDay ?? false),
       rrule: payload.rrule !== undefined ? payload.rrule : (previous?.rrule ?? null),
       exdate: previous?.exdate ?? null,

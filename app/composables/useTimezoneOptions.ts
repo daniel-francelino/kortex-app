@@ -1,3 +1,5 @@
+import { detectBrowserTimeZone } from '#shared/utils/dateTime'
+
 const FALLBACK_TIMEZONES = ['UTC', 'America/Fortaleza', 'America/Sao_Paulo', 'America/New_York', 'Europe/London']
 
 export interface TimezoneOption {
@@ -18,9 +20,7 @@ export interface TimezoneOption {
  * stop maintaining their own copy of this list/logic.
  */
 export function useTimezoneOptions(currentTimezone: Ref<string>) {
-  const browserTimezone = computed(() => import.meta.client
-    ? Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
-    : 'UTC')
+  const browserTimezone = computed(() => detectBrowserTimeZone() ?? 'UTC')
 
   const { state: preferencesState } = useUserPreferences()
 

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { DashboardEvent } from '~/types/life-os'
-import { formatDisplay } from '#shared/utils/dateTime'
+import { detectBrowserTimeZone, formatDisplay } from '#shared/utils/dateTime'
 
 defineProps<{
   events: DashboardEvent[]
@@ -8,19 +8,26 @@ defineProps<{
 }>()
 
 // Regra 1 (docs/timezone/ANALISE_TIMEZONE.md): the browser's own detected
-// zone would be ideal here, but this card is SSR-rendered — reading
+// zone, read only once mounted — this card is SSR-rendered, and
 // `Intl.DateTimeFormat().resolvedOptions().timeZone` would give the
-// *server's* zone during SSR and the *browser's* zone on the client, a
-// mismatch between the two renders of the same text. `useUserPreferences`'s
-// `state.timezone` comes from the same `/api/settings/preferences` payload
-// on both sides, so it's identical in both renders — and in practice it's
-// kept in sync with the browser automatically (Regra 2), just not on every
-// single render the way a live `Intl` read would be.
-const { state: preferencesState } = useUserPreferences()
+// *server's* zone during SSR (a real value, not a placeholder), which then
+// wouldn't match the *browser's* zone at hydration time. `clientTimezone`
+// stays `null` through SSR and the initial client render (so both agree —
+// no mismatch), then flips to the real value in the same tick the component
+// mounts. `useUserPreferences`'s `state.timezone` was the other candidate,
+// but it only ever populates from `onMounted` too (see app/layouts/app.vue),
+// so during SSR it's just sitting at its hardcoded 'UTC' default — no more
+// SSR-safe than reading `Intl` directly, and not what Regra 1 actually asks
+// for (browser first, not the stored fallback, whenever a browser exists).
+const clientTimezone = ref<string | null>(null)
+onMounted(() => {
+  clientTimezone.value = detectBrowserTimeZone() ?? null
+})
 
 function formatTime(isoDate: string, allDay: boolean): string {
   if (allDay) return 'Dia inteiro'
-  return formatDisplay(isoDate, 'HH:mm', { timeZone: preferencesState.value.timezone })
+  if (!clientTimezone.value) return '--:--'
+  return formatDisplay(isoDate, 'HH:mm', { timeZone: clientTimezone.value })
 }
 </script>
 

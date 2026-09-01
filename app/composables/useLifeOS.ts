@@ -1,13 +1,14 @@
 import type { DailyDashboardResponse, LifeInsights, LifeArea, EntityLink, CreateLifeAreaPayload, CreateEntityLinkPayload } from '~/types/life-os'
+import { detectBrowserTimeZone } from '#shared/utils/dateTime'
 
 export function useLifeOS() {
   const toast = useToast()
 
   // Regra 1 (docs/timezone/ANALISE_TIMEZONE.md): the server can't detect the
-  // browser's zone on its own, so the client sends it explicitly — `null`
+  // browser's zone on its own, so the client sends it explicitly — `undefined`
   // during SSR (there's no browser there; the server falls back to the
   // user's stored preference instead of trusting a fake value).
-  const clientTimezone = import.meta.client ? Intl.DateTimeFormat().resolvedOptions().timeZone : undefined
+  const clientTimezone = detectBrowserTimeZone()
 
   // ─── Daily Dashboard ────────────────────────────────────────────────────
   const {

@@ -14,6 +14,7 @@ import type {
   UpsertGoalReflectionPayload
 } from '~/types/goals'
 import { GoalLifeCategory, GoalStatus, GoalTimeCategory } from '~/types/goals'
+import { detectBrowserTimeZone } from '#shared/utils/dateTime'
 
 type BadgeColor = 'success' | 'error' | 'primary' | 'secondary' | 'info' | 'warning' | 'neutral'
 
@@ -115,8 +116,7 @@ export function useGoalActions() {
       // Regra 1 (docs/timezone/ANALISE_TIMEZONE.md): lets the server resolve
       // habit-consistency progress against the browser's zone instead of the
       // stored fallback.
-      const tz = import.meta.client ? Intl.DateTimeFormat().resolvedOptions().timeZone : undefined
-      return await $fetch<Goal>(`/api/goals/${id}`, { query: { tz } })
+      return await $fetch<Goal>(`/api/goals/${id}`, { query: { tz: detectBrowserTimeZone() } })
     } catch {
       toast.add({ title: 'Erro', description: 'Meta não encontrada.', color: 'error' })
       return null

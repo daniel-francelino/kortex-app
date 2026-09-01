@@ -52,5 +52,7 @@ export interface OnboardingState {
 
 export interface OnboardingResponse {
   onboarding: OnboardingState
-  timezone: string
+  // `null` = never explicitly chosen yet (docs/timezone/ANALISE_TIMEZONE.md,
+  // Regra 2) — distinct from an explicit 'UTC' choice.
+  timezone: string | null
 }
