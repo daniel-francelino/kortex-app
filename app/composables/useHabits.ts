@@ -28,9 +28,37 @@ import type {
 import { HabitDifficulty, HabitFrequency, HabitLogStatus, HabitType } from '~/types/habits'
 import { PostHogEvent } from '~/types/analytics'
 
+// Shape of POST /api/habits/log's response — the raw `habit_logs` row
+// (snake_case, straight from Supabase) plus the recalculated streak, used by
+// logHabit()'s reconcile step (see docs/habits/OPTIMISTIC_UPDATES.md).
+interface HabitLogResult {
+  id: string
+  user_id: string
+  habit_id: string
+  habit_version_id: string
+  log_date: string
+  completed: boolean
+  status: string
+  note: string | null
+  created_at: string
+  updated_at: string
+  streak: { currentStreak: number, longestStreak: number, status: 'active' | 'frozen' } | null
+}
+
+// useHabits() is called fresh from many components (habit modals, the today
+// list, goals' weekly review, ...) — it isn't a createSharedComposable
+// singleton like useAppointments(). The offline-sync drain loop below must
+// still only ever run once at a time no matter how many instances exist, or
+// two components mounted together could both try to replay the same queued
+// mutation concurrently. This module-level flag, not per-instance state,
+// is what makes only the very first useHabits() call register the
+// reconnect/mounted triggers; every later call is a no-op here.
+let offlineSyncRegistered = false
+
 export function useHabits() {
   const toast = useToast()
   const { capture } = usePostHog()
+  const { runOptimisticAction } = useOptimisticAction()
 
   function trackHabitsEvent(event: PostHogEvent, properties?: Record<string, boolean | number | string | undefined>) {
     capture(event, {
@@ -253,33 +281,103 @@ export function useHabits() {
       = habitIndex >= 0 ? { ...todayData.value!.habits[habitIndex]! } : null
     const previousCompletedCount = todayData.value?.completedCount ?? 0
 
-    if (habitIndex >= 0 && todayData.value && previousHabit) {
-      const wasCompleted = previousHabit.log?.completed ?? false
-      todayData.value.habits[habitIndex] = {
-        ...previousHabit,
-        log: {
-          id: previousHabit.log?.id ?? '',
-          userId: previousHabit.log?.userId ?? previousHabit.userId,
-          habitId: payload.habitId,
-          habitVersionId: previousHabit.log?.habitVersionId ?? '',
-          logDate: payload.logDate,
-          completed: payload.completed,
-          status,
-          note: payload.note ?? previousHabit.log?.note ?? null,
-          createdAt: previousHabit.log?.createdAt ?? new Date().toISOString(),
-          updatedAt: new Date().toISOString()
-        }
-      }
-      if (payload.completed !== wasCompleted) {
-        todayData.value.completedCount += payload.completed ? 1 : -1
-      }
+    if (habitIndex < 0 || !todayData.value || !previousHabit) return false
+
+    const wasCompleted = previousHabit.log?.completed ?? false
+    const optimisticLog = {
+      id: previousHabit.log?.id ?? '',
+      userId: previousHabit.log?.userId ?? previousHabit.userId,
+      habitId: payload.habitId,
+      habitVersionId: previousHabit.log?.habitVersionId ?? '',
+      logDate: payload.logDate,
+      completed: payload.completed,
+      status,
+      note: payload.note ?? previousHabit.log?.note ?? null,
+      createdAt: previousHabit.log?.createdAt ?? new Date().toISOString(),
+      updatedAt: new Date().toISOString()
     }
 
-    try {
-      await $fetch('/api/habits/log', {
+    const result = await runOptimisticAction<HabitLogResult>({
+      apply: () => {
+        todayData.value!.habits[habitIndex] = { ...previousHabit, log: optimisticLog }
+        if (payload.completed !== wasCompleted) {
+          todayData.value!.completedCount += payload.completed ? 1 : -1
+        }
+      },
+      rollback: () => {
+        todayData.value!.habits[habitIndex] = previousHabit
+        todayData.value!.completedCount = previousCompletedCount
+      },
+      request: () => $fetch<HabitLogResult>('/api/habits/log', {
         method: 'POST',
         body: { ...payload, tz: clientTimezone }
-      })
+      }),
+      // Merges back only what the client couldn't have computed itself — the
+      // recalculated streak — instead of the old unconditional refreshToday()
+      // that swapped the whole list for a loading skeleton on every mark
+      // (see docs/habits/OPTIMISTIC_UPDATES.md).
+      reconcile: (serverResult) => {
+        const idx = todayData.value?.habits.findIndex(h => h.id === payload.habitId) ?? -1
+        if (idx < 0 || !todayData.value) return
+        const current = todayData.value.habits[idx]!
+        todayData.value.habits[idx] = {
+          ...current,
+          log: {
+            ...optimisticLog,
+            id: serverResult.id,
+            habitVersionId: serverResult.habit_version_id
+          },
+          streak: serverResult.streak
+            ? {
+                habitId: payload.habitId,
+                userId: previousHabit.userId,
+                currentStreak: serverResult.streak.currentStreak,
+                longestStreak: serverResult.streak.longestStreak,
+                status: serverResult.streak.status,
+                lastCompletedDate: current.streak?.lastCompletedDate ?? null,
+                updatedAt: optimisticLog.updatedAt
+              }
+            : current.streak
+        }
+      },
+      errorMessage: 'Não foi possível registrar o hábito',
+      offline: {
+        entity: 'habit_log',
+        // Deliberately 'create', not 'update': useMutationQueue's enqueue()
+        // coalesces consecutive 'update' entries that share the same entity
+        // + url into one, merging their bodies — fine for e.g. events, whose
+        // url embeds the specific id being edited, but /api/habits/log is
+        // the *same* url for every habit (the habitId travels in the body).
+        // Marking habit A then habit B offline under 'update' would merge
+        // both bodies into a single queued mutation and silently drop one.
+        // 'create' skips that merge branch entirely, so each log action
+        // queues as its own independent entry.
+        action: 'create',
+        method: 'POST',
+        url: '/api/habits/log',
+        body: { ...payload, tz: clientTimezone },
+        // Upserted server-side on (habit_id, log_date) — log.post.ts:94 — so
+        // replaying this once connectivity returns is naturally idempotent,
+        // no tempId reconciliation needed the way event/note creates do.
+        // Field names match the server's raw (snake_case) row shape, not
+        // the camelCase `optimisticLog` used for the local store above.
+        optimisticResult: {
+          id: optimisticLog.id,
+          user_id: optimisticLog.userId,
+          habit_id: optimisticLog.habitId,
+          habit_version_id: optimisticLog.habitVersionId,
+          log_date: optimisticLog.logDate,
+          completed: optimisticLog.completed,
+          status: optimisticLog.status,
+          note: optimisticLog.note,
+          created_at: optimisticLog.createdAt,
+          updated_at: optimisticLog.updatedAt,
+          streak: null
+        }
+      }
+    })
+
+    if (result) {
       trackHabitsEvent(PostHogEvent.HabitLogged, {
         completed: isCompleted,
         habit_id: payload.habitId,
@@ -289,17 +387,8 @@ export function useHabits() {
       if (isCompleted) {
         toast.add({ title: 'Muito bem!', description: 'Você está construindo consistência.', color: 'success' })
       }
-      await refreshToday()
-      return true
-    } catch (err: unknown) {
-      if (habitIndex >= 0 && todayData.value && previousHabit) {
-        todayData.value.habits[habitIndex] = previousHabit
-        todayData.value.completedCount = previousCompletedCount
-      }
-      const message = (err as { data?: { statusMessage?: string } })?.data?.statusMessage
-      toast.add({ title: 'Erro', description: message ?? 'Não foi possível registrar o hábito.', color: 'error' })
-      return false
     }
+    return result !== null
   }
 
   async function createIdentity(payload: CreateIdentityPayload): Promise<Identity | null> {
@@ -662,7 +751,89 @@ export function useHabits() {
     return `${now.getFullYear()}-W${String(weekNumber).padStart(2, '0')}`
   }
 
+  // ─── Offline sync (habit_log only) ──────────────────────────────────────
+  // Same shape as useAppointments.ts's drain loop — replays whatever
+  // logHabit() queued while offline (see the `offline:` block above).
+  const { pendingMutations, pendingCount: pendingSyncCount, dequeue: dequeueMutation, markRetry, ensureLoaded: ensureQueueLoaded } = useMutationQueue()
+  const { isOnline, onReconnect } = useConnectionStatus()
+  const syncingOffline = ref(false)
+  const MAX_MUTATION_RETRIES = 5
+
+  async function drainMutationQueue(): Promise<void> {
+    if (syncingOffline.value) return
+    await ensureQueueLoaded()
+    const relevant = pendingMutations.value.filter(m => m.entity === 'habit_log')
+    if (relevant.length === 0) return
+
+    syncingOffline.value = true
+    let replayedAny = false
+    let permanentFailureCount = 0
+
+    try {
+      const queue = [...relevant]
+
+      for (const mutation of queue) {
+        // Coalesced/cancelled by a later action since the snapshot was taken.
+        if (!pendingMutations.value.some(m => m.id === mutation.id)) continue
+        if (!isOnline.value) break
+
+        try {
+          await $fetch(mutation.url, {
+            method: mutation.method,
+            body: mutation.body as Record<string, unknown> | undefined
+          })
+          await dequeueMutation(mutation.id)
+          replayedAny = true
+        } catch (err) {
+          if (!isOnline.value) break // connection dropped mid-replay, not a real rejection
+
+          const statusCode = (err as { statusCode?: number, response?: { status?: number } })?.statusCode
+            ?? (err as { statusCode?: number, response?: { status?: number } })?.response?.status
+          const isClientError = typeof statusCode === 'number' && statusCode >= 400 && statusCode < 500
+          const outOfRetries = mutation.retryCount + 1 >= MAX_MUTATION_RETRIES
+
+          if (isClientError || outOfRetries) {
+            console.error('[offline-sync] habit log mutation permanently failed, dropping', mutation, err)
+            await dequeueMutation(mutation.id)
+            permanentFailureCount++
+          } else {
+            console.error('[offline-sync] habit log mutation failed, will retry', mutation, err)
+            await markRetry(mutation.id)
+          }
+        }
+      }
+    } finally {
+      syncingOffline.value = false
+      if (replayedAny) {
+        await refreshToday()
+        toast.add({ title: 'Sincronizado', description: 'Seus hábitos marcados offline foram salvos.', color: 'success' })
+      }
+      if (permanentFailureCount > 0) {
+        await refreshToday()
+        toast.add({
+          title: 'Não foi possível sincronizar',
+          description: `${permanentFailureCount} marcação(ões) de hábito não puderam ser salvas e foram descartadas.`,
+          color: 'error'
+        })
+      }
+    }
+  }
+
+  if (!offlineSyncRegistered) {
+    offlineSyncRegistered = true
+    onReconnect(() => {
+      void drainMutationQueue()
+    })
+    onMounted(() => {
+      if (isOnline.value) void drainMutationQueue()
+    })
+  }
+
   return {
+    // Offline sync
+    isOnline,
+    pendingSyncCount,
+    syncingOffline: readonly(syncingOffline),
     // Today
     todayData,
     todayStatus,

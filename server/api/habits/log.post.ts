@@ -100,10 +100,13 @@ export default eventHandler(async (event) => {
     throw createError({ statusCode: 500, statusMessage: 'Falha ao registrar hábito', data: logError.message })
   }
 
-  // Keep the log action successful even if the cache refresh fails.
+  // Keep the log action successful even if the cache refresh fails — `streak`
+  // just stays null in the response, and the client keeps whatever streak
+  // badge it already had instead of updating it.
+  let streak: { currentStreak: number, longestStreak: number, status: 'active' | 'frozen' } | null = null
   try {
     const timezone = await resolveUserTimezone(supabase, user.id, parsed.tz)
-    await updateStreakCache(supabase, user.id, parsed.habitId, timezone)
+    streak = await updateStreakCache(supabase, user.id, parsed.habitId, timezone)
   } catch (error) {
     console.error('[habits/log] streak cache update failed', {
       habitId: parsed.habitId,
@@ -112,7 +115,7 @@ export default eventHandler(async (event) => {
     })
   }
 
-  return log
+  return { ...log, streak }
 })
 
 async function updateStreakCache(
@@ -120,7 +123,7 @@ async function updateStreakCache(
   userId: string,
   habitId: string,
   timezone: string
-): Promise<void> {
+): Promise<{ currentStreak: number, longestStreak: number, status: 'active' | 'frozen' } | null> {
   // Get recent logs (completed or frozen) ordered by date desc
   const { data: logs } = await supabase
     .from('habit_logs')
@@ -141,7 +144,7 @@ async function updateStreakCache(
       status: 'active',
       updated_at: new Date().toISOString()
     }, { onConflict: 'habit_id' })
-    return
+    return { currentStreak: 0, longestStreak: 0, status: 'active' }
   }
 
   const completedDates = new Set(
@@ -213,6 +216,7 @@ async function updateStreakCache(
   }
 
   const lastCompletedDate = sortedCompletedDates.at(-1) ?? null
+  const status = anchorIsFrozen ? 'frozen' : 'active'
 
   await supabase.from('habit_streaks').upsert({
     habit_id: habitId,
@@ -220,7 +224,9 @@ async function updateStreakCache(
     current_streak: currentStreak,
     longest_streak: longestStreak,
     last_completed_date: lastCompletedDate,
-    status: anchorIsFrozen ? 'frozen' : 'active',
+    status,
     updated_at: new Date().toISOString()
   }, { onConflict: 'habit_id' })
+
+  return { currentStreak, longestStreak, status }
 }

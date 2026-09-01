@@ -1,6 +1,6 @@
 import { get, set } from 'idb-keyval'
 
-export type PendingMutationEntity = 'note' | 'folder' | 'journal_entry' | 'calendar' | 'event' | 'scheduling_page'
+export type PendingMutationEntity = 'note' | 'folder' | 'journal_entry' | 'calendar' | 'event' | 'scheduling_page' | 'habit_log'
 export type PendingMutationAction = 'create' | 'update' | 'delete'
 
 export interface PendingMutation {
