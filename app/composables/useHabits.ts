@@ -214,7 +214,13 @@ export function useHabits() {
         ...getHabitTrackingProperties(habit)
       })
       toast.add({ title: 'Hábito criado', description: `"${habit.name}" adicionado com sucesso.`, color: 'success' })
-      await Promise.all([refreshToday(), refreshList()])
+      // Whether the new habit is due *today* depends on frequency/day-of-week
+      // logic the server already resolved — not worth re-deriving client-side
+      // just to fabricate an optimistic insert into todayData. A silent
+      // refresh (writes straight into .value, doesn't touch todayStatus/
+      // listStatus) still avoids the list-wide skeleton flash this pass is
+      // about — see silentRefreshAfterStackChange below.
+      void silentRefreshAfterStackChange()
       return habit
     } catch {
       toast.add({ title: 'Erro', description: 'Não foi possível criar o hábito.', color: 'error' })
@@ -223,53 +229,143 @@ export function useHabits() {
   }
 
   async function updateHabit(id: string, payload: UpdateHabitPayload): Promise<Habit | null> {
-    try {
-      const habit = await $fetch<Habit>(`/api/habits/${id}`, {
-        method: 'PUT',
-        body: payload
-      })
-      trackHabitsEvent(PostHogEvent.HabitUpdated, {
-        habit_id: habit.id,
-        ...getHabitPayloadTrackingProperties(payload),
-        ...getHabitTrackingProperties(habit)
-      })
-      toast.add({ title: 'Hábito atualizado', description: `"${habit.name}" salvo com sucesso.`, color: 'success' })
-      await Promise.all([refreshToday(), refreshList()])
-      return habit
-    } catch {
-      toast.add({ title: 'Erro', description: 'Não foi possível atualizar o hábito.', color: 'error' })
-      return null
+    const todayIndex = todayData.value?.habits.findIndex(h => h.id === id) ?? -1
+    const listIndex = listData.value?.data.findIndex(h => h.id === id) ?? -1
+    const previousToday = todayIndex >= 0 ? todayData.value!.habits[todayIndex]! : null
+    const previousList = listIndex >= 0 ? listData.value!.data[listIndex]! : null
+    const base = previousToday ?? previousList
+
+    const resolvedIdentity = payload.identityId !== undefined
+      ? (payload.identityId ? (identities.value ?? []).find(i => i.id === payload.identityId) ?? base?.identity ?? null : null)
+      : undefined
+    const resolvedTags = payload.tagIds !== undefined
+      ? (tags.value ?? []).filter(t => payload.tagIds!.includes(t.id))
+      : undefined
+
+    function applyPatch<T extends Habit>(habit: T): T {
+      return {
+        ...habit,
+        ...payload,
+        identity: resolvedIdentity !== undefined ? resolvedIdentity : habit.identity,
+        tags: resolvedTags !== undefined ? resolvedTags : habit.tags,
+        updatedAt: new Date().toISOString()
+      }
     }
+
+    const result = await runOptimisticAction<Habit>({
+      apply: () => {
+        if (todayIndex >= 0 && todayData.value) {
+          todayData.value.habits[todayIndex] = applyPatch(todayData.value.habits[todayIndex]!)
+        }
+        if (listIndex >= 0 && listData.value) {
+          listData.value.data[listIndex] = applyPatch(listData.value.data[listIndex]!)
+        }
+      },
+      rollback: () => {
+        if (todayIndex >= 0 && todayData.value && previousToday) todayData.value.habits[todayIndex] = previousToday
+        if (listIndex >= 0 && listData.value && previousList) listData.value.data[listIndex] = previousList
+      },
+      request: () => $fetch<Habit>(`/api/habits/${id}`, { method: 'PUT', body: payload }),
+      reconcile: (habit) => {
+        const idxToday = todayData.value?.habits.findIndex(h => h.id === id) ?? -1
+        const idxList = listData.value?.data.findIndex(h => h.id === id) ?? -1
+        if (idxToday >= 0 && todayData.value) todayData.value.habits[idxToday] = { ...todayData.value.habits[idxToday], ...habit }
+        if (idxList >= 0 && listData.value) listData.value.data[idxList] = habit
+      },
+      errorMessage: 'Não foi possível atualizar o hábito'
+    })
+
+    if (result) {
+      trackHabitsEvent(PostHogEvent.HabitUpdated, {
+        habit_id: result.id,
+        ...getHabitPayloadTrackingProperties(payload),
+        ...getHabitTrackingProperties(result)
+      })
+      toast.add({ title: 'Hábito atualizado', description: `"${result.name}" salvo com sucesso.`, color: 'success' })
+    }
+    return result
   }
 
   async function archiveHabit(id: string, name: string): Promise<boolean> {
-    try {
-      await $fetch(`/api/habits/${id}`, { method: 'DELETE' })
-      trackHabitsEvent(PostHogEvent.HabitArchived, {
-        habit_id: id
-      })
+    const todayIndex = todayData.value?.habits.findIndex(h => h.id === id) ?? -1
+    const listIndex = listData.value?.data.findIndex(h => h.id === id) ?? -1
+    const previousTodayHabit = todayIndex >= 0 ? todayData.value!.habits[todayIndex]! : null
+    const previousListHabit = listIndex >= 0 ? listData.value!.data[listIndex]! : null
+    const previousCompletedCount = todayData.value?.completedCount ?? 0
+    const previousTodayTotal = todayData.value?.totalCount ?? 0
+    const previousListTotal = listData.value?.total ?? 0
+
+    const result = await runOptimisticAction<unknown>({
+      apply: () => {
+        if (previousTodayHabit && todayData.value) {
+          todayData.value.habits = todayData.value.habits.filter(h => h.id !== id)
+          todayData.value.totalCount = Math.max(0, todayData.value.totalCount - 1)
+          if (previousTodayHabit.log?.completed) {
+            todayData.value.completedCount = Math.max(0, todayData.value.completedCount - 1)
+          }
+        }
+        // Archived habits don't belong in the active list — only strip it
+        // out here if that's actually the view currently loaded.
+        if (previousListHabit && listData.value && !listArchived.value) {
+          listData.value.data = listData.value.data.filter(h => h.id !== id)
+          listData.value.total = Math.max(0, listData.value.total - 1)
+        }
+      },
+      rollback: () => {
+        if (previousTodayHabit && todayData.value) {
+          todayData.value.habits = [...todayData.value.habits, previousTodayHabit]
+          todayData.value.totalCount = previousTodayTotal
+          todayData.value.completedCount = previousCompletedCount
+        }
+        if (previousListHabit && listData.value) {
+          listData.value.data = [...listData.value.data, previousListHabit]
+          listData.value.total = previousListTotal
+        }
+      },
+      request: () => $fetch(`/api/habits/${id}`, { method: 'DELETE' }),
+      errorMessage: 'Não foi possível arquivar o hábito'
+    })
+
+    if (result !== null) {
+      trackHabitsEvent(PostHogEvent.HabitArchived, { habit_id: id })
       toast.add({ title: 'Hábito arquivado', description: `"${name}" foi arquivado.`, color: 'success' })
-      await Promise.all([refreshToday(), refreshList()])
-      return true
-    } catch {
-      toast.add({ title: 'Erro', description: 'Não foi possível arquivar o hábito.', color: 'error' })
-      return false
     }
+    return result !== null
   }
 
   async function restoreHabit(id: string): Promise<boolean> {
-    try {
-      await $fetch(`/api/habits/${id}/restore`, { method: 'POST' })
-      trackHabitsEvent(PostHogEvent.HabitRestored, {
-        habit_id: id
-      })
+    // Only ever called from the archived view (listArchived === true) — the
+    // item stops belonging there the moment it's restored.
+    const listIndex = listData.value?.data.findIndex(h => h.id === id) ?? -1
+    const previousListHabit = listIndex >= 0 ? listData.value!.data[listIndex]! : null
+    const previousListTotal = listData.value?.total ?? 0
+
+    const result = await runOptimisticAction<unknown>({
+      apply: () => {
+        if (previousListHabit && listData.value && listArchived.value) {
+          listData.value.data = listData.value.data.filter(h => h.id !== id)
+          listData.value.total = Math.max(0, listData.value.total - 1)
+        }
+      },
+      rollback: () => {
+        if (previousListHabit && listData.value) {
+          listData.value.data = [...listData.value.data, previousListHabit]
+          listData.value.total = previousListTotal
+        }
+      },
+      request: () => $fetch(`/api/habits/${id}/restore`, { method: 'POST' }),
+      errorMessage: 'Não foi possível restaurar o hábito'
+    })
+
+    if (result !== null) {
+      trackHabitsEvent(PostHogEvent.HabitRestored, { habit_id: id })
       toast.add({ title: 'Hábito restaurado', description: 'O hábito foi restaurado com sucesso.', color: 'success' })
-      await Promise.all([refreshToday(), refreshList()])
-      return true
-    } catch {
-      toast.add({ title: 'Erro', description: 'Não foi possível restaurar o hábito.', color: 'error' })
-      return false
+      // The restored habit may be due today — no reliable way to know that
+      // client-side, so a silent background refresh picks it back up in the
+      // today list without flashing a skeleton over everything else.
+      void silentRefreshAfterStackChange()
     }
+    return result !== null
   }
 
   async function logHabit(payload: LogHabitPayload): Promise<boolean> {
@@ -392,94 +488,155 @@ export function useHabits() {
   }
 
   async function createIdentity(payload: CreateIdentityPayload): Promise<Identity | null> {
-    try {
-      const identity = await $fetch<Identity>('/api/habits/identities', {
-        method: 'POST',
-        body: payload
-      })
-      trackHabitsEvent(PostHogEvent.HabitIdentityCreated, {
-        has_description: Boolean(identity.description?.trim()),
-        identity_id: identity.id
-      })
-      toast.add({ title: 'Identidade criada', description: `"${identity.name}" criada com sucesso.`, color: 'success' })
-      await refreshIdentities()
-      return identity
-    } catch {
-      toast.add({ title: 'Erro', description: 'Não foi possível criar a identidade.', color: 'error' })
-      return null
+    const tempId = `temp-${crypto.randomUUID()}`
+    const now = new Date().toISOString()
+    const optimisticIdentity: Identity = {
+      id: tempId,
+      userId: '',
+      name: payload.name,
+      description: payload.description ?? null,
+      createdAt: now,
+      updatedAt: now,
+      archivedAt: null
     }
+
+    const result = await runOptimisticAction<Identity>({
+      apply: () => {
+        identities.value = [...(identities.value ?? []), optimisticIdentity]
+      },
+      rollback: () => {
+        identities.value = (identities.value ?? []).filter(i => i.id !== tempId)
+      },
+      request: () => $fetch<Identity>('/api/habits/identities', { method: 'POST', body: payload }),
+      reconcile: (identity) => {
+        identities.value = (identities.value ?? []).map(i => i.id === tempId ? identity : i)
+      },
+      errorMessage: 'Não foi possível criar a identidade'
+    })
+
+    if (result) {
+      trackHabitsEvent(PostHogEvent.HabitIdentityCreated, {
+        has_description: Boolean(result.description?.trim()),
+        identity_id: result.id
+      })
+      toast.add({ title: 'Identidade criada', description: `"${result.name}" criada com sucesso.`, color: 'success' })
+    }
+    return result
   }
 
   async function archiveIdentity(id: string, name: string): Promise<boolean> {
-    try {
-      await $fetch(`/api/habits/identities/${id}`, { method: 'DELETE' })
-      trackHabitsEvent(PostHogEvent.HabitIdentityArchived, {
-        identity_id: id
-      })
+    const previous = (identities.value ?? []).find(i => i.id === id) ?? null
+    const previousListIdentityFilter = listIdentityId.value
+
+    const result = await runOptimisticAction<unknown>({
+      apply: () => {
+        identities.value = (identities.value ?? []).filter(i => i.id !== id)
+        if (listIdentityId.value === id) listIdentityId.value = ''
+      },
+      rollback: () => {
+        if (previous) identities.value = [...(identities.value ?? []), previous]
+        listIdentityId.value = previousListIdentityFilter
+      },
+      request: () => $fetch(`/api/habits/identities/${id}`, { method: 'DELETE' }),
+      errorMessage: 'Não foi possível arquivar a identidade'
+    })
+
+    if (result !== null) {
+      trackHabitsEvent(PostHogEvent.HabitIdentityArchived, { identity_id: id })
       toast.add({ title: 'Identidade arquivada', description: `"${name}" foi arquivada.`, color: 'success' })
-
-      if (listIdentityId.value === id) {
-        listIdentityId.value = ''
-      }
-
-      await Promise.all([refreshIdentities(), refreshList()])
-      return true
-    } catch {
-      toast.add({ title: 'Erro', description: 'Não foi possível arquivar a identidade.', color: 'error' })
-      return false
+      // Habits shown elsewhere may still reference this identity — a silent
+      // background refresh (not refreshList(), which flips status and
+      // flashes the skeleton) keeps them in sync.
+      void silentRefreshAfterStackChange()
     }
+    return result !== null
   }
 
   async function updateIdentity(id: string, payload: UpdateIdentityPayload): Promise<Identity | null> {
-    try {
-      const identity = await $fetch<Identity>(`/api/habits/identities/${id}`, {
-        method: 'PUT',
-        body: payload
-      })
+    const previous = (identities.value ?? []).find(i => i.id === id) ?? null
+    if (!previous) return null
+
+    const optimistic: Identity = { ...previous, ...payload, updatedAt: new Date().toISOString() }
+
+    const result = await runOptimisticAction<Identity>({
+      apply: () => {
+        identities.value = (identities.value ?? []).map(i => i.id === id ? optimistic : i)
+      },
+      rollback: () => {
+        identities.value = (identities.value ?? []).map(i => i.id === id ? previous : i)
+      },
+      request: () => $fetch<Identity>(`/api/habits/identities/${id}`, { method: 'PUT', body: payload }),
+      reconcile: (identity) => {
+        identities.value = (identities.value ?? []).map(i => i.id === id ? identity : i)
+      },
+      errorMessage: 'Não foi possível atualizar a identidade'
+    })
+
+    if (result) {
       trackHabitsEvent(PostHogEvent.HabitIdentityUpdated, {
-        has_description: Boolean(identity.description?.trim()),
-        identity_id: identity.id
+        has_description: Boolean(result.description?.trim()),
+        identity_id: result.id
       })
-      toast.add({ title: 'Identidade atualizada', description: `"${identity.name}" salva com sucesso.`, color: 'success' })
-      await Promise.all([refreshIdentities(), refreshList()])
-      return identity
-    } catch {
-      toast.add({ title: 'Erro', description: 'Não foi possível atualizar a identidade.', color: 'error' })
-      return null
+      toast.add({ title: 'Identidade atualizada', description: `"${result.name}" salva com sucesso.`, color: 'success' })
+      void silentRefreshAfterStackChange()
     }
+    return result
   }
 
   async function createTag(payload: CreateHabitTagPayload): Promise<HabitTag | null> {
-    try {
-      const tag = await $fetch<HabitTag>('/api/habits/tags', {
-        method: 'POST',
-        body: payload
-      })
-      trackHabitsEvent(PostHogEvent.HabitTagCreated, {
-        tag_id: tag.id
-      })
-      toast.add({ title: 'Tag criada', description: `"${tag.name}" criada com sucesso.`, color: 'success' })
-      await refreshTags()
-      return tag
-    } catch {
-      toast.add({ title: 'Erro', description: 'Não foi possível criar a tag.', color: 'error' })
-      return null
+    const tempId = `temp-${crypto.randomUUID()}`
+    const now = new Date().toISOString()
+    const optimisticTag: HabitTag = {
+      id: tempId,
+      userId: '',
+      name: payload.name,
+      color: payload.color ?? '#6366f1',
+      createdAt: now,
+      updatedAt: now
     }
+
+    const result = await runOptimisticAction<HabitTag>({
+      apply: () => {
+        tags.value = [...(tags.value ?? []), optimisticTag]
+      },
+      rollback: () => {
+        tags.value = (tags.value ?? []).filter(t => t.id !== tempId)
+      },
+      request: () => $fetch<HabitTag>('/api/habits/tags', { method: 'POST', body: payload }),
+      reconcile: (tag) => {
+        tags.value = (tags.value ?? []).map(t => t.id === tempId ? tag : t)
+      },
+      errorMessage: 'Não foi possível criar a tag'
+    })
+
+    if (result) {
+      trackHabitsEvent(PostHogEvent.HabitTagCreated, { tag_id: result.id })
+      toast.add({ title: 'Tag criada', description: `"${result.name}" criada com sucesso.`, color: 'success' })
+    }
+    return result
   }
 
   async function deleteTag(id: string, name: string): Promise<boolean> {
-    try {
-      await $fetch(`/api/habits/tags/${id}`, { method: 'DELETE' })
-      trackHabitsEvent(PostHogEvent.HabitTagDeleted, {
-        tag_id: id
-      })
+    const previous = (tags.value ?? []).find(t => t.id === id) ?? null
+
+    const result = await runOptimisticAction<unknown>({
+      apply: () => {
+        tags.value = (tags.value ?? []).filter(t => t.id !== id)
+      },
+      rollback: () => {
+        if (previous) tags.value = [...(tags.value ?? []), previous]
+      },
+      request: () => $fetch(`/api/habits/tags/${id}`, { method: 'DELETE' }),
+      errorMessage: 'Não foi possível excluir a tag'
+    })
+
+    if (result !== null) {
+      trackHabitsEvent(PostHogEvent.HabitTagDeleted, { tag_id: id })
       toast.add({ title: 'Tag excluída', description: `"${name}" foi excluída.`, color: 'success' })
-      await Promise.all([refreshTags(), refreshList()])
-      return true
-    } catch {
-      toast.add({ title: 'Erro', description: 'Não foi possível excluir a tag.', color: 'error' })
-      return false
+      // Habits shown elsewhere may still reference this tag.
+      void silentRefreshAfterStackChange()
     }
+    return result !== null
   }
 
   async function saveReflection(payload: CreateReflectionPayload): Promise<HabitReflection | null> {
