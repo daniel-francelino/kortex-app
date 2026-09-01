@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { Idea } from '~/types/ideas'
 import { IDEA_STATUS_META, IdeaStatus } from '~/types/ideas'
+import { formatDisplay } from '#shared/utils/dateTime'
 
 const props = defineProps<{
   ideas: Idea[]
@@ -27,7 +28,7 @@ const columns = computed(() => {
 
 function formatDate(dateStr: string | null): string {
   if (!dateStr) return ''
-  return new Date(dateStr).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })
+  return formatDisplay(dateStr, "dd 'de' MMM'.'")
 }
 
 function isOverdue(dueDate: string | null, status: string): boolean {

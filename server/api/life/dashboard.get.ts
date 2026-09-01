@@ -1,39 +1,34 @@
 import { z } from 'zod'
 import { getDay } from 'date-fns'
-import { formatInTimeZone, fromZonedTime } from 'date-fns-tz'
 import { getSupabaseAdminClient } from '../../utils/supabase'
 import { requireAuthUser } from '../../utils/require-auth'
 import { resolveHabitsForDate } from '../../utils/habit-versions'
 import { isDueOnDay } from '../../utils/habits'
+import { resolveUserTimezone } from '../../utils/user-timezone'
+import { endOfDayInZone, parseCalendarDate, startOfDayInZone, todayInZone } from '#shared/utils/dateTime'
 
 const querySchema = z.object({
-  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data deve estar no formato YYYY-MM-DD').optional()
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data deve estar no formato YYYY-MM-DD').optional(),
+  tz: z.string().optional()
 })
-
-// Same zone hardcoded across the app (see index.vue's todayFormatted) —
-// this is a single-tenant personal app, not a per-user-timezone product,
-// so "today" is defined consistently everywhere against this one zone
-// rather than the server's own UTC clock.
-const DASHBOARD_TIMEZONE = 'America/Fortaleza'
 
 export default eventHandler(async (event) => {
   const user = await requireAuthUser(event)
   const query = getQuery(event)
   const params = querySchema.parse(query)
+  const supabase = getSupabaseAdminClient()
 
-  // `new Date().toISOString().split('T')[0]` used to read the UTC calendar
-  // date — for the last ~3 hours of every local day (UTC-3), that's already
-  // "tomorrow" in UTC, so the whole dashboard (habits due today, task
-  // overdue check, journal entry, today's events) silently jumped a day
-  // early each night.
-  const todayStr = formatInTimeZone(new Date(), DASHBOARD_TIMEZONE, 'yyyy-MM-dd')
+  // Regra 1 (docs/timezone/ANALISE_TIMEZONE.md): browser-detected zone from
+  // the client wins when sent; falls back to the user's stored preference,
+  // then 'UTC'. Replaces the old hardcoded `DASHBOARD_TIMEZONE` — that's
+  // what caused the dashboard to show Fortaleza time to a user in Lisbon.
+  const timezone = await resolveUserTimezone(supabase, user.id, params.tz)
+
+  const todayStr = todayInZone(timezone)
   const date = params.date ?? todayStr
-  const [dateYear, dateMonth, dateDay] = date.split('-').map(Number) as [number, number, number]
-  const localMidnight = new Date(dateYear, dateMonth - 1, dateDay)
+  const localMidnight = parseCalendarDate(date)
   const dayOfWeek = getDay(localMidnight)
   const isCurrentDay = date === todayStr
-
-  const supabase = getSupabaseAdminClient()
 
   // ─── Habits ───────────────────────────────────────────────────────────────
   type DashboardHabitItem = { id: string, name: string, frequency: string, difficulty: string, completed: boolean, streakCurrent: number }
@@ -154,10 +149,11 @@ export default eventHandler(async (event) => {
   // event (~9pm-midnight local) starts at 00:00-02:59Z the *next* UTC day,
   // past dayEnd, so it silently fell out of "today" here — while the actual
   // calendar/day-view (which converts through the event's own eventTimezone
-  // via calendarEventTime.ts) showed it correctly. fromZonedTime converts
-  // the real local-day boundaries instead of assuming they line up with UTC.
-  const dayStart = fromZonedTime(localMidnight, DASHBOARD_TIMEZONE).toISOString()
-  const dayEnd = fromZonedTime(new Date(dateYear, dateMonth - 1, dateDay, 23, 59, 59, 999), DASHBOARD_TIMEZONE).toISOString()
+  // via calendarEventTime.ts) showed it correctly. startOfDayInZone/
+  // endOfDayInZone convert the real local-day boundaries in `timezone`
+  // instead of assuming they line up with UTC.
+  const dayStart = startOfDayInZone(date, timezone).toISOString()
+  const dayEnd = endOfDayInZone(date, timezone).toISOString()
 
   const { data: events } = await supabase
     .from('events')

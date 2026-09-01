@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { GoalTask } from '~/types/goals'
+import { formatDisplay } from '#shared/utils/dateTime'
 
 defineProps<{
   task: GoalTask
@@ -12,7 +13,7 @@ const emit = defineEmits<{
 }>()
 
 function formatDueDate(dueDate: string): string {
-  return new Date(`${dueDate}T12:00:00`).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })
+  return formatDisplay(new Date(`${dueDate}T12:00:00`), "dd 'de' MMM'.'")
 }
 </script>
 

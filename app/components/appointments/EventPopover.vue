@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { CalendarEvent } from '~/types/appointments'
 import { formatEventTime, getEventTimeZone } from '~/utils/calendarEventTime'
+import { formatDisplay } from '#shared/utils/dateTime'
 
 const props = defineProps<{
   event: CalendarEvent | null
@@ -47,20 +48,10 @@ function formatDateTime(dateStr: string, allDay: boolean): string {
   if (Number.isNaN(date.getTime())) return 'Data inválida'
 
   if (allDay) {
-    return date.toLocaleDateString('pt-BR', {
-      timeZone,
-      weekday: 'short',
-      day: '2-digit',
-      month: 'short'
-    })
+    return formatDisplay(date, "EEEEEE'.,' dd 'de' MMM'.'", { timeZone })
   }
 
-  return date.toLocaleDateString('pt-BR', {
-    timeZone,
-    weekday: 'short',
-    day: '2-digit',
-    month: 'short'
-  }) + ' ' + (props.event ? formatEventTime(props.event) : '')
+  return formatDisplay(date, "EEEEEE'.,' dd 'de' MMM'.'", { timeZone }) + ' ' + (props.event ? formatEventTime(props.event) : '')
 }
 
 function getTimeRange(evt: CalendarEvent): string {

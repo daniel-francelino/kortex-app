@@ -12,7 +12,15 @@ type UserPreferences = {
   primary_color: string
   neutral_color: string
   color_mode: ColorModePreference
-  timezone: string
+  // `null` = never explicitly chosen (see docs/timezone/ANALISE_TIMEZONE.md,
+  // Regra 2) — only `GET /api/settings/preferences`'s response carries this;
+  // `PreferencesState.timezone` below is always a concrete string, since the
+  // app always needs *something* to display/send immediately.
+  timezone: string | null
+  // How many times each zone has been active for this user (auto-fill or
+  // manual change) — powers "most used first" in the timezone picker
+  // (docs/timezone/ANALISE_TIMEZONE.md, seção 7).
+  timezone_usage: Record<string, number>
 }
 
 type PreferencesState = {
@@ -21,6 +29,7 @@ type PreferencesState = {
   neutral_color: string
   color_mode: ColorModePreference
   timezone: string
+  timezoneUsage: Record<string, number>
 }
 
 type ThemePreset = UserPreferences
@@ -30,14 +39,16 @@ const PUBLIC_THEME: ThemePreset = {
   primary_color: 'emerald',
   neutral_color: 'slate',
   color_mode: ColorModePreference.Dark,
-  timezone: 'UTC'
+  timezone: 'UTC',
+  timezone_usage: {}
 }
 
 const BRAND_THEME: ThemePreset = {
   primary_color: 'emerald',
   neutral_color: 'slate',
   color_mode: ColorModePreference.Dark,
-  timezone: 'UTC'
+  timezone: 'UTC',
+  timezone_usage: {}
 }
 
 export function useUserPreferences() {
@@ -46,7 +57,8 @@ export function useUserPreferences() {
     primary_color: BRAND_THEME.primary_color,
     neutral_color: BRAND_THEME.neutral_color,
     color_mode: BRAND_THEME.color_mode,
-    timezone: BRAND_THEME.timezone
+    timezone: BRAND_THEME.timezone,
+    timezoneUsage: {}
   }))
 
   const appConfig = useAppConfig()
@@ -72,8 +84,25 @@ export function useUserPreferences() {
       state.value.primary_color = data.primary_color
       state.value.neutral_color = data.neutral_color
       state.value.color_mode = data.color_mode
-      state.value.timezone = data.timezone
+      // `data.timezone` may be `null` (never explicitly chosen) — fall back
+      // to 'UTC' for immediate display only; never persist that fallback
+      // back automatically (see the Regra 2 block right below, which is the
+      // only thing allowed to fill it in on the user's behalf).
+      state.value.timezone = data.timezone ?? 'UTC'
+      state.value.timezoneUsage = data.timezone_usage ?? {}
       state.value.loaded = true
+
+      // Regra 2 (docs/timezone/ANALISE_TIMEZONE.md): the very first time
+      // this account is ever seen with no timezone preference at all, seed
+      // it from the browser's detected zone — once. From then on the column
+      // is never null again, so this block never runs again for this user;
+      // any later change only happens if they explicitly pick one in
+      // Configurações. Never do this for the public/unauthenticated theme
+      // context, where there's no real user preference to seed.
+      if (data.timezone === null && import.meta.client) {
+        const browserTz = Intl.DateTimeFormat().resolvedOptions().timeZone
+        if (browserTz) void setTimezone(browserTz)
+      }
     } catch {
       // Keep brand defaults silently when preferences cannot be loaded.
       state.value.loaded = true
@@ -108,6 +137,7 @@ export function useUserPreferences() {
     if (prefs.neutral_color) state.value.neutral_color = prefs.neutral_color
     if (prefs.color_mode) state.value.color_mode = prefs.color_mode
     if (prefs.timezone) state.value.timezone = prefs.timezone
+    if (prefs.timezone_usage) state.value.timezoneUsage = prefs.timezone_usage
 
     applyStoredTheme()
 
@@ -118,7 +148,11 @@ export function useUserPreferences() {
           primary_color: state.value.primary_color,
           neutral_color: state.value.neutral_color,
           color_mode: state.value.color_mode,
-          timezone: state.value.timezone
+          timezone: state.value.timezone,
+          // Only sent when this save is actually changing usage counts
+          // (see setTimezone) — omitting it otherwise lets the PUT endpoint
+          // leave the stored map untouched instead of resetting it.
+          ...(prefs.timezone_usage ? { timezone_usage: prefs.timezone_usage } : {})
         }
       })
     } catch {
@@ -139,7 +173,15 @@ export function useUserPreferences() {
   }
 
   async function setTimezone(timezone: string) {
-    await save({ timezone })
+    // Covers both paths that are allowed to change the timezone (seção 7):
+    // the Regra 2 one-time auto-fill and an explicit change in
+    // Configurações — both call this same function, so counting usage here
+    // catches both without duplicating the increment logic at each call site.
+    const nextUsage = {
+      ...state.value.timezoneUsage,
+      [timezone]: (state.value.timezoneUsage[timezone] ?? 0) + 1
+    }
+    await save({ timezone, timezone_usage: nextUsage })
   }
 
   return {

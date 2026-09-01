@@ -2,6 +2,7 @@
 import { addDays, addMilliseconds, format, isSameDay } from 'date-fns'
 import type { CalendarEvent } from '~/types/appointments'
 import { getEventTimeZone, getZonedDate, zonedDateTimeToUtcIso } from '~/utils/calendarEventTime'
+import { formatDisplay } from '#shared/utils/dateTime'
 import {
   layoutTimedEvents,
   getEventTopPx,
@@ -78,7 +79,7 @@ const weekDays = computed((): DayColumn[] => {
     return {
       date,
       dateStr: formatDate(date),
-      label: date.toLocaleDateString('pt-BR', { weekday: 'short' }),
+      label: formatDisplay(date, "EEEEEE'.'"),
       dayNumber: date.getDate(),
       isToday: isSameDay(date, today),
       allDayEvents: dayEvents.filter(e => e.allDay),

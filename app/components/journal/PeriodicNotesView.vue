@@ -2,6 +2,7 @@
 import { getMoodOption } from '~/types/journal'
 import { formatPeriodLabel } from '~/utils/journal-periods'
 import { isEditorContentEmpty } from '~/utils/editor/content'
+import { formatDisplay } from '#shared/utils/dateTime'
 
 const emit = defineEmits<{
   selectDate: [date: string]
@@ -28,11 +29,7 @@ async function onSave() {
 }
 
 function formatEntryDate(dateStr: string): string {
-  return new Date(dateStr + 'T12:00:00').toLocaleDateString('pt-BR', {
-    weekday: 'short',
-    day: '2-digit',
-    month: 'short'
-  })
+  return formatDisplay(new Date(dateStr + 'T12:00:00'), "EEEEEE'.,' dd 'de' MMM'.'")
 }
 </script>
 

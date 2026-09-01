@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { isValidTimeZone } from './user-timezone'
 
 export const ONBOARDING_STEPS = [
   'welcome',
@@ -54,7 +55,7 @@ export const onboardingUpdateSchema = z.object({
   currentStep: z.enum(ONBOARDING_STEPS).optional(),
   profile: onboardingProfileSchema.partial().optional(),
   status: z.enum(ONBOARDING_STATUSES).optional(),
-  timezone: z.string().trim().min(1).max(120).optional(),
+  timezone: z.string().refine(isValidTimeZone, { message: 'Timezone inválido' }).optional(),
   markCompleted: z.boolean().optional()
 })
 

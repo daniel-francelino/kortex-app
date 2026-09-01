@@ -20,6 +20,11 @@ type BadgeColor = 'success' | 'error' | 'primary' | 'secondary' | 'info' | 'warn
 export function useTasks() {
   const toast = useToast()
 
+  // Regra 1 (docs/timezone/ANALISE_TIMEZONE.md): sent so the server can
+  // resolve "today" (overdue filter, insights) against the browser's zone
+  // instead of its stored fallback — undefined during SSR (no browser there).
+  const clientTimezone = import.meta.client ? Intl.DateTimeFormat().resolvedOptions().timeZone : undefined
+
   // ─── Tasks list (paginated) ─────────────────────────────────────────────────
   const listPage = ref(1)
   const listPageSize = ref(20)
@@ -39,7 +44,8 @@ export function useTasks() {
       search: listSearch.value || undefined,
       status: listStatus.value || undefined,
       priority: listPriority.value || undefined,
-      listId: listListId.value || undefined
+      listId: listListId.value || undefined,
+      tz: clientTimezone
     })),
     lazy: true,
     key: 'tasks-list',
@@ -81,6 +87,7 @@ export function useTasks() {
     status: insightsStatus,
     refresh: refreshInsights
   } = useFetch<TaskInsights>('/api/tasks/insights', {
+    query: { tz: clientTimezone },
     lazy: true,
     key: 'tasks-insights'
   })

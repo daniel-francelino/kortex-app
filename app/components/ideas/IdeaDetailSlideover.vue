@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { IdeaDetail, IdeaList, IdeaTag, IdeaPriority } from '~/types/ideas'
 import { IDEA_STATUS_META, IdeaStatus } from '~/types/ideas'
+import { formatDisplay } from '#shared/utils/dateTime'
 
 const props = defineProps<{
   ideaId: string | null
@@ -146,13 +147,7 @@ async function removeSubtask(subtaskId: string): Promise<void> {
 }
 
 function formatDate(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString('pt-BR', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit'
-  })
+  return formatDisplay(dateStr, "dd 'de' MMM'.' 'de' yyyy, HH:mm")
 }
 
 const subtaskProgress = computed(() => {

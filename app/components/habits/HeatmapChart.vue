@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { HeatmapDay } from '~/types/habits'
+import { formatDisplay } from '#shared/utils/dateTime'
 
 const props = defineProps<{
   days: HeatmapDay[]
@@ -130,7 +131,7 @@ function onCellLeave() {
 
 function formatDate(dateStr: string): string {
   const date = new Date(dateStr + 'T12:00:00')
-  return date.toLocaleDateString('pt-BR', { weekday: 'short', day: 'numeric', month: 'short' })
+  return formatDisplay(date, "EEEEEE'.,' d 'de' MMM'.'")
 }
 
 function formatTooltipCount(cell: CellData): string {

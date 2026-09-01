@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { HabitInsights as InsightsType, HeatmapData, IdentityProgress, MoodCorrelationData } from '~/types/habits'
 import { MOOD_OPTIONS } from '~/types/journal'
+import { formatDisplay } from '#shared/utils/dateTime'
 
 const props = defineProps<{
   insights: InsightsType | null
@@ -181,10 +182,7 @@ const hasAnyInsightData = computed(() => {
 })
 
 function formatDayLabel(dateStr: string): string {
-  return new Date(`${dateStr}T12:00:00`).toLocaleDateString('pt-BR', {
-    day: '2-digit',
-    month: 'short'
-  })
+  return formatDisplay(new Date(`${dateStr}T12:00:00`), "dd 'de' MMM'.'")
 }
 
 function navigateHeatmapYear(direction: 'older' | 'newer') {

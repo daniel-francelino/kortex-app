@@ -1,25 +1,29 @@
 import { z } from 'zod'
+import { getDay } from 'date-fns'
 import { getSupabaseAdminClient } from '../../utils/supabase'
 import { requireAuthUser } from '../../utils/require-auth'
 import { mapHabit, mapHabitFromVersion, fetchHabitTagMap, fetchHabitGoalMap, isDueOnDay } from '../../utils/habits'
 import { resolveHabitsForDate } from '../../utils/habit-versions'
 import { resolveHabitStacksForDate } from '../../utils/habit-stacks'
+import { resolveUserTimezone } from '../../utils/user-timezone'
+import { parseCalendarDate, todayInZone } from '#shared/utils/dateTime'
 
 const querySchema = z.object({
-  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data deve estar no formato YYYY-MM-DD').optional()
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data deve estar no formato YYYY-MM-DD').optional(),
+  tz: z.string().optional()
 })
 
 export default eventHandler(async (event) => {
   const user = await requireAuthUser(event)
   const query = getQuery(event)
   const params = querySchema.parse(query)
-
-  const todayStr = new Date().toISOString().split('T')[0]!
-  const date = params.date ?? todayStr
-  const dayOfWeek = new Date(`${date}T12:00:00Z`).getUTCDay()
-  const isCurrentDay = date === todayStr
-
   const supabase = getSupabaseAdminClient()
+
+  const timezone = await resolveUserTimezone(supabase, user.id, params.tz)
+  const todayStr = todayInZone(timezone)
+  const date = params.date ?? todayStr
+  const dayOfWeek = getDay(parseCalendarDate(date))
+  const isCurrentDay = date === todayStr
 
   let todayHabitsMapped: Record<string, unknown>[]
 
@@ -98,7 +102,7 @@ export default eventHandler(async (event) => {
   }))
 
   const completedCount = result.filter(h => (h.log as Record<string, unknown> | null)?.completed).length
-  const stacks = await resolveHabitStacksForDate(supabase, user.id, date)
+  const stacks = await resolveHabitStacksForDate(supabase, user.id, timezone, date)
 
   return {
     habits: result,

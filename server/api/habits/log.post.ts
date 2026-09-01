@@ -2,13 +2,16 @@ import { z } from 'zod'
 import { getSupabaseAdminClient } from '../../utils/supabase'
 import { requireAuthUser } from '../../utils/require-auth'
 import { resolveHabitVersionIdForDate } from '../../utils/habit-versions'
+import { resolveUserTimezone } from '../../utils/user-timezone'
+import { differenceInCalendarDaysInZone, subCalendarDays, todayInZone } from '#shared/utils/dateTime'
 
 const bodySchema = z.object({
   habitId: z.string().uuid(),
   logDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data deve estar no formato YYYY-MM-DD'),
   completed: z.boolean(),
   status: z.enum(['done', 'done_later', 'skipped', 'frozen']).optional(),
-  note: z.string().max(500).optional()
+  note: z.string().max(500).optional(),
+  tz: z.string().optional()
 })
 
 export default eventHandler(async (event) => {
@@ -99,7 +102,8 @@ export default eventHandler(async (event) => {
 
   // Keep the log action successful even if the cache refresh fails.
   try {
-    await updateStreakCache(supabase, user.id, parsed.habitId)
+    const timezone = await resolveUserTimezone(supabase, user.id, parsed.tz)
+    await updateStreakCache(supabase, user.id, parsed.habitId, timezone)
   } catch (error) {
     console.error('[habits/log] streak cache update failed', {
       habitId: parsed.habitId,
@@ -114,7 +118,8 @@ export default eventHandler(async (event) => {
 async function updateStreakCache(
   supabase: ReturnType<typeof getSupabaseAdminClient>,
   userId: string,
-  habitId: string
+  habitId: string,
+  timezone: string
 ): Promise<void> {
   // Get recent logs (completed or frozen) ordered by date desc
   const { data: logs } = await supabase
@@ -150,20 +155,17 @@ async function updateStreakCache(
       .map((l: Record<string, unknown>) => l.log_date as string)
   )
 
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  const yesterday = new Date(today)
-  yesterday.setDate(yesterday.getDate() - 1)
+  const today = todayInZone(timezone)
+  const yesterday = subCalendarDays(today, 1)
 
   // Determine streak start: today or yesterday (if today has no log yet).
   // A frozen day counts as "activity" for anchoring, same as a real completion.
   const mostRecentDateStr = [...completedDates, ...frozenDates].sort().reverse()[0]
-  const mostRecentDate = mostRecentDateStr ? new Date(`${mostRecentDateStr}T00:00:00`) : null
 
-  let streakAnchor: Date
-  if (mostRecentDate && mostRecentDate.getTime() === today.getTime()) {
+  let streakAnchor: string
+  if (mostRecentDateStr === today) {
     streakAnchor = today
-  } else if (mostRecentDate && mostRecentDate.getTime() === yesterday.getTime()) {
+  } else if (mostRecentDateStr === yesterday) {
     streakAnchor = yesterday
   } else {
     // Last activity was before yesterday — streak is 0
@@ -175,20 +177,18 @@ async function updateStreakCache(
   // any other day breaks the walk.
   let currentStreak = 0
   let anchorIsFrozen = false
-  const cursor = new Date(streakAnchor)
+  let cursor = streakAnchor
 
   for (let i = 0; ; i++) {
-    const dateStr = cursor.toISOString().split('T')[0]!
-
-    if (completedDates.has(dateStr)) {
+    if (completedDates.has(cursor)) {
       currentStreak++
-    } else if (frozenDates.has(dateStr)) {
+    } else if (frozenDates.has(cursor)) {
       if (i === 0) anchorIsFrozen = true
     } else {
       break
     }
 
-    cursor.setDate(cursor.getDate() - 1)
+    cursor = subCalendarDays(cursor, 1)
   }
 
   // Calculate longest streak — real completions only, freezes don't inflate it.
@@ -197,9 +197,9 @@ async function updateStreakCache(
   const sortedCompletedDates = [...completedDates].sort()
 
   for (let i = 1; i < sortedCompletedDates.length; i++) {
-    const prev = new Date(`${sortedCompletedDates[i - 1]}T00:00:00`)
-    const curr = new Date(`${sortedCompletedDates[i]}T00:00:00`)
-    const diff = (curr.getTime() - prev.getTime()) / (1000 * 60 * 60 * 24)
+    const prev = sortedCompletedDates[i - 1]!
+    const curr = sortedCompletedDates[i]!
+    const diff = differenceInCalendarDaysInZone(prev, curr)
 
     if (diff === 1) {
       tempStreak++

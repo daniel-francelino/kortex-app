@@ -9,6 +9,7 @@ import {
   feedbackStatusLabels,
   feedbackPriorityLabels
 } from '~/types/feedback'
+import { formatDisplay } from '#shared/utils/dateTime'
 
 defineProps<{
   feedbacks: Feedback[]
@@ -36,11 +37,7 @@ const priorityOptions = Object.values(FeedbackPriority).map(p => ({
 }))
 
 function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString('pt-BR', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric'
-  })
+  return formatDisplay(iso, "dd 'de' MMM'.' 'de' yyyy")
 }
 </script>
 

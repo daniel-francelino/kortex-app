@@ -2,6 +2,7 @@
 import * as z from 'zod'
 import type { FormSubmitEvent } from '@nuxt/ui'
 import type { Identity } from '~/types/habits'
+import { formatDisplay } from '#shared/utils/dateTime'
 
 definePageMeta({
   layout: 'app'
@@ -179,7 +180,7 @@ async function onArchive(identity: Identity) {
                     class="shrink-0"
                   >
                     {{
-                      new Date(identity.createdAt).toLocaleDateString("pt-BR")
+                      formatDisplay(identity.createdAt, 'dd/MM/yyyy')
                     }}
                   </UBadge>
                 </div>

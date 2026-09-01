@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { todayInZone } from '#shared/utils/dateTime'
 
 const HABIT_STACK_SELECT = '*, triggerHabit:habits!trigger_habit_id(id, name), newHabit:habits!new_habit_id(id, name)'
 
@@ -28,10 +29,6 @@ export function mapHabitStacks(rows: Record<string, unknown>[] | null | undefine
   return (rows ?? []).map(mapHabitStack)
 }
 
-function getTodayDate(): string {
-  return new Date().toISOString().split('T')[0] as string
-}
-
 function getEndOfDayIso(date: string): string {
   return `${date}T23:59:59.999Z`
 }
@@ -39,9 +36,10 @@ function getEndOfDayIso(date: string): string {
 async function fetchHabitStacksRows(
   supabase: SupabaseClient,
   userId: string,
+  timezone: string,
   date?: string
 ): Promise<Record<string, unknown>[]> {
-  const isCurrentDate = !date || date === getTodayDate()
+  const isCurrentDate = !date || date === todayInZone(timezone)
 
   let query = supabase
     .from('habit_stacks')
@@ -74,8 +72,9 @@ async function fetchHabitStacksRows(
 export async function resolveHabitStacksForDate(
   supabase: SupabaseClient,
   userId: string,
+  timezone: string,
   date?: string
 ): Promise<Record<string, unknown>[]> {
-  const rows = await fetchHabitStacksRows(supabase, userId, date)
+  const rows = await fetchHabitStacksRows(supabase, userId, timezone, date)
   return mapHabitStacks(rows)
 }

@@ -8,6 +8,7 @@ import { downloadTextFile, printHtmlAsPdf } from '~/utils/export-download'
 import { getWeatherInfo } from '~/utils/weather-codes'
 import type { EntityLink } from '~/types/life-os'
 import { EntityType } from '~/types/life-os'
+import { formatDisplay } from '#shared/utils/dateTime'
 
 const props = defineProps<{
   open: boolean
@@ -188,12 +189,7 @@ async function onSave() {
 }
 
 function formatDate(dateStr: string): string {
-  return new Date(dateStr + 'T12:00:00').toLocaleDateString('pt-BR', {
-    weekday: 'long',
-    day: '2-digit',
-    month: 'long',
-    year: 'numeric'
-  })
+  return formatDisplay(new Date(dateStr + 'T12:00:00'), "EEEE, dd 'de' MMMM 'de' yyyy")
 }
 
 function onOpenChange(value: boolean) {

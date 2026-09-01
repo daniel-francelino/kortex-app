@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { Booking } from '~/types/scheduling'
 import { BookingStatus } from '~/types/scheduling'
+import { formatDisplay } from '#shared/utils/dateTime'
 
 definePageMeta({ layout: 'app' })
 
@@ -22,7 +23,7 @@ const STATUS_META: Record<BookingStatus, { label: string, color: 'success' | 'er
 }
 
 function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+  return formatDisplay(iso, "dd 'de' MMM'.' 'de' yyyy, HH:mm")
 }
 </script>
 

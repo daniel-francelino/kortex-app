@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { formatDisplay } from '#shared/utils/dateTime'
+
 definePageMeta({
   layout: 'app'
 })
@@ -13,15 +15,18 @@ const {
   insights,
   insightsInitialLoading
 } = useLifeOS()
-const todayFormatted = useState('life-os-today-formatted', () =>
-  new Intl.DateTimeFormat('pt-BR', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-    timeZone: 'America/Fortaleza'
-  }).format(new Date())
-)
+
+// Regra 1 (docs/timezone/ANALISE_TIMEZONE.md): `useUserPreferences`'s
+// `state.timezone` (not a direct `Intl` read) — this is SSR-rendered, and a
+// `useState` factory only runs once, so a raw `Intl.DateTimeFormat().
+// resolvedOptions().timeZone` here would permanently bake in the *server's*
+// zone from the very first render. Using the shared preference state instead
+// keeps server/client renders consistent and updates reactively once Regra 2
+// resolves the real zone.
+const { state: preferencesState } = useUserPreferences()
+const todayFormatted = computed(() => formatDisplay(new Date(), 'EEEE, d \'de\' MMMM \'de\' yyyy', {
+  timeZone: preferencesState.value.timezone
+}))
 </script>
 
 <template>

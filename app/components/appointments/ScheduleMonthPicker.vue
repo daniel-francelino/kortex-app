@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { formatDisplay } from '#shared/utils/dateTime'
+
 const props = defineProps<{
   modelValue: string | null
   availableDates: Set<string>
@@ -60,7 +62,7 @@ const grid = computed((): DayCell[][] => {
 })
 
 const monthLabel = computed(() =>
-  new Date(viewYear.value, viewMonth.value, 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })
+  formatDisplay(new Date(viewYear.value, viewMonth.value, 1), "MMMM 'de' yyyy")
 )
 
 function emitMonthChange() {

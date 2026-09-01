@@ -1,4 +1,5 @@
 import { useDebounceFn } from '@vueuse/core'
+import { todayInZone } from '#shared/utils/dateTime'
 import type {
   CalendarDay,
   CreateHabitPayload,
@@ -77,8 +78,13 @@ export function useHabits() {
     )
   }
 
+  // Regra 1 (docs/timezone/ANALISE_TIMEZONE.md): sent on every request below
+  // that needs the server to know "today" — `undefined` during SSR, where
+  // there's no browser to ask (the server falls back to the stored preference).
+  const clientTimezone = import.meta.client ? Intl.DateTimeFormat().resolvedOptions().timeZone : undefined
+
   // ─── Today habits ────────────────────────────────────────────────────────────
-  const todayDate = ref(new Date().toISOString().split('T')[0])
+  const todayDate = ref(clientTimezone ? todayInZone(clientTimezone) : new Date().toISOString().split('T')[0])
 
   const {
     data: todayData,
@@ -86,7 +92,8 @@ export function useHabits() {
     refresh: refreshToday
   } = useFetch<TodayHabitsResponse>('/api/habits/today', {
     query: computed(() => ({
-      date: todayDate.value
+      date: todayDate.value,
+      tz: clientTimezone
     })),
     lazy: true,
     immediate: false,
@@ -271,7 +278,7 @@ export function useHabits() {
     try {
       await $fetch('/api/habits/log', {
         method: 'POST',
-        body: payload
+        body: { ...payload, tz: clientTimezone }
       })
       trackHabitsEvent(PostHogEvent.HabitLogged, {
         completed: isCompleted,
@@ -442,6 +449,7 @@ export function useHabits() {
     status: stacksStatus,
     refresh: refreshStacks
   } = useFetch<HabitStack[]>('/api/habits/stacks', {
+    query: { tz: clientTimezone },
     lazy: true,
     immediate: false,
     key: 'habits-stacks'
@@ -452,14 +460,14 @@ export function useHabits() {
     const promises: Promise<void>[] = []
 
     promises.push(
-      $fetch<HabitStack[]>('/api/habits/stacks').then((data) => {
+      $fetch<HabitStack[]>('/api/habits/stacks', { query: { tz: clientTimezone } }).then((data) => {
         stacks.value = data
       }).catch(() => {})
     )
 
     if (todayStatus.value === 'success') {
       promises.push(
-        $fetch<TodayHabitsResponse>('/api/habits/today', { query: { date: todayDate.value } }).then((data) => {
+        $fetch<TodayHabitsResponse>('/api/habits/today', { query: { date: todayDate.value, tz: clientTimezone } }).then((data) => {
           todayData.value = data
         }).catch(() => {})
       )

@@ -2,6 +2,7 @@
 import * as z from 'zod'
 import type { FormSubmitEvent } from '@nuxt/ui'
 import type { Identity } from '~/types/habits'
+import { formatDisplay } from '#shared/utils/dateTime'
 
 const props = defineProps<{
   open: boolean
@@ -148,7 +149,7 @@ async function onArchive(identity: Identity) {
                       </div>
 
                       <UBadge color="neutral" variant="subtle" size="sm">
-                        {{ new Date(identity.createdAt).toLocaleDateString('pt-BR') }}
+                        {{ formatDisplay(identity.createdAt, 'dd/MM/yyyy') }}
                       </UBadge>
                     </div>
                   </div>

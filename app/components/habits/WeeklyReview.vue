@@ -2,6 +2,7 @@
 import * as z from 'zod'
 import type { FormSubmitEvent } from '@nuxt/ui'
 import type { HabitReflection } from '~/types/habits'
+import { formatDisplay } from '#shared/utils/dateTime'
 
 const props = defineProps<{
   weekKey: string
@@ -77,19 +78,10 @@ const reviewPeriod = computed(() => {
   const currentYear = new Date().getFullYear()
   const shouldShowYear = startDate.getFullYear() !== currentYear || endDate.getFullYear() !== currentYear
 
-  const formatter = new Intl.DateTimeFormat('pt-BR', shouldShowYear
-    ? {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric'
-      }
-    : {
-        day: '2-digit',
-        month: '2-digit'
-      })
+  const dateFormat = shouldShowYear ? 'dd/MM/yyyy' : 'dd/MM'
 
   return {
-    dateRangeLabel: `${formatter.format(startDate)} — ${formatter.format(endDate)}`
+    dateRangeLabel: `${formatDisplay(startDate, dateFormat)} — ${formatDisplay(endDate, dateFormat)}`
   }
 })
 

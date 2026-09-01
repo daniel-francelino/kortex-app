@@ -1,12 +1,21 @@
+import { z } from 'zod'
 import { getSupabaseAdminClient } from '../../utils/supabase'
 import { requireAuthUser } from '../../utils/require-auth'
 import { mapJournalEntry } from '../../utils/journal-mappers'
+import { resolveUserTimezone } from '../../utils/user-timezone'
+import { subCalendarDays, todayInZone } from '#shared/utils/dateTime'
+
+const querySchema = z.object({
+  tz: z.string().optional()
+})
 
 export default eventHandler(async (event) => {
   const user = await requireAuthUser(event)
   const supabase = getSupabaseAdminClient()
+  const params = querySchema.parse(getQuery(event))
 
-  const today = new Date().toISOString().split('T')[0] ?? ''
+  const timezone = await resolveUserTimezone(supabase, user.id, params.tz)
+  const today = todayInZone(timezone)
 
   // Try to get today's entry
   const { data: entry } = await supabase
@@ -31,15 +40,10 @@ export default eventHandler(async (event) => {
     const entryDates = new Set(
       (recentEntries as Array<Record<string, unknown>>).map(e => e.entry_date as string)
     )
-    const cursor = new Date(`${today}T12:00:00Z`)
-    while (true) {
-      const dateStr = cursor.toISOString().split('T')[0]!
-      if (entryDates.has(dateStr)) {
-        streak++
-        cursor.setDate(cursor.getDate() - 1)
-      } else {
-        break
-      }
+    let cursor = today
+    while (entryDates.has(cursor)) {
+      streak++
+      cursor = subCalendarDays(cursor, 1)
     }
   }
 

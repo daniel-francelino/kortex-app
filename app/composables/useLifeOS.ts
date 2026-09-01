@@ -3,6 +3,12 @@ import type { DailyDashboardResponse, LifeInsights, LifeArea, EntityLink, Create
 export function useLifeOS() {
   const toast = useToast()
 
+  // Regra 1 (docs/timezone/ANALISE_TIMEZONE.md): the server can't detect the
+  // browser's zone on its own, so the client sends it explicitly — `null`
+  // during SSR (there's no browser there; the server falls back to the
+  // user's stored preference instead of trusting a fake value).
+  const clientTimezone = import.meta.client ? Intl.DateTimeFormat().resolvedOptions().timeZone : undefined
+
   // ─── Daily Dashboard ────────────────────────────────────────────────────
   const {
     data: dashboard,
@@ -10,6 +16,7 @@ export function useLifeOS() {
     refresh: refreshDashboard
   } = useFetch<DailyDashboardResponse>('/api/life/dashboard', {
     lazy: true,
+    query: { tz: clientTimezone },
     default: () => ({
       date: '',
       habits: { items: [], completedCount: 0, totalCount: 0 },
@@ -44,6 +51,7 @@ export function useLifeOS() {
     refresh: refreshInsights
   } = useFetch<LifeInsights>('/api/life/insights', {
     lazy: true,
+    query: { tz: clientTimezone },
     default: () => ({
       period: '30d',
       habits: { completionRate7d: 0, completionRate30d: 0, averageStreak: 0, totalActive: 0 },

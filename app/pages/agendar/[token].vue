@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { PublicSchedulingPage, AvailabilitySlot, BookingConfirmation } from '~/types/scheduling'
 import { LOCATION_TYPE_META } from '~/types/scheduling'
+import { formatDisplay } from '#shared/utils/dateTime'
 
 definePageMeta({ layout: false, ssr: true })
 
@@ -74,12 +75,12 @@ async function onMonthChange(year: number, month: number) {
 }
 
 function formatSlotTime(iso: string): string {
-  return new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: guestTimezone.value })
+  return formatDisplay(iso, 'HH:mm', { timeZone: guestTimezone.value })
 }
 
 function formatSelectedDate(): string {
   if (!selectedDate.value) return ''
-  const raw = new Date(`${selectedDate.value}T12:00:00Z`).toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' })
+  const raw = formatDisplay(new Date(`${selectedDate.value}T12:00:00Z`), "EEEE, dd 'de' MMMM")
   return raw.charAt(0).toUpperCase() + raw.slice(1)
 }
 

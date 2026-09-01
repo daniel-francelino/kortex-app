@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { CalendarEvent } from '~/types/appointments'
 import { formatEventTime } from '~/utils/calendarEventTime'
+import { formatDisplay } from '#shared/utils/dateTime'
 
 const props = defineProps<{
   date: string
@@ -43,7 +44,7 @@ const popoverStyle = computed(() => {
 const weekdayLabel = computed(() => {
   if (!props.date) return ''
   const d = new Date(`${props.date}T00:00:00`)
-  return d.toLocaleDateString('pt-BR', { weekday: 'short' }).replace('.', '').toUpperCase()
+  return formatDisplay(d, 'EEEEEE').replace('.', '').toUpperCase()
 })
 
 const dayNumber = computed(() => {

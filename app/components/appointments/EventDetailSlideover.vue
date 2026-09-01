@@ -4,6 +4,7 @@ import type { Calendar, CalendarEvent, EventParticipant } from '~/types/appointm
 import { RsvpStatus } from '~/types/appointments'
 import { strToDateValue, dateValueToStr, strToTimeValue, timeValueToStr, type TimeValue } from '~/utils/calendarDate'
 import { formatEventDate, formatEventTime, getEventTimeZone, getZonedDate, getZonedDateParts, zonedDateTimeToUtcIso } from '~/utils/calendarEventTime'
+import { formatDisplay } from '#shared/utils/dateTime'
 
 const props = defineProps<{
   open: boolean
@@ -343,9 +344,9 @@ async function onCancelOccurrence(recurrenceId: string) {
 function formatDate(dateStr: string, allDay: boolean): string {
   const date = new Date(dateStr)
   if (Number.isNaN(date.getTime())) return 'Data inválida'
-  const d = date.toLocaleDateString('pt-BR', { timeZone: getEventTimeZone(props.event), weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })
+  const d = formatDisplay(date, "EEEE, dd 'de' MMMM 'de' yyyy", { timeZone: getEventTimeZone(props.event) })
   if (allDay) return d
-  return `${d} às ${date.toLocaleTimeString('pt-BR', { timeZone: getEventTimeZone(props.event), hour: '2-digit', minute: '2-digit' })}`
+  return `${d} às ${formatDisplay(date, 'HH:mm', { timeZone: getEventTimeZone(props.event) })}`
 }
 
 function formatTimeRange(evt: CalendarEvent): string {

@@ -1,23 +1,26 @@
 <script setup lang="ts">
-import { formatInTimeZone } from 'date-fns-tz'
 import type { DashboardEvent } from '~/types/life-os'
+import { formatDisplay } from '#shared/utils/dateTime'
 
 defineProps<{
   events: DashboardEvent[]
   totalCount: number
 }>()
 
-// Same fixed zone the dashboard's own "today" is computed against
-// server-side (see server/api/life/dashboard.get.ts) — a single-tenant app,
-// so no per-event timezone plumbing here. Explicit zone (not
-// `new Date(iso).toLocaleTimeString()`, which used the *server's* zone
-// during SSR and the *browser's* zone on the client — different results,
-// a hydration mismatch) keeps this deterministic either way.
-const DASHBOARD_TIMEZONE = 'America/Fortaleza'
+// Regra 1 (docs/timezone/ANALISE_TIMEZONE.md): the browser's own detected
+// zone would be ideal here, but this card is SSR-rendered — reading
+// `Intl.DateTimeFormat().resolvedOptions().timeZone` would give the
+// *server's* zone during SSR and the *browser's* zone on the client, a
+// mismatch between the two renders of the same text. `useUserPreferences`'s
+// `state.timezone` comes from the same `/api/settings/preferences` payload
+// on both sides, so it's identical in both renders — and in practice it's
+// kept in sync with the browser automatically (Regra 2), just not on every
+// single render the way a live `Intl` read would be.
+const { state: preferencesState } = useUserPreferences()
 
 function formatTime(isoDate: string, allDay: boolean): string {
   if (allDay) return 'Dia inteiro'
-  return formatInTimeZone(isoDate, DASHBOARD_TIMEZONE, 'HH:mm')
+  return formatDisplay(isoDate, 'HH:mm', { timeZone: preferencesState.value.timezone })
 }
 </script>
 

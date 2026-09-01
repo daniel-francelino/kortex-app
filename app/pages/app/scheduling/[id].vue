@@ -170,9 +170,10 @@ const colorOptions = [
   { label: 'Rosa', value: '#ec4899' }
 ]
 
-const detectedTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone
-const timezoneOptions = (typeof Intl.supportedValuesOf === 'function' ? Intl.supportedValuesOf('timeZone') : [detectedTimezone])
-  .map(tz => ({ label: tz, value: tz }))
+// Shared with the Settings "Regional" picker (docs/timezone/ANALISE_TIMEZONE.md,
+// seção 5) — same ordering (browser zone, then current selection, then most
+// used, then the rest alphabetically), so both pickers behave consistently.
+const { options: timezoneOptions } = useTimezoneOptions(computed(() => state.timezone))
 
 // ─── Disponibilidade ─────────────────────────────────────────────────────────
 function addWindow(day: number) {

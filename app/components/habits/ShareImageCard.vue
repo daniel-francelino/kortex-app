@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { DIFFICULTY_META, FREQUENCY_META, HABIT_TYPE_META } from '~/types/habits'
 import type { SharedHabitCardData } from '~/types/habits'
+import { formatDisplay } from '#shared/utils/dateTime'
 
 export type ShareFormat = 'square'
 
@@ -45,12 +46,12 @@ const createdAtLabel = computed(() => {
   const date = new Date(habit.value.createdAt)
   return Number.isNaN(date.getTime())
     ? ''
-    : date.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })
+    : formatDisplay(date, "dd 'de' MMM'.' 'de' yyyy")
 })
 
 const shareDateLabel = computed(() => {
   const date = new Date(`${props.date}T12:00:00`)
-  return date.toLocaleDateString('pt-BR', { day: 'numeric', month: 'long', year: 'numeric' })
+  return formatDisplay(date, "d 'de' MMMM 'de' yyyy")
 })
 
 const completionTone = computed(() => {

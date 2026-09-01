@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { Task } from '~/types/tasks'
 import { TaskStatus } from '~/types/tasks'
+import { formatDisplay } from '#shared/utils/dateTime'
 
 const _props = defineProps<{
   tasks: Task[]
@@ -47,10 +48,7 @@ function getRowItems(task: Task) {
 }
 
 function formatDueDate(dateStr: string): string {
-  return new Date(dateStr + 'T00:00:00').toLocaleDateString('pt-BR', {
-    day: '2-digit',
-    month: 'short'
-  })
+  return formatDisplay(new Date(dateStr + 'T00:00:00'), "dd 'de' MMM'.'")
 }
 </script>
 

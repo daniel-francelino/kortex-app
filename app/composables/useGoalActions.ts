@@ -112,7 +112,11 @@ export function useGoalActions() {
 
   async function fetchGoal(id: string): Promise<Goal | null> {
     try {
-      return await $fetch<Goal>(`/api/goals/${id}`)
+      // Regra 1 (docs/timezone/ANALISE_TIMEZONE.md): lets the server resolve
+      // habit-consistency progress against the browser's zone instead of the
+      // stored fallback.
+      const tz = import.meta.client ? Intl.DateTimeFormat().resolvedOptions().timeZone : undefined
+      return await $fetch<Goal>(`/api/goals/${id}`, { query: { tz } })
     } catch {
       toast.add({ title: 'Erro', description: 'Meta não encontrada.', color: 'error' })
       return null

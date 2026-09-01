@@ -7,6 +7,7 @@ import { useSwipe } from '@vueuse/core'
 import { addDays, addMilliseconds, addMonths, addWeeks, format, startOfWeek, subDays, subMonths, subWeeks } from 'date-fns'
 import { AnimatePresence, motion } from 'motion-v'
 import { getEventTimeZone, getZonedDate, zonedDateTimeToUtcIso } from '~/utils/calendarEventTime'
+import { formatDisplay } from '#shared/utils/dateTime'
 
 definePageMeta({
   layout: 'app'
@@ -95,22 +96,17 @@ function capitalizeFirst(s: string): string {
 const headerLabel = computed(() => {
   if (activeView.value === 'month') {
     const d = new Date(viewYear.value, viewMonth.value, 1)
-    return capitalizeFirst(d.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }))
+    return capitalizeFirst(formatDisplay(d, "MMMM 'de' yyyy"))
   }
   if (activeView.value === 'week') {
     const start = viewWeekStart.value
     const end = new Date(start)
     end.setDate(end.getDate() + 6)
-    const sStr = capitalizeFirst(start.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' }))
-    const eStr = end.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })
+    const sStr = capitalizeFirst(formatDisplay(start, "dd 'de' MMM'.'"))
+    const eStr = formatDisplay(end, "dd 'de' MMM'.' 'de' yyyy")
     return `${sStr} — ${eStr}`
   }
-  return capitalizeFirst(viewDayDate.value.toLocaleDateString('pt-BR', {
-    weekday: 'long',
-    day: '2-digit',
-    month: 'long',
-    year: 'numeric'
-  }))
+  return capitalizeFirst(formatDisplay(viewDayDate.value, "EEEE, dd 'de' MMMM 'de' yyyy"))
 })
 
 const calendarViewKey = computed(() => {

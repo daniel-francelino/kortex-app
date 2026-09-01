@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { JournalEntry } from '~/types/journal'
+import { formatDisplay } from '#shared/utils/dateTime'
 
 const props = defineProps<{
   existingEntryIds: string[]
@@ -39,7 +40,7 @@ watch(search, () => {
 function formatEntryDate(dateStr: string): string {
   const parsed = new Date(`${dateStr}T12:00:00`)
   if (Number.isNaN(parsed.getTime())) return dateStr
-  return parsed.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })
+  return formatDisplay(parsed, "dd 'de' MMM'.' 'de' yyyy")
 }
 
 const availableEntries = computed(() =>

@@ -5,6 +5,7 @@ import type {
   JournalListResponse,
   UpsertEntryPayload
 } from '~/types/journal'
+import { todayInZone } from '#shared/utils/dateTime'
 
 interface TodayResponse {
   entryDate: string
@@ -28,7 +29,12 @@ export function useJournal() {
   const toast = useToast()
   const { runOptimisticAction } = useOptimisticAction()
 
-  const todayDate = new Date().toISOString().split('T')[0] ?? ''
+  // Regra 1 (docs/timezone/ANALISE_TIMEZONE.md): must match how the server
+  // resolves "today" (see server/api/journal/today.get.ts) — otherwise this
+  // key can miss the entry the fetch below just stored under the server's
+  // (correct) date.
+  const clientTimezone = import.meta.client ? Intl.DateTimeFormat().resolvedOptions().timeZone : undefined
+  const todayDate = clientTimezone ? todayInZone(clientTimezone) : (new Date().toISOString().split('T')[0] ?? '')
 
   // ─── Local reactive store ───────────────────────────────────────────────────
   // Single source of truth for the UI, same idea as useNotes.ts: fetch results
@@ -58,7 +64,7 @@ export function useJournal() {
     data: todayFetchResult,
     status: todayStatus,
     refresh: refreshTodayFetch
-  } = useFetch<TodayResponse>('/api/journal/today', { lazy: true, key: 'journal-today' })
+  } = useFetch<TodayResponse>('/api/journal/today', { query: { tz: clientTimezone }, lazy: true, key: 'journal-today' })
 
   const todayLoadedOnce = ref(false)
   const todayStreak = ref(0)

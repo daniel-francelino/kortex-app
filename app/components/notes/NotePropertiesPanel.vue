@@ -2,6 +2,7 @@
 import type { CreateTagPayload, Note, NoteTag, NoteDetail, UpdateNotePayload, UpdateTagPayload } from '~/types/notes'
 import { NOTE_TYPE_META, NoteType } from '~/types/notes'
 import { motion } from 'motion-v'
+import { formatDisplay } from '#shared/utils/dateTime'
 
 const props = defineProps<{
   note: NoteDetail | null
@@ -88,7 +89,7 @@ onUnmounted(() => {
 })
 
 function formatDate(d: string) {
-  return new Date(d).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })
+  return formatDisplay(d, "dd 'de' MMM'.' 'de' yyyy")
 }
 </script>
 

@@ -3,14 +3,21 @@ import { getSupabaseAdminClient } from '../../../utils/supabase'
 import { requireAuthUser } from '../../../utils/require-auth'
 import { mapGoal } from '../../../utils/goals'
 import { calculateHabitConsistency } from '../../../utils/habits'
+import { resolveUserTimezone } from '../../../utils/user-timezone'
+import { todayInZone } from '#shared/utils/dateTime'
 
 const paramsSchema = z.object({
   id: z.string().uuid()
 })
 
+const querySchema = z.object({
+  tz: z.string().optional()
+})
+
 export default eventHandler(async (event) => {
   const user = await requireAuthUser(event)
   const { id } = paramsSchema.parse(getRouterParams(event))
+  const params = querySchema.parse(getQuery(event))
 
   const supabase = getSupabaseAdminClient()
 
@@ -52,7 +59,8 @@ export default eventHandler(async (event) => {
   let combinedProgress = taskProgress
 
   if ((habitLinks ?? []).length > 0) {
-    const today = new Date().toISOString().split('T')[0]!
+    const timezone = await resolveUserTimezone(supabase, user.id, params.tz)
+    const today = todayInZone(timezone)
 
     const rates = await Promise.all((habitLinks ?? []).map(async (link: Record<string, unknown>) => {
       const habit = link.habit as Record<string, unknown> | null

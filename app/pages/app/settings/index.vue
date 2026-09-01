@@ -12,7 +12,7 @@ useSeoMeta({
 
 const toast = useToast()
 const { fetchUser } = useAuth()
-const { state: userPreferencesState } = useUserPreferences()
+const { state: userPreferencesState, setTimezone: setSharedTimezone } = useUserPreferences()
 const requestFetch = useRequestFetch()
 const requestHeaders = import.meta.server ? useRequestHeaders(['cookie']) : undefined
 
@@ -27,7 +27,8 @@ type PreferencesResponse = {
   primary_color: string
   neutral_color: string
   color_mode: 'light' | 'dark'
-  timezone: string
+  timezone: string | null
+  timezone_usage: Record<string, number>
 }
 
 const profileSchema = z.object({
@@ -62,32 +63,18 @@ watch(profileData, (newData) => {
   }
 })
 
-const browserTimezone = computed(() => import.meta.client
-  ? Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
-  : 'UTC')
-const selectedTimezone = ref(preferencesData.value?.timezone || browserTimezone.value)
+const selectedTimezone = ref(preferencesData.value?.timezone || userPreferencesState.value.timezone)
+const { browserTimezone, options: timezoneOptions } = useTimezoneOptions(selectedTimezone)
 
 watch(preferencesData, (newData) => {
   if (!newData)
     return
 
-  selectedTimezone.value = newData.timezone
+  // `newData.timezone` can be `null` for an account that hasn't gone
+  // through the Regra 2 auto-fill yet — fall back to the shared state's
+  // (already-resolved) value rather than showing a null selection.
+  selectedTimezone.value = newData.timezone || userPreferencesState.value.timezone
 }, { immediate: true })
-
-const timezoneOptions = computed(() => {
-  const builtInTimezones = typeof Intl.supportedValuesOf === 'function'
-    ? Intl.supportedValuesOf('timeZone')
-    : ['UTC', 'America/Fortaleza', 'America/Sao_Paulo', 'America/New_York', 'Europe/London']
-  const values = new Set([...builtInTimezones, browserTimezone.value, userPreferencesState.value.timezone])
-
-  return Array.from(values)
-    .filter(Boolean)
-    .sort((a, b) => a.localeCompare(b))
-    .map(timezone => ({
-      label: timezone,
-      value: timezone
-    }))
-})
 
 const isSaving = ref(false)
 const isSavingTimezone = ref(false)
@@ -128,20 +115,17 @@ async function saveTimezonePreference() {
   isSavingTimezone.value = true
 
   try {
-    await $fetch('/api/settings/preferences', {
-      method: 'PUT',
-      body: {
-        primary_color: preferencesData.value?.primary_color || userPreferencesState.value.primary_color,
-        neutral_color: preferencesData.value?.neutral_color || userPreferencesState.value.neutral_color,
-        color_mode: preferencesData.value?.color_mode || userPreferencesState.value.color_mode,
-        timezone: selectedTimezone.value
-      }
-    })
+    // Routed through the shared composable — not a direct $fetch — so the
+    // singleton `state` other components read (Dashboard, this picker's own
+    // ordering) updates immediately instead of going stale until next
+    // reload, and the usage-count bump (seção 7) happens in one place.
+    await setSharedTimezone(selectedTimezone.value)
 
     if (preferencesData.value) {
       preferencesData.value = {
         ...preferencesData.value,
-        timezone: selectedTimezone.value
+        timezone: selectedTimezone.value,
+        timezone_usage: userPreferencesState.value.timezoneUsage
       }
     }
 

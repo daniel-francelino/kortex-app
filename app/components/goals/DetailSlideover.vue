@@ -3,6 +3,7 @@ import type { Goal, GoalTask, GoalHabitLink, GoalMilestone } from '~/types/goals
 import { GoalStatus, GoalProgressType } from '~/types/goals'
 import type { EntityLink } from '~/types/life-os'
 import { EntityType } from '~/types/life-os'
+import { formatDisplay } from '#shared/utils/dateTime'
 
 const props = defineProps<{
   goal: Goal
@@ -374,11 +375,7 @@ function formatDate(dateStr: string | null | undefined): string {
   const parsed = new Date(dateStr)
   if (Number.isNaN(parsed.getTime())) return '—'
 
-  return parsed.toLocaleDateString('pt-BR', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric'
-  })
+  return formatDisplay(parsed, "dd 'de' MMM'.' 'de' yyyy")
 }
 
 defineExpose({ reload: loadDetail })

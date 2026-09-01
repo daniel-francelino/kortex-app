@@ -2,6 +2,7 @@
 import { BaseTree } from '@he-tree/vue'
 import type { HabitStack, TodayHabit } from '~/types/habits'
 import { HabitLogStatus, LOG_STATUS_META } from '~/types/habits'
+import { formatDisplay } from '#shared/utils/dateTime'
 
 interface TodayTreeNode {
   id: string
@@ -61,11 +62,7 @@ const allDone = computed(() => props.totalCount > 0 && props.completedCount === 
 
 const formattedDate = computed(() => {
   const d = new Date(props.currentDate + 'T12:00:00')
-  return d.toLocaleDateString('pt-BR', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long'
-  })
+  return formatDisplay(d, "EEEE, d 'de' MMMM")
 })
 
 const isToday = computed(() => {

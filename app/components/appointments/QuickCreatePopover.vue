@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { Calendar } from '~/types/appointments'
+import { formatDisplay } from '#shared/utils/dateTime'
 
 const props = defineProps<{
   visible: boolean
@@ -63,7 +64,7 @@ const dateLabel = computed(() => {
   if (!props.date) return ''
   const [year, month, day] = props.date.split('-').map(Number)
   const d = new Date(year ?? 0, (month ?? 1) - 1, day ?? 1)
-  return d.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' })
+  return formatDisplay(d, "EEEE, dd 'de' MMMM")
 })
 
 // ─── Visibility / focus ────────────────────────────────────────────────────

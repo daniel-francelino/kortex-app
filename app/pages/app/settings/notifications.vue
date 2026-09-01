@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { NotificationPermission, NotificationPreferences, NotificationSettingsResponse } from '~/types/notifications'
+import { formatDisplay } from '#shared/utils/dateTime'
 
 definePageMeta({
   layout: 'app'
@@ -169,13 +170,7 @@ const isSaving = ref(false)
 const isUpdatingCurrentDevice = ref(false)
 
 function formatSubscriptionLastSeen(value: string) {
-  const date = new Date(value)
-
-  return `${date.toLocaleDateString('pt-BR', { timeZone: 'UTC' })} ${date.toLocaleTimeString('pt-BR', {
-    hour: '2-digit',
-    minute: '2-digit',
-    timeZone: 'UTC'
-  })} UTC`
+  return `${formatDisplay(value, 'dd/MM/yyyy HH:mm', { timeZone: 'UTC' })} UTC`
 }
 
 async function savePreferences(options: { silent?: boolean } = {}) {

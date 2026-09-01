@@ -2,6 +2,7 @@
 import { AnimatePresence, motion } from 'motion-v'
 import type { JournalEntry } from '~/types/journal'
 import { getMoodOption } from '~/types/journal'
+import { formatDisplay } from '#shared/utils/dateTime'
 
 const props = defineProps<{
   entries: JournalEntry[]
@@ -23,12 +24,7 @@ const { isEntryLocked } = useJournalLock()
 const { isUnlocked: encryptionUnlocked, decryptEntryFields } = useJournalEncryption()
 
 function formatDate(dateStr: string): string {
-  return new Date(dateStr + 'T12:00:00').toLocaleDateString('pt-BR', {
-    weekday: 'short',
-    day: '2-digit',
-    month: 'long',
-    year: 'numeric'
-  })
+  return formatDisplay(new Date(dateStr + 'T12:00:00'), "EEEEEE'.,' dd 'de' MMMM 'de' yyyy")
 }
 
 // Extracts plain text from Tiptap JSON content (or returns legacy plain text as-is)

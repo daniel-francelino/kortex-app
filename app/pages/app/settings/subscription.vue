@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { h, resolveComponent } from 'vue'
+import { formatDisplay } from '#shared/utils/dateTime'
 
 definePageMeta({
   layout: 'app'
@@ -74,7 +75,7 @@ async function cancelAtPeriodEnd() {
 function formatDate(date: string | null): string {
   if (!date) return '-'
   try {
-    return new Date(date).toLocaleDateString('pt-BR')
+    return formatDisplay(date, 'dd/MM/yyyy')
   } catch {
     return date
   }
@@ -215,7 +216,7 @@ const invoiceColumns = [
     header: 'Data',
     cell: ({ row }: { row: { original: InvoiceItem } }) => {
       if (!row.original.created) return '-'
-      return new Date(row.original.created).toLocaleDateString('pt-BR')
+      return formatDisplay(row.original.created, 'dd/MM/yyyy')
     }
   },
   {

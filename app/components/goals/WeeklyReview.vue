@@ -2,6 +2,7 @@
 import * as z from 'zod'
 import type { FormSubmitEvent } from '@nuxt/ui'
 import type { GoalReflection } from '~/types/goals'
+import { formatDisplay } from '#shared/utils/dateTime'
 
 const props = defineProps<{
   goalId: string
@@ -49,8 +50,7 @@ const reviewPeriod = computed(() => {
   const endDate = new Date(startDate)
   endDate.setDate(startDate.getDate() + 6)
 
-  const formatter = new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit' })
-  return `${formatter.format(startDate)} — ${formatter.format(endDate)}`
+  return `${formatDisplay(startDate, 'dd/MM')} — ${formatDisplay(endDate, 'dd/MM')}`
 })
 
 const currentWeekKey = ref(getCurrentWeekKey())

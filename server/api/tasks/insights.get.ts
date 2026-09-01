@@ -1,9 +1,17 @@
+import { z } from 'zod'
 import { getSupabaseAdminClient } from '../../utils/supabase'
 import { requireAuthUser } from '../../utils/require-auth'
+import { resolveUserTimezone } from '../../utils/user-timezone'
+import { todayInZone } from '#shared/utils/dateTime'
+
+const querySchema = z.object({
+  tz: z.string().optional()
+})
 
 export default eventHandler(async (event) => {
   const user = await requireAuthUser(event)
   const supabase = getSupabaseAdminClient()
+  const params = querySchema.parse(getQuery(event))
 
   const { data: tasks, error } = await supabase
     .from('tasks')
@@ -16,7 +24,8 @@ export default eventHandler(async (event) => {
   }
 
   const all = tasks ?? []
-  const today = new Date().toISOString().split('T')[0] ?? ''
+  const timezone = await resolveUserTimezone(supabase, user.id, params.tz)
+  const today = todayInZone(timezone)
 
   const pending = all.filter((t: Record<string, unknown>) => t.status === 'pending')
   const inProgress = all.filter((t: Record<string, unknown>) => t.status === 'in_progress')

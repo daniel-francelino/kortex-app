@@ -4,6 +4,7 @@ import { useDebounceFn } from '@vueuse/core'
 import type { JournalEntry, JournalListResponse } from '~/types/journal'
 import { tiptapJsonToMarkdown } from '~/utils/tiptap-markdown'
 import { downloadTextFile } from '~/utils/export-download'
+import { formatDisplay } from '#shared/utils/dateTime'
 
 definePageMeta({
   layout: 'app',
@@ -125,9 +126,7 @@ async function decryptedFor(entry: JournalEntry): Promise<{ title: string | null
 }
 
 function formatExportDate(dateStr: string): string {
-  return new Date(dateStr + 'T12:00:00').toLocaleDateString('pt-BR', {
-    weekday: 'long', day: '2-digit', month: 'long', year: 'numeric'
-  })
+  return formatDisplay(new Date(dateStr + 'T12:00:00'), "EEEE, dd 'de' MMMM 'de' yyyy")
 }
 
 async function exportAllMarkdown() {

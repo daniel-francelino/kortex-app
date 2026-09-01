@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { PublicBookingDetail, AvailabilitySlot } from '~/types/scheduling'
 import { BookingStatus, LOCATION_TYPE_META } from '~/types/scheduling'
+import { formatDisplay } from '#shared/utils/dateTime'
 
 definePageMeta({ layout: false, ssr: true })
 
@@ -23,14 +24,7 @@ const guestTimezone = computed(() => booking.value?.guestTimezone || Intl.DateTi
 
 function formatDateTime(iso: string | null): string {
   if (!iso) return ''
-  const raw = new Date(iso).toLocaleDateString('pt-BR', {
-    weekday: 'long',
-    day: '2-digit',
-    month: 'long',
-    hour: '2-digit',
-    minute: '2-digit',
-    timeZone: guestTimezone.value
-  })
+  const raw = formatDisplay(iso, "EEEE, dd 'de' MMMM 'às' HH:mm", { timeZone: guestTimezone.value })
   return raw.charAt(0).toUpperCase() + raw.slice(1)
 }
 
@@ -81,7 +75,7 @@ const slotsForSelectedDate = computed(() => {
 })
 
 function formatSlotTime(iso: string): string {
-  return new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: guestTimezone.value })
+  return formatDisplay(iso, 'HH:mm', { timeZone: guestTimezone.value })
 }
 
 async function onMonthChange(year: number, month: number) {

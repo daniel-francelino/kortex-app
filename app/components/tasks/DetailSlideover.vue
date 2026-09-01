@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { Task, TaskSubtask } from '~/types/tasks'
 import { TaskStatus } from '~/types/tasks'
+import { formatDisplay } from '#shared/utils/dateTime'
 
 const props = defineProps<{
   task: Task
@@ -91,15 +92,11 @@ async function onCompleteTask() {
 }
 
 function formatDate(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString('pt-BR')
+  return formatDisplay(dateStr, 'dd/MM/yyyy')
 }
 
 function formatDueDate(dateStr: string): string {
-  return new Date(dateStr + 'T00:00:00').toLocaleDateString('pt-BR', {
-    day: '2-digit',
-    month: 'long',
-    year: 'numeric'
-  })
+  return formatDisplay(new Date(dateStr + 'T00:00:00'), "dd 'de' MMMM 'de' yyyy")
 }
 </script>
 

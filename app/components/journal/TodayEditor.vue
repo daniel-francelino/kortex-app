@@ -6,6 +6,7 @@ import { tiptapJsonToMarkdown } from '~/utils/tiptap-markdown'
 import { downloadTextFile, printHtmlAsPdf } from '~/utils/export-download'
 import { captureWeatherSnapshot } from '~/utils/journal-weather'
 import { getWeatherInfo } from '~/utils/weather-codes'
+import { formatDisplay } from '#shared/utils/dateTime'
 
 const props = defineProps<{
   todayEntry: JournalEntry | null
@@ -146,7 +147,7 @@ const savedAt = ref<Date | null>(null)
 const initialized = ref(false)
 
 const savedAtText = computed(() =>
-  savedAt.value?.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) ?? ''
+  savedAt.value ? formatDisplay(savedAt.value, 'HH:mm') : ''
 )
 
 // ── Empty content check ────────────────────────────────────────────────────────
@@ -332,12 +333,7 @@ watch(mood, (val) => {
 // CSS `capitalize` class would title-case every word ("De Agosto De 2026"),
 // so this only uppercases the leading letter instead.
 function formatToday(): string {
-  const raw = new Date(today + 'T12:00:00').toLocaleDateString('pt-BR', {
-    weekday: 'long',
-    day: '2-digit',
-    month: 'long',
-    year: 'numeric'
-  })
+  const raw = formatDisplay(new Date(today + 'T12:00:00'), "EEEE, dd 'de' MMMM 'de' yyyy")
   return raw.charAt(0).toUpperCase() + raw.slice(1)
 }
 

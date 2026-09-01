@@ -9,6 +9,7 @@ import {
   feedbackPriorityLabels,
   feedbackPriorityColors
 } from '~/types/feedback'
+import { formatDisplay } from '#shared/utils/dateTime'
 
 const props = defineProps<{
   open: boolean
@@ -49,13 +50,7 @@ watch(() => props.feedback, async (fb) => {
 }, { immediate: true })
 
 function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString('pt-BR', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit'
-  })
+  return formatDisplay(iso, "dd 'de' MMM'.' 'de' yyyy, HH:mm")
 }
 
 async function onSubmitResponse(evt: FormSubmitEvent<ResponseSchema>) {

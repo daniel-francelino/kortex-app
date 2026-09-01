@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { HabitChangeHistory, HabitDifficulty, HabitFrequency, HabitType } from '~/types/habits'
 import { DIFFICULTY_META, FREQUENCY_META, HABIT_TYPE_META } from '~/types/habits'
+import { formatDisplay } from '#shared/utils/dateTime'
 
 const props = defineProps<{
   habitId: string
@@ -39,13 +40,7 @@ function formatFieldValue(field: string, value: string | null): string {
 }
 
 function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString('pt-BR', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit'
-  })
+  return formatDisplay(iso, "dd 'de' MMM'.' 'de' yyyy, HH:mm")
 }
 
 async function loadMore() {

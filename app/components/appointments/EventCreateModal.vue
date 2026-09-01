@@ -5,6 +5,7 @@ import type { Calendar } from '~/types/appointments'
 import { ReminderType } from '~/types/appointments'
 import { strToDateValue, dateValueToStr, strToTimeValue, timeValueToStr, type TimeValue } from '~/utils/calendarDate'
 import { zonedDateTimeToUtcIso } from '~/utils/calendarEventTime'
+import { formatDisplay } from '#shared/utils/dateTime'
 
 const props = defineProps<{
   open: boolean
@@ -174,9 +175,7 @@ const reminderOptions = [
 function formatDateDisplay(dateStr: string): string {
   if (!dateStr) return ''
   const [y, m, d] = dateStr.split('-').map(Number)
-  return new Date(y!, m! - 1, d!).toLocaleDateString('pt-BR', {
-    weekday: 'short', day: '2-digit', month: 'short', year: 'numeric'
-  })
+  return formatDisplay(new Date(y!, m! - 1, d!), "EEEEEE'.,' dd 'de' MMM'.' 'de' yyyy")
 }
 </script>
 

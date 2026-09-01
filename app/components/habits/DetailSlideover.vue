@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { Habit, HabitStack } from '~/types/habits'
 import { DIFFICULTY_META, FREQUENCY_META, HABIT_TYPE_META } from '~/types/habits'
+import { formatDisplay } from '#shared/utils/dateTime'
 
 const props = defineProps<{
   habit: Habit
@@ -47,7 +48,7 @@ const lawMeta = [
 function formatDate(iso: string | null | undefined): string {
   if (!iso) return '—'
   const d = new Date(iso)
-  return Number.isNaN(d.getTime()) ? '—' : d.toLocaleDateString('pt-BR')
+  return Number.isNaN(d.getTime()) ? '—' : formatDisplay(d, 'dd/MM/yyyy')
 }
 
 function formatHabitTime(value: string | null | undefined): string | null {

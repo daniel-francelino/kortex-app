@@ -5,6 +5,8 @@
  * dedicated version rather than trying to generalize the habit one.
  */
 
+import { resolveUserTimezone } from './user-timezone'
+
 const GOALS_CALENDAR_NAME = 'Metas'
 const GOALS_CALENDAR_DESCRIPTION = 'Agendamentos gerados automaticamente a partir de tarefas de metas com data definida.'
 const GOALS_CALENDAR_COLOR = '#8b5cf6'
@@ -184,6 +186,11 @@ export async function syncGoalTaskLinkedEvent(
   }
 
   const calendarId = await getOrCreateGoalsCalendar(supabase, userId)
+  // Regra 1 (docs/timezone/ANALISE_TIMEZONE.md): this runs server-side with
+  // no request-scoped client timezone to read, so it resolves straight to
+  // the user's stored fallback — was hardcoded 'UTC' before, same class of
+  // bug as the Dashboard's hardcoded Fortaleza.
+  const eventTimezone = await resolveUserTimezone(supabase, userId)
   const payload = {
     calendar_id: calendarId,
     title: task.title,
@@ -191,7 +198,7 @@ export async function syncGoalTaskLinkedEvent(
     location: null,
     start_at: `${task.dueDate}T00:00:00.000Z`,
     end_at: `${task.dueDate}T23:59:59.000Z`,
-    event_timezone: 'UTC',
+    event_timezone: eventTimezone,
     all_day: true,
     rrule: null
   }

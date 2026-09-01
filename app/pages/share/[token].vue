@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { NOTE_TYPE_META, type PublicNote } from '~/types/notes'
+import { formatDisplay } from '#shared/utils/dateTime'
 
 definePageMeta({ layout: false, ssr: true })
 
@@ -59,7 +60,7 @@ function onWikilinkClick(noteId: string) {
           {{ publicNote.title || 'Sem título' }}
         </h1>
         <p class="text-sm text-muted mt-2">
-          Atualizado em {{ new Date(publicNote.updatedAt).toLocaleDateString('pt-BR', { year: 'numeric', month: 'long', day: 'numeric' }) }}
+          Atualizado em {{ formatDisplay(publicNote.updatedAt, "d 'de' MMMM 'de' yyyy") }}
         </p>
       </header>
 

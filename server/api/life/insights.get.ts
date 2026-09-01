@@ -1,13 +1,22 @@
+import { z } from 'zod'
+import { subDays } from 'date-fns'
 import { getSupabaseAdminClient } from '../../utils/supabase'
 import { requireAuthUser } from '../../utils/require-auth'
+import { resolveUserTimezone } from '../../utils/user-timezone'
+import { subCalendarDays, todayInZone } from '#shared/utils/dateTime'
+
+const querySchema = z.object({
+  tz: z.string().optional()
+})
 
 export default eventHandler(async (event) => {
   const user = await requireAuthUser(event)
+  const params = querySchema.parse(getQuery(event))
 
   const supabase = getSupabaseAdminClient()
 
-  const now = new Date()
-  const today = now.toISOString().split('T')[0]!
+  const timezone = await resolveUserTimezone(supabase, user.id, params.tz)
+  const today = todayInZone(timezone)
 
   // ─── Habits insights ─────────────────────────────────────────────────────
   const { data: activeHabits } = await supabase
@@ -18,14 +27,13 @@ export default eventHandler(async (event) => {
 
   const totalActiveHabits = activeHabits?.length ?? 0
 
-  // Last 7 days habit logs
-  const d7 = new Date(now)
-  d7.setDate(d7.getDate() - 7)
-  const date7 = d7.toISOString().split('T')[0]!
-
-  const d30 = new Date(now)
-  d30.setDate(d30.getDate() - 30)
-  const date30 = d30.toISOString().split('T')[0]!
+  // Last 7/30 calendar days (date-key windows, for log_date/entry_date range
+  // filters below) and their real-instant equivalents (for updated_at, which
+  // is a timestamp, not a calendar-day key).
+  const date7 = subCalendarDays(today, 7)
+  const date30 = subCalendarDays(today, 30)
+  const instant7 = subDays(new Date(), 7)
+  const instant30 = subDays(new Date(), 30)
 
   const { data: logs7d } = await supabase
     .from('habit_logs')
@@ -66,14 +74,14 @@ export default eventHandler(async (event) => {
     .select('id')
     .eq('user_id', user.id)
     .eq('status', 'completed')
-    .gte('updated_at', d7.toISOString())
+    .gte('updated_at', instant7.toISOString())
 
   const { data: completedTasks30d } = await supabase
     .from('tasks')
     .select('id')
     .eq('user_id', user.id)
     .eq('status', 'completed')
-    .gte('updated_at', d30.toISOString())
+    .gte('updated_at', instant30.toISOString())
 
   const { data: pendingTasks } = await supabase
     .from('tasks')
@@ -134,15 +142,10 @@ export default eventHandler(async (event) => {
     const entryDates = new Set(
       recentEntries.map((e: Record<string, unknown>) => e.entry_date as string)
     )
-    const cursor = new Date(`${today}T12:00:00Z`)
-    while (true) {
-      const dateStr = cursor.toISOString().split('T')[0]!
-      if (entryDates.has(dateStr)) {
-        journalStreak++
-        cursor.setDate(cursor.getDate() - 1)
-      } else {
-        break
-      }
+    let cursor = today
+    while (entryDates.has(cursor)) {
+      journalStreak++
+      cursor = subCalendarDays(cursor, 1)
     }
   }
 

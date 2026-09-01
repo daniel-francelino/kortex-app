@@ -3,6 +3,7 @@ import type { CreateNoteSharePayload, Note, NoteDetail, NoteFolder, NoteShare, U
 import { NOTE_TYPE_META, NoteType, NoteVisibility } from '~/types/notes'
 import { tiptapJsonToMarkdown } from '~/utils/tiptap-markdown'
 import { downloadTextFile, printHtmlAsPdf } from '~/utils/export-download'
+import { formatDisplay } from '#shared/utils/dateTime'
 
 interface NotionStyleEditorRef {
   focus: () => void
@@ -77,7 +78,7 @@ const shareDialogOpen = ref(false)
 const isDragOver = ref(false)
 
 const savedAtText = computed(() =>
-  savedAt.value?.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) ?? ''
+  savedAt.value ? formatDisplay(savedAt.value, 'HH:mm') : ''
 )
 
 const dirty = computed(() => {
@@ -462,13 +463,7 @@ const typeMenuItems = computed(() => [
 ])
 
 function formatDate(value: string) {
-  return new Date(value).toLocaleDateString('pt-BR', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit'
-  })
+  return formatDisplay(value, "dd 'de' MMM'.' 'de' yyyy, HH:mm")
 }
 
 function onDragOver(event: DragEvent) {

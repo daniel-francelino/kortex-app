@@ -1,6 +1,8 @@
 import { z } from 'zod'
 import { getSupabaseAdminClient } from '../../utils/supabase'
 import { requireAuthUser } from '../../utils/require-auth'
+import { resolveUserTimezone } from '../../utils/user-timezone'
+import { todayInZone } from '#shared/utils/dateTime'
 
 const querySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
@@ -10,6 +12,7 @@ const querySchema = z.object({
   listId: z.string().uuid().optional(),
   search: z.string().max(200).optional(),
   dueBefore: z.string().optional(),
+  tz: z.string().optional(),
   overdue: z.preprocess((value) => {
     if (value === undefined) return undefined
     if (typeof value === 'boolean') return value
@@ -63,7 +66,8 @@ export default eventHandler(async (event) => {
   }
 
   if (params.overdue) {
-    const today = new Date().toISOString().split('T')[0]
+    const timezone = await resolveUserTimezone(supabase, user.id, params.tz)
+    const today = todayInZone(timezone)
     qb = qb.lt('due_date', today).neq('status', 'completed')
   }
 
