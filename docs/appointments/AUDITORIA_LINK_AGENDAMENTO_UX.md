@@ -2,7 +2,13 @@
 
 Este documento faz duas coisas: (1) **audita** o estado real do código hoje contra o que [`PLANO_MELHORIAS_FLUXO_CRIACAO_AGENDAMENTO.md`](./PLANO_MELHORIAS_FLUXO_CRIACAO_AGENDAMENTO.md) propôs — a maior parte já foi implementada desde que aquele plano foi escrito, e a seção 1 dele (diagnóstico) está **desatualizada**; e (2) especifica, no mesmo nível de detalhe, os itens que continuam faltando, mais um lote de melhorias novas inspiradas no Cal.com que nenhum documento anterior cobriu (respostas do formulário nunca aparecem para o anfitrião, tela de reservas sem ações, página pública sem "adicionar ao calendário", perfil público raso).
 
-> Ordem de leitura recomendada: [`PLANO_LINK_AGENDAMENTO.md`](./PLANO_LINK_AGENDAMENTO.md) (plano original, Fases 1–4, **implementado**) → [`PLANO_MELHORIAS_FLUXO_CRIACAO_AGENDAMENTO.md`](./PLANO_MELHORIAS_FLUXO_CRIACAO_AGENDAMENTO.md) (redesenho, **~80% implementado**, ver seção 1 abaixo) → este documento (o que resta + itens novos). Nenhuma mudança de código foi feita ao gerar este documento — é só análise e especificação.
+> Ordem de leitura recomendada: [`PLANO_LINK_AGENDAMENTO.md`](./PLANO_LINK_AGENDAMENTO.md) (plano original, Fases 1–4, **implementado**) → [`PLANO_MELHORIAS_FLUXO_CRIACAO_AGENDAMENTO.md`](./PLANO_MELHORIAS_FLUXO_CRIACAO_AGENDAMENTO.md) (redesenho, **~80% implementado**, ver seção 1 abaixo) → este documento (o que resta + itens novos).
+
+> **Status: implementado em 2026-09-01.** Todos os itens das seções 3.1–3.4 (painel de reserva com respostas do formulário, filtro/busca/cancelamento pelo anfitrião, confirmação manual com status `pending`, polimentos da página pública, "adicionar ao calendário", avatar do anfitrião) foram construídos — ver checklist na seção 5. Também implementado, a partir das anotações adicionadas ao vivo neste documento (linhas 47/50): um card **"Próxima reserva"** no Dashboard (`app/pages/app/index.vue`, componente novo `DashboardNextBooking.vue`, endpoint novo `GET /api/appointments/scheduling-pages/next-booking`) — resolve o gap #3 da seção 1.3. Também implementados nesta segunda passada, os últimos 4 itens da seção 1.2 (buffers/incremento como `USelect`, antecedência mínima com unidade, popover de "copiar horários" por dia arbitrário, resumo sticky no passo 2 da página pública) — a seção 1.2 não tem mais nenhum item pendente.
+
+Numa terceira passada, a partir da anotação em 1.3-item-1 ("deveria exibir as marcações dos clientes na tela de agendamento... já que tem um calendário"): as respostas do formulário e os dados do convidado agora também aparecem direto no `EventDetailSlideover.vue` da Agenda (não só em `/app/scheduling-bookings/[id]`) — endpoint novo `GET /api/appointments/events/[id]/booking`, tipo novo `EventBookingInfo`. Nenhum item da seção 1.3 continua pendente.
+
+Duas simplificações conscientes em relação à especificação original: (1) "Ver evento na Agenda" no painel de reserva (§3.1) abre `/app/appointments` (a Agenda), não um deep-link para o evento específico — esse deep-link (`?event=`) não existe hoje em lugar nenhum do app, construí-lo seria um projeto à parte; (2) "Usar a duração do evento" no seletor de incremento de horários (§1.2) não é um vínculo persistido — selecioná-lo só copia a duração atual para o campo na hora (não há coluna nova nem flag "sincronizar com a duração"; se a duração mudar depois, o incremento não re-sincroniza sozinho). `node_modules` está vazio neste ambiente — sem build/typecheck real disponível; verificação foi só leitura cuidadosa + checagem de balanceamento de chaves. Rode `pnpm install` e exercite o fluxo (criar página com confirmação manual → reservar pelo link público → aprovar/recusar em `/app/scheduling-bookings/[id]` → conferir o card no Dashboard) antes de confiar em produção. A migration `20260911000000_scheduling_manual_confirmation.sql` precisa rodar (`ALTER TYPE ... ADD VALUE` + nova coluna) antes do deploy do código.
 
 ---
 
@@ -26,16 +32,18 @@ Este documento faz duas coisas: (1) **audita** o estado real do código hoje con
 
 Isso é bem mais do que a seção 1.2 daquele documento (escrita quando tudo isso ainda era modal único de 423 linhas) dava a entender pronto. **Trate a seção 1 do `PLANO_MELHORIAS` como histórico, não como diagnóstico atual.**
 
-### 1.2 O que o plano de redesenho pediu e **continua faltando**
+### 1.2 O que o plano de redesenho pediu — status final (todos os itens abaixo foram implementados em 2026-09-01)
 
-| Item | Pedido em | Status |
+| Item | Pedido em | Onde ficou |
 | --- | --- | --- |
-| Confirmação manual (`requiresConfirmation`, status `pending`, aprovação/recusa) | §5.5, §7 | ❌ não existe — grep por `requiresConfirmation`/`pending` no schema de agendamento não retorna nada |
-| Perfil público do anfitrião (avatar) | §6.3 | ❌ `PublicSchedulingPage` só tem `hostName` (texto) |
-| Página pública: indicador de passo, resumo sticky, "adicionar ao calendário" (.ics/Google), skeleton dos slots | §6.2 | ❌ nenhum dos quatro |
-| Buffers/incremento como `USelect` de valores discretos (em vez de `UInputNumber` livre) | §5.5 | ❌ ainda é `UInputNumber` livre (aba Limites) |
-| Antecedência mínima com unidade (Horas/Dias) | §5.3 | ❌ ainda só horas |
-| "Copiar horários" como popover com checkboxes de qualquer dia | §5.3 | Parcial — `copyToWeekdays` só cobre "dias úteis" fixo, não um popover arbitrário |
+| Confirmação manual (`requiresConfirmation`, status `pending`, aprovação/recusa) | §5.5, §7 | ✅ migration `20260911000000_scheduling_manual_confirmation.sql` + toggle na aba Políticas + painel de reserva |
+| Perfil público do anfitrião (avatar) | §6.3 | ✅ reaproveita `user_metadata.avatar_url` (já existia em Configurações) — sem coluna nova |
+| Página pública: indicador de passo, resumo sticky, "adicionar ao calendário" (.ics/Google), skeleton dos slots | §6.2 | ✅ os quatro — `agendar/[token].vue` |
+| Buffers/incremento como `USelect` de valores discretos (em vez de `UInputNumber` livre) | §5.5 | ✅ `scheduling/[id].vue`, aba Limites — `bufferBeforeOptions`/`bufferAfterOptions`/`slotIncrementOptions` |
+| Antecedência mínima com unidade (Horas/Dias) | §5.3 | ✅ `minNoticeDisplayValue`/`minNoticeUnit` — segue guardado em horas no banco, a unidade é só apresentação |
+| "Copiar horários" como popover com checkboxes de qualquer dia | §5.3 | ✅ `UPopover` por dia com checkbox por dia de destino, substitui o antigo `copyToWeekdays` fixo |
+
+Nenhum item desta seção continua pendente. A tabela fica como registro histórico do que o `PLANO_MELHORIAS` original pedia.
 
 ### 1.3 Gaps novos, achados nesta auditoria (não estavam em nenhum documento anterior)
 
@@ -43,6 +51,7 @@ Estes são os itens de maior impacto real hoje, porque não são polimento — s
 
 1. **As respostas do formulário nunca aparecem para o anfitrião.** `bookings.answers` é gravado (`book.post.ts:100`) e o tipo `Booking.answers` existe, mas [`scheduling-bookings/[id].vue`](../../app/pages/app/scheduling-bookings/%5Bid%5D.vue) (linhas 60-80) só renderiza nome, e-mail, data de criação e motivo de cancelamento — a pergunta customizada que o convidado respondeu ("De que se trata a reunião?", "Como você me conheceu?") é invisível. O anfitrião marcou a pergunta como importante o bastante para pedir no formulário, e não há lugar nenhum no produto onde ele vê a resposta. **Este é o gap #1 a corrigir, à frente até da confirmação manual.**
  - uma coisa interessantes, deveria exibir as marcações dos clientes na tela de agendamento. Já que tem um calendário justamente para a pessoa organizar a agenda.
+ - ✅ Implementado (2026-09-01): endpoint novo `GET /api/appointments/events/[id]/booking` + seção "Reserva pelo link de agendamento" dentro do `EventDetailSlideover.vue` da própria Agenda — abre o evento criado por uma reserva e mostra convidado, e-mail, badge "Pendente" (se aplicável) e todas as respostas do formulário, com link de volta para `/app/scheduling-bookings/[id]`. Restrito ao dono da página de agendamento (não a colaboradores de calendário compartilhado), já que e-mail e respostas livres do convidado são mais sensíveis que título/local do evento.
 2. **A tela de reservas é só uma lista morta.** Sem busca, sem filtro por status (nem "Confirmadas" vs "Canceladas"), sem paginação (busca todas de uma vez via `fetchBookings`), sem ação nenhuma — o anfitrião não consegue cancelar uma reserva por ali (só o convidado, pelo link de gerenciar), não vê o horário marcado (só "Criada em", que é a data em que a reserva foi feita, não a data/hora do compromisso!), e não tem link para abrir o evento correspondente na Agenda.
 3. **Sem prévia de "próxima reserva" em lugar nenhum do app.** Diferente do Cal.com (que mostra a próxima reunião confirmada no topo do dashboard), o Kortex não expõe isso nem na página de listagem (`/app/scheduling`) nem em `/app/appointments`.
  - Poderia exibir no dashboard quando tem uma próxima reserva

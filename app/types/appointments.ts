@@ -84,6 +84,21 @@ export interface EventException {
   updatedAt: string
 }
 
+/**
+ * The scheduling-link booking behind an event, if the event was created by
+ * a guest through /agendar/[token] — see server/api/appointments/events/[id]/booking.get.ts
+ * and docs/appointments/AUDITORIA_LINK_AGENDAMENTO_UX.md §1.3 item 1.
+ */
+export interface EventBookingInfo {
+  bookingId: string
+  guestName: string
+  guestEmail: string
+  status: string
+  schedulingPageId: string
+  schedulingPageTitle: string
+  answers: { label: string, value: string }[]
+}
+
 export interface CalendarShare {
   id: string
   calendarId: string

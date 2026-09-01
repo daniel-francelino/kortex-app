@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { z } from 'zod'
-import type { Calendar, CalendarEvent, EventParticipant } from '~/types/appointments'
+import type { Calendar, CalendarEvent, EventBookingInfo, EventParticipant } from '~/types/appointments'
 import { RsvpStatus } from '~/types/appointments'
 import { strToDateValue, dateValueToStr, strToTimeValue, timeValueToStr, type TimeValue } from '~/utils/calendarDate'
 import { formatEventDate, formatEventTime, getEventTimeZone, getZonedDate, getZonedDateParts, zonedDateTimeToUtcIso } from '~/utils/calendarEventTime'
@@ -30,6 +30,7 @@ const {
   cancelOccurrence,
   modifyOccurrence,
   splitSeries,
+  fetchEventBooking,
   fetchParticipants,
   inviteParticipant,
   removeParticipant,
@@ -75,6 +76,15 @@ async function loadParticipants() {
   participantsLoading.value = true
   participants.value = await fetchParticipants(props.event.id)
   participantsLoading.value = false
+}
+
+// ─── Scheduling-link booking (docs/appointments/AUDITORIA_LINK_AGENDAMENTO_UX.md
+// §1.3 item 1) — most events have none, so this stays null for the common case.
+const eventBooking = ref<EventBookingInfo | null>(null)
+
+async function loadEventBooking() {
+  if (!props.event) return
+  eventBooking.value = await fetchEventBooking(props.event.id)
 }
 
 async function onInviteParticipant() {
@@ -172,6 +182,7 @@ const endTimeValue = computed({
 
 watch(() => props.event, (event) => {
   participants.value = []
+  eventBooking.value = null
   if (!event) return
   state.calendarId = event.calendarId
   state.title = event.title
@@ -185,6 +196,7 @@ watch(() => props.event, (event) => {
   state.rrule = event.rrule ?? ''
   editing.value = false
   void loadParticipants()
+  void loadEventBooking()
 }, { immediate: true })
 
 function toDateInput(dateStr: string): string {
@@ -452,6 +464,44 @@ function formatTimeRange(evt: CalendarEvent): string {
             <p class="whitespace-pre-wrap text-muted">
               {{ event.description }}
             </p>
+          </div>
+
+          <!-- Reserva pelo link de agendamento -->
+          <div v-if="eventBooking" class="rounded-xl border border-default p-3">
+            <div class="flex items-center justify-between gap-2">
+              <div class="flex items-center gap-2">
+                <UIcon name="i-lucide-calendar-clock" class="size-4 shrink-0 text-muted" />
+                <p class="text-sm font-medium text-highlighted">
+                  Reserva por {{ eventBooking.schedulingPageTitle }}
+                </p>
+              </div>
+              <UBadge v-if="eventBooking.status === 'pending'" color="warning" variant="subtle" size="sm">
+                Pendente
+              </UBadge>
+            </div>
+            <p class="mt-1 text-sm text-muted">
+              {{ eventBooking.guestName }} · {{ eventBooking.guestEmail }}
+            </p>
+            <div v-if="eventBooking.answers.length" class="mt-3 space-y-2">
+              <div v-for="a in eventBooking.answers" :key="a.label" class="space-y-0.5">
+                <p class="text-xs text-muted">
+                  {{ a.label }}
+                </p>
+                <p class="text-sm text-highlighted">
+                  {{ a.value }}
+                </p>
+              </div>
+            </div>
+            <UButton
+              label="Ver na tela de reservas"
+              icon="i-lucide-arrow-right"
+              trailing
+              size="xs"
+              color="neutral"
+              variant="link"
+              class="mt-2 px-0"
+              :to="`/app/scheduling-bookings/${eventBooking.schedulingPageId}`"
+            />
           </div>
 
           <!-- Reminders -->

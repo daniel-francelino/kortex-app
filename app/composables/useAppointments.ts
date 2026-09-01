@@ -4,6 +4,7 @@ import type {
   Calendar,
   CalendarEvent,
   CalendarShare,
+  EventBookingInfo,
   EventException,
   EventParticipant,
   EventReminder,
@@ -847,6 +848,18 @@ function _useAppointments() {
     }
   }
 
+  // ─── Scheduling-link booking (unchanged — out of offline scope) ───────────
+  // Lazily fetched by EventDetailSlideover, same pattern as fetchParticipants
+  // below — most events have no booking behind them, so this isn't part of
+  // the main events list payload (server/api/appointments/events.get.ts).
+  async function fetchEventBooking(eventId: string): Promise<EventBookingInfo | null> {
+    try {
+      return await $fetch<EventBookingInfo | null>(`/api/appointments/events/${eventId}/booking`)
+    } catch {
+      return null
+    }
+  }
+
   // ─── Participants (unchanged — out of offline scope) ──────────────────────
   async function fetchParticipants(eventId: string): Promise<EventParticipant[]> {
     try {
@@ -1079,6 +1092,9 @@ function _useAppointments() {
     upsertReminders,
     modifyOccurrence,
     splitSeries,
+
+    // Scheduling-link booking
+    fetchEventBooking,
 
     // Participants
     fetchParticipants,
