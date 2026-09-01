@@ -3,12 +3,14 @@ import { detectBrowserTimeZone } from '#shared/utils/dateTime'
 
 export function useLifeOS() {
   const toast = useToast()
+  const auth = useAuth()
 
   // Regra 1 (docs/timezone/ANALISE_TIMEZONE.md): the server can't detect the
   // browser's zone on its own, so the client sends it explicitly — `undefined`
   // during SSR (there's no browser there; the server falls back to the
   // user's stored preference instead of trusting a fake value).
-  const clientTimezone = detectBrowserTimeZone()
+  const clientTimezone = ref<string | undefined>(undefined)
+  const dashboardQuery = computed(() => ({ tz: clientTimezone.value }))
 
   // ─── Daily Dashboard ────────────────────────────────────────────────────
   const {
@@ -17,7 +19,12 @@ export function useLifeOS() {
     refresh: refreshDashboard
   } = useFetch<DailyDashboardResponse>('/api/life/dashboard', {
     lazy: true,
-    query: { tz: clientTimezone },
+    immediate: false,
+    server: false,
+    key: 'life-dashboard',
+    watch: false,
+    credentials: 'include',
+    query: dashboardQuery,
     default: () => ({
       date: '',
       habits: { items: [], completedCount: 0, totalCount: 0 },
@@ -43,7 +50,9 @@ export function useLifeOS() {
   watch(dashboardStatus, (status) => {
     if (status === 'success' || status === 'error') dashboardLoadedOnce.value = true
   }, { immediate: true })
-  const dashboardInitialLoading = computed(() => !dashboardLoadedOnce.value && dashboardStatus.value === 'pending')
+  const dashboardInitialLoading = computed(() =>
+    !dashboardLoadedOnce.value && (dashboardStatus.value === 'idle' || dashboardStatus.value === 'pending')
+  )
 
   // ─── Insights ───────────────────────────────────────────────────────────
   const {
@@ -52,7 +61,12 @@ export function useLifeOS() {
     refresh: refreshInsights
   } = useFetch<LifeInsights>('/api/life/insights', {
     lazy: true,
-    query: { tz: clientTimezone },
+    immediate: false,
+    server: false,
+    key: 'life-insights',
+    watch: false,
+    credentials: 'include',
+    query: dashboardQuery,
     default: () => ({
       period: '30d',
       habits: { completionRate7d: 0, completionRate30d: 0, averageStreak: 0, totalActive: 0 },
@@ -67,9 +81,40 @@ export function useLifeOS() {
   watch(insightsStatus, (status) => {
     if (status === 'success' || status === 'error') insightsLoadedOnce.value = true
   }, { immediate: true })
-  const insightsInitialLoading = computed(() => !insightsLoadedOnce.value && insightsStatus.value === 'pending')
+  const insightsInitialLoading = computed(() =>
+    !insightsLoadedOnce.value && (insightsStatus.value === 'idle' || insightsStatus.value === 'pending')
+  )
 
   // ─── Life Areas ─────────────────────────────────────────────────────────
+  const initialDashboardLoadStarted = ref(false)
+
+  async function loadInitialDashboard() {
+    if (!import.meta.client || initialDashboardLoadStarted.value)
+      return
+
+    if (!auth.ready.value)
+      await auth.ensureReady()
+
+    if (!auth.isAuthenticated.value)
+      return
+
+    initialDashboardLoadStarted.value = true
+    clientTimezone.value = detectBrowserTimeZone()
+
+    await Promise.all([
+      refreshDashboard(),
+      refreshInsights()
+    ])
+  }
+
+  onMounted(() => {
+    void loadInitialDashboard()
+  })
+
+  watch([auth.ready, auth.isAuthenticated], () => {
+    void loadInitialDashboard()
+  })
+
   const {
     data: areasResponse,
     status: areasStatus,
