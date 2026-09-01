@@ -178,11 +178,6 @@ body.keyboard-open .mobile-bottom-nav {
   padding-left: var(--safe-area-left);
   background: var(--ui-bg);
   border-top: 1px solid var(--ui-border-default, var(--ui-color-neutral-200));
-  /* WebKit can visibly nudge a `position: fixed` element mid-touch/scroll
-     gesture unless it's promoted to its own compositor layer — this keeps it
-     glued to the viewport edge instead of jittering while a finger is down. */
-  transform: translateZ(0);
-  will-change: transform;
 }
 
 .mobile-bottom-nav::after {
