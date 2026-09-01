@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { getSupabaseAdminClient } from '../../../../utils/supabase'
-import { mapBooking } from '../../../../utils/scheduling'
+import { mapBooking, archiveBookingEvent } from '../../../../utils/scheduling'
 
 const paramsSchema = z.object({
   manageToken: z.string().min(1)
@@ -52,33 +52,8 @@ export default eventHandler(async (event) => {
     }
   }
 
-  const { data: current } = await supabase
-    .from('events')
-    .select('*')
-    .eq('id', booking.event_id)
-    .is('archived_at', null)
-    .maybeSingle()
-
-  if (current && hostUserId) {
-    await supabase.from('event_history').insert({
-      event_id: current.id,
-      changed_by: hostUserId,
-      title: current.title,
-      description: current.description,
-      location: current.location,
-      start_at: current.start_at,
-      end_at: current.end_at,
-      event_timezone: current.event_timezone,
-      all_day: current.all_day,
-      rrule: current.rrule,
-      calendar_id: current.calendar_id,
-      change_type: 'archive'
-    })
-
-    await supabase
-      .from('events')
-      .update({ archived_at: new Date().toISOString(), updated_at: new Date().toISOString() })
-      .eq('id', current.id)
+  if (hostUserId) {
+    await archiveBookingEvent(supabase, booking.event_id as string, hostUserId)
   }
 
   const { data: updated, error } = await supabase

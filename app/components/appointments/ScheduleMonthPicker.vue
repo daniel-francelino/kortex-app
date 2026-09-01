@@ -95,6 +95,8 @@ function selectDay(cell: DayCell) {
 }
 
 onMounted(() => emitMonthChange())
+
+defineExpose({ goNextMonth })
 </script>
 
 <template>

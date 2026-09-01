@@ -89,6 +89,12 @@ export default eventHandler(async (event) => {
     allDay: false
   })
 
+  // The event above is created either way — it already blocks the slot for
+  // everyone else. `requires_confirmation` only affects whether the booking
+  // itself starts as 'pending' (awaiting host approval) or 'confirmed'; see
+  // docs/appointments/AUDITORIA_LINK_AGENDAMENTO_UX.md §3.3.
+  const initialStatus = page.requires_confirmation ? 'pending' : 'confirmed'
+
   const { data: booking, error: bookingError } = await supabase
     .from('bookings')
     .insert({
@@ -98,7 +104,8 @@ export default eventHandler(async (event) => {
       guest_email: payload.guestEmail,
       guest_timezone: payload.guestTimezone,
       answers: payload.answers ?? {},
-      manage_token: createShareToken()
+      manage_token: createShareToken(),
+      status: initialStatus
     })
     .select('*')
     .single()

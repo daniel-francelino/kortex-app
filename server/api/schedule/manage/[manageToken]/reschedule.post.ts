@@ -110,9 +110,14 @@ export default eventHandler(async (event) => {
     throw createError({ statusCode: 500, statusMessage: 'Falha ao reagendar evento', data: eventError.message })
   }
 
+  // Rescheduling a booking that's still awaiting host approval shouldn't
+  // silently confirm it — only bump 'rescheduled'-transitional bookings back
+  // to 'confirmed'. A 'pending' booking stays 'pending' at the new time.
+  const nextStatus = booking.status === 'pending' ? 'pending' : 'confirmed'
+
   const { data: updatedBooking, error: bookingError } = await supabase
     .from('bookings')
-    .update({ status: 'confirmed', updated_at: new Date().toISOString() })
+    .update({ status: nextStatus, updated_at: new Date().toISOString() })
     .eq('id', booking.id)
     .select('*')
     .single()

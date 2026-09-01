@@ -1,3 +1,5 @@
+import type { getSupabaseAdminClient } from './supabase'
+
 export function mapAvailabilityRule(row: Record<string, unknown>): Record<string, unknown> {
   return {
     id: row.id,
@@ -43,6 +45,7 @@ export function mapSchedulingPage(row: Record<string, unknown>): Record<string, 
     cancellationMinNoticeHours: row.cancellation_min_notice_hours ?? null,
     cancellationReasonRequired: Boolean(row.cancellation_reason_required),
     hideDetailsOnManagePage: Boolean(row.hide_details_on_manage_page),
+    requiresConfirmation: Boolean(row.requires_confirmation),
     shareToken: row.share_token,
     isActive: Boolean(row.is_active),
     createdAt: row.created_at,
@@ -59,6 +62,13 @@ export function mapSchedulingPage(row: Record<string, unknown>): Record<string, 
 }
 
 export function mapBooking(row: Record<string, unknown>): Record<string, unknown> {
+  // `event` is present when the caller joined `bookings` against `events`
+  // (server/api/appointments/scheduling-pages/[id]/bookings.get.ts) to expose
+  // the real appointment time — Supabase returns a single related row as an
+  // object, but as an array when the relationship is ambiguous, so handle both.
+  const eventRaw = row.event as Record<string, unknown> | Record<string, unknown>[] | null | undefined
+  const eventRow = Array.isArray(eventRaw) ? eventRaw[0] : eventRaw
+
   return {
     id: row.id,
     schedulingPageId: row.scheduling_page_id,
@@ -72,6 +82,50 @@ export function mapBooking(row: Record<string, unknown>): Record<string, unknown
     cancellationReason: row.cancellation_reason ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
-    cancelledAt: row.cancelled_at ?? null
+    cancelledAt: row.cancelled_at ?? null,
+    startAt: eventRow?.start_at ?? null,
+    endAt: eventRow?.end_at ?? null
   }
+}
+
+/**
+ * Archives the calendar event behind a booking (same snapshot-then-archive
+ * dance as POST /api/appointments/events/[id]/archive) — shared by the
+ * guest-facing cancel (manage/[manageToken]/cancel.post.ts) and the
+ * host-facing cancel/decline (scheduling-pages/[id]/bookings/[bookingId]/cancel.post.ts)
+ * so the two paths can't silently drift apart.
+ */
+export async function archiveBookingEvent(
+  supabase: ReturnType<typeof getSupabaseAdminClient>,
+  eventId: string,
+  changedBy: string
+): Promise<void> {
+  const { data: current } = await supabase
+    .from('events')
+    .select('*')
+    .eq('id', eventId)
+    .is('archived_at', null)
+    .maybeSingle()
+
+  if (!current) return
+
+  await supabase.from('event_history').insert({
+    event_id: current.id,
+    changed_by: changedBy,
+    title: current.title,
+    description: current.description,
+    location: current.location,
+    start_at: current.start_at,
+    end_at: current.end_at,
+    event_timezone: current.event_timezone,
+    all_day: current.all_day,
+    rrule: current.rrule,
+    calendar_id: current.calendar_id,
+    change_type: 'archive'
+  })
+
+  await supabase
+    .from('events')
+    .update({ archived_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+    .eq('id', current.id)
 }

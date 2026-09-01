@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { PublicSchedulingPage, AvailabilitySlot, BookingConfirmation } from '~/types/scheduling'
-import { LOCATION_TYPE_META } from '~/types/scheduling'
-import { detectBrowserTimeZone, formatDisplay } from '#shared/utils/dateTime'
+import { BookingStatus, LOCATION_TYPE_META } from '~/types/scheduling'
+import { detectBrowserTimeZone, formatDisplay, addCalendarDays, parseCalendarDate, todayInZone } from '#shared/utils/dateTime'
 
 definePageMeta({ layout: false, ssr: true })
 
@@ -55,8 +55,12 @@ const slotsForSelectedDate = computed(() => {
     .sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime())
 })
 
+const monthLoaded = ref(false)
+const monthPickerRef = useTemplateRef('monthPickerRef')
+
 async function onMonthChange(year: number, month: number) {
   slotsLoading.value = true
+  monthLoaded.value = false
   selectedDate.value = null
   selectedSlot.value = null
   try {
@@ -71,8 +75,23 @@ async function onMonthChange(year: number, month: number) {
     toast.add({ title: 'Erro', description: 'Não foi possível carregar a disponibilidade.', color: 'error' })
   } finally {
     slotsLoading.value = false
+    monthLoaded.value = true
   }
 }
+
+function goToNextAvailableMonth() {
+  monthPickerRef.value?.goNextMonth()
+}
+
+// "Horários disponíveis até {data}" — deriva de maxAdvanceDays, um campo de
+// dias-calendário (não um instante), por isso usa as funções de data pura
+// (addCalendarDays/parseCalendarDate), não fromZonedTime/toZonedTime.
+const availableUntilLabel = computed(() => {
+  const todayStr = todayInZone(guestTimezone.value)
+  const untilStr = addCalendarDays(todayStr, publicPage.value.maxAdvanceDays)
+  const raw = formatDisplay(parseCalendarDate(untilStr), "dd 'de' MMMM")
+  return raw
+})
 
 function formatSlotTime(iso: string): string {
   return formatDisplay(iso, 'HH:mm', { timeZone: guestTimezone.value })
@@ -136,6 +155,8 @@ const manageUrl = computed(() => {
   return `${base}${confirmation.value.manageUrl}`
 })
 
+const isPendingConfirmation = computed(() => confirmation.value?.booking.status === BookingStatus.Pending)
+
 async function copyManageUrl() {
   try {
     await navigator.clipboard.writeText(manageUrl.value)
@@ -144,15 +165,73 @@ async function copyManageUrl() {
     toast.add({ title: 'Erro', description: 'Não foi possível copiar o link.', color: 'error' })
   }
 }
+
+// ─── Adicionar ao calendário ─────────────────────────────────────────────────
+// Todos os três derivam só do que já está em memória (a reserva acabou de ser
+// confirmada) — zero chamada de rede adicional, zero endpoint novo.
+function toUtcCompact(iso: string): string {
+  return iso.replace(/[-:]/g, '').replace(/\.\d{3}/, '')
+}
+
+const calendarEventTitle = computed(() => `${publicPage.value.title} — ${publicPage.value.hostName}`)
+
+const googleCalendarUrl = computed(() => {
+  if (!confirmation.value || !selectedSlot.value) return ''
+  const params = new URLSearchParams({
+    action: 'TEMPLATE',
+    text: calendarEventTitle.value,
+    dates: `${toUtcCompact(selectedSlot.value.startAt)}/${toUtcCompact(selectedSlot.value.endAt)}`,
+    details: publicPage.value.description ?? '',
+    location: publicPage.value.locationDetails ?? ''
+  })
+  return `https://calendar.google.com/calendar/render?${params.toString()}`
+})
+
+const outlookCalendarUrl = computed(() => {
+  if (!confirmation.value || !selectedSlot.value) return ''
+  const params = new URLSearchParams({
+    path: '/calendar/action/compose',
+    rru: 'addevent',
+    subject: calendarEventTitle.value,
+    startdt: selectedSlot.value.startAt,
+    enddt: selectedSlot.value.endAt,
+    body: publicPage.value.description ?? '',
+    location: publicPage.value.locationDetails ?? ''
+  })
+  return `https://outlook.live.com/calendar/0/deeplink/compose?${params.toString()}`
+})
+
+const icsDataUrl = computed(() => {
+  if (!confirmation.value || !selectedSlot.value) return ''
+  const lines = [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//Kortex//Agendamento//PT',
+    'BEGIN:VEVENT',
+    `UID:${confirmation.value.booking.id}@kortex`,
+    `DTSTAMP:${toUtcCompact(new Date().toISOString())}`,
+    `DTSTART:${toUtcCompact(selectedSlot.value.startAt)}`,
+    `DTEND:${toUtcCompact(selectedSlot.value.endAt)}`,
+    `SUMMARY:${calendarEventTitle.value}`,
+    publicPage.value.locationDetails ? `LOCATION:${publicPage.value.locationDetails}` : '',
+    publicPage.value.description ? `DESCRIPTION:${publicPage.value.description}` : '',
+    'END:VEVENT',
+    'END:VCALENDAR'
+  ].filter(Boolean)
+  return `data:text/calendar;charset=utf-8,${encodeURIComponent(lines.join('\r\n'))}`
+})
 </script>
 
 <template>
   <div class="min-h-screen bg-default">
     <div class="mx-auto max-w-2xl px-4 py-12">
       <header class="mb-6">
-        <p class="text-sm text-muted">
-          {{ publicPage.hostName }}
-        </p>
+        <div class="flex items-center gap-2">
+          <UAvatar :src="publicPage.hostAvatarUrl ?? undefined" :alt="publicPage.hostName" size="xs" />
+          <p class="text-sm text-muted">
+            {{ publicPage.hostName }}
+          </p>
+        </div>
         <h1 class="text-2xl font-bold text-highlighted">
           {{ publicPage.title }}
         </h1>
@@ -171,6 +250,14 @@ async function copyManageUrl() {
         </div>
       </header>
 
+      <!-- Indicador de passo -->
+      <div v-if="step === 'pick-time' || step === 'details'" class="mb-4 flex items-center gap-1.5 text-xs text-dimmed">
+        <span :class="step === 'pick-time' ? 'font-medium text-muted' : ''">1</span>
+        <span class="h-px w-4 bg-default" />
+        <span :class="step === 'details' ? 'font-medium text-muted' : ''">2</span>
+        <span class="ml-1">{{ step === 'pick-time' ? 'Escolha um horário' : 'Seus dados' }}</span>
+      </div>
+
       <!-- Step 1: pick a time -->
       <div v-if="step === 'pick-time'" class="space-y-4">
         <UFormField label="Seu fuso horário">
@@ -183,8 +270,13 @@ async function copyManageUrl() {
           />
         </UFormField>
 
+        <p class="text-xs text-muted">
+          Horários disponíveis até {{ availableUntilLabel }}.
+        </p>
+
         <div class="grid gap-4 sm:grid-cols-2">
           <AppointmentsScheduleMonthPicker
+            ref="monthPickerRef"
             v-model="selectedDate"
             :available-dates="availableDates"
             :loading="slotsLoading"
@@ -192,25 +284,44 @@ async function copyManageUrl() {
           />
 
           <div class="space-y-2">
-            <p v-if="selectedDate" class="text-sm font-medium text-highlighted">
-              {{ formatSelectedDate() }}
-            </p>
-            <p v-else class="text-sm text-muted">
-              Selecione um dia disponível.
-            </p>
-            <div v-if="selectedDate" class="grid max-h-80 grid-cols-2 gap-2 overflow-y-auto">
-              <UButton
-                v-for="slot in slotsForSelectedDate"
-                :key="slot.startAt"
-                :label="formatSlotTime(slot.startAt)"
-                color="neutral"
-                variant="outline"
-                @click="onPickSlot(slot)"
-              />
-              <p v-if="slotsForSelectedDate.length === 0" class="col-span-2 text-sm text-muted">
-                Sem horários livres neste dia.
+            <template v-if="monthLoaded && !slotsLoading && availableDates.size === 0">
+              <p class="text-sm text-muted">
+                Nenhum horário disponível neste mês.
               </p>
-            </div>
+              <UButton
+                label="Ver próximo mês"
+                icon="i-lucide-arrow-right"
+                trailing
+                size="sm"
+                color="neutral"
+                variant="subtle"
+                @click="goToNextAvailableMonth"
+              />
+            </template>
+            <template v-else>
+              <p v-if="selectedDate" class="text-sm font-medium text-highlighted">
+                {{ formatSelectedDate() }}
+              </p>
+              <p v-else class="text-sm text-muted">
+                Selecione um dia disponível.
+              </p>
+              <div v-if="selectedDate && slotsLoading" class="grid max-h-80 grid-cols-2 gap-2 overflow-y-auto">
+                <USkeleton v-for="i in 6" :key="i" class="h-9 w-full rounded-md" />
+              </div>
+              <div v-else-if="selectedDate" class="grid max-h-80 grid-cols-2 gap-2 overflow-y-auto">
+                <UButton
+                  v-for="slot in slotsForSelectedDate"
+                  :key="slot.startAt"
+                  :label="formatSlotTime(slot.startAt)"
+                  color="neutral"
+                  variant="outline"
+                  @click="onPickSlot(slot)"
+                />
+                <p v-if="slotsForSelectedDate.length === 0" class="col-span-2 text-sm text-muted">
+                  Sem horários livres neste dia.
+                </p>
+              </div>
+            </template>
           </div>
         </div>
       </div>
@@ -270,13 +381,48 @@ async function copyManageUrl() {
 
       <!-- Step 3: confirmation -->
       <div v-else class="space-y-4 text-center">
-        <UIcon name="i-lucide-check-circle-2" class="mx-auto size-14 text-success" />
+        <UIcon
+          :name="isPendingConfirmation ? 'i-lucide-clock' : 'i-lucide-check-circle-2'"
+          class="mx-auto size-14"
+          :class="isPendingConfirmation ? 'text-warning' : 'text-success'"
+        />
         <h2 class="text-xl font-semibold text-highlighted">
-          Reserva confirmada!
+          {{ isPendingConfirmation ? `Pedido enviado — aguardando confirmação de ${publicPage.hostName}` : 'Reserva confirmada!' }}
         </h2>
         <p class="text-sm text-muted">
           {{ formatSelectedDate() }} às {{ selectedSlot ? formatSlotTime(selectedSlot.startAt) : '' }} ({{ guestTimezone }})
         </p>
+
+        <div v-if="!isPendingConfirmation" class="flex flex-wrap items-center justify-center gap-2">
+          <UButton
+            label="Google Calendar"
+            icon="i-lucide-calendar-plus"
+            size="sm"
+            color="neutral"
+            variant="outline"
+            :to="googleCalendarUrl"
+            target="_blank"
+          />
+          <UButton
+            label="Outlook"
+            icon="i-lucide-calendar-plus"
+            size="sm"
+            color="neutral"
+            variant="outline"
+            :to="outlookCalendarUrl"
+            target="_blank"
+          />
+          <UButton
+            label="Apple / .ics"
+            icon="i-lucide-download"
+            size="sm"
+            color="neutral"
+            variant="outline"
+            :to="icsDataUrl"
+            download="reserva.ics"
+          />
+        </div>
+
         <div class="mx-auto flex max-w-md items-center gap-2">
           <UInput
             :model-value="manageUrl"

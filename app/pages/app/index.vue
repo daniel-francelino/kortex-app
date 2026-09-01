@@ -30,6 +30,13 @@ onMounted(() => {
 const todayFormatted = computed(() => clientTimezone.value
   ? formatDisplay(new Date(), 'EEEE, d \'de\' MMMM \'de\' yyyy', { timeZone: clientTimezone.value })
   : '')
+
+// Próxima reserva feita por um link de agendamento, se houver — endpoint
+// próprio e silencioso (docs/appointments/AUDITORIA_LINK_AGENDAMENTO_UX.md
+// §1.3, item 3): uma falha aqui não deve derrubar o resto do dashboard.
+const { data: nextBooking } = useAsyncData('dashboard-next-booking', () =>
+  $fetch('/api/appointments/scheduling-pages/next-booking').catch(() => null)
+)
 </script>
 
 <template>
@@ -132,6 +139,7 @@ const todayFormatted = computed(() => clientTimezone.value
             :events="dashboard.events.items"
             :total-count="dashboard.events.totalCount"
           />
+          <DashboardNextBooking v-if="nextBooking" :booking="nextBooking" class="md:col-span-2" />
         </div>
 
         <!-- Insights section -->

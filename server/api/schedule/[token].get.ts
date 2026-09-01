@@ -16,7 +16,7 @@ export default eventHandler(async (event) => {
 
   const { data: page } = await supabase
     .from('scheduling_pages')
-    .select('id, user_id, title, description, duration_minutes, location_type, location_details, is_active, archived_at')
+    .select('id, user_id, title, description, duration_minutes, location_type, location_details, max_advance_days, requires_confirmation, is_active, archived_at')
     .eq('share_token', token)
     .maybeSingle()
 
@@ -34,6 +34,7 @@ export default eventHandler(async (event) => {
   const { data: hostData } = await supabase.auth.admin.getUserById(page.user_id as string)
   const hostMeta = (hostData?.user?.user_metadata ?? {}) as Record<string, unknown>
   const hostName = (hostMeta.name as string | undefined) || hostData?.user?.email || 'Anfitrião'
+  const hostAvatarUrl = (hostMeta.avatar_url as string | undefined) || null
 
   return {
     title: page.title,
@@ -42,6 +43,9 @@ export default eventHandler(async (event) => {
     locationType: page.location_type,
     locationDetails: page.location_details ?? null,
     hostName,
+    hostAvatarUrl,
+    maxAdvanceDays: page.max_advance_days,
+    requiresConfirmation: Boolean(page.requires_confirmation),
     questions: (questionsData ?? []).map(row => mapSchedulingQuestion(row as Record<string, unknown>))
   }
 })

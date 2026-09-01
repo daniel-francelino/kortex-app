@@ -60,7 +60,8 @@ const state = reactive({
   cancellationMinNoticeEnabled: false,
   cancellationMinNoticeHours: 24,
   cancellationReasonRequired: false,
-  hideDetailsOnManagePage: false
+  hideDetailsOnManagePage: false,
+  requiresConfirmation: false
 })
 
 const dayWindows = reactive<Record<number, DayWindow[]>>({ 0: [], 1: [], 2: [], 3: [], 4: [], 5: [], 6: [] })
@@ -89,6 +90,7 @@ function applyPageToState(page: NonNullable<Awaited<ReturnType<typeof fetchSched
   state.cancellationMinNoticeHours = page.cancellationMinNoticeHours ?? 24
   state.cancellationReasonRequired = page.cancellationReasonRequired
   state.hideDetailsOnManagePage = page.hideDetailsOnManagePage
+  state.requiresConfirmation = page.requiresConfirmation
 
   shareToken.value = page.shareToken
   isActive.value = page.isActive
@@ -319,6 +321,7 @@ function buildPayload() {
     cancellationMinNoticeHours: state.cancellationMinNoticeEnabled ? state.cancellationMinNoticeHours : null,
     cancellationReasonRequired: state.cancellationReasonRequired,
     hideDetailsOnManagePage: state.hideDetailsOnManagePage,
+    requiresConfirmation: state.requiresConfirmation,
     availabilityRules,
     questions: questions.value.map((q, i) => ({ ...q, options: q.options ?? undefined, sortOrder: i }))
   }
@@ -817,6 +820,25 @@ if (import.meta.client) {
 
         <!-- POLÍTICAS -->
         <div v-if="activeTab === 'politicas'" class="space-y-5">
+          <UCard>
+            <template #header>
+              <p class="text-sm font-medium text-highlighted">
+                Confirmação
+              </p>
+            </template>
+            <div class="flex items-center justify-between">
+              <div>
+                <p class="text-sm font-medium text-highlighted">
+                  Confirmação manual
+                </p>
+                <p class="text-xs text-muted">
+                  Você aprova cada reserva antes de ela valer — enquanto isso, ela fica como "Pendente" na sua lista de reservas e o horário continua bloqueado na sua agenda.
+                </p>
+              </div>
+              <USwitch v-model="state.requiresConfirmation" />
+            </div>
+          </UCard>
+
           <UCard>
             <template #header>
               <p class="text-sm font-medium text-highlighted">

@@ -43,6 +43,7 @@ const bodySchema = z.object({
   cancellationMinNoticeHours: z.number().int().min(0).max(720).nullable().optional(),
   cancellationReasonRequired: z.boolean().optional(),
   hideDetailsOnManagePage: z.boolean().optional(),
+  requiresConfirmation: z.boolean().optional(),
   isActive: z.boolean().optional(),
   availabilityRules: z.array(availabilityRuleSchema).min(1).optional(),
   questions: z.array(questionSchema).max(20).optional()
@@ -103,6 +104,7 @@ export default eventHandler(async (event) => {
   if (payload.cancellationMinNoticeHours !== undefined) updateData.cancellation_min_notice_hours = payload.cancellationMinNoticeHours
   if (payload.cancellationReasonRequired !== undefined) updateData.cancellation_reason_required = payload.cancellationReasonRequired
   if (payload.hideDetailsOnManagePage !== undefined) updateData.hide_details_on_manage_page = payload.hideDetailsOnManagePage
+  if (payload.requiresConfirmation !== undefined) updateData.requires_confirmation = payload.requiresConfirmation
   if (payload.isActive !== undefined) updateData.is_active = payload.isActive
 
   const { data: page, error } = await supabase

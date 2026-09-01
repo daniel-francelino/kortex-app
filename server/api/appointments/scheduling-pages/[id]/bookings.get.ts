@@ -22,7 +22,7 @@ export default eventHandler(async (event) => {
 
   const { data, error } = await supabase
     .from('bookings')
-    .select('*')
+    .select('*, event:events(start_at, end_at)')
     .eq('scheduling_page_id', id)
     .order('created_at', { ascending: false })
 

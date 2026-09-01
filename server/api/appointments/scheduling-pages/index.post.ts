@@ -45,6 +45,7 @@ const bodySchema = z.object({
   cancellationMinNoticeHours: z.number().int().min(0).max(720).nullable().optional(),
   cancellationReasonRequired: z.boolean().default(false),
   hideDetailsOnManagePage: z.boolean().default(false),
+  requiresConfirmation: z.boolean().default(false),
   availabilityRules: z.array(availabilityRuleSchema).min(1, 'Defina ao menos uma janela de disponibilidade'),
   questions: z.array(questionSchema).max(20).optional()
 })
@@ -90,6 +91,7 @@ export default eventHandler(async (event) => {
     cancellation_min_notice_hours: payload.cancellationMinNoticeHours ?? null,
     cancellation_reason_required: payload.cancellationReasonRequired,
     hide_details_on_manage_page: payload.hideDetailsOnManagePage,
+    requires_confirmation: payload.requiresConfirmation,
     share_token: createShareToken()
   }
   if (payload.id) insertRow.id = payload.id

@@ -10,7 +10,8 @@ export enum SchedulingLocationType {
 export enum BookingStatus {
   Confirmed = 'confirmed',
   Cancelled = 'cancelled',
-  Rescheduled = 'rescheduled'
+  Rescheduled = 'rescheduled',
+  Pending = 'pending'
 }
 
 export enum SchedulingQuestionType {
@@ -68,6 +69,7 @@ export interface SchedulingPage {
   cancellationMinNoticeHours: number | null
   cancellationReasonRequired: boolean
   hideDetailsOnManagePage: boolean
+  requiresConfirmation: boolean
   shareToken: string
   isActive: boolean
   createdAt: string
@@ -92,6 +94,9 @@ export interface Booking {
   createdAt: string
   updatedAt: string
   cancelledAt: string | null
+  /** Real appointment time, joined from `events` — null only if the join failed to resolve. */
+  startAt: string | null
+  endAt: string | null
 }
 
 // ─── Payloads ─────────────────────────────────────────────────────────────────
@@ -132,6 +137,7 @@ export interface CreateSchedulingPagePayload {
   cancellationMinNoticeHours?: number | null
   cancellationReasonRequired?: boolean
   hideDetailsOnManagePage?: boolean
+  requiresConfirmation?: boolean
   availabilityRules: AvailabilityRuleInput[]
   questions?: SchedulingQuestionInput[]
 }
@@ -147,6 +153,9 @@ export interface PublicSchedulingPage {
   locationType: SchedulingLocationType
   locationDetails: string | null
   hostName: string
+  hostAvatarUrl: string | null
+  maxAdvanceDays: number
+  requiresConfirmation: boolean
   questions: SchedulingQuestion[]
 }
 

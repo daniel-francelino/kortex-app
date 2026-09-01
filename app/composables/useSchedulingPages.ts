@@ -60,6 +60,7 @@ function normalizeSchedulingPage(input: unknown): SchedulingPage {
     cancellationMinNoticeHours: (page.cancellationMinNoticeHours as number | null) ?? (page.cancellation_min_notice_hours as number | null) ?? null,
     cancellationReasonRequired: Boolean(page.cancellationReasonRequired ?? page.cancellation_reason_required),
     hideDetailsOnManagePage: Boolean(page.hideDetailsOnManagePage ?? page.hide_details_on_manage_page),
+    requiresConfirmation: Boolean(page.requiresConfirmation ?? page.requires_confirmation),
     shareToken: String(page.shareToken ?? page.share_token ?? ''),
     isActive: Boolean(page.isActive ?? page.is_active),
     createdAt: String(page.createdAt ?? page.created_at ?? ''),
@@ -86,7 +87,9 @@ function normalizeBooking(input: unknown): Booking {
     cancellationReason: (b.cancellationReason as string | null) ?? (b.cancellation_reason as string | null) ?? null,
     createdAt: String(b.createdAt ?? b.created_at ?? ''),
     updatedAt: String(b.updatedAt ?? b.updated_at ?? ''),
-    cancelledAt: (b.cancelledAt as string | null) ?? (b.cancelled_at as string | null) ?? null
+    cancelledAt: (b.cancelledAt as string | null) ?? (b.cancelled_at as string | null) ?? null,
+    startAt: (b.startAt as string | null) ?? (b.start_at as string | null) ?? null,
+    endAt: (b.endAt as string | null) ?? (b.end_at as string | null) ?? null
   }
 }
 
@@ -171,6 +174,7 @@ export function useSchedulingPages() {
       cancellationMinNoticeHours: payload.cancellationMinNoticeHours ?? null,
       cancellationReasonRequired: payload.cancellationReasonRequired ?? false,
       hideDetailsOnManagePage: payload.hideDetailsOnManagePage ?? false,
+      requiresConfirmation: payload.requiresConfirmation ?? false,
       shareToken: '',
       isActive: true,
       createdAt: now,
@@ -253,6 +257,7 @@ export function useSchedulingPages() {
       cancellationMinNoticeHours: payload.cancellationMinNoticeHours !== undefined ? payload.cancellationMinNoticeHours : (previous?.cancellationMinNoticeHours ?? null),
       cancellationReasonRequired: payload.cancellationReasonRequired !== undefined ? payload.cancellationReasonRequired : (previous?.cancellationReasonRequired ?? false),
       hideDetailsOnManagePage: payload.hideDetailsOnManagePage !== undefined ? payload.hideDetailsOnManagePage : (previous?.hideDetailsOnManagePage ?? false),
+      requiresConfirmation: payload.requiresConfirmation !== undefined ? payload.requiresConfirmation : (previous?.requiresConfirmation ?? false),
       shareToken: previous?.shareToken ?? '',
       isActive: payload.isActive !== undefined ? payload.isActive : (previous?.isActive ?? true),
       createdAt: previous?.createdAt ?? now,
@@ -357,6 +362,7 @@ export function useSchedulingPages() {
       cancellationMinNoticeHours: full.cancellationMinNoticeHours,
       cancellationReasonRequired: full.cancellationReasonRequired,
       hideDetailsOnManagePage: full.hideDetailsOnManagePage,
+      requiresConfirmation: full.requiresConfirmation,
       availabilityRules: (full.availabilityRules ?? []).map(r => ({
         dayOfWeek: r.dayOfWeek,
         startTime: r.startTime,
@@ -379,6 +385,39 @@ export function useSchedulingPages() {
       return (data ?? []).map(normalizeBooking)
     } catch {
       return []
+    }
+  }
+
+  // These two are deliberately not routed through runOptimisticAction/the
+  // offline queue like the rest of this composable: bookings aren't kept in
+  // `pagesById` (they live in the caller's own useAsyncData, e.g.
+  // scheduling-bookings/[id].vue), and approving/cancelling someone's
+  // real-world meeting is exactly the kind of action that should surface a
+  // clear error immediately rather than silently retry later while offline.
+  async function approveBooking(pageId: string, bookingId: string): Promise<Booking | null> {
+    try {
+      const data = await $fetch(`/api/appointments/scheduling-pages/${pageId}/bookings/${bookingId}/approve`, { method: 'POST' })
+      toast.add({ title: 'Reserva aprovada', color: 'success' })
+      return normalizeBooking(data)
+    } catch (err: unknown) {
+      const message = (err as { data?: { statusMessage?: string } })?.data?.statusMessage
+      toast.add({ title: 'Erro', description: message ?? 'Não foi possível aprovar a reserva.', color: 'error' })
+      return null
+    }
+  }
+
+  async function cancelBookingAsHost(pageId: string, bookingId: string, reason?: string): Promise<Booking | null> {
+    try {
+      const data = await $fetch(`/api/appointments/scheduling-pages/${pageId}/bookings/${bookingId}/cancel`, {
+        method: 'POST',
+        body: { reason }
+      })
+      toast.add({ title: 'Reserva cancelada', color: 'success' })
+      return normalizeBooking(data)
+    } catch (err: unknown) {
+      const message = (err as { data?: { statusMessage?: string } })?.data?.statusMessage
+      toast.add({ title: 'Erro', description: message ?? 'Não foi possível cancelar a reserva.', color: 'error' })
+      return null
     }
   }
 
@@ -445,6 +484,8 @@ export function useSchedulingPages() {
     regenerateShareToken,
     duplicateSchedulingPage,
     fetchBookings,
+    approveBooking,
+    cancelBookingAsHost,
     // Offline
     isOnline,
     pendingSyncCount: pendingCount,

@@ -20,6 +20,13 @@ if (!booking.value) {
 useSeoMeta({ title: 'Gerenciar reserva', robots: 'noindex' })
 
 const locationMeta = computed(() => booking.value ? LOCATION_TYPE_META[booking.value.locationType] : null)
+
+const STATUS_META: Record<BookingStatus, { label: string, color: 'success' | 'error' | 'warning' | 'neutral' }> = {
+  [BookingStatus.Confirmed]: { label: 'Confirmada', color: 'success' },
+  [BookingStatus.Pending]: { label: 'Aguardando confirmação', color: 'warning' },
+  [BookingStatus.Cancelled]: { label: 'Cancelada', color: 'error' },
+  [BookingStatus.Rescheduled]: { label: 'Reagendada', color: 'neutral' }
+}
 const guestTimezone = computed(() => booking.value?.guestTimezone || detectBrowserTimeZone() || 'UTC')
 
 function formatDateTime(iso: string | null): string {
@@ -139,11 +146,8 @@ async function confirmReschedule() {
 
         <UCard>
           <div class="space-y-3">
-            <UBadge
-              :color="booking.status === BookingStatus.Cancelled ? 'error' : 'success'"
-              variant="subtle"
-            >
-              {{ booking.status === BookingStatus.Cancelled ? 'Cancelada' : 'Confirmada' }}
+            <UBadge :color="STATUS_META[booking.status].color" variant="subtle">
+              {{ STATUS_META[booking.status].label }}
             </UBadge>
 
             <div class="flex items-start gap-3 text-sm">
