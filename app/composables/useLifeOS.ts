@@ -85,15 +85,14 @@ export function useLifeOS() {
     !insightsLoadedOnce.value && (insightsStatus.value === 'idle' || insightsStatus.value === 'pending')
   )
 
-  // ─── Life Areas ─────────────────────────────────────────────────────────
+  // ─── Initial dashboard bootstrap ────────────────────────────────────────
   const initialDashboardLoadStarted = ref(false)
 
   async function loadInitialDashboard() {
     if (!import.meta.client || initialDashboardLoadStarted.value)
       return
 
-    if (!auth.ready.value)
-      await auth.ensureReady()
+    await auth.ensureReady()
 
     if (!auth.isAuthenticated.value)
       return
@@ -115,6 +114,7 @@ export function useLifeOS() {
     void loadInitialDashboard()
   })
 
+  // ─── Life Areas ─────────────────────────────────────────────────────────
   const {
     data: areasResponse,
     status: areasStatus,
