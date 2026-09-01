@@ -121,8 +121,6 @@ function applyNavDebugPreference() {
   }
 
   navDebugEnabled.value = window.localStorage.getItem('kortex-mobile-nav-debug') !== '0'
-  document.documentElement.classList.toggle('mobile-nav-debug', navDebugEnabled.value)
-  document.body.classList.toggle('mobile-nav-debug', navDebugEnabled.value)
   updateNavDebugInfo()
 }
 
@@ -148,8 +146,6 @@ onMounted(() => {
 
 onUnmounted(() => {
   if (!import.meta.client) return
-  document.documentElement.classList.remove('mobile-nav-debug')
-  document.body.classList.remove('mobile-nav-debug')
   window.removeEventListener('resize', updateNavDebugInfo)
   window.visualViewport?.removeEventListener('resize', updateNavDebugInfo)
   window.visualViewport?.removeEventListener('scroll', updateNavDebugInfo)
@@ -161,10 +157,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div
-    class="mobile-bottom-nav lg:hidden"
-    :class="{ 'mobile-bottom-nav--debug': navDebugEnabled }"
-  >
+  <div class="mobile-bottom-nav lg:hidden">
     <div
       v-if="navDebugEnabled"
       class="mobile-bottom-nav__debug-panel"
@@ -276,53 +269,6 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
-.mobile-bottom-nav--debug {
-  outline: 3px solid red !important;
-  outline-offset: -3px;
-  background:
-    repeating-linear-gradient(
-      45deg,
-      rgba(255, 0, 0, 0.24),
-      rgba(255, 0, 0, 0.24) 8px,
-      rgba(255, 255, 0, 0.16) 8px,
-      rgba(255, 255, 0, 0.16) 16px
-    ),
-    var(--ui-bg) !important;
-}
-
-.mobile-bottom-nav--debug::after {
-  outline: 3px dashed fuchsia !important;
-  outline-offset: -3px;
-  background:
-    repeating-linear-gradient(
-      -45deg,
-      rgba(255, 0, 255, 0.3),
-      rgba(255, 0, 255, 0.3) 8px,
-      rgba(0, 255, 255, 0.16) 8px,
-      rgba(0, 255, 255, 0.16) 16px
-    ) !important;
-}
-
-.mobile-bottom-nav--debug > nav {
-  outline: 3px solid yellow !important;
-  outline-offset: -6px;
-  background: rgba(255, 255, 0, 0.16) !important;
-}
-
-.mobile-bottom-nav--debug :deep(.mobile-context-nav),
-.mobile-bottom-nav--debug :deep(nav > div) {
-  outline: 2px solid cyan !important;
-  outline-offset: -4px;
-  background: rgba(0, 255, 255, 0.12) !important;
-}
-
-.mobile-bottom-nav--debug :deep(a),
-.mobile-bottom-nav--debug :deep(button) {
-  outline: 2px solid lime !important;
-  outline-offset: -2px;
-  background-color: rgba(0, 255, 0, 0.12) !important;
-}
-
 .mobile-bottom-nav__debug-panel {
   position: absolute;
   right: 0;
