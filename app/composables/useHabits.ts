@@ -1,4 +1,4 @@
-import { useDebounceFn } from '@vueuse/core'
+import { createSharedComposable, useDebounceFn } from '@vueuse/core'
 import { detectBrowserTimeZone, todayInZone } from '#shared/utils/dateTime'
 import type {
   CalendarDay,
@@ -45,17 +45,17 @@ interface HabitLogResult {
   streak: { currentStreak: number, longestStreak: number, status: 'active' | 'frozen' } | null
 }
 
-// useHabits() is called fresh from many components (habit modals, the today
-// list, goals' weekly review, ...) — it isn't a createSharedComposable
-// singleton like useAppointments(). The offline-sync drain loop below must
-// still only ever run once at a time no matter how many instances exist, or
-// two components mounted together could both try to replay the same queued
-// mutation concurrently. This module-level flag, not per-instance state,
-// is what makes only the very first useHabits() call register the
-// reconnect/mounted triggers; every later call is a no-op here.
-let offlineSyncRegistered = false
-
-export function useHabits() {
+// Singleton — shared across every component that calls useHabits(), same
+// idea as useAppointments.ts's createSharedComposable(_useAppointments).
+// Without this, each modal (CreateModal/EditModal/ArchiveModal/...) got its
+// own private todayData/listData: an optimistic edit applied inside one of
+// them mutated a copy nothing on screen was reading from, so index.vue
+// (the page that actually renders the list) only ever saw the change once
+// its own explicit refresh call landed — the optimistic update was correct
+// but invisible until then. It also means the offline-sync drain loop
+// (onReconnect/onMounted below) now only ever gets wired up once, for real,
+// instead of needing the manual "only register once" flag this used to have.
+function _useHabits() {
   const toast = useToast()
   const { capture } = usePostHog()
   const { runOptimisticAction } = useOptimisticAction()
@@ -976,15 +976,12 @@ export function useHabits() {
     }
   }
 
-  if (!offlineSyncRegistered) {
-    offlineSyncRegistered = true
-    onReconnect(() => {
-      void drainMutationQueue()
-    })
-    onMounted(() => {
-      if (isOnline.value) void drainMutationQueue()
-    })
-  }
+  onReconnect(() => {
+    void drainMutationQueue()
+  })
+  onMounted(() => {
+    if (isOnline.value) void drainMutationQueue()
+  })
 
   return {
     // Offline sync
@@ -1054,3 +1051,5 @@ export function useHabits() {
     getCurrentWeekKey
   }
 }
+
+export const useHabits = createSharedComposable(_useHabits)
