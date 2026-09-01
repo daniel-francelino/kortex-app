@@ -65,6 +65,23 @@ watch(activeView, (v) => {
   }
 })
 
+// `eventsInitialLoading` (useAppointments.ts) only covers the very first
+// fetch the page ever makes — switching Dia/Semana/Mês fetches a new date
+// range (via the viewFrom/viewTo watcher in the composable) and silently
+// left the previous view's stale events on screen until it resolved. Track
+// "has this specific view's range loaded at least once" separately, so a
+// tab switched into for the first time gets its own skeleton, while
+// navigating within an already-visited view (next/prev/hoje) and background
+// refetches (create, drag-and-drop reconcile) keep the smooth no-flash
+// behavior `eventsInitialLoading` was originally built for.
+const viewLoadedOnce = reactive<Record<CalendarViewMode, boolean>>({ day: false, week: false, month: false })
+watch(eventsStatus, (status) => {
+  if (status !== 'pending') viewLoadedOnce[activeView.value] = true
+})
+const activeViewLoading = computed(() =>
+  eventsInitialLoading.value || (!viewLoadedOnce[activeView.value] && eventsStatus.value === 'pending')
+)
+
 const viewModes: { label: string, value: CalendarViewMode, icon: string }[] = [
   { label: 'Dia', value: 'day', icon: 'i-lucide-square' },
   { label: 'Semana', value: 'week', icon: 'i-lucide-columns-3' },
@@ -735,7 +752,7 @@ onMounted(() => {
                 <AppointmentsMonthView
                   v-if="activeView === 'month'"
                   :events="eventsList"
-                  :loading="eventsInitialLoading"
+                  :loading="activeViewLoading"
                   :current-date="new Date()"
                   :view-year="viewYear"
                   :view-month="viewMonth"
@@ -750,7 +767,7 @@ onMounted(() => {
                 <AppointmentsWeekView
                   v-if="activeView === 'week'"
                   :events="eventsList"
-                  :loading="eventsInitialLoading"
+                  :loading="activeViewLoading"
                   :week-start-date="viewWeekStart"
                   @select-event="onSelectEvent"
                   @select-slot="onSelectSlot"
@@ -762,7 +779,7 @@ onMounted(() => {
                 <AppointmentsDayView
                   v-if="activeView === 'day'"
                   :events="eventsList"
-                  :loading="eventsInitialLoading"
+                  :loading="activeViewLoading"
                   :current-date="viewDayDate"
                   @select-event="onSelectEvent"
                   @select-slot="onDaySlotSelect"
@@ -903,123 +920,3 @@ onMounted(() => {
     @archived="refreshEvents"
   />
 </template>
-
-<!--
-  TO DO
-
-  ========================
-  ⚡ Performance
-  ========================
-
-  - Ao abrir a página estão sendo disparados múltiplos requests desnecessários.
-    É necessário otimizar o carregamento inicial para evitar requisições repetidas.
-
-  ========================
-  📅 Calendário / Eventos
-  ========================
-
-  - Na tab de Agenda:
-    - Deve ser possível editar completamente um evento ao clicar nele.
-    - Todas as informações do evento devem ser exibidas corretamente.
-
-  - Corrigir erro de "Invalid Date" na visualização da Agenda.
-
-  - Na visualização de Mês:
-    - Os dados estão sendo retornados pela API, porém os eventos não estão sendo renderizados.
-
-  - Na visualização de Semana:
-    - Os dados estão sendo retornados pela API, porém os eventos não estão sendo renderizados.
-
-  - Quando alterar o dia selecionado, os eventos não estão sendo atualizados corretamente.
-
-  - Corrigir erro 500 ao tentar duplicar um evento.
-
-  - Implementar suporte a arrastar e soltar (drag and drop) para alterar data ou horário dos eventos.
-
-  - Ao clicar em um evento:
-    - Deve abrir um **HoverCard** semelhante ao Google Calendar.
-    - O card deve conter:
-      - Informações do evento
-      - Botões de **editar**, **remover** e **duplicar**.
-
-  - Ao clicar em um espaço vazio do calendário:
-    - Deve abrir um **HoverCard para criação de evento**.
-    - A data (e horário, quando aplicável) deve ser preenchida automaticamente.
-
-  - No modo **Dia**, ao clicar em um espaço vazio:
-    - O horário correspondente ao local clicado deve ser utilizado para criar o evento.
-
-  - A seleção de data deve ser facilitada nos modos **Semana** e **Mês**, onde há muitos dias visíveis.
-
-  - O layout da visualização **Semana** deve seguir o padrão do Google Calendar,
-    exibindo a grade de horários na lateral esquerda, semelhante ao modo Dia.
-
-  - Não é necessário manter três abas separadas (Agenda, Semana, Mês).
-    O gerenciamento deve ser centralizado em um único calendário com alternância de visualização.
-
-  - O usuário deve poder alternar entre **Dia / Semana / Mês**, e essa preferência deve ser persistida
-    para melhorar a experiência na próxima visita.
-
-  - O sistema deve seguir padrões de interação semelhantes ao **Google Calendar**,
-    já que a maioria dos usuários está familiarizada com esse modelo.
-
-  - O histórico dos eventos deve ser preservado para permitir visualização correta de dados passados,
-    mesmo após alterações.
-
-  ========================
-  🗂️ Calendários / Filtros
-  ========================
-
-  - A seção de calendários está ocupando muito espaço.
-    Deve ser **colapsada por padrão** e expandida apenas quando o usuário desejar.
-
-  - Ao clicar em um calendário:
-    - Ele deve ficar ativo e exibir apenas os eventos relacionados a ele.
-
-  - Deve ser possível selecionar **apenas um calendário por vez**.
-
-  - Ao remover a seleção:
-    - Todos os calendários devem voltar a ser exibidos.
-
-  - Hábitos devem ser considerados um **tipo de calendário**.
-    Assim, deve ser possível filtrar eventos apenas de hábitos.
-
-  - Os hábitos devem possuir **uma cor específica reservada**,
-    que não pode ser utilizada por calendários comuns,
-    facilitando a identificação visual.
-
-  ========================
-  🧠 Integração com Hábitos
-  ========================
-
-  - Hábitos com horário definido devem aparecer na agenda.
-
-  - Deve ser possível marcar diretamente no calendário se o hábito foi:
-    - Concluído
-    - Não concluído
-
-  - Deve ser possível alterar o horário de um hábito em um dia específico.
-
-  - Hábitos sem horário definido devem aparecer no topo do dia,
-    semelhante ao comportamento de **tarefas no Google Calendar**.
-
-  - Se um hábito fizer parte de um **empilhamento (habit stacking)**:
-    - Caso o primeiro hábito tenha horário definido,
-    - os demais hábitos devem aparecer empilhados abaixo dele,
-      utilizando o mesmo horário como referência visual.
-
-  ========================
-  🧭 Navegação / Layout
-  ========================
-
-  - A sidebar lateral de navegação deve iniciar **colapsada por padrão**.
-
-  - A sidebar deve expandir:
-    - ao passar o mouse sobre ela
-    - ou quando o usuário clicar para expandir manualmente.
-
-  ---
-
-  - Deve ser possível selecionar um icon como se fosse uma avatar para o Evento.
-
--->
