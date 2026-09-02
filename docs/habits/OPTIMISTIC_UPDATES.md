@@ -13,7 +13,8 @@
 | 3 | `POST /api/habits/log` não devolve o streak recalculado — é por isso que hoje o refetch completo "parece" necessário | 🟠 | Baixo | ✅ Corrigido |
 | 4 | As outras 10+ mutações de hábito (criar, editar, arquivar, stacks, tags, identidades) têm exatamente o mesmo problema, fora do escopo relatado | 🟡 | Médio | ✅ Corrigido (pedido depois numa mensagem separada) |
 | 5 | `useHabits.ts` não integra com a fila offline (`useMutationQueue`) — Agenda e Notas integram | 🔵 | Médio | ✅ Corrigido |
-| 6 | Efeito colateral do fix #1: sem o refetch completo (que forçava a `<BaseTree>` desmontar via o skeleton e remontar do zero), a árvore de hábitos parou de refletir visualmente a marcação — o usuário via o estado antigo até dar F5, mesmo com o dado já correto no servidor | 🔴 | Baixo | ✅ Corrigido |
+| 6 | Efeito colateral do fix #1, parte 1 (`he-tree`): a árvore de hábitos reconstruía o array inteiro a cada mudança, o que a própria lib avisa não ser confiável sob virtualização | 🔴 | Baixo | ✅ Corrigido |
+| 7 | Efeito colateral do fix #1, parte 2 (causa raiz real): `todayData`/`listData` são `shallowRef` desde o Nuxt 4 — as mutações otimistas escreviam em propriedades aninhadas (`todayData.value.habits[i] = x`), o que não dispara reatividade nenhuma. O item 6 sozinho não resolvia porque `props.habits` nunca chegava a mudar de referência | 🔴 | Médio | ✅ Corrigido |
 
 ---
 
@@ -234,18 +235,48 @@ Essas ações são mais raras (criar/editar hábito, não marcar todo dia), ent�
 
 Itens 1-3 resolvem o que foi relatado. 4 é bônus de paridade com Agenda/Notas. 5 é follow-up opcional.
 
-## 6. 🔴 Regressão pós-fix: marcar como feito não atualiza a tela sem F5 (2026-09-02)
+## 6. 🔴 Regressão pós-fix, parte 1: `@he-tree/vue` não re-renderiza sob virtualização (2026-09-02)
 
 ### 6.1 O problema relatado
 
 > "em hábitos, quando marco um hábito como feito, não está atualizando como se estivesse feito, tenho que dar f5 para ver o estado de feito."
 
-### 6.2 Causa raiz
+### 6.2 Causa (necessária, mas — como a seção 7 mostra — não suficiente sozinha)
 
 Efeito colateral direto do fix da seção 1: antes, marcar um hábito disparava `refreshToday()` — um refetch completo que trocava `todayStatus` para `'pending'`, o que fazia `TodayList.vue` esconder `<BaseTree>` atrás do `v-if="loading"` e remontá-lo do zero quando os dados novos chegavam. Uma remontagem completa sempre renderiza certo, então isso mascarava um problema que já existia por baixo: `TodayList.vue`/`AllList.vue` reconstroem `treeData` inteiro (`treeData.value = buildTreeData()`, um array novo com objetos de nó novos) toda vez que `props.habits` muda — inclusive numa mera marcação de "feito".
 
-Com `logHabit()` agora otimista (`todayData.value.habits[i] = {...}` — sem refetch, sem loading, `<BaseTree>` nunca desmonta), essa reconstrução por inteiro passou a ser a *única* forma de o componente `@he-tree/vue` (`BaseTree`) saber que algo mudou — e a própria documentação da lib avisa que isso não é confiável sob virtualização (ativada quando há mais de 12 hábitos, `virtualizationEnabled`, `TodayList.vue`/`AllList.vue`): "it's safer to modify existing node objects in place rather than wholesale array replacement" — substituir o array inteiro não garante o re-render de linhas virtualizadas já visíveis.
+Com `logHabit()` agora otimista (sem refetch, sem loading, `<BaseTree>` nunca desmonta), essa reconstrução por inteiro passou a ser a *única* forma de o componente `@he-tree/vue` (`BaseTree`) saber que algo mudou — e a própria documentação da lib avisa que isso não é confiável sob virtualização (ativada quando há mais de 12 hábitos, `virtualizationEnabled`, `TodayList.vue`/`AllList.vue`): "it's safer to modify existing node objects in place rather than wholesale array replacement" — substituir o array inteiro não garante o re-render de linhas virtualizadas já visíveis.
 
 ### 6.3 Fix aplicado
 
 Em `TodayList.vue` e `AllList.vue`: o `watch(() => [props.habits, props.stacks], ...)` agora só reconstrói `treeData` do zero quando a *forma* da árvore muda de fato (hábito adicionado/removido, `sortOrder` mudou, ou uma relação de empilhamento mudou — comparado via uma assinatura `structuralSignature()`). Para qualquer outra mudança (log, streak, nome editado, nota) — o caso comum de marcar como feito — os objetos de nó existentes são mutados no lugar (`patchTreeDataInPlace`, `node.habit = updated`), sem trocar a referência do array nem criar objetos novos, seguindo exatamente a recomendação da documentação da lib para atualização reativa sob virtualização.
+
+**Isso não resolveu o problema sozinho** — o usuário confirmou que continuava igual depois desse fix. A razão está na seção 7: `props.habits` nunca sequer chegava a mudar de referência, então esse fix (por mais correto que fosse) nunca tinha a chance de entrar em ação.
+
+## 7. 🔴 Regressão pós-fix, parte 2 (causa raiz real): `useFetch` é `shallowRef` no Nuxt 4 (2026-09-02)
+
+### 7.1 O problema relatado (mesmo, confirmado que persistia)
+
+> "de hábitos ainda está estranho, estou marcando, parece até a notificação que foi marcado com sucesso, mas continua sem mudar o estado do hábito. Tinha pedido para resolver anteriormente."
+
+O toast de sucesso aparecia (a mutação chegava ao servidor e voltava certo — `runOptimisticAction` completava o fluxo inteiro), mas a tela nunca refletia. F5 sempre mostrava o estado certo.
+
+### 7.2 Causa raiz
+
+**O Nuxt 4 mudou o padrão de `useFetch`/`useAsyncData`: o ref `data` agora é `shallowRef`, não profundamente reativo como era no Nuxt 3.** Confirmado no changelog/docs do Nuxt 4 — dá pra optar por reatividade profunda de novo com `{ deep: true }`, mas isso não está configurado em `useHabits.ts`.
+
+Sob um `shallowRef`, só reatribuir `.value` inteiro dispara reatividade — mutar uma propriedade aninhada não dispara nada. E era exatamente isso que `logHabit`/`updateHabit`/`archiveHabit`/`restoreHabit` faziam:
+
+```ts
+// Não dispara reatividade nenhuma sob shallowRef — Vue nunca fica sabendo
+todayData.value.habits[habitIndex] = { ...previousHabit, log: optimisticLog }
+todayData.value.habits = todayData.value.habits.filter(h => h.id !== id)
+```
+
+`createIdentity`/`createTag`/`silentRefreshAfterStackChange` nunca tiveram esse problema porque sempre reatribuíam o `.value` inteiro (`identities.value = [...]`, `todayData.value = data`) — por isso pareciam funcionar normalmente, e por isso o padrão-ouro do projeto (`useAppointments.ts`/`useSchedulingPages.ts`, um `reactive(new Map())` à parte, nunca tocando o `.value` bruto do `useFetch`) nunca teve esse bug: aquele padrão foi desenhado, por outro motivo (dedupe de paginação), mas por acidente também contorna esse problema do Nuxt 4.
+
+A seção 6 não estava errada — só não era suficiente: com `todayData.value` nunca trocando de referência, `props.habits` (passado de `index.vue` pra `TodayList.vue`) também nunca trocava, então nem chegava a acionar o watch que decide entre reconstruir a árvore ou aplicar o patch em linha.
+
+### 7.3 Fix aplicado
+
+Em `useHabits.ts`, `logHabit`/`updateHabit`/`archiveHabit`/`restoreHabit` (`apply`/`rollback`/`reconcile`) passam a reatribuir `todayData.value`/`listData.value` por inteiro (`todayData.value = { ...todayData.value, habits: replaceAt(...) }`) em vez de mutar `habits`/`data` no lugar. Helper novo `replaceAt(list, index, value)` no topo do arquivo. Com isso, `props.habits` passa a mudar de referência de verdade a cada marcação — e aí sim o fix da seção 6 (patch em linha na árvore) entra em ação.

@@ -28,6 +28,20 @@ import type {
 import { HabitDifficulty, HabitFrequency, HabitLogStatus, HabitType } from '~/types/habits'
 import { PostHogEvent } from '~/types/analytics'
 
+// Nuxt 4 defaults useFetch/useAsyncData's `data` ref to shallow (was deep in
+// Nuxt 3) — mutating a nested property (`todayData.value.habits[i] = x`,
+// `todayData.value.habits = [...]`) triggers NO reactivity at all, only
+// reassigning `.value` itself does. Every optimistic mutation below must
+// therefore rebuild a brand-new top-level object for `todayData`/`listData`
+// rather than touching their nested arrays in place — this helper is the
+// "replace one item, new array" building block for that.
+// See docs/habits/OPTIMISTIC_UPDATES.md §7 for the full incident writeup —
+// this is what made marking a habit done show a success toast but never
+// visually update until a hard refresh.
+function replaceAt<T>(list: T[], index: number, value: T): T[] {
+  return list.map((item, i) => (i === index ? value : item))
+}
+
 // Shape of POST /api/habits/log's response — the raw `habit_logs` row
 // (snake_case, straight from Supabase) plus the recalculated streak, used by
 // logHabit()'s reconcile step (see docs/habits/OPTIMISTIC_UPDATES.md).
@@ -255,22 +269,30 @@ function _useHabits() {
     const result = await runOptimisticAction<Habit>({
       apply: () => {
         if (todayIndex >= 0 && todayData.value) {
-          todayData.value.habits[todayIndex] = applyPatch(todayData.value.habits[todayIndex]!)
+          todayData.value = { ...todayData.value, habits: replaceAt(todayData.value.habits, todayIndex, applyPatch(todayData.value.habits[todayIndex]!)) }
         }
         if (listIndex >= 0 && listData.value) {
-          listData.value.data[listIndex] = applyPatch(listData.value.data[listIndex]!)
+          listData.value = { ...listData.value, data: replaceAt(listData.value.data, listIndex, applyPatch(listData.value.data[listIndex]!)) }
         }
       },
       rollback: () => {
-        if (todayIndex >= 0 && todayData.value && previousToday) todayData.value.habits[todayIndex] = previousToday
-        if (listIndex >= 0 && listData.value && previousList) listData.value.data[listIndex] = previousList
+        if (todayIndex >= 0 && todayData.value && previousToday) {
+          todayData.value = { ...todayData.value, habits: replaceAt(todayData.value.habits, todayIndex, previousToday) }
+        }
+        if (listIndex >= 0 && listData.value && previousList) {
+          listData.value = { ...listData.value, data: replaceAt(listData.value.data, listIndex, previousList) }
+        }
       },
       request: () => $fetch<Habit>(`/api/habits/${id}`, { method: 'PUT', body: payload }),
       reconcile: (habit) => {
         const idxToday = todayData.value?.habits.findIndex(h => h.id === id) ?? -1
         const idxList = listData.value?.data.findIndex(h => h.id === id) ?? -1
-        if (idxToday >= 0 && todayData.value) todayData.value.habits[idxToday] = { ...todayData.value.habits[idxToday], ...habit }
-        if (idxList >= 0 && listData.value) listData.value.data[idxList] = habit
+        if (idxToday >= 0 && todayData.value) {
+          todayData.value = { ...todayData.value, habits: replaceAt(todayData.value.habits, idxToday, { ...todayData.value.habits[idxToday], ...habit }) }
+        }
+        if (idxList >= 0 && listData.value) {
+          listData.value = { ...listData.value, data: replaceAt(listData.value.data, idxList, habit) }
+        }
       },
       errorMessage: 'Não foi possível atualizar o hábito'
     })
@@ -298,28 +320,40 @@ function _useHabits() {
     const result = await runOptimisticAction<unknown>({
       apply: () => {
         if (previousTodayHabit && todayData.value) {
-          todayData.value.habits = todayData.value.habits.filter(h => h.id !== id)
-          todayData.value.totalCount = Math.max(0, todayData.value.totalCount - 1)
-          if (previousTodayHabit.log?.completed) {
-            todayData.value.completedCount = Math.max(0, todayData.value.completedCount - 1)
+          todayData.value = {
+            ...todayData.value,
+            habits: todayData.value.habits.filter(h => h.id !== id),
+            totalCount: Math.max(0, todayData.value.totalCount - 1),
+            completedCount: previousTodayHabit.log?.completed
+              ? Math.max(0, todayData.value.completedCount - 1)
+              : todayData.value.completedCount
           }
         }
         // Archived habits don't belong in the active list — only strip it
         // out here if that's actually the view currently loaded.
         if (previousListHabit && listData.value && !listArchived.value) {
-          listData.value.data = listData.value.data.filter(h => h.id !== id)
-          listData.value.total = Math.max(0, listData.value.total - 1)
+          listData.value = {
+            ...listData.value,
+            data: listData.value.data.filter(h => h.id !== id),
+            total: Math.max(0, listData.value.total - 1)
+          }
         }
       },
       rollback: () => {
         if (previousTodayHabit && todayData.value) {
-          todayData.value.habits = [...todayData.value.habits, previousTodayHabit]
-          todayData.value.totalCount = previousTodayTotal
-          todayData.value.completedCount = previousCompletedCount
+          todayData.value = {
+            ...todayData.value,
+            habits: [...todayData.value.habits, previousTodayHabit],
+            totalCount: previousTodayTotal,
+            completedCount: previousCompletedCount
+          }
         }
         if (previousListHabit && listData.value) {
-          listData.value.data = [...listData.value.data, previousListHabit]
-          listData.value.total = previousListTotal
+          listData.value = {
+            ...listData.value,
+            data: [...listData.value.data, previousListHabit],
+            total: previousListTotal
+          }
         }
       },
       request: () => $fetch(`/api/habits/${id}`, { method: 'DELETE' }),
@@ -343,14 +377,20 @@ function _useHabits() {
     const result = await runOptimisticAction<unknown>({
       apply: () => {
         if (previousListHabit && listData.value && listArchived.value) {
-          listData.value.data = listData.value.data.filter(h => h.id !== id)
-          listData.value.total = Math.max(0, listData.value.total - 1)
+          listData.value = {
+            ...listData.value,
+            data: listData.value.data.filter(h => h.id !== id),
+            total: Math.max(0, listData.value.total - 1)
+          }
         }
       },
       rollback: () => {
         if (previousListHabit && listData.value) {
-          listData.value.data = [...listData.value.data, previousListHabit]
-          listData.value.total = previousListTotal
+          listData.value = {
+            ...listData.value,
+            data: [...listData.value.data, previousListHabit],
+            total: previousListTotal
+          }
         }
       },
       request: () => $fetch(`/api/habits/${id}/restore`, { method: 'POST' }),
@@ -395,14 +435,20 @@ function _useHabits() {
 
     const result = await runOptimisticAction<HabitLogResult>({
       apply: () => {
-        todayData.value!.habits[habitIndex] = { ...previousHabit, log: optimisticLog }
-        if (payload.completed !== wasCompleted) {
-          todayData.value!.completedCount += payload.completed ? 1 : -1
+        todayData.value = {
+          ...todayData.value!,
+          habits: replaceAt(todayData.value!.habits, habitIndex, { ...previousHabit, log: optimisticLog }),
+          completedCount: payload.completed !== wasCompleted
+            ? todayData.value!.completedCount + (payload.completed ? 1 : -1)
+            : todayData.value!.completedCount
         }
       },
       rollback: () => {
-        todayData.value!.habits[habitIndex] = previousHabit
-        todayData.value!.completedCount = previousCompletedCount
+        todayData.value = {
+          ...todayData.value!,
+          habits: replaceAt(todayData.value!.habits, habitIndex, previousHabit),
+          completedCount: previousCompletedCount
+        }
       },
       request: () => $fetch<HabitLogResult>('/api/habits/log', {
         method: 'POST',
@@ -416,7 +462,7 @@ function _useHabits() {
         const idx = todayData.value?.habits.findIndex(h => h.id === payload.habitId) ?? -1
         if (idx < 0 || !todayData.value) return
         const current = todayData.value.habits[idx]!
-        todayData.value.habits[idx] = {
+        const reconciled: TodayHabit = {
           ...current,
           log: {
             ...optimisticLog,
@@ -435,6 +481,7 @@ function _useHabits() {
               }
             : current.streak
         }
+        todayData.value = { ...todayData.value, habits: replaceAt(todayData.value.habits, idx, reconciled) }
       },
       errorMessage: 'Não foi possível registrar o hábito',
       offline: {
