@@ -124,10 +124,46 @@ function buildTreeData(): HabitSortableTreeNode[] {
   return roots
 }
 
+// Same fix as TodayList.vue's identical tree — only rebuild `treeData`
+// wholesale when its *shape* changes; otherwise patch existing node
+// objects' `.habit` in place. `he-tree`'s own docs warn that replacing the
+// whole bound array doesn't reliably re-render already-visible virtualized
+// rows, only patching existing node objects does — see the longer comment
+// in TodayList.vue for how this manifested (habit edits/archives not
+// showing up without a hard refresh once optimistic updates stopped
+// forcing a full remount via the loading skeleton).
+function patchTreeDataInPlace(nodes: HabitSortableTreeNode[], habitsById: Map<string, Habit>): void {
+  for (const node of nodes) {
+    const updated = habitsById.get(node.id)
+    if (updated) node.habit = updated
+    if (node.children.length) patchTreeDataInPlace(node.children, habitsById)
+  }
+}
+
+function structuralSignature(): string {
+  const habitsKey = [...(props.habits ?? [])]
+    .map(h => `${h.id}:${h.sortOrder}`)
+    .sort()
+    .join(',')
+  const stacksKey = (props.stacks ?? [])
+    .map(s => `${s.triggerHabitId}>${s.newHabitId}`)
+    .sort()
+    .join(',')
+  return `${habitsKey}|${stacksKey}`
+}
+
+let lastStructuralSignature = ''
+
 watch(
   () => [props.habits, props.stacks],
   () => {
-    treeData.value = buildTreeData()
+    const signature = structuralSignature()
+    if (signature !== lastStructuralSignature) {
+      lastStructuralSignature = signature
+      treeData.value = buildTreeData()
+      return
+    }
+    patchTreeDataInPlace(treeData.value, new Map((props.habits ?? []).map(h => [h.id, h])))
   },
   { immediate: true, deep: true }
 )

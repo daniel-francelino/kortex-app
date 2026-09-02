@@ -162,10 +162,54 @@ function buildTreeData(): TodayTreeNode[] {
   return roots
 }
 
+// Rebuilding `treeData` wholesale on every change (the old behavior here)
+// fed `he-tree` a brand-new array of brand-new node objects on every single
+// habit toggle. That's exactly the anti-pattern its own docs warn against
+// under virtualization ("safer to modify existing node objects in place
+// rather than wholesale array replacement" — replacing the array doesn't
+// reliably re-render already-visible virtualized rows). This is why marking
+// a habit done stopped visually updating once logHabit() became optimistic
+// (useHabits.ts) instead of going through a full refreshToday(): the old
+// code path forced a fresh mount of <BaseTree> via the loading skeleton
+// (v-if="loading" swaps it out and back in), which masked this. Now that
+// there's no loading flash, the live in-place update has to actually work.
+//
+// So: only rebuild the tree from scratch when its *shape* changes (a habit
+// was added/removed, a stack relationship changed, or sort order changed) —
+// for everything else (a log, a streak, a name edit), patch the existing
+// node objects' `.habit` in place, leaving the array/node identities alone.
+function patchTreeDataInPlace(nodes: TodayTreeNode[], habitsById: Map<string, TodayHabit>): void {
+  for (const node of nodes) {
+    const updated = habitsById.get(node.id)
+    if (updated) node.habit = updated
+    if (node.children.length) patchTreeDataInPlace(node.children, habitsById)
+  }
+}
+
+function structuralSignature(): string {
+  const habitsKey = [...(props.habits ?? [])]
+    .map(h => `${h.id}:${h.sortOrder}`)
+    .sort()
+    .join(',')
+  const stacksKey = (props.stacks ?? [])
+    .map(s => `${s.triggerHabitId}>${s.newHabitId}`)
+    .sort()
+    .join(',')
+  return `${habitsKey}|${stacksKey}`
+}
+
+let lastStructuralSignature = ''
+
 watch(
   () => [props.habits, props.stacks],
   () => {
-    treeData.value = buildTreeData()
+    const signature = structuralSignature()
+    if (signature !== lastStructuralSignature) {
+      lastStructuralSignature = signature
+      treeData.value = buildTreeData()
+      return
+    }
+    patchTreeDataInPlace(treeData.value, new Map((props.habits ?? []).map(h => [h.id, h])))
   },
   { immediate: true, deep: true }
 )

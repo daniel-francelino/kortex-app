@@ -13,6 +13,7 @@
 | 3 | `POST /api/habits/log` não devolve o streak recalculado — é por isso que hoje o refetch completo "parece" necessário | 🟠 | Baixo | ✅ Corrigido |
 | 4 | As outras 10+ mutações de hábito (criar, editar, arquivar, stacks, tags, identidades) têm exatamente o mesmo problema, fora do escopo relatado | 🟡 | Médio | ✅ Corrigido (pedido depois numa mensagem separada) |
 | 5 | `useHabits.ts` não integra com a fila offline (`useMutationQueue`) — Agenda e Notas integram | 🔵 | Médio | ✅ Corrigido |
+| 6 | Efeito colateral do fix #1: sem o refetch completo (que forçava a `<BaseTree>` desmontar via o skeleton e remontar do zero), a árvore de hábitos parou de refletir visualmente a marcação — o usuário via o estado antigo até dar F5, mesmo com o dado já correto no servidor | 🔴 | Baixo | ✅ Corrigido |
 
 ---
 
@@ -232,3 +233,19 @@ Essas ações são mais raras (criar/editar hábito, não marcar todo dia), ent�
 5. *(Opcional, não relatado)* Repetir o padrão nas demais mutações da seção 4, se algum dia incomodar.
 
 Itens 1-3 resolvem o que foi relatado. 4 é bônus de paridade com Agenda/Notas. 5 é follow-up opcional.
+
+## 6. 🔴 Regressão pós-fix: marcar como feito não atualiza a tela sem F5 (2026-09-02)
+
+### 6.1 O problema relatado
+
+> "em hábitos, quando marco um hábito como feito, não está atualizando como se estivesse feito, tenho que dar f5 para ver o estado de feito."
+
+### 6.2 Causa raiz
+
+Efeito colateral direto do fix da seção 1: antes, marcar um hábito disparava `refreshToday()` — um refetch completo que trocava `todayStatus` para `'pending'`, o que fazia `TodayList.vue` esconder `<BaseTree>` atrás do `v-if="loading"` e remontá-lo do zero quando os dados novos chegavam. Uma remontagem completa sempre renderiza certo, então isso mascarava um problema que já existia por baixo: `TodayList.vue`/`AllList.vue` reconstroem `treeData` inteiro (`treeData.value = buildTreeData()`, um array novo com objetos de nó novos) toda vez que `props.habits` muda — inclusive numa mera marcação de "feito".
+
+Com `logHabit()` agora otimista (`todayData.value.habits[i] = {...}` — sem refetch, sem loading, `<BaseTree>` nunca desmonta), essa reconstrução por inteiro passou a ser a *única* forma de o componente `@he-tree/vue` (`BaseTree`) saber que algo mudou — e a própria documentação da lib avisa que isso não é confiável sob virtualização (ativada quando há mais de 12 hábitos, `virtualizationEnabled`, `TodayList.vue`/`AllList.vue`): "it's safer to modify existing node objects in place rather than wholesale array replacement" — substituir o array inteiro não garante o re-render de linhas virtualizadas já visíveis.
+
+### 6.3 Fix aplicado
+
+Em `TodayList.vue` e `AllList.vue`: o `watch(() => [props.habits, props.stacks], ...)` agora só reconstrói `treeData` do zero quando a *forma* da árvore muda de fato (hábito adicionado/removido, `sortOrder` mudou, ou uma relação de empilhamento mudou — comparado via uma assinatura `structuralSignature()`). Para qualquer outra mudança (log, streak, nome editado, nota) — o caso comum de marcar como feito — os objetos de nó existentes são mutados no lugar (`patchTreeDataInPlace`, `node.habit = updated`), sem trocar a referência do array nem criar objetos novos, seguindo exatamente a recomendação da documentação da lib para atualização reativa sob virtualização.
