@@ -48,6 +48,11 @@ const {
 const { setCompleted, startIfNeeded } = useGuidedTour()
 const { consumeHabitHandoff, pendingHabitHandoff } = useOnboarding()
 
+// Same breakpoint/pattern as the Agenda and Agendamento mobile "+" button
+// (app/pages/app/appointments.vue, app/pages/app/scheduling.vue) — a fixed
+// floating button instead of a cramped icon inside the navbar.
+const isMobile = useMediaQuery('(max-width: 1023px)')
+
 // ─── Active tab ───────────────────────────────────────────────────────────────
 const activeTab = ref('today')
 
@@ -649,17 +654,10 @@ onBeforeUnmount(() => {
                 class="hidden sm:inline-flex"
               />
               <UButton
-                icon="i-lucide-plus"
-                square
-                data-tour="habits-create-button-mobile"
-                class="flex sm:hidden items-center justify-center"
-                @click="createModalOpen = true"
-              />
-              <UButton
+                v-if="!isMobile"
                 label="Novo hábito"
                 icon="i-lucide-plus"
                 data-tour="habits-create-button-desktop"
-                class="hidden sm:inline-flex"
                 @click="createModalOpen = true"
               />
             </div>
@@ -796,6 +794,22 @@ onBeforeUnmount(() => {
       </div>
     </template>
   </UDashboardPanel>
+
+  <!-- Mobile: floating "new habit" button, replaces the navbar action (same pattern as Agenda/Agendamento) -->
+  <UButton
+    v-if="isMobile"
+    icon="i-lucide-plus"
+    size="xl"
+    square
+    class="fixed z-30 size-14 items-center justify-center rounded-full shadow-lg shadow-black/30"
+    :style="{
+      right: 'calc(1rem + var(--safe-area-right, 0px))',
+      bottom: 'calc(var(--mobile-bottom-nav-height, 4.75rem) + 1rem)'
+    }"
+    aria-label="Novo hábito"
+    data-tour="habits-create-button-mobile"
+    @click="createModalOpen = true"
+  />
 
   <!-- Slideover first so modals render on top -->
   <HabitsDetailSlideover
