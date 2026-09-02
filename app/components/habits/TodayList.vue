@@ -51,8 +51,15 @@ function submitNote(status: HabitLogStatus) {
   noteText.value = ''
 }
 
+// "Pular" (Skipped) e "Congelar" (Frozen) ficam fora do modal — não são uma
+// escolha manual: Skipped é o que o servidor já grava sozinho quando um
+// hábito não é marcado (log.post.ts: status = payload.status ?? (completed
+// ? 'done' : 'skipped')), e Frozen tem regra de negócio própria (limite
+// mensal, log.post.ts) que faz mais sentido o backend decidir do que o
+// usuário escolher num botão.
+const NOTE_MODAL_STATUSES = [HabitLogStatus.Done, HabitLogStatus.DoneLater]
 const statusButtons = computed(() =>
-  Object.values(HabitLogStatus).map(s => ({
+  NOTE_MODAL_STATUSES.map(s => ({
     status: s,
     ...LOG_STATUS_META[s]
   }))
