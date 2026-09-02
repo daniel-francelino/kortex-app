@@ -273,15 +273,15 @@ async function saveWithScope(scope: 'this' | 'this-and-following' | 'all') {
   saving.value = true
   try {
     let success = false
-    // modifyOccurrence/splitSeries hit the API directly with no optimistic
-    // local update (out of the offline-optimistic scope, see useAppointments.ts),
-    // so the parent genuinely needs a refetch to see the result — unlike the
-    // `all` scope below, which goes through the shared, optimistic updateEvent().
+    // splitSeries hits the API directly with no optimistic local update (out
+    // of the offline-optimistic scope, see useAppointments.ts), so the parent
+    // genuinely needs a refetch to see the result. modifyOccurrence (the
+    // `this` scope) and updateEvent (the `all` scope below) both apply/
+    // reconcile against the shared store optimistically, so neither needs one.
     let needsRefetch = false
 
     if (scope === 'this') {
       success = await modifyOccurrence(props.event.id, { recurrenceId, ...pending })
-      needsRefetch = success
     } else if (scope === 'this-and-following') {
       success = await splitSeries(props.event.id, { recurrenceId, ...pending })
       needsRefetch = success

@@ -25,7 +25,7 @@ const emit = defineEmits<{
   selectEvent: [event: CalendarEvent, mouseEvent: MouseEvent]
   selectSlot: [date: string, time: string, mouseEvent: MouseEvent]
   dayChange: [from: string, to: string]
-  dropEvent: [eventId: string, newStartAt: string, newEndAt: string]
+  dropEvent: [eventId: string, newStartAt: string, newEndAt: string, recurrenceId: string | null]
 }>()
 
 const viewDate = ref(new Date(props.currentDate))
@@ -250,7 +250,7 @@ function commitDrop() {
   const dateStr = formatDate(newStart)
   const startTime = format(newStart, 'HH:mm')
   const endTime = format(newEnd, 'HH:mm')
-  emit('dropEvent', drag.event.id, zonedDateTimeToUtcIso(dateStr, startTime, timeZone), zonedDateTimeToUtcIso(formatDate(newEnd), endTime, timeZone))
+  emit('dropEvent', drag.event.id, zonedDateTimeToUtcIso(dateStr, startTime, timeZone), zonedDateTimeToUtcIso(formatDate(newEnd), endTime, timeZone), drag.event.recurrenceId ?? null)
 }
 
 function endDrag() {

@@ -16,7 +16,7 @@ const emit = defineEmits<{
   selectSlot: [date: string, mouseEvent: MouseEvent]
   expandDay: [date: string, events: CalendarEvent[], mouseEvent: MouseEvent]
   monthChange: [from: string, to: string]
-  dropEvent: [eventId: string, newDate: string]
+  dropEvent: [eventId: string, newDate: string, recurrenceId: string | null]
 }>()
 
 // ─── Helpers ──────────────────────────────────────────────────────────────
@@ -140,7 +140,7 @@ function onPointerUp(e: PointerEvent) {
   const targetDate = targetDateFromPoint(e.clientX, e.clientY)
   const original = formatZonedDateKey(dragEvent.value.startAt, getEventTimeZone(dragEvent.value))
   if (targetDate && targetDate !== original) {
-    emit('dropEvent', dragEvent.value.id, targetDate)
+    emit('dropEvent', dragEvent.value.id, targetDate, dragEvent.value.recurrenceId ?? null)
   }
   endDrag()
 }

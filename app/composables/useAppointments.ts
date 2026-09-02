@@ -821,17 +821,56 @@ function _useAppointments() {
   }
 
   async function modifyOccurrence(eventId: string, payload: ModifyOccurrencePayload): Promise<boolean> {
-    try {
-      await $fetch(`/api/appointments/events/${eventId}/modify-occurrence`, {
+    // Unlike updateEvent (whole series), this only touches the single
+    // occurrence keyed by payload.recurrenceId — used by the "Somente esta"
+    // scope in the edit modal, and by drag-and-drop when the dragged card
+    // belongs to a recurring series (onEventDrop/onMonthEventDrop in
+    // appointments.vue). Optimistic apply/rollback here is what keeps a drag
+    // feeling instant instead of the card snapping back to its old slot until
+    // the request resolves — the endpoint itself returns the raw
+    // event_exceptions row, not a normalized event, so there's nothing useful
+    // to reconcile with; the optimistic value is left standing on success.
+    const key = payload.recurrenceId
+    const previous = eventsByKey.get(key)
+    const wasInView = viewEventKeys.value.includes(key)
+    const now = new Date().toISOString()
+
+    const optimisticEvent: CalendarEvent | null = previous
+      ? {
+          ...previous,
+          title: payload.title !== undefined ? payload.title : previous.title,
+          description: payload.description !== undefined ? payload.description : previous.description,
+          location: payload.location !== undefined ? payload.location : previous.location,
+          startAt: payload.startAt !== undefined ? payload.startAt : previous.startAt,
+          endAt: payload.endAt !== undefined ? payload.endAt : previous.endAt,
+          updatedAt: now
+        }
+      : null
+
+    const result = await runOptimisticAction<unknown>({
+      apply: () => {
+        if (!optimisticEvent) return
+        upsertEventInStore(optimisticEvent)
+        const nowInView = isEventInCurrentView(optimisticEvent)
+        if (nowInView && !wasInView) viewEventKeys.value = [...viewEventKeys.value, key]
+        else if (!nowInView && wasInView) viewEventKeys.value = viewEventKeys.value.filter(k => k !== key)
+      },
+      rollback: () => {
+        if (!previous) return
+        upsertEventInStore(previous)
+        const stillInView = viewEventKeys.value.includes(key)
+        if (wasInView && !stillInView) viewEventKeys.value = [...viewEventKeys.value, key]
+        else if (!wasInView && stillInView) viewEventKeys.value = viewEventKeys.value.filter(k => k !== key)
+      },
+      request: () => $fetch(`/api/appointments/events/${eventId}/modify-occurrence`, {
         method: 'POST',
         body: payload
-      })
-      toast.add({ title: 'Ocorrência atualizada', color: 'success' })
-      return true
-    } catch {
-      toast.add({ title: 'Erro', description: 'Não foi possível atualizar a ocorrência', color: 'error' })
-      return false
-    }
+      }),
+      errorMessage: 'Não foi possível atualizar a ocorrência'
+    })
+
+    if (result) toast.add({ title: 'Ocorrência atualizada', color: 'success' })
+    return result !== null
   }
 
   async function splitSeries(eventId: string, payload: SplitSeriesPayload): Promise<boolean> {

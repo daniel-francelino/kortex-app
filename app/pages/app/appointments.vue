@@ -35,6 +35,7 @@ const {
   refreshEvents,
   createEvent,
   updateEvent,
+  modifyOccurrence,
   archiveEvent,
   archiveCalendar,
   restoreCalendar,
@@ -550,17 +551,28 @@ async function onRestoreCalendar(calendar: Calendar) {
   await restoreCalendar(calendar.id)
 }
 
-async function onEventDrop(eventId: string, newStartAt: string, newEndAt: string) {
+async function onEventDrop(eventId: string, newStartAt: string, newEndAt: string, recurrenceId: string | null) {
   if (eventId.startsWith('journal-')) return
-  // Like useNotes' updateNote(), updateEvent() already applies the change to
-  // the local store optimistically and reconciles it with the server's
-  // response — no refreshEvents() needed here. A drag-and-drop refetch used
-  // to flip eventsStatus to 'pending' and swap the whole calendar body for a
-  // loading skeleton mid-drag.
+  // Like useNotes' updateNote(), updateEvent()/modifyOccurrence() already
+  // apply the change to the local store optimistically and reconcile it —
+  // no refreshEvents() needed here. A drag-and-drop refetch used to flip
+  // eventsStatus to 'pending' and swap the whole calendar body for a loading
+  // skeleton mid-drag.
+  //
+  // The dragged card is one occurrence of a series when recurrenceId is set
+  // — updateEvent() edits the whole series (same primitive as the "Todas as
+  // ocorrências" scope in the edit modal), which used to fire on every drag
+  // regardless of which occurrence was moved. modifyOccurrence() scopes the
+  // change to just that occurrence, same as dragging an event in Google
+  // Calendar never asks "apply to which occurrences?".
+  if (recurrenceId) {
+    await modifyOccurrence(eventId, { recurrenceId, startAt: newStartAt, endAt: newEndAt })
+    return
+  }
   await updateEvent(eventId, { startAt: newStartAt, endAt: newEndAt })
 }
 
-async function onMonthEventDrop(eventId: string, newDate: string) {
+async function onMonthEventDrop(eventId: string, newDate: string, recurrenceId: string | null) {
   if (eventId.startsWith('journal-')) return
   const event = eventsList.value.find(e => e.id === eventId)
   if (!event) return
@@ -573,10 +585,15 @@ async function onMonthEventDrop(eventId: string, newDate: string) {
   const newEnd = addMilliseconds(newStart, durationMs)
   const endDate = format(newEnd, 'yyyy-MM-dd')
   const endTime = format(newEnd, 'HH:mm')
-  await updateEvent(eventId, {
-    startAt: zonedDateTimeToUtcIso(newDate, startTime, timeZone),
-    endAt: zonedDateTimeToUtcIso(endDate, endTime, timeZone)
-  })
+  const startAt = zonedDateTimeToUtcIso(newDate, startTime, timeZone)
+  const endAt = zonedDateTimeToUtcIso(endDate, endTime, timeZone)
+  // See onEventDrop above: a recurring occurrence dragged in Month view must
+  // scope the change to itself, not the whole series.
+  if (recurrenceId) {
+    await modifyOccurrence(eventId, { recurrenceId, startAt, endAt })
+    return
+  }
+  await updateEvent(eventId, { startAt, endAt })
 }
 
 onMounted(() => {
