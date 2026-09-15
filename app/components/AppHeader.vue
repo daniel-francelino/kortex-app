@@ -15,10 +15,12 @@ function trackNavigation(label: string, target: string, location: 'header' | 'he
 const items = computed(() => route.path === '/' ? [{
   label: 'Recursos',
   to: '/#recursos',
+  exactHash: true,
   onSelect: () => trackNavigation('Recursos', '/#recursos', 'header')
 }, {
   label: 'Como funciona',
   to: '/#como-funciona',
+  exactHash: true,
   onSelect: () => trackNavigation('Como funciona', '/#como-funciona', 'header')
 }, {
   label: 'Planos',
