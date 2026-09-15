@@ -10,7 +10,6 @@ import { detectBrowserTimeZone, formatDisplay } from '#shared/utils/dateTime'
 const props = defineProps<{
   open: boolean
   calendars: Calendar[] | null | undefined
-  prefill?: { title: string, startAt: Date | null, location: string | null } | null
 }>()
 
 const emit = defineEmits<{
@@ -41,18 +40,18 @@ function formatLocalDate(date: Date): string {
 }
 
 function buildDefaults(): FormState {
-  const base = props.prefill?.startAt ?? new Date()
+  const base = new Date()
   const h = base.getHours()
-  const snapped = props.prefill?.startAt ? base.getMinutes() : Math.ceil(base.getMinutes() / 15) * 15
+  const snapped = Math.ceil(base.getMinutes() / 15) * 15
   const startH = snapped >= 60 ? h + 1 : h
   const startM = snapped >= 60 ? 0 : snapped
   const endH = startH + 1
 
   return {
     calendarId: props.calendars?.[0]?.id ?? '',
-    title: props.prefill?.title ?? '',
+    title: '',
     description: '',
-    location: props.prefill?.location ?? '',
+    location: '',
     startDate: formatLocalDate(base),
     startTime: `${String(startH).padStart(2, '0')}:${String(startM).padStart(2, '0')}`,
     endDate: formatLocalDate(base),

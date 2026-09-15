@@ -205,13 +205,7 @@ const calendarCreateOpen = ref(false)
 const calendarToEdit = ref<Calendar | null>(null)
 const calendarToArchive = ref<Calendar | null>(null)
 const eventCreateOpen = ref(false)
-const eventCreatePrefill = ref<{ title: string, startAt: Date | null, location: string | null } | null>(null)
 const eventDetailOpen = ref(false)
-
-function onQuickAddParsed(result: { title: string, startAt: Date | null, location: string | null }) {
-  eventCreatePrefill.value = result
-  eventCreateOpen.value = true
-}
 const eventDetailLoading = ref(false)
 const calendarsExpanded = ref(false)
 const isMobile = useMediaQuery('(max-width: 1023px)')
@@ -683,15 +677,12 @@ onMounted(() => {
             />
           </UDropdownMenu>
 
-          <!-- Quick add (natural language) -->
-          <AppointmentsQuickAddPopover @parsed="onQuickAddParsed" />
-
           <!-- New event (mobile: a floating action button takes over instead, see below) -->
           <UTooltip text="Novo evento" class="hidden lg:flex">
             <UButton
               square
               icon="i-lucide-plus"
-              @click="eventCreateOpen = true; eventCreatePrefill = null"
+              @click="eventCreateOpen = true"
             />
           </UTooltip>
 
@@ -823,7 +814,7 @@ onMounted(() => {
       bottom: 'calc(var(--mobile-bottom-nav-height, 4.75rem) + 1rem)'
     }"
     aria-label="Novo evento"
-    @click="eventCreateOpen = true; eventCreatePrefill = null"
+    @click="eventCreateOpen = true"
   />
 
   <!-- Calendar list: bottom drawer on mobile (mirrors the desktop sidebar above) -->
@@ -921,7 +912,6 @@ onMounted(() => {
   <AppointmentsEventCreateModal
     :open="eventCreateOpen"
     :calendars="calendars"
-    :prefill="eventCreatePrefill"
     @update:open="eventCreateOpen = $event"
     @created="refreshEvents"
   />
