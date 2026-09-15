@@ -25,6 +25,7 @@ const {
   eventsData,
   eventsStatus,
   eventsInitialLoading,
+  eventsRangeLoading,
   activeCalendarIds,
   viewFrom,
   viewTo,
@@ -72,15 +73,20 @@ watch(activeView, (v) => {
 // left the previous view's stale events on screen until it resolved. Track
 // "has this specific view's range loaded at least once" separately, so a
 // tab switched into for the first time gets its own skeleton, while
-// navigating within an already-visited view (next/prev/hoje) and background
-// refetches (create, drag-and-drop reconcile) keep the smooth no-flash
-// behavior `eventsInitialLoading` was originally built for.
+// background refetches (create, drag-and-drop reconcile) keep the smooth
+// no-flash behavior `eventsInitialLoading` was originally built for.
 const viewLoadedOnce = reactive<Record<CalendarViewMode, boolean>>({ day: false, week: false, month: false })
 watch(eventsStatus, (status) => {
   if (status !== 'pending') viewLoadedOnce[activeView.value] = true
 })
+// `eventsRangeLoading` (useAppointments.ts) covers the remaining gap: moving
+// to a different day/week/month WITHIN an already-visited view — previously
+// nothing signaled this at all, so the old date's events just sat there
+// until the new ones arrived, with no way to tell it was still loading.
 const activeViewLoading = computed(() =>
-  eventsInitialLoading.value || (!viewLoadedOnce[activeView.value] && eventsStatus.value === 'pending')
+  eventsInitialLoading.value
+  || (!viewLoadedOnce[activeView.value] && eventsStatus.value === 'pending')
+  || eventsRangeLoading.value
 )
 
 const viewModes: { label: string, value: CalendarViewMode, icon: string }[] = [

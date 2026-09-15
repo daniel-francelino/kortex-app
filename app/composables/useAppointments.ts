@@ -330,6 +330,19 @@ function _useAppointments() {
   // their place mid-interaction every time they change something.
   const eventsInitialLoading = computed(() => !eventsLoadedOnce.value && eventsStatus.value === 'pending')
 
+  // Unlike `eventsInitialLoading` above, this one DOES need to flip on every
+  // fetch — but only the ones caused by navigating to a different date range
+  // (prev/next/hoje, jumping to a date, switching Dia/Semana/Mês), not the
+  // ones caused by an optimistic mutation reconciling in the background
+  // (drag-and-drop, create, archive) — those call refreshEvents() directly,
+  // never through this watcher, so they never touch this flag. Without it,
+  // navigating within an already-visited view had zero loading feedback: the
+  // previous date's events just sat on screen until the new ones arrived.
+  const eventsRangeLoading = ref(false)
+  watch(eventsStatus, (status) => {
+    if (status !== 'pending') eventsRangeLoading.value = false
+  })
+
   const debouncedRefreshEvents = useDebounceFn(() => {
     if (!viewFrom.value && !viewTo.value) {
       return
@@ -344,6 +357,7 @@ function _useAppointments() {
     }
 
     eventsPage.value = 1
+    eventsRangeLoading.value = true
     refreshEvents()
   })
 
@@ -1120,6 +1134,7 @@ function _useAppointments() {
     eventsData,
     eventsStatus,
     eventsInitialLoading,
+    eventsRangeLoading,
     eventsPage,
     eventsPageSize,
     refreshEvents,
