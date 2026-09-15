@@ -371,7 +371,11 @@ function formatTimeRange(evt: CalendarEvent): string {
 </script>
 
 <template>
-  <USlideover
+  <!-- A side panel works well on desktop, but on a small viewport it ends up
+       feeling like an awkward full-height sliver — a centered modal reads
+       better once there's no room to the side. -->
+  <component
+    :is="isMobile ? 'UModal' : 'USlideover'"
     :open="open"
     @update:open="emit('update:open', $event)"
   >
@@ -823,5 +827,5 @@ function formatTimeRange(evt: CalendarEvent): string {
         </template>
       </UModal>
     </template>
-  </USlideover>
+  </component>
 </template>
