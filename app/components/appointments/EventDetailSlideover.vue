@@ -375,25 +375,15 @@ function formatTimeRange(evt: CalendarEvent): string {
     :open="open"
     @update:open="emit('update:open', $event)"
   >
-    <template #header>
-      <div class="flex w-full items-center justify-between gap-2">
-        <div class="flex min-w-0 items-center gap-2">
-          <span
-            class="inline-block size-3 shrink-0 rounded-full"
-            :style="{ backgroundColor: eventColor }"
-          />
-          <span class="max-lg:text-base lg:text-sm font-semibold text-highlighted truncate">
-            {{ event?.title ?? 'Detalhes do evento' }}
-          </span>
-        </div>
-        <UButton
-          icon="i-lucide-x"
-          :size="isMobile ? 'lg' : 'sm'"
-          color="neutral"
-          variant="ghost"
-          aria-label="Fechar"
-          @click="emit('update:open', false)"
+    <template #title>
+      <div class="flex min-w-0 items-center gap-2">
+        <span
+          class="inline-block size-3 shrink-0 rounded-full"
+          :style="{ backgroundColor: eventColor }"
         />
+        <span class="truncate">
+          {{ event?.title ?? 'Detalhes do evento' }}
+        </span>
       </div>
     </template>
 
