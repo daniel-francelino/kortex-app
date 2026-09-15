@@ -157,8 +157,15 @@ function closeMobileSidebar() {
 
 const { load: loadPreferences } = useUserPreferences()
 
+// Desativado até a lógica de consentimento de cookies ser implementada de verdade.
+const COOKIE_CONSENT_ENABLED = false
+
 onMounted(async () => {
   await loadPreferences()
+
+  if (!COOKIE_CONSENT_ENABLED) {
+    return
+  }
 
   const cookie = useCookie('cookie-consent')
   if (cookie.value === 'accepted') {

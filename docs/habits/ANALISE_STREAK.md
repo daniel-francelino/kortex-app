@@ -201,7 +201,13 @@ Optei por implementar em vez de remover do `CHECK`: o frontend (`app/types/habit
 
 Os tipos que espelhavam `'active' | 'frozen'` em código foram todos ampliados para incluir `'broken'`: `server/utils/habits.ts` (`StreakComputation.status`), `server/api/habits/log.post.ts` (as duas anotações de retorno), `app/composables/useHabits.ts` (`HabitLogResult.streak.status`) no `kortex-app`; `src/utils/habits.ts` (`StreakComputation.status`) e `src/types/habits.ts` (`HabitStreakUpsert.status`) no `kortex-api`. Nenhuma migration nova foi necessária — o `CHECK (status IN ('active', 'frozen', 'broken'))` já permitia o valor.
 
-**Ponto em aberto, fora do escopo desta correção:** `AllTreeRow.vue` e `TodayTreeRow.vue` (`kortex-app`) hoje colapsam qualquer status que não seja `'frozen'` para `'Active'` antes de consultar `HABIT_STREAK_STATUS_META` (`status = habit.streak.status === Frozen ? Frozen : Active`), e o badge de streak só renderiza quando `currentStreak > 0` — que é justamente quando `'broken'` nunca ocorre. Ou seja: o backend agora escreve `'broken'` corretamente, mas nenhuma tela ainda o exibe de forma distinta — é dado pronto para uma badge futura ("seu streak quebrou"), não uma mudança visual imediata.
+### Ponto em aberto fechado: `AllTreeRow.vue`/`TodayTreeRow.vue` agora exibem `'broken'`
+
+Os dois componentes colapsavam qualquer status que não fosse `'frozen'` para `'Active'`, e o único indicador de streak (contador "Xd") só renderizava com `currentStreak > 0` — exatamente a condição que `'broken'` nunca satisfaz (por definição, um streak quebrado está em 0). Resultado: o backend já escrevia `'broken'` corretamente, mas nenhuma tela distinguia isso de "nunca começou".
+
+Correção: em ambos os componentes, o cálculo de meta do contador (`getStreakCountMeta`/`streakCountMeta`, mantido como estava — só renomeado) foi separado de um novo `getStreakStatusBadge`/`streakStatusBadge`, que ignora `currentStreak` e olha só `status`. Quando `currentStreak > 0`, o contador de dias continua aparecendo como antes; quando `currentStreak === 0` mas `status` é `'frozen'` ou `'broken'`, um badge com o label/ícone/cor de `HABIT_STREAK_STATUS_META` aparece no lugar (`v-else-if`) — reaproveitando o badge "Congelado" que o `TodayTreeRow.vue` já tinha (antes também preso ao `currentStreak > 0`, então nem "Congelado" aparecia para um hábito recém-congelado sem streak prévio — esse gap foi corrigido de brinde) e adicionando um equivalente novo no `AllTreeRow.vue`, que não tinha nenhum badge de status separado do contador.
+
+Arquivos tocados: [app/components/habits/AllTreeRow.vue](app/components/habits/AllTreeRow.vue) e [app/components/habits/TodayTreeRow.vue](app/components/habits/TodayTreeRow.vue).
 
 ---
 
@@ -212,4 +218,4 @@ Os tipos que espelhavam `'active' | 'frozen'` em código foram todos ampliados p
 3. ~~Fase 2 tem um caminho natural~~ — ✅ feita (`kortex-api`): o `close-day` job passou a chamar `computeStreak`/atualizar `habit_streaks` para os hábitos que ficam sem log num dia devido. `computeStreak` foi portado para `kortex-api/src/utils/habits.ts`, mantido em sincronia manual com a versão do `kortex-app` (mesmo padrão já usado por `kortex-api/src/utils/timezone.ts`).
 4. ~~Fases 4 e 5 são de baixo risco/baixo impacto~~ — ✅ feitas nos dois repositórios: Fase 4 unificou o teto de busca (`MAX_STREAK_LOOKBACK_DAYS`, a mesma constante já usada como rede de segurança do walk); Fase 5 passou a escrever `status: 'broken'`, completando um valor que o frontend já esperava mas nunca recebia.
 
-Todos os cinco itens do resumo executivo estão corrigidos. O único ponto ainda em aberto é de UI (fora do escopo desta auditoria): `AllTreeRow.vue`/`TodayTreeRow.vue` no `kortex-app` ainda não distinguem `'broken'` de `'active'` visualmente — ver nota ao final da Fase 5.
+Todos os cinco itens do resumo executivo estão corrigidos, e o ponto em aberto de UI (`AllTreeRow.vue`/`TodayTreeRow.vue` não distinguiam `'broken'` visualmente) também foi fechado — ver nota ao final da Fase 5.
