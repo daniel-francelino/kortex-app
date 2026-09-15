@@ -1,13 +1,22 @@
 <script setup lang="ts">
 import type { Calendar } from '~/types/appointments'
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   calendars: Calendar[] | null | undefined
   archivedCalendars?: Calendar[] | null | undefined
   loading: boolean
   archivedLoading?: boolean
   activeCalendarId?: string
-}>()
+  // The mobile bottom drawer already shows "Calendários" as its own title
+  // (see appointments/index.vue) — rendering this component's own heading
+  // there too duplicated the text. Desktop's sidebar has no such wrapper, so
+  // it keeps the heading.
+  showTitle?: boolean
+}>(), {
+  showTitle: true
+})
+
+const isMobile = useMediaQuery('(max-width: 1023px)')
 
 const emit = defineEmits<{
   create: []
@@ -27,14 +36,18 @@ void props
 
 <template>
   <div class="space-y-3">
-    <div class="flex items-center justify-between">
-      <h3 class="text-sm font-semibold text-highlighted">
+    <div class="flex items-center" :class="showTitle ? 'justify-between' : 'justify-end'">
+      <h3
+        v-if="showTitle"
+        class="max-lg:text-base lg:text-sm font-semibold text-highlighted"
+      >
         Calendários
       </h3>
       <UButton
         icon="i-lucide-plus"
-        size="xs"
+        :size="isMobile ? 'lg' : 'xs'"
         variant="ghost"
+        aria-label="Novo calendário"
         @click="emit('create')"
       />
     </div>
@@ -56,12 +69,12 @@ void props
       v-else-if="!calendars || calendars.length === 0"
       class="text-center py-4"
     >
-      <p class="text-sm text-muted">
+      <p class="max-lg:text-base lg:text-sm text-muted">
         Nenhum calendário criado
       </p>
       <UButton
         label="Criar calendário"
-        size="xs"
+        :size="isMobile ? 'md' : 'xs'"
         variant="link"
         class="mt-1"
         @click="emit('create')"
@@ -76,7 +89,7 @@ void props
       <div
         v-for="(cal, index) in calendars"
         :key="cal.id"
-        class="group flex items-center gap-2 rounded-md px-2 py-1.5 transition-colors hover:bg-elevated/50"
+        class="group flex items-center gap-2 rounded-md px-2 max-lg:py-2.5 lg:py-1.5 transition-colors hover:bg-elevated/50"
         :class="props.activeCalendarId === cal.id ? 'bg-primary/10 ring-1 ring-primary/20' : ''"
       >
         <button
@@ -85,10 +98,10 @@ void props
           @click="emit('toggle', cal.id)"
         >
           <span
-            class="size-3 shrink-0 rounded-full"
+            class="max-lg:size-3.5 lg:size-3 shrink-0 rounded-full"
             :style="{ backgroundColor: getColor(cal, index) }"
           />
-          <span class="flex-1 truncate text-sm">{{ cal.name }}</span>
+          <span class="flex-1 truncate max-lg:text-base lg:text-sm">{{ cal.name }}</span>
           <UIcon
             v-if="props.activeCalendarId === cal.id"
             name="i-lucide-check"
@@ -112,7 +125,7 @@ void props
         >
           <UButton
             icon="i-lucide-more-horizontal"
-            size="xs"
+            :size="isMobile ? 'md' : 'xs'"
             variant="ghost"
             class="opacity-100 lg:opacity-0 lg:group-hover:opacity-100"
           />
@@ -129,7 +142,7 @@ void props
           name="i-lucide-archive"
           class="size-4 text-muted"
         />
-        <h4 class="text-xs font-semibold uppercase tracking-wide text-muted">
+        <h4 class="max-lg:text-sm lg:text-xs font-semibold uppercase tracking-wide text-muted">
           Arquivados
         </h4>
       </div>
@@ -152,20 +165,20 @@ void props
         <div
           v-for="(cal, index) in archivedCalendars"
           :key="cal.id"
-          class="group flex items-center gap-2 rounded-md px-2 py-1.5 text-muted transition-colors hover:bg-elevated/40"
+          class="group flex items-center gap-2 rounded-md px-2 max-lg:py-2.5 lg:py-1.5 text-muted transition-colors hover:bg-elevated/40"
         >
           <span
-            class="size-3 shrink-0 rounded-full opacity-60"
+            class="max-lg:size-3.5 lg:size-3 shrink-0 rounded-full opacity-60"
             :style="{ backgroundColor: getColor(cal, index) }"
           />
-          <span class="min-w-0 flex-1 truncate text-sm">
+          <span class="min-w-0 flex-1 truncate max-lg:text-base lg:text-sm">
             {{ cal.name }}
           </span>
 
           <UTooltip text="Restaurar calendário">
             <UButton
               icon="i-lucide-rotate-ccw"
-              size="xs"
+              :size="isMobile ? 'md' : 'xs'"
               variant="ghost"
               class="opacity-100 sm:opacity-0 sm:group-hover:opacity-100"
               @click="emit('restore', cal)"

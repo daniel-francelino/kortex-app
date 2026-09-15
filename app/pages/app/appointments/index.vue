@@ -839,6 +839,7 @@ onMounted(() => {
           :loading="calendarsStatus === 'pending'"
           :archived-loading="archivedCalendarsStatus === 'pending'"
           :active-calendar-id="selectedCalendarId"
+          :show-title="false"
           @create="onCreateCalendar"
           @toggle="onToggleCalendar"
           @archive="onArchiveCalendar"
