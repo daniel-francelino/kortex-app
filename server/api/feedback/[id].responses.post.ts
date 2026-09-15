@@ -3,7 +3,7 @@ import { getSupabaseAdminClient } from '../../utils/supabase'
 import { requireAuthUser } from '../../utils/require-auth'
 
 const bodySchema = z.object({
-  content: z.string().min(1, 'Conteúdo é obrigatório').max(5000)
+  content: z.string().trim().min(1, 'Conteúdo é obrigatório').max(5000)
 })
 
 export default eventHandler(async (event) => {
