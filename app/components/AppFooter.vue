@@ -12,7 +12,7 @@ const columns = [{
 }, {
   label: 'Explore',
   children: [
-    { label: 'Documenta??o', to: '/docs' },
+    { label: 'Documentação', to: '/docs' },
     { label: 'Blog', to: '/blog' },
     { label: 'Novidades', to: '/changelog' }
   ]
@@ -24,15 +24,15 @@ const columns = [{
     <UContainer>
       <div class="grid gap-12 py-14 sm:grid-cols-2 lg:grid-cols-[2fr_1fr_1fr]">
         <div>
-          <NuxtLink to="/" aria-label="Kortex ? in?cio" class="inline-flex"><AppLogo /></NuxtLink>
-          <p class="mt-5 max-w-xs text-sm leading-7 text-muted">Um lugar para organizar suas ideias.<br>Mais espa?o para viver as suas prioridades.</p>
+          <NuxtLink to="/" aria-label="Kortex – início" class="inline-flex"><AppLogo /></NuxtLink>
+          <p class="mt-5 max-w-xs text-sm leading-7 text-muted">Um lugar para organizar suas ideias.<br>Mais espaço para viver as suas prioridades.</p>
           <UButton
             to="/signup"
-            label="Come?ar meu Kortex"
+            label="Começar meu Kortex"
             trailing-icon="i-lucide-arrow-up-right"
             variant="link"
             class="mt-5 min-h-11 px-0"
-            @click="capture(PostHogEvent.PublicFooterCtaClicked, { location: 'footer', target: '/signup', target_label: 'Come?ar meu Kortex' })"
+            @click="capture(PostHogEvent.PublicFooterCtaClicked, { location: 'footer', target: '/signup', target_label: 'Começar meu Kortex' })"
           />
         </div>
         <nav v-for="column in columns" :key="column.label" :aria-label="column.label">
@@ -49,8 +49,8 @@ const columns = [{
         </nav>
       </div>
       <div class="flex flex-wrap items-center justify-between gap-4 border-t border-default py-6 text-xs text-dimmed">
-        <p>? {{ new Date().getFullYear() }} Kortex</p>
-        <p>Clareza para pensar. Espa?o para agir.</p>
+        <p>© {{ new Date().getFullYear() }} Kortex</p>
+        <p>Clareza para pensar. Espaço para agir.</p>
       </div>
     </UContainer>
   </footer>
