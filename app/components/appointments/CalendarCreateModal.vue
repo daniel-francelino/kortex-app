@@ -24,8 +24,20 @@ const {
   removeCalendarShare
 } = useAppointments()
 const toast = useToast()
+const isMobile = useMediaQuery('(max-width: 1023px)')
 const subscribeToggling = ref(false)
 const localCalendar = ref<Calendar | null>(null)
+
+// ─── Tabs (only relevant once editing — a new calendar has no export/share
+// state yet) — keeps Geral/Exportar/Compartilhar from being stacked into one
+// long, mixed-together form. ──────────────────────────────────────────────
+type ModalTab = 'general' | 'export' | 'share'
+const modalTab = ref<ModalTab>('general')
+const modalTabItems = [
+  { label: 'Geral', value: 'general' },
+  { label: 'Exportar', value: 'export' },
+  { label: 'Compartilhar', value: 'share' }
+]
 
 // ─── Sharing ─────────────────────────────────────────────────────────────────
 const shares = ref<CalendarShare[]>([])
@@ -105,7 +117,7 @@ async function copySubscribeUrl() {
 }
 
 const schema = z.object({
-  name: z.string().min(1, 'Nome Ã© obrigatÃ³rio').max(100),
+  name: z.string().min(1, 'Nome é obrigatório').max(100),
   description: z.string().max(500).optional(),
   color: z.string().max(20).optional(),
   visibility: z.enum(['private', 'shared', 'public']).default('private')
@@ -183,6 +195,7 @@ watch(
     state.visibility = calendar?.visibility ?? 'private'
     localCalendar.value = calendar ?? null
     shares.value = []
+    modalTab.value = 'general'
     if (calendar) void loadShares()
   },
   { immediate: true }
@@ -202,49 +215,65 @@ watch(
         class="space-y-4"
         @submit="onSubmit"
       >
-        <UFormField
-          label="Nome"
-          name="name"
-        >
-          <UInput
-            v-model="state.name"
-            placeholder="Ex.: Trabalho, Pessoal..."
-            class="w-full"
-          />
-        </UFormField>
+        <UTabs
+          v-if="isEditing"
+          :items="modalTabItems"
+          :model-value="modalTab"
+          :size="isMobile ? 'md' : 'sm'"
+          class="mb-2"
+          @update:model-value="modalTab = $event as ModalTab"
+        />
 
-        <UFormField
-          label="DescriÃ§Ã£o"
-          name="description"
-        >
-          <UTextarea
-            v-model="state.description"
-            placeholder="DescriÃ§Ã£o opcional"
-            :rows="2"
-            class="w-full"
-          />
-        </UFormField>
-
-        <UFormField
-          label="Cor"
-          name="color"
-        >
-          <div class="flex gap-2">
-            <button
-              v-for="opt in colorOptions"
-              :key="opt.value"
-              type="button"
-              class="size-8 rounded-full ring-2 ring-offset-2 ring-offset-default transition-all"
-              :class="state.color === opt.value ? 'ring-primary' : 'ring-transparent'"
-              :style="{ backgroundColor: opt.value }"
-              :title="opt.label"
-              @click="state.color = opt.value"
+        <!-- Geral: always shown when creating (nothing else applies yet); a
+             tab like the other two once editing. -->
+        <div v-if="!isEditing || modalTab === 'general'" class="space-y-4">
+          <UFormField
+            label="Nome"
+            name="name"
+          >
+            <UInput
+              v-model="state.name"
+              placeholder="Ex.: Trabalho, Pessoal..."
+              :size="isMobile ? 'md' : 'sm'"
+              class="w-full"
             />
-          </div>
-        </UFormField>
+          </UFormField>
 
-        <div v-if="isEditing" class="space-y-2 border-t border-default pt-4">
-          <p class="text-sm font-medium text-highlighted">
+          <UFormField
+            label="Descrição"
+            name="description"
+          >
+            <UTextarea
+              v-model="state.description"
+              placeholder="Descrição opcional"
+              :rows="2"
+              :size="isMobile ? 'md' : 'sm'"
+              class="w-full"
+            />
+          </UFormField>
+
+          <UFormField
+            label="Cor"
+            name="color"
+          >
+            <div class="flex gap-2">
+              <button
+                v-for="opt in colorOptions"
+                :key="opt.value"
+                type="button"
+                class="max-lg:size-9 lg:size-8 rounded-full ring-2 ring-offset-2 ring-offset-default transition-all"
+                :class="state.color === opt.value ? 'ring-primary' : 'ring-transparent'"
+                :style="{ backgroundColor: opt.value }"
+                :title="opt.label"
+                @click="state.color = opt.value"
+              />
+            </div>
+          </UFormField>
+        </div>
+
+        <!-- Exportar -->
+        <div v-if="isEditing && modalTab === 'export'" class="space-y-3">
+          <p class="max-lg:text-base lg:text-sm font-medium text-highlighted">
             Exportar / assinar (.ics)
           </p>
           <UButton
@@ -252,18 +281,19 @@ watch(
             label="Exportar .ics"
             color="neutral"
             variant="subtle"
-            size="sm"
+            :size="isMobile ? 'md' : 'sm'"
             @click="onExportIcs"
           />
           <div class="flex items-center gap-3">
             <UCheckbox
               :model-value="localCalendar?.subscribeEnabled ?? false"
               label="Assinatura ativa"
+              :size="isMobile ? 'md' : 'sm'"
               :disabled="subscribeToggling"
               @update:model-value="onToggleSubscribe(Boolean($event))"
             />
           </div>
-          <p class="text-xs text-muted">
+          <p class="max-lg:text-sm lg:text-xs text-muted">
             Gera um link para assinar este calendário em outro app (Google Calendar, Apple Calendar, etc).
           </p>
           <div v-if="subscribeUrl" class="flex items-center gap-2">
@@ -271,30 +301,31 @@ watch(
               :model-value="subscribeUrl"
               readonly
               class="flex-1"
-              size="sm"
+              :size="isMobile ? 'md' : 'sm'"
             />
             <UButton
               icon="i-lucide-copy"
               color="neutral"
               variant="subtle"
-              size="sm"
+              :size="isMobile ? 'md' : 'sm'"
               aria-label="Copiar link"
               @click="copySubscribeUrl"
             />
           </div>
         </div>
 
-        <div v-if="isEditing" class="space-y-3 border-t border-default pt-4">
-          <p class="text-sm font-medium text-highlighted">
+        <!-- Compartilhar -->
+        <div v-if="isEditing && modalTab === 'share'" class="space-y-3">
+          <p class="max-lg:text-base lg:text-sm font-medium text-highlighted">
             Compartilhar calendário
           </p>
 
-          <div class="flex items-center gap-2">
+          <div class="flex flex-wrap items-center gap-2">
             <UInput
               v-model="newShareEmail"
               type="email"
               placeholder="email@exemplo.com"
-              size="sm"
+              :size="isMobile ? 'md' : 'sm'"
               class="flex-1"
               @keydown.enter="onAddShare"
             />
@@ -302,12 +333,12 @@ watch(
               v-model="newSharePermission"
               :items="[{ label: 'Visualizar', value: 'view' }, { label: 'Editar', value: 'edit' }]"
               value-key="value"
-              size="sm"
+              :size="isMobile ? 'md' : 'sm'"
               class="w-32"
             />
             <UButton
               icon="i-lucide-plus"
-              size="sm"
+              :size="isMobile ? 'md' : 'sm'"
               color="primary"
               variant="subtle"
               :loading="addingShare"
@@ -323,7 +354,7 @@ watch(
             <li
               v-for="share in shares"
               :key="share.id"
-              class="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-elevated"
+              class="flex flex-wrap items-center gap-2 rounded-md px-2 max-lg:py-2 lg:py-1.5 max-lg:text-base lg:text-sm hover:bg-elevated"
             >
               <UIcon
                 :name="share.status === 'pending' ? 'i-lucide-mail' : 'i-lucide-user'"
@@ -342,13 +373,13 @@ watch(
                 :model-value="share.permission"
                 :items="[{ label: 'Visualizar', value: 'view' }, { label: 'Editar', value: 'edit' }]"
                 value-key="value"
-                size="sm"
+                :size="isMobile ? 'md' : 'sm'"
                 class="w-28"
                 @update:model-value="(value: string) => onChangeSharePermission(share, value as 'view' | 'edit')"
               />
               <UButton
                 icon="i-lucide-x"
-                size="xs"
+                :size="isMobile ? 'md' : 'xs'"
                 color="neutral"
                 variant="ghost"
                 @click="onRemoveShare(share)"
@@ -360,15 +391,19 @@ watch(
           </p>
         </div>
 
-        <div class="flex justify-end gap-2 pt-2">
+        <div class="flex max-lg:flex-col-reverse lg:flex-row justify-end gap-2 pt-2">
           <UButton
             label="Cancelar"
             variant="outline"
+            :size="isMobile ? 'lg' : 'md'"
+            :block="isMobile"
             @click="emit('update:open', false)"
           />
           <UButton
             type="submit"
             :label="isEditing ? 'Salvar' : 'Criar'"
+            :size="isMobile ? 'lg' : 'md'"
+            :block="isMobile"
             :loading="loading"
             :disabled="loading"
           />
