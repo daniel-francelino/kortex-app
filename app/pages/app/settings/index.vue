@@ -11,7 +11,6 @@ useSeoMeta({
 })
 
 const toast = useToast()
-const cssDiagnosticsEnabled = useState('css-diagnostics-enabled', () => false)
 const { fetchUser } = useAuth()
 const { state: userPreferencesState, setTimezone: setSharedTimezone } = useUserPreferences()
 const requestFetch = useRequestFetch()
@@ -342,18 +341,5 @@ function onFileClick() {
         </div>
       </UFormField>
     </template>
-  </UPageCard>
-  <UPageCard
-    title="Diagnóstico de layout"
-    description="Capture informações sobre espaços extras e problemas de exibição no iPhone. O relatório fica neste dispositivo até você compartilhá-lo."
-    variant="subtle"
-    class="mt-6 mb-20 pb-20"
-  >
-    <UButton
-      :label="cssDiagnosticsEnabled ? 'Desativar diagnóstico CSS' : 'Ativar diagnóstico CSS'"
-      color="neutral"
-      variant="outline"
-      @click="cssDiagnosticsEnabled = !cssDiagnosticsEnabled"
-    />
   </UPageCard>
 </template>

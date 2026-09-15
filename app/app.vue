@@ -155,7 +155,6 @@ provide('navigation', navigation)
     <ClientOnly>
       <ViewportMetrics />
       <CapacitorInit />
-      <CssDiagnostics />
     </ClientOnly>
 
     <NuxtLayout>
