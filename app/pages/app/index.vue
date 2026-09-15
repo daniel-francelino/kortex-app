@@ -1,5 +1,8 @@
 <script setup lang="ts">
+import { AnimatePresence, motion } from 'motion-v'
 import { detectBrowserTimeZone, formatDisplay } from '#shared/utils/dateTime'
+
+const reducedMotion = useMediaQuery('(prefers-reduced-motion: reduce)')
 
 definePageMeta({
   layout: 'app'
@@ -54,110 +57,180 @@ const { data: nextBooking } = useAsyncData('dashboard-next-booking', () =>
     </template>
 
     <template #body>
-      <!-- Loading skeleton -->
-      <DashboardSkeleton v-if="dashboardInitialLoading" />
+      <AnimatePresence mode="wait">
+        <!-- Loading skeleton -->
+        <motion.div
+          v-if="dashboardInitialLoading"
+          key="skeleton"
+          :initial="{ opacity: 0 }"
+          :animate="{ opacity: 1 }"
+          :exit="{ opacity: 0 }"
+          :transition="{ duration: 0.2 }"
+        >
+          <DashboardSkeleton />
+        </motion.div>
 
-      <div v-else class="space-y-6 p-4 md:p-6">
-        <!-- Greeting -->
-        <div>
-          <h2 class="text-lg font-semibold text-highlighted">
-            Seu dia — {{ todayFormatted }}
-          </h2>
-          <p class="text-sm text-muted">
-            Capturar → Planejar → Executar → Refletir → Aprender
-          </p>
-        </div>
+        <motion.div
+          v-else
+          key="content"
+          class="space-y-6 p-4 md:p-6"
+          :initial="{ opacity: 0 }"
+          :animate="{ opacity: 1 }"
+          :transition="{ duration: 0.3 }"
+        >
+          <!-- Greeting -->
+          <motion.div
+            :initial="{ opacity: 0, y: reducedMotion ? 0 : 14 }"
+            :animate="{ opacity: 1, y: 0 }"
+            :transition="{ duration: 0.4 }"
+          >
+            <h2 class="text-lg font-semibold text-highlighted">
+              Seu dia — {{ todayFormatted }}
+            </h2>
+            <p class="text-sm text-muted">
+              Capturar → Planejar → Executar → Refletir → Aprender
+            </p>
+          </motion.div>
 
-        <!-- Quick stats -->
-        <div v-if="dashboard" class="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <UCard :ui="{ body: 'p-3 sm:p-4' }">
-            <div class="flex items-center gap-3">
-              <UIcon name="i-lucide-calendar-check" class="size-5 shrink-0 text-success" />
-              <div>
-                <p class="text-lg font-bold leading-tight">
-                  {{ dashboard.habits.completedCount }}/{{ dashboard.habits.totalCount }}
-                </p>
-                <p class="text-xs text-muted">
-                  Hábitos
-                </p>
-              </div>
-            </div>
-          </UCard>
-          <UCard :ui="{ body: 'p-3 sm:p-4' }">
-            <div class="flex items-center gap-3">
-              <UIcon name="i-lucide-check-square" class="size-5 shrink-0 text-primary" />
-              <div>
-                <p class="text-lg font-bold leading-tight">
-                  {{ dashboard.tasks.pendingCount }}
-                </p>
-                <p class="text-xs text-muted">
-                  Tarefas pendentes
-                </p>
-              </div>
-            </div>
-          </UCard>
-          <UCard :ui="{ body: 'p-3 sm:p-4' }">
-            <div class="flex items-center gap-3">
-              <UIcon name="i-lucide-calendar" class="size-5 shrink-0 text-info" />
-              <div>
-                <p class="text-lg font-bold leading-tight">
-                  {{ dashboard.events.totalCount }}
-                </p>
-                <p class="text-xs text-muted">
-                  Eventos hoje
-                </p>
-              </div>
-            </div>
-          </UCard>
-          <UCard :ui="{ body: 'p-3 sm:p-4' }">
-            <div class="flex items-center gap-3">
-              <UIcon
-                :name="dashboard.journal.exists ? 'i-lucide-book-open-check' : 'i-lucide-book-open'"
-                class="size-5 shrink-0"
-                :class="dashboard.journal.exists ? 'text-success' : 'text-warning'"
-              />
-              <div>
-                <p class="text-lg font-bold leading-tight">
-                  {{ dashboard.journal.exists ? '✓' : '—' }}
-                </p>
-                <p class="text-xs text-muted">
-                  Diário
-                </p>
-              </div>
-            </div>
-          </UCard>
-        </div>
-
-        <!-- Main cards grid -->
-        <div v-if="dashboard" class="grid gap-4 md:grid-cols-2">
-          <DashboardTodayHabits
-            :habits="dashboard.habits.items"
-            :completed-count="dashboard.habits.completedCount"
-            :total-count="dashboard.habits.totalCount"
-          />
-          <DashboardTodayEvents
-            :events="dashboard.events.items"
-            :total-count="dashboard.events.totalCount"
-          />
-          <DashboardNextBooking v-if="nextBooking" :booking="nextBooking" class="md:col-span-2" />
-        </div>
-
-        <!-- Insights section -->
-        <div>
-          <h3 class="mb-4 text-base font-semibold text-highlighted">
-            Insights de produtividade
-          </h3>
-
-          <div v-if="insightsInitialLoading" class="grid gap-4 md:grid-cols-2">
-            <USkeleton v-for="i in 4" :key="i" class="h-44 w-full rounded-lg" />
+          <!-- Quick stats -->
+          <div v-if="dashboard" class="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <motion.div
+              :initial="{ opacity: 0, y: reducedMotion ? 0 : 16 }"
+              :animate="{ opacity: 1, y: 0 }"
+              :transition="{ duration: 0.35, delay: reducedMotion ? 0 : 0.05 }"
+            >
+              <UCard :ui="{ body: 'p-3 sm:p-4' }">
+                <div class="flex items-center gap-3">
+                  <UIcon name="i-lucide-calendar-check" class="size-5 shrink-0 text-success" />
+                  <div>
+                    <p class="text-lg font-bold leading-tight">
+                      {{ dashboard.habits.completedCount }}/{{ dashboard.habits.totalCount }}
+                    </p>
+                    <p class="text-xs text-muted">
+                      Hábitos
+                    </p>
+                  </div>
+                </div>
+              </UCard>
+            </motion.div>
+            <motion.div
+              :initial="{ opacity: 0, y: reducedMotion ? 0 : 16 }"
+              :animate="{ opacity: 1, y: 0 }"
+              :transition="{ duration: 0.35, delay: reducedMotion ? 0 : 0.1 }"
+            >
+              <UCard :ui="{ body: 'p-3 sm:p-4' }">
+                <div class="flex items-center gap-3">
+                  <UIcon name="i-lucide-check-square" class="size-5 shrink-0 text-primary" />
+                  <div>
+                    <p class="text-lg font-bold leading-tight">
+                      {{ dashboard.tasks.pendingCount }}
+                    </p>
+                    <p class="text-xs text-muted">
+                      Tarefas pendentes
+                    </p>
+                  </div>
+                </div>
+              </UCard>
+            </motion.div>
+            <motion.div
+              :initial="{ opacity: 0, y: reducedMotion ? 0 : 16 }"
+              :animate="{ opacity: 1, y: 0 }"
+              :transition="{ duration: 0.35, delay: reducedMotion ? 0 : 0.15 }"
+            >
+              <UCard :ui="{ body: 'p-3 sm:p-4' }">
+                <div class="flex items-center gap-3">
+                  <UIcon name="i-lucide-calendar" class="size-5 shrink-0 text-info" />
+                  <div>
+                    <p class="text-lg font-bold leading-tight">
+                      {{ dashboard.events.totalCount }}
+                    </p>
+                    <p class="text-xs text-muted">
+                      Eventos hoje
+                    </p>
+                  </div>
+                </div>
+              </UCard>
+            </motion.div>
+            <motion.div
+              :initial="{ opacity: 0, y: reducedMotion ? 0 : 16 }"
+              :animate="{ opacity: 1, y: 0 }"
+              :transition="{ duration: 0.35, delay: reducedMotion ? 0 : 0.2 }"
+            >
+              <UCard :ui="{ body: 'p-3 sm:p-4' }">
+                <div class="flex items-center gap-3">
+                  <UIcon
+                    :name="dashboard.journal.exists ? 'i-lucide-book-open-check' : 'i-lucide-book-open'"
+                    class="size-5 shrink-0"
+                    :class="dashboard.journal.exists ? 'text-success' : 'text-warning'"
+                  />
+                  <div>
+                    <p class="text-lg font-bold leading-tight">
+                      {{ dashboard.journal.exists ? '✓' : '—' }}
+                    </p>
+                    <p class="text-xs text-muted">
+                      Diário
+                    </p>
+                  </div>
+                </div>
+              </UCard>
+            </motion.div>
           </div>
 
-          <DashboardInsights
-            v-else
-            :insights="insights"
-          />
-        </div>
-      </div>
+          <!-- Main cards grid -->
+          <div v-if="dashboard" class="grid gap-4 md:grid-cols-2">
+            <motion.div
+              :initial="{ opacity: 0, y: reducedMotion ? 0 : 18 }"
+              :animate="{ opacity: 1, y: 0 }"
+              :transition="{ duration: 0.4, delay: reducedMotion ? 0 : 0.25 }"
+            >
+              <DashboardTodayHabits
+                :habits="dashboard.habits.items"
+                :completed-count="dashboard.habits.completedCount"
+                :total-count="dashboard.habits.totalCount"
+              />
+            </motion.div>
+            <motion.div
+              :initial="{ opacity: 0, y: reducedMotion ? 0 : 18 }"
+              :animate="{ opacity: 1, y: 0 }"
+              :transition="{ duration: 0.4, delay: reducedMotion ? 0 : 0.3 }"
+            >
+              <DashboardTodayEvents
+                :events="dashboard.events.items"
+                :total-count="dashboard.events.totalCount"
+              />
+            </motion.div>
+            <motion.div
+              v-if="nextBooking"
+              class="md:col-span-2"
+              :initial="{ opacity: 0, y: reducedMotion ? 0 : 18 }"
+              :animate="{ opacity: 1, y: 0 }"
+              :transition="{ duration: 0.4, delay: reducedMotion ? 0 : 0.35 }"
+            >
+              <DashboardNextBooking :booking="nextBooking" />
+            </motion.div>
+          </div>
+
+          <!-- Insights section -->
+          <motion.div
+            :initial="{ opacity: 0, y: reducedMotion ? 0 : 18 }"
+            :animate="{ opacity: 1, y: 0 }"
+            :transition="{ duration: 0.4, delay: reducedMotion ? 0 : 0.4 }"
+          >
+            <h3 class="mb-4 text-base font-semibold text-highlighted">
+              Insights de produtividade
+            </h3>
+
+            <div v-if="insightsInitialLoading" class="grid gap-4 md:grid-cols-2">
+              <USkeleton v-for="i in 4" :key="i" class="h-44 w-full rounded-lg" />
+            </div>
+
+            <DashboardInsights
+              v-else
+              :insights="insights"
+            />
+          </motion.div>
+        </motion.div>
+      </AnimatePresence>
     </template>
   </UDashboardPanel>
 </template>
