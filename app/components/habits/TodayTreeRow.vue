@@ -133,13 +133,23 @@ const scheduledTimeLabel = computed(() => {
   return `${start} - ${end}`
 })
 
-const streakMeta = computed(() => {
+const streakCountMeta = computed(() => {
   const streak = props.node.habit.streak
   if (!streak || streak.currentStreak <= 0) return null
 
   const status = streak.status === HabitStreakStatus.Frozen
     ? HabitStreakStatus.Frozen
     : HabitStreakStatus.Active
+
+  return HABIT_STREAK_STATUS_META[status]
+})
+
+// 'broken' always has currentStreak === 0, and 'frozen' can too (first-ever
+// log, frozen with no prior history) — neither fits the "Xd" counter above,
+// so they get a small status badge instead.
+const streakStatusBadge = computed(() => {
+  const status = props.node.habit.streak?.status
+  if (status !== HabitStreakStatus.Frozen && status !== HabitStreakStatus.Broken) return null
 
   return HABIT_STREAK_STATUS_META[status]
 })
@@ -237,10 +247,10 @@ function onRowKeydown(event: KeyboardEvent) {
 
           <!-- Streak -->
           <div
-            v-if="node.habit.streak && node.habit.streak.currentStreak > 0 && streakMeta"
+            v-if="node.habit.streak && node.habit.streak.currentStreak > 0 && streakCountMeta"
             class="flex shrink-0 items-center gap-0.5 text-xs text-muted ml-auto sm:ml-0"
           >
-            <UIcon :name="streakMeta.icon" class="size-3.5" :class="streakMeta.color === 'primary' ? 'text-primary' : 'text-orange-500'" />
+            <UIcon :name="streakCountMeta.icon" class="size-3.5" :class="streakCountMeta.color === 'primary' ? 'text-primary' : 'text-orange-500'" />
             <span>{{ node.habit.streak.currentStreak }}</span>
           </div>
 
@@ -294,14 +304,14 @@ function onRowKeydown(event: KeyboardEvent) {
           </UBadge>
 
           <UBadge
-            v-if="node.habit.streak && node.habit.streak.currentStreak > 0 && streakMeta && node.habit.streak.status === HabitStreakStatus.Frozen"
-            :label="streakMeta.label"
+            v-if="streakStatusBadge"
+            :label="streakStatusBadge.label"
             variant="subtle"
-            :color="streakMeta.color"
+            :color="streakStatusBadge.color"
             size="sm"
           >
             <template #leading>
-              <UIcon :name="streakMeta.icon" class="size-3.5" />
+              <UIcon :name="streakStatusBadge.icon" class="size-3.5" />
             </template>
           </UBadge>
 

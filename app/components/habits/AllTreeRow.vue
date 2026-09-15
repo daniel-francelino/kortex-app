@@ -66,7 +66,7 @@ function getRowItems(habit: Habit) {
   ]
 }
 
-function getStreakMeta(habit: Habit) {
+function getStreakCountMeta(habit: Habit) {
   if (!habit.streak || habit.streak.currentStreak <= 0) return null
 
   const status = habit.streak.status === HabitStreakStatus.Frozen
@@ -74,6 +74,16 @@ function getStreakMeta(habit: Habit) {
     : HabitStreakStatus.Active
 
   return HABIT_STREAK_STATUS_META[status]
+}
+
+// 'broken' always has currentStreak === 0, and 'frozen' can too (first-ever
+// log, frozen with no prior history) — neither fits the "Xd" counter above,
+// so they get a small status badge instead.
+function getStreakStatusBadge(habit: Habit) {
+  if (!habit.streak || habit.streak.currentStreak > 0) return null
+  if (habit.streak.status !== HabitStreakStatus.Frozen && habit.streak.status !== HabitStreakStatus.Broken) return null
+
+  return HABIT_STREAK_STATUS_META[habit.streak.status]
 }
 </script>
 
@@ -186,12 +196,24 @@ function getStreakMeta(habit: Habit) {
             class="flex items-center gap-1 text-xs text-muted sm:hidden"
           >
             <UIcon
-              :name="getStreakMeta(node.habit)?.icon ?? 'i-lucide-flame'"
+              :name="getStreakCountMeta(node.habit)?.icon ?? 'i-lucide-flame'"
               class="size-3.5"
               :class="node.habit.streak?.status === HabitStreakStatus.Frozen ? 'text-primary' : 'text-orange-500'"
             />
             <span>{{ node.habit.streak.currentStreak }}d</span>
           </div>
+          <UBadge
+            v-else-if="getStreakStatusBadge(node.habit)"
+            variant="subtle"
+            :color="getStreakStatusBadge(node.habit)?.color"
+            size="sm"
+            class="sm:hidden"
+          >
+            <template #leading>
+              <UIcon :name="getStreakStatusBadge(node.habit)?.icon ?? 'i-lucide-flame'" class="size-3.5" />
+            </template>
+            {{ getStreakStatusBadge(node.habit)?.label }}
+          </UBadge>
         </div>
       </div>
 
@@ -208,12 +230,23 @@ function getStreakMeta(habit: Habit) {
           class="flex items-center gap-1 text-xs text-muted"
         >
           <UIcon
-            :name="getStreakMeta(node.habit)?.icon ?? 'i-lucide-flame'"
+            :name="getStreakCountMeta(node.habit)?.icon ?? 'i-lucide-flame'"
             class="size-3.5"
             :class="node.habit.streak?.status === HabitStreakStatus.Frozen ? 'text-primary' : 'text-orange-500'"
           />
           <span>{{ node.habit.streak.currentStreak }}d</span>
         </div>
+        <UBadge
+          v-else-if="getStreakStatusBadge(node.habit)"
+          variant="subtle"
+          :color="getStreakStatusBadge(node.habit)?.color"
+          size="sm"
+        >
+          <template #leading>
+            <UIcon :name="getStreakStatusBadge(node.habit)?.icon ?? 'i-lucide-flame'" class="size-3.5" />
+          </template>
+          {{ getStreakStatusBadge(node.habit)?.label }}
+        </UBadge>
 
         <UDropdownMenu :items="getRowItems(node.habit)" :content="{ align: 'end' }">
           <UButton
