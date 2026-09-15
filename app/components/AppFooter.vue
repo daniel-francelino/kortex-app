@@ -25,10 +25,8 @@ const columns = [{
     { label: 'Novidades', to: '/changelog' }
   ]
 }, {
-  label: 'Aprenda',
+  label: 'Conteúdo',
   children: [
-    { label: 'Primeiros passos', to: '/docs/getting-started' },
-    { label: 'Documentação', to: '/docs' },
     { label: 'Blog', to: '/blog' }
   ]
 }, {

@@ -12,9 +12,6 @@
       label: 'Hábitos',
       to: '/app/habits'
     }, {
-      label: 'Documentação',
-      to: '/docs/getting-started'
-    }, {
       label: 'Planos',
       to: '/pricing'
     }]"

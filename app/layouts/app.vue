@@ -129,11 +129,6 @@ const links = computed(() => [
       onSelect: () => {
         open.value = false
       }
-    },
-    {
-      label: 'Ajuda',
-      icon: 'i-lucide-info',
-      to: '/docs'
     }
   ]
 ] satisfies NavigationMenuItem[][])

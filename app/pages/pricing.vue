@@ -35,7 +35,7 @@ defineOgImageComponent("Saas");
             {{ page.faq.description }}
           </p>
           <UButton
-            to="/docs/getting-started"
+            to="/#recursos"
             label="Conheça o Kortex"
             trailing-icon="i-lucide-arrow-up-right"
             variant="link"

@@ -37,11 +37,6 @@ const items = computed(() =>
           to: "/pricing",
           onSelect: () => trackNavigation("Pricing", "/pricing", "header"),
         },
-        {
-          label: "Documentação",
-          to: "/docs",
-          onSelect: () => trackNavigation("Documentation", "/docs", "header"),
-        },
       ]
     : [
         {
@@ -53,12 +48,6 @@ const items = computed(() =>
           label: "Planos",
           to: "/pricing",
           onSelect: () => trackNavigation("Pricing", "/pricing", "header"),
-        },
-        {
-          label: "Documentação",
-          to: "/docs",
-          active: route.path.startsWith("/docs"),
-          onSelect: () => trackNavigation("Documentation", "/docs", "header"),
         },
         {
           label: "Blog",

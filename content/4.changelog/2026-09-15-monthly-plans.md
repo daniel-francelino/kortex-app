@@ -2,7 +2,7 @@
 title: Planos mais fáceis de comparar
 description: Uma página mais clara para escolher entre Pessoal, Duo e Família, com cobrança somente mensal.
 date: "2026-09-15"
-published: true
+published: false
 category: improvement
 areas:
   - Planos

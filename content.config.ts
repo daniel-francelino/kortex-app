@@ -71,10 +71,6 @@ export const collections = {
       })
     })
   }),
-  docs: defineCollection({
-    source: '1.docs/**/*',
-    type: 'page'
-  }),
   pricing: defineCollection({
     source: '2.pricing.yml',
     type: 'page',
@@ -139,6 +135,9 @@ export const collections = {
       description: z.string(),
       date: z.date(),
       published: z.boolean().default(false),
+      month: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/).optional(),
+      hasUpdates: z.boolean().default(true),
+      partial: z.boolean().default(false),
       category: z.enum(['improvement', 'fix', 'new']).default('improvement'),
       areas: z.array(z.string()).default([]),
       action: z.object({ label: z.string(), to: z.string() }).optional(),

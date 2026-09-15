@@ -136,10 +136,6 @@ const items = computed<DropdownMenuItem[][]>(() => ([[{
     }
   }]
 }], [{
-  label: 'Documentação',
-  icon: 'i-lucide-book-open',
-  to: '/docs/getting-started'
-}, {
   label: 'Sair',
   icon: 'i-lucide-log-out',
   async onSelect(e) {

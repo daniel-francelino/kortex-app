@@ -12,19 +12,16 @@ const title = page.value?.seo?.title || page.value?.title || 'Novidades do Korte
 const description = page.value?.seo?.description || page.value?.description || 'Acompanhe as melhorias e correções do Kortex.'
 const reducedMotion = useMediaQuery('(prefers-reduced-motion: reduce)')
 const selected = ref('all')
-const categories = {
-  improvement: { label: 'Melhoria', icon: 'i-lucide-sparkles' },
-  fix: { label: 'Correção', icon: 'i-lucide-wrench' },
-  new: { label: 'Novo recurso', icon: 'i-lucide-plus' }
+const filters = [
+  { value: 'all', label: 'Todos os meses' },
+  { value: 'updates', label: 'Com novidades' },
+  { value: 'empty', label: 'Sem registros' }
+]
+const filteredVersions = computed(() => (versions.value ?? []).filter(version => selected.value === 'all' || (selected.value === 'updates' ? version.hasUpdates : !version.hasUpdates)))
+const latest = computed(() => versions.value?.find(version => version.hasUpdates))
+function formatMonth(value: string | Date) {
+  return new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric', timeZone: 'UTC' }).format(new Date(value))
 }
-const filters = computed(() => [
-  { value: 'all', label: 'Todas as atualizações' },
-  ...Object.entries(categories)
-    .filter(([key]) => versions.value?.some(version => version.category === key))
-    .map(([value, category]) => ({ value, label: category.label }))
-])
-const filteredVersions = computed(() => (versions.value ?? []).filter(version => selected.value === 'all' || version.category === selected.value))
-const latest = computed(() => versions.value?.[0])
 function formatDate(value: string | Date) {
   return new Intl.DateTimeFormat('pt-BR', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' }).format(new Date(value))
 }
@@ -48,7 +45,7 @@ defineOgImageComponent('Saas')
       <p class="eyebrow"><span class="status-dot" /> EM CONSTANTE EVOLUÇÃO</p>
       <h1>Pequenas mudanças.<br><span>Uma rotina melhor.</span></h1>
       <p class="hero-description">{{ page?.description || description }}</p>
-      <p v-if="latest" class="latest-date"><UIcon name="i-lucide-clock-3" /> Última atualização em {{ formatDate(latest.date) }}</p>
+      <p v-if="latest" class="latest-date"><UIcon name="i-lucide-clock-3" /> Histórico atualizado até {{ formatDate(latest.date) }}</p>
     </header>
 
     <div class="changelog-layout">
@@ -63,7 +60,7 @@ defineOgImageComponent('Saas')
             @click="selected = filter.value"
           >{{ filter.label }}</button>
         </div>
-        <p class="sr-only" aria-live="polite">{{ filteredVersions.length }} atualizações encontradas.</p>
+        <p class="sr-only" aria-live="polite">{{ filteredVersions.length }} meses encontrados.</p>
         <div v-if="status === 'pending'" class="space-y-5 py-8" role="status" aria-label="Carregando novidades">
           <USkeleton class="h-48 rounded-2xl" /><USkeleton class="h-48 rounded-2xl" />
         </div>
@@ -75,7 +72,7 @@ defineOgImageComponent('Saas')
           <UIcon name="i-lucide-clock-3" class="size-7 text-primary" />
           <h2>As próximas novidades aparecem aqui.</h2>
           <p>Enquanto isso, explore os recursos disponíveis no Kortex.</p>
-          <UButton to="/docs/getting-started" label="Ver primeiros passos" variant="outline" class="mt-5" />
+          <UButton to="/blog" label="Explorar o blog" variant="outline" class="mt-5" />
         </div>
         <div v-else class="timeline">
           <motion.article
@@ -83,18 +80,20 @@ defineOgImageComponent('Saas')
             :id="entryId(version.stem)"
             :key="version.id"
             class="release"
+            :class="{ quiet: !version.hasUpdates }"
             :initial="{ y: reducedMotion ? 0 : 14 }"
             :while-in-view="{ y: 0 }"
             :in-view-options="{ once: true }"
             :transition="{ duration: 0.4 }"
           >
             <div class="release-meta">
-              <time :datetime="new Date(version.date).toISOString().slice(0, 10)">{{ formatDate(version.date) }}</time>
+              <time :datetime="version.month || new Date(version.date).toISOString().slice(0, 10)">{{ formatMonth(version.date) }}</time>
               <span v-if="version.id === latest?.id" class="latest-badge">Mais recente</span>
             </div>
             <div class="release-card">
               <div class="release-tags">
-                <span class="category" :class="version.category"><UIcon :name="categories[version.category].icon" />{{ categories[version.category].label }}</span>
+                <span class="category"><UIcon :name="version.hasUpdates ? 'i-lucide-sparkles' : 'i-lucide-calendar'" />{{ version.hasUpdates ? 'Resumo mensal' : 'Sem registros' }}</span>
+                <span v-if="version.partial" class="area">Mês em andamento</span>
                 <span v-for="area in version.areas" :key="area" class="area">{{ area }}</span>
               </div>
               <h2><a :href="`#${entryId(version.stem)}`">{{ version.title }}</a></h2>
@@ -123,8 +122,8 @@ defineOgImageComponent('Saas')
         </div>
         <div class="aside-help">
           <h2>Chegando agora?</h2>
-          <p>Descubra por onde começar e como organizar seu sistema pessoal.</p>
-          <NuxtLink to="/docs/getting-started" class="help-link">Abrir primeiros passos <UIcon name="i-lucide-arrow-up-right" /></NuxtLink>
+          <p>Encontre ideias práticas para organizar suas notas, seus hábitos e sua rotina.</p>
+          <NuxtLink to="/blog" class="help-link">Explorar o blog <UIcon name="i-lucide-arrow-up-right" /></NuxtLink>
         </div>
       </aside>
     </div>
@@ -152,7 +151,11 @@ h1 span { color: var(--ui-primary); }
 .release-card { padding: 28px; border: 1px solid var(--ui-border); border-radius: 18px; }
 .release-tags { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
 .category { display: inline-flex; align-items: center; gap: 6px; padding: 5px 9px; border-radius: 6px; color: var(--ui-text-highlighted); background: color-mix(in srgb, var(--ui-primary) 10%, transparent); font-size: 11px; }
-.category.fix { background: color-mix(in srgb, #38bdf8 12%, transparent); }
+.quiet::before { background: var(--ui-text-dimmed); }
+.quiet .release-card { border-style: dashed; }
+.quiet .category { background: var(--ui-bg-elevated); color: var(--ui-text-muted); }
+.quiet .release-card h2 { font-size: 20px; }
+.release-meta time { text-transform: capitalize; }
 .area { font-size: 11px; color: var(--ui-text-dimmed); }
 .release-card h2 { margin-top: 18px; font-size: 25px; line-height: 1.25; letter-spacing: -.035em; font-weight: 600; color: var(--ui-text-highlighted); }
 .release-card h2 a:hover { color: var(--ui-primary); }
