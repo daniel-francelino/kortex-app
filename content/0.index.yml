@@ -1,12 +1,12 @@
 title: Menos abas abertas.
-description: Tire as ideias da cabe?a, d? dire??o ?s tarefas e encontre o seu ritmo. O Kortex re?ne conhecimento e rotina em um sistema pessoal que faz sentido para voc?.
+description: Tire as ideias da cabeça, dê direção às tarefas e encontre o seu ritmo. O Kortex reúne conhecimento e rotina em um sistema pessoal que faz sentido para você.
 seo:
-  title: Kortex | Menos dispers?o. Mais dire??o.
-  description: Organize notas, tarefas, h?bitos, metas e agenda em um s? lugar. Crie espa?o para o que importa com o Kortex, seu sistema pessoal de organiza??o.
+  title: Kortex | Menos dispersão. Mais direção.
+  description: Organize notas, tarefas, hábitos, metas e agenda em um só lugar. Crie espaço para o que importa com o Kortex, seu sistema pessoal de organização.
 navigation: false
 hero:
   links:
-    - label: Come?ar meu Kortex
+    - label: Começar meu Kortex
       icon: i-lucide-arrow-right
       trailing: true
       to: /signup
@@ -18,55 +18,55 @@ hero:
       variant: outline
 sections:
   - id: capturar
-    title: Tire da cabe?a.
-    description: Uma ideia no meio do dia, uma refer?ncia para depois ou algo que voc? n?o pode esquecer. D? um lugar para cada pensamento.
+    title: Tire da cabeça.
+    description: Uma ideia no meio do dia, uma referência para depois ou algo que você não pode esquecer. Dê um lugar para cada pensamento.
     features:
       - title: Comece por uma nota
         description: Registre o que importa no momento.
         icon: i-lucide-notebook-pen
   - id: planejar
-    title: Escolha o pr?ximo passo.
-    description: Organize suas tarefas, defina prioridades e reserve espa?o na agenda. Transforme uma lista solta em um dia com dire??o.
+    title: Escolha o próximo passo.
+    description: Organize suas tarefas, defina prioridades e reserve espaço na agenda. Transforme uma lista solta em um dia com direção.
     features:
-      - title: Planeje com inten??o
-        description: Defina o que merece sua aten??o.
+      - title: Planeje com intenção
+        description: Defina o que merece sua atenção.
         icon: i-lucide-arrow-up-right
   - id: evoluir
     title: Encontre seu ritmo.
-    description: Acompanhe seus h?bitos e registre o que aprendeu no di?rio. Revise o que funcionou e ajuste a rota sem precisar recome?ar do zero.
+    description: Acompanhe seus hábitos e registre o que aprendeu no diário. Revise o que funcionou e ajuste a rota sem precisar recomeçar do zero.
     features:
-      - title: Fa?a espa?o para refletir
-        description: Aprenda com a pr?pria rotina.
+      - title: Faça espaço para refletir
+        description: Aprenda com a própria rotina.
         icon: i-lucide-repeat-2
 features:
-  title: Sua vida tem v?rias partes. Seu sistema pode ser um s?.
-  description: Do pensamento que acabou de surgir ao h?bito que voc? quer construir. Cada coisa encontra seu lugar.
+  title: Sua vida tem várias partes. Seu sistema pode ser um só.
+  description: Do pensamento que acabou de surgir ao hábito que você quer construir. Cada coisa encontra seu lugar.
   items:
-    - title: Ideias que n?o se perdem.
-      description: Re?na notas e refer?ncias, organize com tags e encontre o contexto que voc? precisa para continuar de onde parou.
+    - title: Ideias que não se perdem.
+      description: Reúna notas e referências, organize com tags e encontre o contexto que você precisa para continuar de onde parou.
       icon: i-lucide-notebook-pen
     - title: Clareza para agir.
-      description: Organize tarefas e prioridades para saber qual ? o pr?ximo passo.
+      description: Organize tarefas e prioridades para saber qual é o próximo passo.
       icon: i-lucide-check-check
-    - title: Const?ncia poss?vel.
-      description: Acompanhe h?bitos e enxergue sua evolu??o, um dia de cada vez.
+    - title: Constância possível.
+      description: Acompanhe hábitos e enxergue sua evolução, um dia de cada vez.
       icon: i-lucide-flame
-    - title: Uma dire??o maior.
-      description: Defina metas e acompanhe o caminho entre a inten??o e o resultado.
+    - title: Uma direção maior.
+      description: Defina metas e acompanhe o caminho entre a intenção e o resultado.
       icon: i-lucide-target
     - title: Tempo bem cuidado.
-      description: Veja seus compromissos e organize a agenda com espa?o para a vida real.
+      description: Veja seus compromissos e organize a agenda com espaço para a vida real.
       icon: i-lucide-calendar-days
-    - title: Aprenda com o seu pr?prio caminho.
-      description: Use o di?rio para registrar pensamentos, reconhecer padr?es e entender o que funciona para voc?. Sua experi?ncia tamb?m ? conhecimento.
+    - title: Aprenda com o seu próprio caminho.
+      description: Use o diário para registrar pensamentos, reconhecer padrões e entender o que funciona para você. Sua experiência também é conhecimento.
       icon: i-lucide-book-open
 testimonials:
   title: Feito para a vida real
-  description: Organiza??o no seu ritmo.
+  description: Organização no seu ritmo.
   items: []
 cta:
-  title: D? um lugar para o que importa.
-  description: Comece por uma ideia, uma tarefa ou um h?bito. O seu sistema cresce com voc?.
+  title: Dê um lugar para o que importa.
+  description: Comece por uma ideia, uma tarefa ou um hábito. O seu sistema cresce com você.
   links:
     - label: Criar minha conta
       to: /signup
