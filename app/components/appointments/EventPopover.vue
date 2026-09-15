@@ -17,14 +17,17 @@ const emit = defineEmits<{
 }>()
 
 const popoverRef = ref<HTMLElement | null>(null)
+const isMobile = useMediaQuery('(max-width: 1023px)')
 
 const popoverStyle = computed(() => {
   if (!props.visible || !props.position) return { display: 'none' }
 
   const viewportW = typeof window !== 'undefined' ? window.innerWidth : 1200
   const viewportH = typeof window !== 'undefined' ? window.innerHeight : 800
-  const cardW = 320
-  const cardH = 280
+  // Mobile renders larger text/buttons (see template) — reserve more room so
+  // the collision math below doesn't clip the taller/wider card off-screen.
+  const cardW = isMobile.value ? 320 : 288
+  const cardH = isMobile.value ? 320 : 260
 
   let left = props.position.x + 8
   let top = props.position.y - 40
@@ -96,7 +99,7 @@ onBeforeUnmount(() => {
         v-if="visible && event"
         ref="popoverRef"
         :style="popoverStyle"
-        class="w-72 overflow-hidden rounded-xl border border-default bg-default shadow-2xl"
+        class="max-lg:w-80 lg:w-72 overflow-hidden rounded-xl border border-default bg-default shadow-2xl"
       >
         <!-- Top color bar -->
         <div
@@ -105,50 +108,50 @@ onBeforeUnmount(() => {
         />
 
         <!-- Header -->
-        <div class="flex items-start justify-between px-3 pt-3 pb-1">
+        <div class="flex items-start justify-between max-lg:px-4 max-lg:pt-4 lg:px-3 lg:pt-3 pb-1">
           <div class="min-w-0 flex-1 pr-2">
-            <h4 class="text-sm font-semibold leading-snug text-highlighted">
+            <h4 class="max-lg:text-base lg:text-sm font-semibold leading-snug text-highlighted">
               {{ event.title }}
             </h4>
-            <p class="mt-0.5 text-[11px] text-muted">
+            <p class="mt-0.5 max-lg:text-sm lg:text-[11px] text-muted">
               {{ getTimeRange(event) }}
             </p>
           </div>
           <button
-            class="-mr-1 -mt-0.5 rounded p-0.5 text-muted transition-colors hover:bg-elevated hover:text-highlighted"
+            class="-mr-1 -mt-0.5 rounded max-lg:p-1.5 lg:p-0.5 text-muted transition-colors hover:bg-elevated hover:text-highlighted"
             @click="emit('close')"
           >
-            <UIcon name="i-lucide-x" class="size-3.5" />
+            <UIcon name="i-lucide-x" class="max-lg:size-5 lg:size-3.5" />
           </button>
         </div>
 
         <!-- Details -->
-        <div class="space-y-1.5 px-3 py-2 text-[11px] text-muted">
+        <div class="max-lg:space-y-2.5 lg:space-y-1.5 max-lg:px-4 lg:px-3 max-lg:py-3 lg:py-2 max-lg:text-sm lg:text-[11px] text-muted">
           <div v-if="event.location" class="flex items-center gap-2">
-            <UIcon name="i-lucide-map-pin" class="size-3 shrink-0" />
+            <UIcon name="i-lucide-map-pin" class="max-lg:size-4 lg:size-3 shrink-0" />
             <span class="truncate">{{ event.location }}</span>
           </div>
           <div v-if="event.calendar?.name" class="flex items-center gap-2">
             <span
-              class="inline-block size-2.5 shrink-0 rounded-full"
+              class="inline-block max-lg:size-3 lg:size-2.5 shrink-0 rounded-full"
               :style="{ backgroundColor: event.calendar.color ?? '#10b981' }"
             />
             <span class="truncate">{{ event.calendar.name }}</span>
           </div>
           <div v-if="event.rrule" class="flex items-center gap-2">
-            <UIcon name="i-lucide-repeat" class="size-3 shrink-0" />
+            <UIcon name="i-lucide-repeat" class="max-lg:size-4 lg:size-3 shrink-0" />
             <span>Recorrente</span>
           </div>
-          <p v-if="event.description" class="line-clamp-2 leading-relaxed">
+          <p v-if="event.description" class="max-lg:line-clamp-3 lg:line-clamp-2 leading-relaxed">
             {{ event.description }}
           </p>
         </div>
 
         <!-- Actions -->
-        <div class="flex items-center justify-end gap-0.5 border-t border-default/50 px-2 py-1.5">
+        <div class="flex items-center justify-end max-lg:gap-1.5 lg:gap-0.5 border-t border-default/50 max-lg:px-3 lg:px-2 max-lg:py-2 lg:py-1.5">
           <UButton
             icon="i-lucide-pencil"
-            size="xs"
+            :size="isMobile ? 'lg' : 'xs'"
             variant="ghost"
             color="neutral"
             title="Editar"
@@ -156,7 +159,7 @@ onBeforeUnmount(() => {
           />
           <UButton
             icon="i-lucide-copy"
-            size="xs"
+            :size="isMobile ? 'lg' : 'xs'"
             variant="ghost"
             color="neutral"
             title="Duplicar"
@@ -164,7 +167,7 @@ onBeforeUnmount(() => {
           />
           <UButton
             icon="i-lucide-trash-2"
-            size="xs"
+            :size="isMobile ? 'lg' : 'xs'"
             variant="ghost"
             color="error"
             title="Remover"

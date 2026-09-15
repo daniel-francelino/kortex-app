@@ -37,7 +37,9 @@
       "Bash(cd \"C:\\\\Users\\\\daniel.francelino\\\\Desktop\\\\projects_study\\\\kortex\\\\kortex-api\" && cat package.json)",
       "Read(//c/Users/daniel.francelino/Desktop/projects_study/kortex/kortex-api/**)",
       "Bash(cd \"C:\\\\Users\\\\daniel.francelino\\\\Desktop\\\\projects_study\\\\kortex\\\\kortex-api\" && ls node_modules/.bin/tsc* 2>&1 | head -5)",
-      "Bash(npx prettier *)"
+      "Bash(npx prettier *)",
+      "Bash(cd \"C:\\\\Users\\\\daniel.francelino\\\\Desktop\\\\projects_study\\\\kortex\" && echo \"--- kortex-app structure ---\" && find kortex-app/server -maxdepth 4 -type d 2>/dev/null && echo \"--- kortex-api structure ---\" && find kortex-api/src -maxdepth 3 -type d 2>/dev/null)",
+      "Read(//c/Users/daniel.francelino/Desktop/projects_study/kortex/**)"
     ],
     "additionalDirectories": [
       "C:\\Users\\daniel.francelino\\Desktop\\projects_study\\kortex\\kortex-api\\src\\utils",

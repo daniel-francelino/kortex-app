@@ -41,6 +41,7 @@ const {
 } = useAppointments()
 const { user } = useAuth()
 const toast = useToast()
+const isMobile = useMediaQuery('(max-width: 1023px)')
 
 const editing = ref(false)
 const saving = ref(false)
@@ -375,14 +376,24 @@ function formatTimeRange(evt: CalendarEvent): string {
     @update:open="emit('update:open', $event)"
   >
     <template #header>
-      <div class="flex items-center gap-2">
-        <span
-          class="inline-block size-3 rounded-full"
-          :style="{ backgroundColor: eventColor }"
+      <div class="flex w-full items-center justify-between gap-2">
+        <div class="flex min-w-0 items-center gap-2">
+          <span
+            class="inline-block size-3 shrink-0 rounded-full"
+            :style="{ backgroundColor: eventColor }"
+          />
+          <span class="max-lg:text-base lg:text-sm font-semibold text-highlighted truncate">
+            {{ event?.title ?? 'Detalhes do evento' }}
+          </span>
+        </div>
+        <UButton
+          icon="i-lucide-x"
+          :size="isMobile ? 'lg' : 'sm'"
+          color="neutral"
+          variant="ghost"
+          aria-label="Fechar"
+          @click="emit('update:open', false)"
         />
-        <span class="text-sm font-semibold text-highlighted truncate">
-          {{ event?.title ?? 'Detalhes do evento' }}
-        </span>
       </div>
     </template>
 
@@ -413,16 +424,16 @@ function formatTimeRange(evt: CalendarEvent): string {
           class="mb-4 border-l-4 pl-3 pb-1"
           :style="{ borderColor: eventColor }"
         >
-          <h3 class="text-base font-semibold leading-snug text-highlighted">
+          <h3 class="max-lg:text-lg lg:text-base font-semibold leading-snug text-highlighted">
             {{ event.title }}
           </h3>
-          <p class="mt-0.5 text-xs text-muted">
+          <p class="mt-0.5 max-lg:text-sm lg:text-xs text-muted">
             {{ formatTimeRange(event) }}
           </p>
         </div>
 
         <!-- Rows with icons -->
-        <div class="space-y-3 text-sm">
+        <div class="max-lg:space-y-4 lg:space-y-3 max-lg:text-base lg:text-sm">
           <!-- Date/time -->
           <div class="flex items-start gap-3">
             <UIcon name="i-lucide-clock" class="mt-0.5 size-4 shrink-0 text-muted" />
@@ -531,7 +542,7 @@ function formatTimeRange(evt: CalendarEvent): string {
             <UButton
               label="Aceitar"
               icon="i-lucide-check"
-              size="xs"
+              :size="isMobile ? 'md' : 'xs'"
               :color="myParticipation.rsvpStatus === 'accepted' ? 'success' : 'neutral'"
               :variant="myParticipation.rsvpStatus === 'accepted' ? 'solid' : 'outline'"
               :loading="respondingRsvp"
@@ -540,7 +551,7 @@ function formatTimeRange(evt: CalendarEvent): string {
             <UButton
               label="Talvez"
               icon="i-lucide-help-circle"
-              size="xs"
+              :size="isMobile ? 'md' : 'xs'"
               :color="myParticipation.rsvpStatus === 'tentative' ? 'warning' : 'neutral'"
               :variant="myParticipation.rsvpStatus === 'tentative' ? 'solid' : 'outline'"
               :loading="respondingRsvp"
@@ -549,7 +560,7 @@ function formatTimeRange(evt: CalendarEvent): string {
             <UButton
               label="Recusar"
               icon="i-lucide-x"
-              size="xs"
+              :size="isMobile ? 'md' : 'xs'"
               :color="myParticipation.rsvpStatus === 'declined' ? 'error' : 'neutral'"
               :variant="myParticipation.rsvpStatus === 'declined' ? 'solid' : 'outline'"
               :loading="respondingRsvp"
@@ -569,13 +580,13 @@ function formatTimeRange(evt: CalendarEvent): string {
               v-model="newParticipantEmail"
               type="email"
               placeholder="email@exemplo.com"
-              size="sm"
+              :size="isMobile ? 'md' : 'sm'"
               class="flex-1"
               @keydown.enter="onInviteParticipant"
             />
             <UButton
               icon="i-lucide-plus"
-              size="sm"
+              :size="isMobile ? 'md' : 'sm'"
               color="primary"
               variant="subtle"
               :loading="invitingParticipant"
@@ -591,7 +602,7 @@ function formatTimeRange(evt: CalendarEvent): string {
             <li
               v-for="participant in participants"
               :key="participant.id"
-              class="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-elevated"
+              class="flex items-center gap-2 rounded-md px-2 max-lg:py-2 lg:py-1.5 max-lg:text-base lg:text-sm hover:bg-elevated"
             >
               <UIcon name="i-lucide-user" class="size-3.5 shrink-0 text-dimmed" />
               <span class="flex-1 truncate">{{ participant.invitedEmail }}</span>
@@ -605,7 +616,7 @@ function formatTimeRange(evt: CalendarEvent): string {
               <UButton
                 v-if="isOwner"
                 icon="i-lucide-x"
-                size="xs"
+                :size="isMobile ? 'md' : 'xs'"
                 color="neutral"
                 variant="ghost"
                 @click="onRemoveParticipant(participant)"
@@ -615,12 +626,13 @@ function formatTimeRange(evt: CalendarEvent): string {
         </div>
 
         <!-- Actions -->
-        <div v-if="isOwner" class="mt-6 flex flex-wrap gap-2 border-t border-default pt-4">
+        <div v-if="isOwner" class="mt-6 flex max-lg:flex-col lg:flex-wrap gap-2 border-t border-default pt-4">
           <UButton
             label="Editar"
             icon="i-lucide-pencil"
             variant="outline"
-            size="sm"
+            :size="isMobile ? 'lg' : 'sm'"
+            :block="isMobile"
             @click="editing = true"
           />
           <UButton
@@ -628,7 +640,8 @@ function formatTimeRange(evt: CalendarEvent): string {
             label="Cancelar ocorrência"
             icon="i-lucide-x"
             variant="outline"
-            size="sm"
+            :size="isMobile ? 'lg' : 'sm'"
+            :block="isMobile"
             color="error"
             @click="onCancelOccurrence(event.recurrenceId)"
           />
@@ -636,7 +649,8 @@ function formatTimeRange(evt: CalendarEvent): string {
             label="Arquivar"
             icon="i-lucide-archive"
             variant="outline"
-            size="sm"
+            :size="isMobile ? 'lg' : 'sm'"
+            :block="isMobile"
             color="error"
             :loading="archiving"
             @click="onArchive"
@@ -673,25 +687,25 @@ function formatTimeRange(evt: CalendarEvent): string {
                 <UCheckbox
                   :model-value="state.allDay"
                   label="Dia inteiro"
-                  size="sm"
+                  :size="isMobile ? 'md' : 'sm'"
                   @update:model-value="state.allDay = Boolean($event)"
                 />
               </div>
               <div class="flex flex-wrap items-center gap-2">
-                <UInputDate v-model="startDateValue" size="sm" :leading-icon="null" />
+                <UInputDate v-model="startDateValue" :size="isMobile ? 'md' : 'sm'" :leading-icon="null" />
                 <UInputTime
                   v-if="!state.allDay"
                   v-model="startTimeValue"
                   granularity="minute"
-                  size="sm"
+                  :size="isMobile ? 'md' : 'sm'"
                 />
-                <span class="text-xs text-muted">até</span>
-                <UInputDate v-model="endDateValue" size="sm" :leading-icon="null" />
+                <span class="max-lg:text-sm lg:text-xs text-muted">até</span>
+                <UInputDate v-model="endDateValue" :size="isMobile ? 'md' : 'sm'" :leading-icon="null" />
                 <UInputTime
                   v-if="!state.allDay"
                   v-model="endTimeValue"
                   granularity="minute"
-                  size="sm"
+                  :size="isMobile ? 'md' : 'sm'"
                 />
               </div>
             </div>
@@ -708,7 +722,7 @@ function formatTimeRange(evt: CalendarEvent): string {
               v-model="state.location"
               placeholder="Adicionar local"
               variant="none"
-              size="sm"
+              :size="isMobile ? 'md' : 'sm'"
               class="flex-1"
             />
           </div>
@@ -724,8 +738,8 @@ function formatTimeRange(evt: CalendarEvent): string {
               v-model="rruleModel"
               :items="recurrenceOptions"
               value-key="value"
-              size="sm"
-              class="w-48"
+              :size="isMobile ? 'md' : 'sm'"
+              class="max-lg:w-full lg:w-48"
             />
           </div>
         </div>
@@ -743,8 +757,8 @@ function formatTimeRange(evt: CalendarEvent): string {
               v-model="state.calendarId"
               :items="calendarOptions"
               placeholder="Selecione..."
-              size="sm"
-              class="w-52"
+              :size="isMobile ? 'md' : 'sm'"
+              class="max-lg:w-full lg:w-52"
             />
           </div>
         </div>
@@ -766,12 +780,13 @@ function formatTimeRange(evt: CalendarEvent): string {
         </div>
 
         <!-- Actions -->
-        <div class="flex gap-2 border-t border-default pt-4">
+        <div class="flex max-lg:flex-col lg:flex-row gap-2 border-t border-default pt-4">
           <UButton
             type="submit"
             label="Salvar"
             icon="i-lucide-check"
-            size="sm"
+            :size="isMobile ? 'lg' : 'sm'"
+            :block="isMobile"
             :loading="saving"
             :disabled="saving"
           />
@@ -779,7 +794,8 @@ function formatTimeRange(evt: CalendarEvent): string {
             label="Cancelar"
             variant="ghost"
             color="neutral"
-            size="sm"
+            :size="isMobile ? 'lg' : 'sm'"
+            :block="isMobile"
             @click="editing = false"
           />
         </div>
@@ -793,6 +809,7 @@ function formatTimeRange(evt: CalendarEvent): string {
               label="Somente esta"
               variant="outline"
               block
+              :size="isMobile ? 'lg' : 'md'"
               :loading="saving"
               @click="saveWithScope('this')"
             />
@@ -800,6 +817,7 @@ function formatTimeRange(evt: CalendarEvent): string {
               label="Esta e as seguintes"
               variant="outline"
               block
+              :size="isMobile ? 'lg' : 'md'"
               :loading="saving"
               @click="saveWithScope('this-and-following')"
             />
@@ -807,6 +825,7 @@ function formatTimeRange(evt: CalendarEvent): string {
               label="Todas as ocorrências"
               variant="outline"
               block
+              :size="isMobile ? 'lg' : 'md'"
               :loading="saving"
               @click="saveWithScope('all')"
             />
