@@ -11,13 +11,7 @@ const { data: versions, status, error, refresh } = await useAsyncData('public-ch
 const title = page.value?.seo?.title || page.value?.title || 'Novidades do Kortex'
 const description = page.value?.seo?.description || page.value?.description || 'Acompanhe as melhorias e correções do Kortex.'
 const reducedMotion = useMediaQuery('(prefers-reduced-motion: reduce)')
-const selected = ref('all')
-const filters = [
-  { value: 'all', label: 'Todos os meses' },
-  { value: 'updates', label: 'Com novidades' },
-  { value: 'empty', label: 'Sem registros' }
-]
-const filteredVersions = computed(() => (versions.value ?? []).filter(version => selected.value === 'all' || (selected.value === 'updates' ? version.hasUpdates : !version.hasUpdates)))
+const filteredVersions = computed(() => (versions.value ?? []).filter(version => version.hasUpdates))
 const latest = computed(() => versions.value?.find(version => version.hasUpdates))
 function formatMonth(value: string | Date) {
   return new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric', timeZone: 'UTC' }).format(new Date(value))
@@ -50,16 +44,7 @@ defineOgImageComponent('Saas')
 
     <div class="changelog-layout">
       <div class="min-w-0">
-        <div class="filter-bar" role="group" aria-label="Filtrar atualizações">
-          <button
-            v-for="filter in filters"
-            :key="filter.value"
-            type="button"
-            :aria-pressed="selected === filter.value"
-            :class="{ selected: selected === filter.value }"
-            @click="selected = filter.value"
-          >{{ filter.label }}</button>
-        </div>
+        <p class="pb-5 text-sm text-muted">Novidades organizadas por mês, das mais recentes às primeiras melhorias.</p>
         <p class="sr-only" aria-live="polite">{{ filteredVersions.length }} meses encontrados.</p>
         <div v-if="status === 'pending'" class="space-y-5 py-8" role="status" aria-label="Carregando novidades">
           <USkeleton class="h-48 rounded-2xl" /><USkeleton class="h-48 rounded-2xl" />
@@ -140,10 +125,6 @@ h1 span { color: var(--ui-primary); }
 .hero-description { max-width: 590px; margin-top: 24px; font-size: 17px; line-height: 1.8; color: var(--ui-text-muted); }
 .latest-date { display: flex; align-items: center; gap: 8px; margin-top: 26px; font-size: 12px; color: var(--ui-text-dimmed); }
 .changelog-layout { display: grid; grid-template-columns: minmax(0, 1fr) 270px; gap: 64px; }
-.filter-bar { display: flex; flex-wrap: wrap; gap: 8px; padding: 18px 0; border-block: 1px solid var(--ui-border); }
-.filter-bar button { min-height: 44px; padding: 8px 14px; border: 1px solid transparent; border-radius: 8px; font-size: 12px; color: var(--ui-text-muted); cursor: pointer; }
-.filter-bar button:hover { background: var(--ui-bg-elevated); }
-.filter-bar button.selected { background: color-mix(in srgb, var(--ui-primary) 9%, transparent); border-color: color-mix(in srgb, var(--ui-primary) 25%, transparent); color: var(--ui-text-highlighted); }
 .release { position: relative; margin: 32px 0 0 8px; padding: 0 0 8px 28px; border-left: 1px solid var(--ui-border); scroll-margin-top: 100px; }
 .release::before { content: ''; position: absolute; top: 5px; left: -5px; width: 9px; height: 9px; border-radius: 50%; background: var(--ui-primary); box-shadow: 0 0 0 5px var(--ui-bg); }
 .release-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 18px; font-size: 12px; color: var(--ui-text-muted); }

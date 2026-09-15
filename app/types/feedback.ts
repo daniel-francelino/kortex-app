@@ -33,6 +33,7 @@ export interface FeedbackAttachment {
   fileName: string
   fileUrl: string
   fileType: string
+  fileSize?: number
   createdAt: string
 }
 
@@ -75,7 +76,6 @@ export interface CreateFeedbackPayload {
   title: string
   description: string
   techContext?: TechContext | null
-  attachments?: { fileName: string, fileUrl: string, fileType: string }[]
 }
 
 export interface UpdateFeedbackPayload {

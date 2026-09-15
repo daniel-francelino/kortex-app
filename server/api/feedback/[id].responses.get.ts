@@ -8,7 +8,7 @@ const querySchema = z.object({
 })
 
 export default eventHandler(async (event) => {
-  await requireAuthUser(event)
+  const user = await requireAuthUser(event)
   const id = getRouterParam(event, 'id')
 
   if (!id) {
@@ -19,6 +19,9 @@ export default eventHandler(async (event) => {
   const params = querySchema.parse(query)
 
   const supabase = getSupabaseAdminClient()
+
+  const { data: owner } = await supabase.from('feedbacks').select('id').eq('id', id).eq('user_id', user.id).single()
+  if (!owner) throw createError({ statusCode: 404, message: 'Feedback não encontrado.' })
 
   const from = (params.page - 1) * params.pageSize
   const to = from + params.pageSize - 1

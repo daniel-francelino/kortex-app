@@ -1,8 +1,8 @@
 import { getSupabaseAdminClient } from '../../../utils/supabase'
-import { requireAuthUser } from '../../../utils/require-auth'
+import { requireFeedbackAdmin } from '../../../utils/require-feedback-admin'
 
 export default eventHandler(async (event) => {
-  await requireAuthUser(event)
+  await requireFeedbackAdmin(event)
   const id = getRouterParam(event, 'id')
 
   if (!id) {

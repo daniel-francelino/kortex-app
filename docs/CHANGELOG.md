@@ -1,28 +1,20 @@
-# Atualizações públicas do Kortex
+# Changelog mensal
 
-O changelog usa arquivos Markdown em `content/4.changelog`. A página exibe somente entradas com `published: true`, ordenadas da data mais recente para a mais antiga. Em datas iguais, usa o nome do arquivo como desempate.
+A página pública usa os Markdown em content/4.changelog, filtrados por published: true e ordenados por date decrescente. Mantenha somente uma entrada publicada por mês, com nome AAAA-MM.md.
 
-## Como adicionar uma atualização
+Campos: title e description descrevem o benefício; month usa AAAA-MM; date é o corte do resumo (último dia de meses encerrados); hasUpdates informa se há novidades confirmadas; partial identifica um resumo ainda em andamento; areas lista os recursos envolvidos. published controla a publicação editorial. O corpo explica mudanças úteis ao usuário, sem detalhes internos ou promessas futuras.
 
-Use o nome `AAAA-MM-DD-assunto.md` e inclua:
+Publique apenas meses com novidades confirmadas (hasUpdates: true). Meses sem registros não ganham cards. Não publique meses futuros. Atualize o mesmo card durante o mês. Os dez exemplos antigos e os três resumos diários de setembro permanecem como rascunhos para evitar duplicação.
 
-```yaml
----
-title: Um título que explique o benefício
-description: Resumo do que mudou para quem usa o produto.
-date: "2026-09-15"
-published: false
-category: improvement
-areas:
-  - Notas
-action:
-  label: Abrir minhas notas
-  to: /app/notes
----
-```
+## Auditoria de 2026
 
-Categorias: `new` (novo recurso), `improvement` (melhoria) ou `fix` (correção). O corpo deve explicar a mudança em linguagem simples e, quando necessário, como usar ou ativar o recurso. O link de ação é opcional.
+Histórico alcançável consultado até 15/09/2026, sem merges, agrupado pela data de autoria dos commits. Foram encontrados 509 commits: março (217), junho (84), agosto (152), setembro (56). Janeiro, fevereiro, abril, maio e julho não têm registros no histórico consultado. Setembro é parcial. Datas dos commits indicam desenvolvimento, não comprovam o dia de implantação.
 
-Antes de marcar `published: true`, confirme que a mudança está disponível e que a data corresponde à publicação. O campo é uma decisão editorial, não um agendador. Evite detalhes de infraestrutura, promessas futuras, métricas não verificadas e versões inventadas.
+Referências usadas para os destaques (revisadas junto aos arquivos alterados):
 
-As dez entradas antigas de exemplo foram preservadas como rascunhos: a ausência de `published` equivale a `false`. Elas continham descrições genéricas, imagens decorativas e uma mesma data; não devem reaparecer como histórico confirmado sem revisão.
+- Março: c1d0e45 hábitos; 76c4c2c tarefas; bfb2854 metas; 14c2806 diário; 3f6b4b7 agenda; 42e53df sequências de hábitos; 54fe696 identidades.
+- Junho: 7eeed0c pastas; ddc54a4 subpastas; f928852 busca; 3af57b6 links entre notas; 2607d6f salvamento; 588b3f3 tabelas; d687128 colunas; 4d43130 comandos; 0f973de humor; 0dca274 arraste na agenda.
+- Agosto: 131fa65 notas fixadas; e55829a compartilhamento; d4df189 lixeira; 7239acf etiquetas; 473cafd salvamento do diário; c7c6094 PIN; 8d53d37 metas e hábitos; a7a480f participantes; 3f27af2 calendário ICS; 8ad0a8c agendamentos; e606823 zoom na agenda.
+- Setembro: ab4b3da e 06afdae sequências; 9f78b18 recorrências; 1cfb6af confirmação; 10fa1ff fuso horário; a2645d2 notificações; 014e6c8 detalhes de eventos; 6b9addd iPhone; 139ee44 planos mensais; 230c55e rodapé; 7107a8c blog.
+
+Refatorações, infraestrutura, diagnósticos temporários, documentação técnica e mudanças revertidas foram excluídos dos destaques públicos.

@@ -1,3 +1,4 @@
+import { mapFeedback } from '../../utils/feedback-mappers'
 import { z } from 'zod'
 import { getSupabaseAdminClient } from '../../utils/supabase'
 import { requireAuthUser } from '../../utils/require-auth'
@@ -38,7 +39,7 @@ export default eventHandler(async (event) => {
   }
 
   return {
-    data: data ?? [],
+    data: (data ?? []).map(mapFeedback),
     total: count ?? 0,
     page: params.page,
     pageSize: params.pageSize

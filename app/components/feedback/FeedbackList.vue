@@ -1,37 +1,39 @@
 <script setup lang="ts">
-import type { Feedback } from '~/types/feedback'
+import type { Feedback } from "~/types/feedback";
 import {
   feedbackTypeLabels,
   feedbackTypeIcons,
   feedbackTypeColors,
-  feedbackPriorityLabels,
-  feedbackPriorityColors
-} from '~/types/feedback'
-import { formatDisplay } from '#shared/utils/dateTime'
+} from "~/types/feedback";
+import { formatDisplay } from "#shared/utils/dateTime";
 
 defineProps<{
-  feedbacks: Feedback[]
-  loading: boolean
-  total: number
-  page: number
-  pageSize: number
-}>()
+  feedbacks: Feedback[];
+  loading: boolean;
+  total: number;
+  page: number;
+  pageSize: number;
+}>();
 
 const emit = defineEmits<{
-  'select': [feedback: Feedback]
-  'delete': [id: string]
-  'update:page': [page: number]
-}>()
+  select: [feedback: Feedback];
+  delete: [id: string];
+  "update:page": [page: number];
+}>();
 
 function formatDate(iso: string) {
-  return formatDisplay(iso, "dd 'de' MMM'.' 'de' yyyy")
+  return formatDisplay(iso, "dd 'de' MMM'.' 'de' yyyy");
 }
 </script>
 
 <template>
   <div class="space-y-3">
     <template v-if="loading">
-      <div v-for="i in 5" :key="i" class="flex flex-col gap-2 p-4 rounded-lg border border-default">
+      <div
+        v-for="i in 5"
+        :key="i"
+        class="flex flex-col gap-2 p-4 rounded-lg border border-default"
+      >
         <USkeleton class="h-5 w-2/3" />
         <USkeleton class="h-4 w-1/3" />
         <USkeleton class="h-4 w-full" />
@@ -49,12 +51,21 @@ function formatDate(iso: string) {
       <div
         v-for="fb in feedbacks"
         :key="fb.id"
-        class="flex flex-col gap-2 p-4 rounded-lg border border-default hover:bg-elevated/50 cursor-pointer transition-colors"
+        role="button"
+        tabindex="0"
+        class="flex flex-col gap-2 p-4 rounded-xl border border-default hover:bg-elevated/50 cursor-pointer transition-colors focus-visible:outline-2 focus-visible:outline-primary"
+        @keydown.enter="emit('select', fb)"
+        @keydown.space.prevent="emit('select', fb)"
         @click="emit('select', fb)"
       >
         <div class="flex items-center gap-2">
-          <UIcon :name="feedbackTypeIcons[fb.type]" :class="`text-${feedbackTypeColors[fb.type]}`" />
-          <span class="font-medium text-sm flex-1 truncate">{{ fb.title }}</span>
+          <UIcon
+            :name="feedbackTypeIcons[fb.type]"
+            :class="`text-${feedbackTypeColors[fb.type]}`"
+          />
+          <span class="font-medium text-sm flex-1 truncate">{{
+            fb.title
+          }}</span>
           <FeedbackStatusBadge :status="fb.status" />
         </div>
         <div class="flex items-center gap-3 text-xs text-dimmed">
@@ -62,12 +73,6 @@ function formatDate(iso: string) {
             :label="feedbackTypeLabels[fb.type]"
             :color="feedbackTypeColors[fb.type]"
             variant="subtle"
-            size="xs"
-          />
-          <UBadge
-            :label="feedbackPriorityLabels[fb.priority]"
-            :color="feedbackPriorityColors[fb.priority]"
-            variant="outline"
             size="xs"
           />
           <span>{{ formatDate(fb.createdAt) }}</span>

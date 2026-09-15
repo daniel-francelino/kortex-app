@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { getSupabaseAdminClient } from '../../../utils/supabase'
-import { requireAuthUser } from '../../../utils/require-auth'
+import { requireFeedbackAdmin } from '../../../utils/require-feedback-admin'
 
 const bodySchema = z.object({
   entityType: z.string().min(1, 'Tipo de entidade é obrigatório'),
@@ -11,7 +11,7 @@ const bodySchema = z.object({
 })
 
 export default eventHandler(async (event) => {
-  await requireAuthUser(event)
+  await requireFeedbackAdmin(event)
   const id = getRouterParam(event, 'id')
 
   if (!id) {

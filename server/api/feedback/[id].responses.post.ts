@@ -24,14 +24,13 @@ export default eventHandler(async (event) => {
     .from('feedbacks')
     .select('id, user_id')
     .eq('id', id)
+    .eq('user_id', user.id)
     .single()
 
   if (fetchError || !feedback) {
     throw createError({ statusCode: 404, statusMessage: 'Feedback não encontrado' })
   }
 
-  const record = feedback as Record<string, unknown>
-  const isOwner = record.user_id === user.id
 
   const { data, error } = await supabase
     .from('feedback_responses')
@@ -39,7 +38,7 @@ export default eventHandler(async (event) => {
       feedback_id: id,
       user_id: user.id,
       content: parsed.content,
-      is_admin: !isOwner
+      is_admin: false
     })
     .select()
     .single()

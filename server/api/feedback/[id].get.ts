@@ -1,3 +1,4 @@
+import { mapFeedback } from '../../utils/feedback-mappers'
 import { getSupabaseAdminClient } from '../../utils/supabase'
 import { requireAuthUser } from '../../utils/require-auth'
 
@@ -22,5 +23,5 @@ export default eventHandler(async (event) => {
     throw createError({ statusCode: 404, statusMessage: 'Feedback não encontrado' })
   }
 
-  return data
+  return mapFeedback(data)
 })
