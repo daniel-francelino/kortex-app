@@ -135,7 +135,11 @@ export const collections = {
       title: z.string().nonempty(),
       description: z.string(),
       date: z.date(),
-      image: z.string()
+      published: z.boolean().default(false),
+      category: z.enum(['improvement', 'fix', 'new']).default('improvement'),
+      areas: z.array(z.string()).default([]),
+      action: z.object({ label: z.string(), to: z.string() }).optional(),
+      image: z.string().optional()
     })
   })
 }
