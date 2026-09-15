@@ -49,7 +49,7 @@ const { setCompleted, startIfNeeded } = useGuidedTour()
 const { consumeHabitHandoff, pendingHabitHandoff } = useOnboarding()
 
 // Same breakpoint/pattern as the Agenda and Agendamento mobile "+" button
-// (app/pages/app/appointments.vue, app/pages/app/scheduling.vue) — a fixed
+// (app/pages/app/appointments/index.vue, app/pages/app/appointments/scheduling/index.vue) — a fixed
 // floating button instead of a cramped icon inside the navbar.
 const isMobile = useMediaQuery('(max-width: 1023px)')
 

@@ -22,7 +22,7 @@ function formatDateTime(iso: string): string {
 </script>
 
 <template>
-  <UCard :to="`/app/scheduling-bookings/${props.booking.schedulingPageId}`">
+  <UCard :to="`/app/appointments/bookings/${props.booking.schedulingPageId}`">
     <template #header>
       <div class="flex items-center justify-between">
         <p class="text-sm font-medium text-highlighted">

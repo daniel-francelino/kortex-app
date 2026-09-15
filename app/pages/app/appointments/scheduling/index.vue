@@ -43,11 +43,11 @@ function onCreate() {
 }
 
 function onCreated(pageId: string) {
-  router.push(`/app/scheduling/${pageId}`)
+  router.push(`/app/appointments/scheduling/${pageId}`)
 }
 
 function onOpenEditor(page: SchedulingPage) {
-  router.push(`/app/scheduling/${page.id}`)
+  router.push(`/app/appointments/scheduling/${page.id}`)
 }
 
 async function onToggleActive(page: SchedulingPage, value: boolean) {
@@ -58,7 +58,7 @@ async function onDuplicate(page: SchedulingPage) {
   duplicatingId.value = page.id
   const created = await duplicateSchedulingPage(page.id)
   duplicatingId.value = null
-  if (created) router.push(`/app/scheduling/${created.id}`)
+  if (created) router.push(`/app/appointments/scheduling/${created.id}`)
 }
 
 async function onArchive(page: SchedulingPage) {
@@ -206,7 +206,7 @@ function openPreview(page: SchedulingPage) {
                     :items="[
                       [
                         { label: 'Duplicar', icon: 'i-lucide-copy-plus', onSelect: () => onDuplicate(page) },
-                        { label: 'Ver reservas', icon: 'i-lucide-list', to: `/app/scheduling-bookings/${page.id}` }
+                        { label: 'Ver reservas', icon: 'i-lucide-list', to: `/app/appointments/bookings/${page.id}` }
                       ],
                       [
                         { label: 'Regenerar link', icon: 'i-lucide-refresh-cw', onSelect: () => onRegenerateToken(page) }

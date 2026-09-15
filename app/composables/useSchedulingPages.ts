@@ -391,7 +391,7 @@ export function useSchedulingPages() {
   // These two are deliberately not routed through runOptimisticAction/the
   // offline queue like the rest of this composable: bookings aren't kept in
   // `pagesById` (they live in the caller's own useAsyncData, e.g.
-  // scheduling-bookings/[id].vue), and approving/cancelling someone's
+  // appointments/bookings/[id].vue), and approving/cancelling someone's
   // real-world meeting is exactly the kind of action that should surface a
   // clear error immediately rather than silently retry later while offline.
   async function approveBooking(pageId: string, bookingId: string): Promise<Booking | null> {

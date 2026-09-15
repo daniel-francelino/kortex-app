@@ -5,7 +5,7 @@ import { requireAuthUser } from '../../../../utils/require-auth'
  * Surfaces the scheduling-link booking behind a calendar event, if any — the
  * gap flagged in docs/appointments/AUDITORIA_LINK_AGENDAMENTO_UX.md §1.3
  * item 1: a guest's form answers were only ever visible in
- * /app/scheduling-bookings/[id], never from the Agenda itself, even though
+ * /app/appointments/bookings/[id], never from the Agenda itself, even though
  * the Agenda is exactly where a host is already looking at the meeting.
  *
  * Deliberately owner-only (not the broader "owner OR shared-calendar viewer

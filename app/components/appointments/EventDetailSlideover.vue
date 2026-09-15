@@ -500,7 +500,7 @@ function formatTimeRange(evt: CalendarEvent): string {
               color="neutral"
               variant="link"
               class="mt-2 px-0"
-              :to="`/app/scheduling-bookings/${eventBooking.schedulingPageId}`"
+              :to="`/app/appointments/bookings/${eventBooking.schedulingPageId}`"
             />
           </div>
 

@@ -332,7 +332,7 @@ async function onDuplicate() {
   duplicating.value = true
   const created = await duplicateSchedulingPage(pageId)
   duplicating.value = false
-  if (created) router.push(`/app/scheduling/${created.id}`)
+  if (created) router.push(`/app/appointments/scheduling/${created.id}`)
 }
 
 const regenerateConfirmOpen = ref(false)
@@ -353,7 +353,7 @@ async function onArchive() {
   archiving.value = true
   const success = await archiveSchedulingPage(pageId)
   archiving.value = false
-  if (success) router.push('/app/scheduling')
+  if (success) router.push('/app/appointments/scheduling')
 }
 
 function onPreview() {
@@ -454,7 +454,7 @@ if (import.meta.client) {
             color="neutral"
             variant="ghost"
             square
-            to="/app/scheduling"
+            to="/app/appointments/scheduling"
           />
         </template>
 
@@ -524,7 +524,7 @@ if (import.meta.client) {
         <p class="text-sm text-muted">
           Página de agendamento não encontrada.
         </p>
-        <UButton label="Voltar" to="/app/scheduling" />
+        <UButton label="Voltar" to="/app/appointments/scheduling" />
       </div>
 
       <div v-else class="mx-auto max-w-2xl space-y-5 p-4">

@@ -118,7 +118,7 @@ async function onCancel(bookingId: string, reason: string | undefined) {
             icon="i-lucide-arrow-left"
             color="neutral"
             variant="ghost"
-            to="/app/scheduling"
+            to="/app/appointments/scheduling"
           />
         </template>
       </UDashboardNavbar>

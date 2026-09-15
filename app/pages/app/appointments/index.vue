@@ -91,7 +91,7 @@ const viewModes: { label: string, value: CalendarViewMode, icon: string }[] = [
 
 const mobileNavItems: MobileContextNavItem[] = [
   ...viewModes,
-  { label: 'Link', value: 'scheduling-link', icon: 'i-lucide-calendar-clock', to: '/app/scheduling' }
+  { label: 'Link', value: 'scheduling-link', icon: 'i-lucide-calendar-clock', to: '/app/appointments/scheduling' }
 ]
 
 useMobileContextNav().registerMobileContextNav('appointments', mobileNavItems, activeView)
@@ -649,7 +649,7 @@ onMounted(() => {
               color="neutral"
               variant="ghost"
               icon="i-lucide-calendar-clock"
-              to="/app/scheduling"
+              to="/app/appointments/scheduling"
             />
           </UTooltip>
 
