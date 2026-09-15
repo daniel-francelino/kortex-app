@@ -1,75 +1,88 @@
 <script setup lang="ts">
-import { PostHogEvent } from '~/types/analytics'
+import { PostHogEvent } from "~/types/analytics";
 
-const route = useRoute()
-const { capture } = usePostHog()
+const route = useRoute();
+const { capture } = usePostHog();
 
-function trackNavigation(label: string, target: string, location: 'header' | 'header-mobile') {
+function trackNavigation(
+  label: string,
+  target: string,
+  location: "header" | "header-mobile",
+) {
   capture(PostHogEvent.PublicNavigationClicked, {
     location,
     target,
-    target_label: label
-  })
+    target_label: label,
+  });
 }
 
-const items = computed(() => route.path === '/' ? [{
-  label: 'Recursos',
-  to: '/#recursos',
-  exactHash: true,
-  onSelect: () => trackNavigation('Recursos', '/#recursos', 'header')
-}, {
-  label: 'Como funciona',
-  to: '/#como-funciona',
-  exactHash: true,
-  onSelect: () => trackNavigation('Como funciona', '/#como-funciona', 'header')
-}, {
-  label: 'Planos',
-  to: '/pricing',
-  onSelect: () => trackNavigation('Pricing', '/pricing', 'header')
-}, {
-  label: 'Documentação',
-  to: '/docs',
-  onSelect: () => trackNavigation('Documentation', '/docs', 'header')
-}] : [{
-  label: 'Início',
-  to: '/',
-  onSelect: () => trackNavigation('Home', '/', 'header')
-}, {
-  label: 'Documentação',
-  to: '/docs',
-  active: route.path.startsWith('/docs'),
-  onSelect: () => trackNavigation('Documentation', '/docs', 'header')
-}, {
-  label: 'Planos',
-  to: '/pricing',
-  onSelect: () => trackNavigation('Pricing', '/pricing', 'header')
-}, {
-  label: 'Blog',
-  to: '/blog',
-  onSelect: () => trackNavigation('Blog', '/blog', 'header')
-}, {
-  label: 'Novidades',
-  to: '/changelog',
-  onSelect: () => trackNavigation('Changelog', '/changelog', 'header')
-}])
+const items = computed(() =>
+  route.path === "/"
+    ? [
+        {
+          label: "Recursos",
+          to: "/#recursos",
+          exactHash: true,
+          onSelect: () => trackNavigation("Recursos", "/#recursos", "header"),
+        },
+        {
+          label: "Como funciona",
+          to: "/#como-funciona",
+          exactHash: true,
+          onSelect: () =>
+            trackNavigation("Como funciona", "/#como-funciona", "header"),
+        },
+        {
+          label: "Planos",
+          to: "/pricing",
+          onSelect: () => trackNavigation("Pricing", "/pricing", "header"),
+        },
+        {
+          label: "Documentação",
+          to: "/docs",
+          onSelect: () => trackNavigation("Documentation", "/docs", "header"),
+        },
+      ]
+    : [
+        {
+          label: "Início",
+          to: "/",
+          onSelect: () => trackNavigation("Home", "/", "header"),
+        },
+        {
+          label: "Planos",
+          to: "/pricing",
+          onSelect: () => trackNavigation("Pricing", "/pricing", "header"),
+        },
+        {
+          label: "Documentação",
+          to: "/docs",
+          active: route.path.startsWith("/docs"),
+          onSelect: () => trackNavigation("Documentation", "/docs", "header"),
+        },
+        {
+          label: "Blog",
+          to: "/blog",
+          onSelect: () => trackNavigation("Blog", "/blog", "header"),
+        },
+        {
+          label: "Novidades",
+          to: "/changelog",
+          onSelect: () => trackNavigation("Changelog", "/changelog", "header"),
+        },
+      ],
+);
 </script>
 
 <template>
   <UHeader>
     <template #left>
-      <NuxtLink
-        to="/"
-        aria-label="Kortex"
-        class="flex items-center"
-      >
+      <NuxtLink to="/" aria-label="Kortex" class="flex items-center">
         <AppLogo />
       </NuxtLink>
     </template>
 
-    <UNavigationMenu
-      :items="items"
-      variant="link"
-    />
+    <UNavigationMenu :items="items" variant="link" />
 
     <template #right>
       <UButton
@@ -91,11 +104,7 @@ const items = computed(() => route.path === '/' ? [{
     </template>
 
     <template #body>
-      <UNavigationMenu
-        :items="items"
-        orientation="vertical"
-        class="-mx-2.5"
-      />
+      <UNavigationMenu :items="items" orientation="vertical" class="-mx-2.5" />
 
       <USeparator class="my-6" />
 
