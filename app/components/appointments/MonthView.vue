@@ -135,12 +135,21 @@ function onPointerMove(e: PointerEvent) {
   if (dateStr) dragOver.value = dateStr
 }
 
+// After a real drop, releasing the pointer (touch especially) still makes the
+// browser synthesize a `click` right afterward — targeting whatever day cell
+// is under the *drop* point, not the drag's origin, since pointer capture
+// only redirects pointer events, not click. Without this, dropping an event
+// on a new day immediately "clicks" that destination cell too, popping the
+// create-event popover right after the drop.
+let suppressNextClick = false
+
 function onPointerUp(e: PointerEvent) {
   if (!dragEvent.value || e.pointerId !== dragPointerId.value) return
   const targetDate = targetDateFromPoint(e.clientX, e.clientY)
   const original = formatZonedDateKey(dragEvent.value.startAt, getEventTimeZone(dragEvent.value))
   if (targetDate && targetDate !== original) {
     emit('dropEvent', dragEvent.value.id, targetDate, dragEvent.value.recurrenceId ?? null)
+    suppressNextClick = true
   }
   endDrag()
 }
@@ -157,10 +166,18 @@ function endDrag() {
 
 // ─── Click handlers ───────────────────────────────────────────────────────
 function onDayClick(cell: DayCell, e: MouseEvent) {
+  if (suppressNextClick) {
+    suppressNextClick = false
+    return
+  }
   emit('selectSlot', cell.dateStr, e)
 }
 
 function onEventClick(evt: CalendarEvent, e: MouseEvent) {
+  if (suppressNextClick) {
+    suppressNextClick = false
+    return
+  }
   e.stopPropagation()
   emit('selectEvent', evt, e)
 }

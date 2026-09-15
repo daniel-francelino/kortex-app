@@ -225,9 +225,21 @@ function onPointerMove(e: PointerEvent) {
   drag.targetMinutes = getSnappedMinutes(e.clientY)
 }
 
+// After a real drag, releasing the pointer (touch especially) still makes the
+// browser synthesize a `click` right afterward — targeting whatever slot/tile
+// is under the *drop* point, not the drag's origin, since pointer capture
+// only redirects pointer events, not click. Without this, dropping an event
+// immediately "clicks" the destination slot too, popping the create-event
+// popover right after the drop. `drag.active` alone can't guard against that
+// click, because `endDrag()` below already resets it before the click fires.
+let suppressNextClick = false
+
 function onPointerUp(e: PointerEvent) {
   if (!drag.event || e.pointerId !== drag.pointerId) return
-  if (drag.active) commitDrop()
+  if (drag.active) {
+    commitDrop()
+    suppressNextClick = true
+  }
   endDrag()
 }
 
@@ -279,6 +291,10 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
 // ─── Slot and event click ─────────────────────────────────────────────────
 function onSlotClick(hour: number, e: MouseEvent) {
   if (drag.active) return
+  if (suppressNextClick) {
+    suppressNextClick = false
+    return
+  }
   const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
   const offsetY = e.clientY - rect.top
   const minutes = snapMinutes(Math.floor((offsetY / hourHeight.value) * 60))
@@ -289,6 +305,10 @@ function onSlotClick(hour: number, e: MouseEvent) {
 
 function onEventClick(evt: CalendarEvent, e: MouseEvent) {
   if (drag.active) return
+  if (suppressNextClick) {
+    suppressNextClick = false
+    return
+  }
   e.stopPropagation()
   emit('selectEvent', evt, e)
 }
