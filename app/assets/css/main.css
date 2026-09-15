@@ -35,7 +35,6 @@ html {
   --safe-area-right: env(safe-area-inset-right, 0px);
   --app-visual-height: 100%;
   --app-visual-offset-top: 0px;
-  --pwa-standalone-bottom-bleed: 0px;
   --mobile-bottom-nav-extra-background: 0px;
   --mobile-sidebar-safe-area-top: var(--safe-area-top);
   --mobile-sidebar-safe-area-bottom: 0px;
@@ -195,31 +194,9 @@ body.keyboard-open .mobile-bottom-nav {
   border-top-color: var(--ui-color-neutral-800);
 }
 
-/* In a regular Safari tab, `top: calc(visualHeight - navHeight)` (above) is
-   needed because a plain `bottom: 0` fixed element jumps around as iOS
-   collapses/expands the address bar. Installed as a home-screen app
-   (display-mode: standalone) there's no address bar to collapse, and iOS's
-   own `visualViewport.height` reporting in that mode doesn't always line up
-   with the real rendered viewport — the mismatch showed up as extra blank
-   space below the bottom nav. `bottom: 0` sidesteps the JS-computed height
-   entirely and lets the browser position it correctly. */
-@supports (-webkit-touch-callout: none) {
-  @media (display-mode: standalone) and (max-width: 1023px) {
-    /* `.kortex-app-shell`'s height also depends on the same mismatched
-       `--app-visual-height` JS value (see above) — a shell shorter than the
-       real screen left a gap of raw `body` background between its bottom
-       edge and the now bottom-pinned nav. `100dvh` tracks the real
-       standalone viewport directly, no JS needed. */
-    .kortex-app-shell {
-      height: 100dvh;
-    }
-  }
-}
-
 @media (max-width: 1023px) {
   html.pwa-standalone {
-    --pwa-standalone-bottom-bleed: env(safe-area-inset-bottom, 0px);
-    --mobile-bottom-nav-safe-padding: var(--pwa-standalone-bottom-bleed);
+    --mobile-bottom-nav-safe-padding: var(--safe-area-bottom);
     --mobile-bottom-nav-extra-background: 0px;
   }
 
@@ -229,13 +206,40 @@ body.keyboard-open .mobile-bottom-nav {
     bottom: 0;
   }
 
-  html.pwa-standalone .mobile-bottom-nav {
-    bottom: calc(0px - var(--pwa-standalone-bottom-bleed));
-  }
-
   html.pwa-standalone .kortex-app-shell,
   html.capacitor-native .kortex-app-shell {
     height: 100dvh;
+  }
+}
+
+/* iPhone Home Screen capture: 100vh = 956px, but 100dvh/innerHeight =
+   894px with black-translucent + viewport-fit=cover. Percentage root
+   heights also left body and #__nuxt at 0px because the app is fixed.
+   Give the roots an explicit full height and use that same coordinate
+   system for the shell and tab bar. Safe-area padding stays INSIDE it.
+   Use the runtime class: navigator.standalone was true in the capture
+   while the display-mode: standalone media query was false. */
+@supports (-webkit-touch-callout: none) {
+  @media (max-width: 1023px) {
+    html.pwa-standalone,
+    html.pwa-standalone body {
+      height: 100vh;
+      min-height: 100vh;
+    }
+
+    html.pwa-standalone #__nuxt {
+      min-height: 100%;
+    }
+
+    html.pwa-standalone .kortex-app-shell {
+      height: 100vh;
+      min-height: 100vh;
+    }
+
+    html.pwa-standalone .mobile-bottom-nav {
+      top: calc(100vh - var(--mobile-bottom-nav-height));
+      bottom: auto;
+    }
   }
 }
 
