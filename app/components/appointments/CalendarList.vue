@@ -36,15 +36,22 @@ void props
 
 <template>
   <div class="space-y-3">
-    <div class="flex items-center" :class="showTitle ? 'justify-between' : 'justify-end'">
+    <div class="flex items-center justify-between">
       <h3
         v-if="showTitle"
         class="max-lg:text-base lg:text-sm font-semibold text-highlighted"
       >
         Calendários
       </h3>
+      <!-- The drawer's own title already says "Calendários" (showTitle is
+           false there) — a count fills the space instead of leaving the "+"
+           button floating alone on an otherwise empty row. -->
+      <p v-else class="max-lg:text-sm text-muted">
+        {{ calendars?.length ?? 0 }} {{ (calendars?.length ?? 0) === 1 ? 'calendário' : 'calendários' }}
+      </p>
       <UButton
         icon="i-lucide-plus"
+        label="Novo"
         :size="isMobile ? 'lg' : 'xs'"
         variant="ghost"
         aria-label="Novo calendário"

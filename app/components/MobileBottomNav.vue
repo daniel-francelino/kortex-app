@@ -55,12 +55,9 @@ function handleMoreClick() {
   showMoreMenu.value = !showMoreMenu.value
 }
 
-function navigateTo(to: string) {
+watch(() => route.fullPath, () => {
   showMoreMenu.value = false
-  if (to) {
-    router.push(to)
-  }
-}
+})
 
 watchEffect(() => {
   if (!import.meta.client) return
@@ -81,108 +78,108 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="mobile-bottom-nav lg:hidden">
-    <!-- More menu overlay -->
-    <Transition name="slide-up">
-      <div
-        v-if="showMoreMenu"
-        class="absolute bottom-full left-0 right-0 bg-elevated border-t border-default shadow-lg"
-      >
-        <div class="grid grid-cols-3 gap-1 p-3">
-          <button
-            v-for="item in moreItems"
-            :key="item.to"
-            class="flex flex-col items-center gap-1.5 rounded-lg p-3 transition-colors"
-            :class="isActive(item.to) ? 'bg-primary/10 text-primary' : 'text-muted hover:bg-muted/50'"
-            @click="navigateTo(item.to)"
-          >
-            <UIcon :name="item.icon" class="size-5" />
-            <span class="text-xs font-medium">{{ item.label }}</span>
-          </button>
-        </div>
-      </div>
-    </Transition>
-
-    <!-- Backdrop for more menu -->
-    <Teleport to="body">
-      <Transition name="fade">
+  <Teleport to="body">
+    <div class="mobile-bottom-nav lg:hidden">
+      <!-- More menu overlay -->
+      <Transition name="slide-up">
         <div
           v-if="showMoreMenu"
-          class="fixed inset-0 z-40 bg-black/30 lg:hidden"
-          @click="showMoreMenu = false"
-        />
-      </Transition>
-    </Teleport>
-
-    <!-- Bottom nav bar -->
-    <nav class="px-2 py-1.5">
-      <AnimatePresence mode="wait">
-        <motion.div
-          v-if="hasContextItems"
-          key="context"
-          class="mobile-context-nav flex items-center overflow-x-auto"
-          :initial="{ opacity: 0, y: 8 }"
-          :animate="{ opacity: 1, y: 0 }"
-          :exit="{ opacity: 0, y: -6 }"
-          :transition="{ duration: 0.18, ease: 'easeOut' }"
+          class="absolute bottom-full left-0 right-0 bg-elevated border-t border-default shadow-lg"
         >
-          <motion.button
-            v-for="(item, index) in contextItems"
-            :key="item.value"
-            type="button"
-            class="flex min-h-14 flex-1 basis-0 flex-col items-center justify-center gap-0.5 rounded-xl px-3 text-center transition-colors"
-            :class="
-              isContextItemActive(item)
-                ? 'text-primary'
-                : 'text-muted active:bg-elevated/80'
-            "
-            :initial="{ opacity: 0, y: 8 }"
-            :animate="{ opacity: 1, y: 0 }"
-            :transition="{ duration: 0.16, delay: Math.min(index * 0.025, 0.1), ease: 'easeOut' }"
-            :while-tap="{ scale: 0.98 }"
-            :aria-pressed="!item.to ? isContextItemActive(item) : undefined"
-            @click="onContextItemClick(item)"
-          >
-            <UIcon :name="item.icon" class="size-5 shrink-0" />
-            <span class="max-w-full truncate text-[10px] font-medium leading-tight">{{ item.label }}</span>
-          </motion.button>
-        </motion.div>
-
-        <motion.div
-          v-else
-          key="global"
-          class="flex items-center justify-around"
-          :initial="{ opacity: 0, y: 8 }"
-          :animate="{ opacity: 1, y: 0 }"
-          :exit="{ opacity: 0, y: -6 }"
-          :transition="{ duration: 0.18, ease: 'easeOut' }"
-        >
-          <template v-for="item in items" :key="item.label">
+          <div class="grid grid-cols-3 gap-1 p-3">
             <NuxtLink
-              v-if="item.to"
+              v-for="item in moreItems"
+              :key="item.to"
               :to="item.to"
-              class="flex min-h-14 flex-col items-center justify-center gap-0.5 rounded-xl px-3 transition-colors"
-              :class="isActive(item.to) ? 'text-primary' : 'text-muted'"
+              class="flex flex-col items-center gap-1.5 rounded-lg p-3 transition-colors"
+              :class="isActive(item.to) ? 'bg-primary/10 text-primary' : 'text-muted hover:bg-muted/50'"
               @click="showMoreMenu = false"
             >
               <UIcon :name="item.icon" class="size-5" />
-              <span class="text-[10px] font-medium leading-tight">{{ item.label }}</span>
+              <span class="text-xs font-medium">{{ item.label }}</span>
             </NuxtLink>
+          </div>
+        </div>
+      </Transition>
 
-            <button
-              v-else
-              class="flex min-h-14 flex-col items-center justify-center gap-0.5 rounded-xl px-3 transition-colors"
-              :class="isMoreActive() || showMoreMenu ? 'text-primary' : 'text-muted'"
-              @click="handleMoreClick"
+      <!-- Bottom nav bar -->
+      <nav class="px-2 py-1.5">
+        <AnimatePresence mode="wait">
+          <motion.div
+            v-if="hasContextItems"
+            key="context"
+            class="mobile-context-nav flex items-center overflow-x-auto"
+            :initial="{ opacity: 0, y: 8 }"
+            :animate="{ opacity: 1, y: 0 }"
+            :exit="{ opacity: 0, y: -6 }"
+            :transition="{ duration: 0.18, ease: 'easeOut' }"
+          >
+            <motion.button
+              v-for="(item, index) in contextItems"
+              :key="item.value"
+              type="button"
+              class="flex min-h-14 flex-1 basis-0 flex-col items-center justify-center gap-0.5 rounded-xl px-3 text-center transition-colors"
+              :class="
+                isContextItemActive(item)
+                  ? 'text-primary'
+                  : 'text-muted active:bg-elevated/80'
+              "
+              :initial="{ opacity: 0, y: 8 }"
+              :animate="{ opacity: 1, y: 0 }"
+              :transition="{ duration: 0.16, delay: Math.min(index * 0.025, 0.1), ease: 'easeOut' }"
+              :while-tap="{ scale: 0.98 }"
+              :aria-pressed="!item.to ? isContextItemActive(item) : undefined"
+              @click="onContextItemClick(item)"
             >
-              <UIcon :name="item.icon" class="size-5" />
-              <span class="text-[10px] font-medium leading-tight">{{ item.label }}</span>
-            </button>
-          </template>
-        </motion.div>
-      </AnimatePresence>
-    </nav>
-  </div>
+              <UIcon :name="item.icon" class="size-5 shrink-0" />
+              <span class="max-w-full truncate text-[10px] font-medium leading-tight">{{ item.label }}</span>
+            </motion.button>
+          </motion.div>
+
+          <motion.div
+            v-else
+            key="global"
+            class="flex items-center justify-around"
+            :initial="{ opacity: 0, y: 8 }"
+            :animate="{ opacity: 1, y: 0 }"
+            :exit="{ opacity: 0, y: -6 }"
+            :transition="{ duration: 0.18, ease: 'easeOut' }"
+          >
+            <template v-for="item in items" :key="item.label">
+              <NuxtLink
+                v-if="item.to"
+                :to="item.to"
+                class="flex min-h-14 flex-col items-center justify-center gap-0.5 rounded-xl px-3 transition-colors"
+                :class="isActive(item.to) ? 'text-primary' : 'text-muted'"
+                @click="showMoreMenu = false"
+              >
+                <UIcon :name="item.icon" class="size-5" />
+                <span class="text-[10px] font-medium leading-tight">{{ item.label }}</span>
+              </NuxtLink>
+
+              <button
+                v-else
+                class="flex min-h-14 flex-col items-center justify-center gap-0.5 rounded-xl px-3 transition-colors"
+                :class="isMoreActive() || showMoreMenu ? 'text-primary' : 'text-muted'"
+                @click="handleMoreClick"
+              >
+                <UIcon :name="item.icon" class="size-5" />
+                <span class="text-[10px] font-medium leading-tight">{{ item.label }}</span>
+              </button>
+            </template>
+          </motion.div>
+        </AnimatePresence>
+      </nav>
+    </div>
+    <!-- Keep the backdrop and navigation in the same stacking context. -->
+    <Transition name="fade">
+      <div
+        v-if="showMoreMenu"
+        class="fixed inset-0 z-40 bg-black/30 lg:hidden"
+        @click="showMoreMenu = false"
+      />
+    </Transition>
+  </Teleport>
 </template>
 
 <style scoped>

@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { formatTimeAgo } from '@vueuse/core'
+import { UModal, USlideover } from '#components'
 
 import { useNotifications, type AppNotification } from '~/composables/useNotifications'
 
 import { computed } from 'vue'
 
 const { isNotificationsSlideoverOpen } = useDashboard()
+const isMobile = useIsMobile()
 
 const toast = useToast()
 const notifications = useNotifications() as {
@@ -52,7 +54,8 @@ async function onOpen(notificationId: number) {
 </script>
 
 <template>
-  <USlideover
+  <component
+    :is="isMobile ? UModal : USlideover"
     v-model:open="isNotificationsSlideoverOpen"
     title="Notificações"
   >
@@ -122,5 +125,5 @@ async function onOpen(notificationId: number) {
         </NuxtLink>
       </template>
     </template>
-  </USlideover>
+  </component>
 </template>

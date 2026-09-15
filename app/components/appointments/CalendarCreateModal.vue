@@ -28,6 +28,16 @@ const isMobile = useMediaQuery('(max-width: 1023px)')
 const subscribeToggling = ref(false)
 const localCalendar = ref<Calendar | null>(null)
 
+// A compact centered card left an awkward dead gap below it on small
+// screens (the dimmed calendar list peeking through) — fullscreen on mobile
+// only, same pattern as journal/EntryDetailModal.vue.
+const modalUi = computed(() => isMobile.value
+  ? {
+      content: 'flex h-dvh max-h-dvh flex-col',
+      body: 'min-h-0 flex-1 overflow-y-auto'
+    }
+  : undefined)
+
 // ─── Tabs (only relevant once editing — a new calendar has no export/share
 // state yet) — keeps Geral/Exportar/Compartilhar from being stacked into one
 // long, mixed-together form. ──────────────────────────────────────────────
@@ -206,6 +216,8 @@ watch(
   <UModal
     :open="open"
     :title="isEditing ? 'Editar calendário' : 'Novo calendário'"
+    :fullscreen="isMobile"
+    :ui="modalUi"
     @update:open="emit('update:open', $event)"
   >
     <template #body>
@@ -320,31 +332,33 @@ watch(
             Compartilhar calendário
           </p>
 
-          <div class="flex flex-wrap items-center gap-2">
+          <div class="flex flex-col gap-2 lg:flex-row lg:items-center">
             <UInput
               v-model="newShareEmail"
               type="email"
               placeholder="email@exemplo.com"
               :size="isMobile ? 'md' : 'sm'"
-              class="flex-1"
+              class="w-full lg:flex-1"
               @keydown.enter="onAddShare"
             />
-            <USelect
-              v-model="newSharePermission"
-              :items="[{ label: 'Visualizar', value: 'view' }, { label: 'Editar', value: 'edit' }]"
-              value-key="value"
-              :size="isMobile ? 'md' : 'sm'"
-              class="w-32"
-            />
-            <UButton
-              icon="i-lucide-plus"
-              :size="isMobile ? 'md' : 'sm'"
-              color="primary"
-              variant="subtle"
-              :loading="addingShare"
-              :disabled="!newShareEmail.trim()"
-              @click="onAddShare"
-            />
+            <div class="flex items-center gap-2">
+              <USelect
+                v-model="newSharePermission"
+                :items="[{ label: 'Visualizar', value: 'view' }, { label: 'Editar', value: 'edit' }]"
+                value-key="value"
+                :size="isMobile ? 'md' : 'sm'"
+                class="flex-1 lg:w-32 lg:flex-none"
+              />
+              <UButton
+                icon="i-lucide-plus"
+                :size="isMobile ? 'md' : 'sm'"
+                color="primary"
+                variant="subtle"
+                :loading="addingShare"
+                :disabled="!newShareEmail.trim()"
+                @click="onAddShare"
+              />
+            </div>
           </div>
 
           <div v-if="sharesLoading" class="text-xs text-muted">
@@ -386,7 +400,7 @@ watch(
               />
             </li>
           </ul>
-          <p v-else class="text-xs text-dimmed">
+          <p v-else class="max-lg:text-sm lg:text-xs text-dimmed">
             Ninguém tem acesso ainda.
           </p>
         </div>
