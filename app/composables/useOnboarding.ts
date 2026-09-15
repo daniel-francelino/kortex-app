@@ -59,29 +59,42 @@ export function useOnboarding() {
       state.value.onboarding = response.onboarding
       state.value.timezone = response.timezone
       state.value.loaded = true
-    } catch {
+    } catch (err) {
+      // Keep the silent default-state fallback for the user (a broken
+      // onboarding fetch shouldn't block the rest of the app), but at least
+      // leave a trace of why it happened.
+      console.error('[useOnboarding] failed to load onboarding state', err)
       state.value.loaded = true
     } finally {
       state.value.loading = false
     }
   }
 
+  // `null` on failure (instead of throwing) — every caller already needs to
+  // branch on success/failure (toast + keep the modal open vs. advance), so
+  // this makes that the only way to consume the result instead of also
+  // requiring a try/catch at each call site.
   async function saveProgress(payload: {
     currentStep?: OnboardingState['currentStep']
     profile?: Partial<OnboardingProfile>
     status?: OnboardingState['status']
     timezone?: string
     markCompleted?: boolean
-  }) {
-    const response = await $fetch<OnboardingResponse>('/api/settings/onboarding', {
-      method: 'PUT',
-      body: payload
-    })
+  }): Promise<OnboardingResponse | null> {
+    try {
+      const response = await $fetch<OnboardingResponse>('/api/settings/onboarding', {
+        method: 'PUT',
+        body: payload
+      })
 
-    state.value.onboarding = response.onboarding
-    state.value.timezone = response.timezone
-    state.value.loaded = true
-    return response
+      state.value.onboarding = response.onboarding
+      state.value.timezone = response.timezone
+      state.value.loaded = true
+      return response
+    } catch (err) {
+      console.error('[useOnboarding] failed to save progress', err)
+      return null
+    }
   }
 
   function open() {
@@ -96,26 +109,36 @@ export function useOnboarding() {
     currentStep: OnboardingState['currentStep']
     profile?: Partial<OnboardingProfile>
     timezone?: string
-  }) {
-    await saveProgress({
+  }): Promise<boolean> {
+    const response = await saveProgress({
       ...payload,
       status: 'in_progress'
     })
+
+    if (!response)
+      return false
+
     close()
+    return true
   }
 
   async function completeAndStartFirstHabit(payload: {
     profile?: Partial<OnboardingProfile>
     timezone?: string
-  }) {
-    await saveProgress({
+  }): Promise<boolean> {
+    const response = await saveProgress({
       ...payload,
       currentStep: 'first_action',
       status: 'completed',
       markCompleted: true
     })
+
+    if (!response)
+      return false
+
     pendingHabitHandoff.value = true
     close()
+    return true
   }
 
   function consumeHabitHandoff() {

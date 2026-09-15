@@ -28,5 +28,10 @@ export enum PostHogEvent {
   HabitTriggerStacksRemoved = 'habit_trigger_stacks_removed',
   HabitTreeSynced = 'habit_tree_synced',
   HabitReflectionSaved = 'habit_reflection_saved',
-  HabitSettingsUpdated = 'habit_settings_updated'
+  HabitSettingsUpdated = 'habit_settings_updated',
+  OnboardingOpened = 'onboarding_opened',
+  OnboardingStepChanged = 'onboarding_step_changed',
+  OnboardingProfileOptionSelected = 'onboarding_profile_option_selected',
+  OnboardingPaused = 'onboarding_paused',
+  OnboardingCompleted = 'onboarding_completed'
 }

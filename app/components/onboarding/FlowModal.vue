@@ -6,9 +6,12 @@ import {
   type OnboardingPrimaryGoal,
   type OnboardingStep
 } from '~/types/onboarding'
+import { PostHogEvent } from '~/types/analytics'
 
 const { user } = useAuth()
 const isMobile = useMediaQuery('(max-width: 1023px)')
+const toast = useToast()
+const { capture } = usePostHog()
 const {
   close,
   completeAndStartFirstHabit,
@@ -19,6 +22,8 @@ const {
   saveProgress,
   state
 } = useOnboarding()
+
+const isSaving = ref(false)
 
 const profile = reactive<{
   primaryGoal: OnboardingPrimaryGoal | null
@@ -197,6 +202,29 @@ const modalUi = computed(() => ({
   footer: 'shrink-0'
 }))
 
+function selectPrimaryGoal(value: OnboardingPrimaryGoal) {
+  profile.primaryGoal = value
+  capture(PostHogEvent.OnboardingProfileOptionSelected, { question: 'primary_goal', value })
+}
+
+function selectExperienceLevel(value: OnboardingExperienceLevel) {
+  profile.experienceLevel = value
+  capture(PostHogEvent.OnboardingProfileOptionSelected, { question: 'experience_level', value })
+}
+
+function selectGuidanceStyle(value: OnboardingGuidanceStyle) {
+  profile.guidanceStyle = value
+  capture(PostHogEvent.OnboardingProfileOptionSelected, { question: 'guidance_style', value })
+}
+
+function showSaveError() {
+  toast.add({
+    title: 'Erro',
+    description: 'Não foi possível salvar seu progresso. Tente novamente.',
+    color: 'error'
+  })
+}
+
 function hydrateLocalState() {
   profile.primaryGoal = state.value.onboarding.profile.primaryGoal
   profile.experienceLevel = state.value.onboarding.profile.experienceLevel
@@ -218,8 +246,8 @@ function getPreviousStep(step: OnboardingStep): OnboardingStep {
   return ONBOARDING_STEPS[Math.max(index - 1, 0)]!
 }
 
-async function persistCurrentStep(targetStep: OnboardingStep) {
-  await saveProgress({
+async function persistCurrentStep(targetStep: OnboardingStep): Promise<boolean> {
+  const response = await saveProgress({
     currentStep: targetStep,
     profile: {
       primaryGoal: profile.primaryGoal,
@@ -229,11 +257,87 @@ async function persistCurrentStep(targetStep: OnboardingStep) {
     status: 'in_progress',
     timezone: selectedTimezone.value
   })
+
+  return Boolean(response)
 }
 
 async function onNext() {
-  if (isLastStep.value) {
-    await completeAndStartFirstHabit({
+  if (isSaving.value)
+    return
+
+  isSaving.value = true
+  try {
+    if (isLastStep.value) {
+      const success = await completeAndStartFirstHabit({
+        profile: {
+          primaryGoal: profile.primaryGoal,
+          experienceLevel: profile.experienceLevel,
+          guidanceStyle: profile.guidanceStyle
+        },
+        timezone: selectedTimezone.value
+      })
+
+      if (!success) {
+        showSaveError()
+        return
+      }
+
+      capture(PostHogEvent.OnboardingCompleted, {
+        primary_goal: profile.primaryGoal,
+        experience_level: profile.experienceLevel,
+        guidance_style: profile.guidanceStyle,
+        timezone: selectedTimezone.value
+      })
+
+      await navigateTo('/app/habits')
+      return
+    }
+
+    const fromStep = currentStep.value
+    const nextStep = getNextStep(fromStep)
+    const success = await persistCurrentStep(nextStep)
+
+    if (!success) {
+      showSaveError()
+      return
+    }
+
+    capture(PostHogEvent.OnboardingStepChanged, { direction: 'next', from_step: fromStep, to_step: nextStep })
+  } finally {
+    isSaving.value = false
+  }
+}
+
+async function onPrevious() {
+  if (isFirstStep.value || isSaving.value)
+    return
+
+  isSaving.value = true
+  try {
+    const fromStep = currentStep.value
+    const previousStep = getPreviousStep(fromStep)
+    const success = await persistCurrentStep(previousStep)
+
+    if (!success) {
+      showSaveError()
+      return
+    }
+
+    capture(PostHogEvent.OnboardingStepChanged, { direction: 'previous', from_step: fromStep, to_step: previousStep })
+  } finally {
+    isSaving.value = false
+  }
+}
+
+async function onContinueLater() {
+  if (isSaving.value)
+    return
+
+  isSaving.value = true
+  try {
+    const step = currentStep.value
+    const success = await continueLater({
+      currentStep: step,
       profile: {
         primaryGoal: profile.primaryGoal,
         experienceLevel: profile.experienceLevel,
@@ -242,40 +346,25 @@ async function onNext() {
       timezone: selectedTimezone.value
     })
 
-    await navigateTo('/app/habits')
-    return
+    if (!success) {
+      showSaveError()
+      return
+    }
+
+    capture(PostHogEvent.OnboardingPaused, { step })
+  } finally {
+    isSaving.value = false
   }
-
-  const nextStep = getNextStep(currentStep.value)
-  await persistCurrentStep(nextStep)
-}
-
-async function onPrevious() {
-  if (isFirstStep.value)
-    return
-
-  const previousStep = getPreviousStep(currentStep.value)
-  await persistCurrentStep(previousStep)
-}
-
-async function onContinueLater() {
-  await continueLater({
-    currentStep: currentStep.value,
-    profile: {
-      primaryGoal: profile.primaryGoal,
-      experienceLevel: profile.experienceLevel,
-      guidanceStyle: profile.guidanceStyle
-    },
-    timezone: selectedTimezone.value
-  })
 }
 
 onMounted(async () => {
   await load()
   hydrateLocalState()
 
-  if (!isCompleted.value)
+  if (!isCompleted.value) {
     open()
+    capture(PostHogEvent.OnboardingOpened, { step: currentStep.value })
+  }
 })
 </script>
 
@@ -339,15 +428,15 @@ onMounted(async () => {
             </div>
           </div>
 
-          <div class="grid gap-3 md:grid-cols-3">
+          <div class="grid gap-3 lg:grid-cols-3">
             <UCard class="border-primary/10 bg-primary/5">
               <div class="flex items-center gap-3">
                 <span class="text-2xl">🎯</span>
-                <p class="text-sm font-medium text-highlighted">
+                <p class="max-lg:text-base text-sm font-medium text-highlighted">
                   Perfil
                 </p>
               </div>
-              <p class="mt-2 text-sm text-muted">
+              <p class="mt-2 max-lg:text-base lg:text-sm text-muted">
                 Entender o seu objetivo principal e o nível de orientação ideal.
               </p>
             </UCard>
@@ -355,11 +444,11 @@ onMounted(async () => {
             <UCard class="border-primary/10 bg-primary/5">
               <div class="flex items-center gap-3">
                 <span class="text-2xl">🌍</span>
-                <p class="text-sm font-medium text-highlighted">
+                <p class="max-lg:text-base text-sm font-medium text-highlighted">
                   Configuração mínima
                 </p>
               </div>
-              <p class="mt-2 text-sm text-muted">
+              <p class="mt-2 max-lg:text-base lg:text-sm text-muted">
                 Ajustar timezone para agenda, hábitos e notificações funcionarem certo.
               </p>
             </UCard>
@@ -367,11 +456,11 @@ onMounted(async () => {
             <UCard class="border-primary/10 bg-primary/5">
               <div class="flex items-center gap-3">
                 <span class="text-2xl">🚀</span>
-                <p class="text-sm font-medium text-highlighted">
+                <p class="max-lg:text-base text-sm font-medium text-highlighted">
                   Primeira ação
                 </p>
               </div>
-              <p class="mt-2 text-sm text-muted">
+              <p class="mt-2 max-lg:text-base lg:text-sm text-muted">
                 Ir para Hábitos e começar com um fluxo guiado de criação.
               </p>
             </UCard>
@@ -393,22 +482,23 @@ onMounted(async () => {
               <p class="text-sm font-medium text-highlighted">
                 Qual é o principal objetivo agora?
               </p>
-              <div class="grid gap-3 md:grid-cols-2">
+              <div class="grid gap-3 lg:grid-cols-2">
                 <button
                   v-for="option in goalOptions"
                   :key="option.value"
                   type="button"
-                  class="rounded-xl border px-4 py-4 text-left transition"
+                  class="rounded-xl border px-4 max-lg:py-5 lg:py-4 text-left transition"
                   :class="profile.primaryGoal === option.value ? 'border-primary bg-primary/10' : 'border-default hover:border-primary/60'"
-                  @click="profile.primaryGoal = option.value"
+                  :aria-pressed="profile.primaryGoal === option.value"
+                  @click="selectPrimaryGoal(option.value)"
                 >
                   <div class="flex items-center gap-3">
                     <UIcon :name="option.icon" class="size-6 shrink-0 text-primary" />
-                    <p class="font-medium text-highlighted">
+                    <p class="max-lg:text-base font-medium text-highlighted">
                       {{ option.label }}
                     </p>
                   </div>
-                  <p class="mt-1 text-sm text-muted">
+                  <p class="mt-1 max-lg:text-base lg:text-sm text-muted">
                     {{ option.description }}
                   </p>
                 </button>
@@ -419,22 +509,23 @@ onMounted(async () => {
               <p class="text-sm font-medium text-highlighted">
                 Como você está chegando no Kortex?
               </p>
-              <div class="grid gap-3 md:grid-cols-3">
+              <div class="grid gap-3 lg:grid-cols-3">
                 <button
                   v-for="option in experienceOptions"
                   :key="option.value"
                   type="button"
-                  class="rounded-xl border px-4 py-4 text-left transition"
+                  class="rounded-xl border px-4 max-lg:py-5 lg:py-4 text-left transition"
                   :class="profile.experienceLevel === option.value ? 'border-primary bg-primary/10' : 'border-default hover:border-primary/60'"
-                  @click="profile.experienceLevel = option.value"
+                  :aria-pressed="profile.experienceLevel === option.value"
+                  @click="selectExperienceLevel(option.value)"
                 >
                   <div class="flex items-center gap-3">
                     <UIcon :name="option.icon" class="size-6 shrink-0 text-primary" />
-                    <p class="font-medium text-highlighted">
+                    <p class="max-lg:text-base font-medium text-highlighted">
                       {{ option.label }}
                     </p>
                   </div>
-                  <p class="mt-1 text-sm text-muted">
+                  <p class="mt-1 max-lg:text-base lg:text-sm text-muted">
                     {{ option.description }}
                   </p>
                 </button>
@@ -445,22 +536,23 @@ onMounted(async () => {
               <p class="text-sm font-medium text-highlighted">
                 Qual estilo de orientação funciona melhor?
               </p>
-              <div class="grid gap-3 md:grid-cols-2">
+              <div class="grid gap-3 lg:grid-cols-2">
                 <button
                   v-for="option in guidanceOptions"
                   :key="option.value"
                   type="button"
-                  class="rounded-xl border px-4 py-4 text-left transition"
+                  class="rounded-xl border px-4 max-lg:py-5 lg:py-4 text-left transition"
                   :class="profile.guidanceStyle === option.value ? 'border-primary bg-primary/10' : 'border-default hover:border-primary/60'"
-                  @click="profile.guidanceStyle = option.value"
+                  :aria-pressed="profile.guidanceStyle === option.value"
+                  @click="selectGuidanceStyle(option.value)"
                 >
                   <div class="flex items-center gap-3">
                     <UIcon :name="option.icon" class="size-6 shrink-0 text-primary" />
-                    <p class="font-medium text-highlighted">
+                    <p class="max-lg:text-base font-medium text-highlighted">
                       {{ option.label }}
                     </p>
                   </div>
-                  <p class="mt-1 text-sm text-muted">
+                  <p class="mt-1 max-lg:text-base lg:text-sm text-muted">
                     {{ option.description }}
                   </p>
                 </button>
@@ -512,7 +604,7 @@ onMounted(async () => {
             </p>
           </div>
 
-          <div class="grid gap-3 md:grid-cols-2">
+          <div class="grid gap-3 lg:grid-cols-2">
             <UCard
               v-for="card in productTourCards"
               :key="card.title"
@@ -520,11 +612,11 @@ onMounted(async () => {
             >
               <div class="flex items-center gap-3">
                 <UIcon :name="card.icon" class="size-6 shrink-0 text-primary" />
-                <p class="font-medium text-highlighted">
+                <p class="max-lg:text-base font-medium text-highlighted">
                   {{ card.title }}
                 </p>
               </div>
-              <p class="mt-3 text-sm text-muted">
+              <p class="mt-3 max-lg:text-base lg:text-sm text-muted">
                 {{ card.description }}
               </p>
             </UCard>
@@ -568,6 +660,7 @@ onMounted(async () => {
           label="Continuar depois"
           icon="i-lucide-coffee"
           :size="isMobile ? 'lg' : 'md'"
+          :disabled="isSaving"
           @click="onContinueLater"
         />
         <div class="flex items-center justify-end gap-2">
@@ -577,11 +670,13 @@ onMounted(async () => {
             variant="subtle"
             label="Anterior"
             :size="isMobile ? 'lg' : 'md'"
+            :disabled="isSaving"
             @click="onPrevious"
           />
           <UButton
             :label="isLastStep ? 'Ir para hábitos' : 'Próximo'"
-            :disabled="!canAdvance"
+            :disabled="!canAdvance || isSaving"
+            :loading="isSaving"
             :size="isMobile ? 'lg' : 'md'"
             @click="onNext"
           />
