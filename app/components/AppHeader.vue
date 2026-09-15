@@ -31,6 +31,10 @@ const items = computed(() => route.path === '/' ? [{
   to: '/docs',
   onSelect: () => trackNavigation('Documentation', '/docs', 'header')
 }] : [{
+  label: 'Início',
+  to: '/',
+  onSelect: () => trackNavigation('Home', '/', 'header')
+}, {
   label: 'Documentação',
   to: '/docs',
   active: route.path.startsWith('/docs'),

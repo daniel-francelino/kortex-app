@@ -1,22 +1,23 @@
-title: Um plano para cada fase
-description: Comece simples e evolua conforme seu sistema cresce. Notas, hábitos e organização em um só lugar.
+title: Seu ritmo. Seu espaço. Seu plano.
+description: Uma assinatura mensal para organizar suas ideias e sua rotina.
+  Comece por você ou encontre espaço para quem faz parte da sua vida.
 seo:
-  title: Planos
-  description: Escolha o plano ideal para o seu Kortex.
+  title: Planos mensais | Kortex
+  description: Conheça os planos mensais Pessoal, Duo e Família do Kortex. Compare
+    recursos e contas incluídas para escolher o seu sistema de organização.
 navigation.icon: i-lucide-credit-card
 plans:
   - title: Pessoal
-    description: Para quem quer capturar e organizar sem fricção.
+    description: Um sistema pessoal para suas ideias, hábitos e próximos passos.
     price:
       month: R$ 19
-      year: R$ 190
     stripePriceId:
-      month: ''
-      year: ''
+      month: ""
     button:
-      label: Começar
+      label: Escolher Pessoal
       color: neutral
       variant: subtle
+      to: /signup
     features:
       - Notas ilimitadas
       - Tags e coleções
@@ -24,60 +25,59 @@ plans:
       - Busca rápida
       - Check-in diário
       - Rastreamento básico de hábitos
+    billing_period: Cobrança mensal
+    billing_cycle: /mês
   - title: Duo
-    description: Para duas pessoas organizarem juntas, com contas separadas.
+    description: Duas contas independentes, reunidas em uma assinatura.
     price:
       month: R$ 29
-      year: R$ 290
     stripePriceId:
-      month: ''
-      year: ''
+      month: ""
     highlight: true
-    scale: true
     button:
-      label: Assinar Duo
+      label: Escolher Duo
+      to: /signup
     features:
       - Tudo do Pessoal
       - 2 contas incluídas
       - Organização independente por pessoa
       - Uso em múltiplos dispositivos
       - Suporte padrão
+    billing_period: Cobrança mensal
+    billing_cycle: /mês
   - title: Família
-    description: Para a família inteira manter rotinas e contexto em dia.
+    description: Até seis contas para cada pessoa organizar a própria rotina.
     price:
       month: R$ 49
-      year: R$ 490
     stripePriceId:
-      month: ''
-      year: ''
+      month: ""
     button:
-      label: Assinar Família
+      label: Escolher Família
+      to: /signup
     features:
       - Tudo do Duo
       - Até 6 contas incluídas
       - Espaços e tags por pessoa
       - Suporte prioritário
-logos:
-  title: Confiável para o dia a dia
-  icons:
-    - i-simple-icons-amazonaws
-    - i-simple-icons-heroku
-    - i-simple-icons-netlify
-    - i-simple-icons-vercel
-    - i-simple-icons-cloudflare
+    billing_period: Cobrança mensal
+    billing_cycle: /mês
 faq:
-  title: Perguntas frequentes
-  description: Respostas rápidas para começar com confiança.
+  title: Escolha com clareza.
+  description: O essencial sobre os planos, em respostas diretas.
   items:
-    - label: O Kortex é um SaaS?
-      content: Sim. Você acessa seus dados de qualquer lugar e em qualquer dispositivo, sem se preocupar com infraestrutura.
-    - label: Meus dados ficam seguros?
-      content: O objetivo é manter uma arquitetura segura e server-side para integrações e banco (Supabase), com boas práticas de validação e acesso.
-    - label: Posso cancelar quando quiser?
-      content: Sim. Você pode cancelar a qualquer momento e manter o controle sobre seus dados.
-    - label: Posso mudar de plano depois?
-      content: Pode. Comece no Pessoal e evolua para o Duo/Família conforme sua necessidade.
-    - label: Como funcionam hábitos no Kortex?
-      content: Hábitos são conectados a contexto (notas/reflexões). O foco é consistência e tendência, não perfeição.
-    - label: Vocês oferecem suporte?
-      content: Sim — com prioridade maior nos planos Pro e Equipe.
+    - label: Como funciona a cobrança?
+      content: Todos os planos têm cobrança mensal. O valor exibido é o total da
+        assinatura escolhida, não um valor por pessoa.
+    - label: Qual é a diferença entre os planos?
+      content: O Pessoal é para uso individual. O Duo inclui duas contas
+        independentes. O Família inclui até seis contas. Os recursos de cada
+        opção estão listados nos cards acima.
+    - label: As contas do Duo são independentes?
+      content: Sim. Cada pessoa tem sua própria conta e organização. O plano Duo reúne
+        duas contas na mesma assinatura.
+    - label: Posso usar no celular?
+      content: Sim. Você pode acessar o Kortex pelo navegador no celular ou no
+        computador. No iPhone, também pode adicioná-lo à Tela de Início.
+    - label: Por onde começo?
+      content: Crie sua conta e comece por uma nota, tarefa ou hábito. A documentação
+        apresenta os primeiros passos para montar seu sistema pessoal.
