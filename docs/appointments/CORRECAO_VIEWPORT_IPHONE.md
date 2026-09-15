@@ -1,5 +1,13 @@
 # Espaço inferior na PWA — análise da captura de 15/09/2026
 
+## Complemento: onboarding em tela cheia (16/09/2026)
+
+O `FlowModal.vue` ainda herdava o limite responsivo de altura de modais centralizados em `app.config.ts`. A altura `h-dvh` não anulava esse `max-height`, e o modal não reservava a área segura superior. A navegação inferior, com `z-index: 50`, também podia aparecer acima do diálogo.
+
+A correção local define altura e altura máxima de `100dvh` no mobile e `100vh` no WebKit com a classe `pwa-standalone`, seguindo a referência do shell descrita abaixo. As quatro áreas seguras ficam dentro da caixa do modal. Overlay e conteúdo usam as camadas 220/230, abaixo dos seletores (320) e acima da navegação. Cabeçalho e ações não encolhem; o corpo tem rolagem independente. Em telas muito baixas, o cabeçalho também pode rolar para preservar espaço para as ações.
+
+Validação desta alteração: `git diff --check` sem erros. Lint e compilação Vue bloqueados por dependências locais incompletas (`eslint` e `@vue/compiler-core` indisponíveis). A confirmação visual no navegador e no iPhone continua pendente. Conferir as cinco etapas, especialmente Perfil, em retrato e paisagem: ações acessíveis, conteúdo rolável e cabeçalho fora da barra de status.
+
 Fonte: `kortex-css-2026-09-15T21-13-50-430Z.json`, incluindo a marcação `manual:gap-visible` em `/app/habits`.
 
 ## Evidências
