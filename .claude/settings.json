@@ -23,7 +23,27 @@
       "Bash(pnpm add *)",
       "Bash(npx --no-install tsx --version)",
       "Bash(node -e ' *)",
-      "Bash(node \"C:\\\\Users\\\\DANIEL~1.FRA\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-daniel-francelino-Desktop-projects-study-kortex-app\\\\8ab1ea3f-4dde-43fe-a8df-078ee2ca9bea\\\\scratchpad\\\\test-availability.mjs\")"
+      "Bash(node \"C:\\\\Users\\\\DANIEL~1.FRA\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-daniel-francelino-Desktop-projects-study-kortex-app\\\\8ab1ea3f-4dde-43fe-a8df-078ee2ca9bea\\\\scratchpad\\\\test-availability.mjs\")",
+      "Bash(cd \"C:\\\\Users\\\\daniel.francelino\\\\Desktop\\\\projects_study\\\\kortex\\\\kortex-api\\\\src\" && find . -type f -name \"*.ts\" | grep -v node_modules | sort)",
+      "Read(//c/Users/daniel.francelino/Desktop/projects_study/kortex/kortex-api/src/**)",
+      "Read(//c/Users/daniel.francelino/Desktop/projects_study/kortex/kortex-api/src/types/**)",
+      "Read(//c/Users/daniel.francelino/Desktop/projects_study/kortex/kortex-api/src/repositories/**)",
+      "Read(//c/Users/daniel.francelino/Desktop/projects_study/kortex/kortex-api/src/utils/**)",
+      "Read(//c/Users/daniel.francelino/Desktop/projects_study/kortex/kortex-api/src/services/**)",
+      "Read(//c/Users/daniel.francelino/Desktop/projects_study/kortex/kortex-api/src/config/**)",
+      "Read(//c/Users/daniel.francelino/Desktop/projects_study/kortex/kortex-api/src/controllers/**)",
+      "Read(//c/Users/daniel.francelino/Desktop/projects_study/kortex/kortex-api/src/routes/**)",
+      "Read(//c/Users/daniel.francelino/Desktop/projects_study/kortex/kortex-api/src/lib/**)",
+      "Bash(cd \"C:\\\\Users\\\\daniel.francelino\\\\Desktop\\\\projects_study\\\\kortex\\\\kortex-api\" && cat package.json)",
+      "Read(//c/Users/daniel.francelino/Desktop/projects_study/kortex/kortex-api/**)",
+      "Bash(cd \"C:\\\\Users\\\\daniel.francelino\\\\Desktop\\\\projects_study\\\\kortex\\\\kortex-api\" && ls node_modules/.bin/tsc* 2>&1 | head -5)",
+      "Bash(npx prettier *)"
+    ],
+    "additionalDirectories": [
+      "C:\\Users\\daniel.francelino\\Desktop\\projects_study\\kortex\\kortex-api\\src\\utils",
+      "C:\\Users\\daniel.francelino\\Desktop\\projects_study\\kortex\\kortex-api\\src\\repositories",
+      "C:\\Users\\daniel.francelino\\Desktop\\projects_study\\kortex\\kortex-api\\src\\services",
+      "C:\\Users\\daniel.francelino\\Desktop\\projects_study\\kortex\\kortex-api\\src\\types"
     ]
   }
 }

@@ -56,7 +56,7 @@ interface HabitLogResult {
   note: string | null
   created_at: string
   updated_at: string
-  streak: { currentStreak: number, longestStreak: number, status: 'active' | 'frozen' } | null
+  streak: { currentStreak: number, longestStreak: number, status: 'active' | 'frozen' | 'broken' } | null
 }
 
 // Singleton — shared across every component that calls useHabits(), same

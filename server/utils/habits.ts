@@ -1,3 +1,5 @@
+import { addCalendarDays, parseCalendarDate, subCalendarDays } from '#shared/utils/dateTime'
+
 /**
  * A habit is due on `dayOfWeek` (0=Sun..6=Sat) based on its frequency.
  * 'weekly' is anchored to Monday — the same convention used across the app.
@@ -9,6 +11,128 @@ export function isDueOnDay(frequency: unknown, customDays: unknown, dayOfWeek: n
     return (customDays as number[]).includes(dayOfWeek)
   }
   return false
+}
+
+function dayOfWeekOf(dateKey: string): number {
+  return parseCalendarDate(dateKey).getDay()
+}
+
+// Safety net against a runaway walk/scan — e.g. a 'custom' habit whose
+// customDays never matches would otherwise never hit a "due day" to stop on.
+// ~10 years is far beyond any realistic gap between two habit_logs rows.
+// Also reused by log.post.ts as the query cap for the logs fed into this
+// function — since a habit can log at most one done/done_later/frozen entry
+// per day, no row beyond this many days back could ever affect the result,
+// so fetching more would just be unused data (see docs/habits/ANALISE_STREAK.md, item 4).
+export const MAX_STREAK_LOOKBACK_DAYS = 3650
+
+/**
+ * Whether at least one day the habit is due on falls strictly between two
+ * `yyyy-MM-dd` keys — used to decide whether a gap between two logged dates
+ * is a real break (a due day went unlogged) or just days the habit was never
+ * due on (e.g. the 6 non-Monday days between two weekly completions).
+ */
+function hasDueDayBetween(fromDateExclusive: string, toDateExclusive: string, frequency: unknown, customDays: unknown): boolean {
+  let cursor = addCalendarDays(fromDateExclusive, 1)
+  for (let i = 0; i < MAX_STREAK_LOOKBACK_DAYS && cursor < toDateExclusive; i++) {
+    if (isDueOnDay(frequency, customDays, dayOfWeekOf(cursor))) return true
+    cursor = addCalendarDays(cursor, 1)
+  }
+  return false
+}
+
+export interface StreakLogEntry {
+  logDate: string
+  status: 'done' | 'done_later' | 'frozen'
+}
+
+export interface StreakComputation {
+  currentStreak: number
+  longestStreak: number
+  lastCompletedDate: string | null
+  status: 'active' | 'frozen' | 'broken'
+}
+
+/**
+ * Computes a habit's current/longest streak from its recent done/done_later/
+ * frozen logs, respecting the habit's frequency: a day the habit isn't due
+ * on doesn't break the streak, it's just skipped over — only a missed *due*
+ * day does. A frozen day bridges the streak on both the current-streak walk
+ * and the historical longest-streak scan (doesn't add to it, doesn't break
+ * it either), so the two numbers share one consistent definition of "still
+ * going" instead of the walk being lenient about freezes while the scan
+ * isn't.
+ *
+ * `status` is 'frozen' when today is a forgiven day, 'broken' when the habit
+ * has done/done_later/frozen history but the streak isn't currently live
+ * (a due day went unlogged), and 'active' either while a streak is live or
+ * for a habit that has never been logged at all — there's nothing to call
+ * "broken" yet.
+ */
+export function computeStreak(
+  logs: StreakLogEntry[],
+  frequency: unknown,
+  customDays: unknown,
+  today: string
+): StreakComputation {
+  const completedDates = new Set(
+    logs.filter(l => l.status === 'done' || l.status === 'done_later').map(l => l.logDate)
+  )
+  const frozenDates = new Set(
+    logs.filter(l => l.status === 'frozen').map(l => l.logDate)
+  )
+
+  if (completedDates.size === 0 && frozenDates.size === 0) {
+    return { currentStreak: 0, longestStreak: 0, lastCompletedDate: null, status: 'active' }
+  }
+
+  // ─── Current streak: walk backward from today, one calendar day at a time.
+  // Today itself (i===0) always gets the benefit of the doubt when empty —
+  // it may just not be logged yet — the same leniency applied to any day
+  // that isn't due; only a *due*, non-today day with no log really breaks it.
+  let currentStreak = 0
+  let anchorIsFrozen = false
+  let cursor = today
+
+  for (let i = 0; i < MAX_STREAK_LOOKBACK_DAYS; i++) {
+    if (completedDates.has(cursor)) {
+      currentStreak++
+    } else if (frozenDates.has(cursor)) {
+      if (i === 0) anchorIsFrozen = true
+    } else if (i === 0 || !isDueOnDay(frequency, customDays, dayOfWeekOf(cursor))) {
+      // Pending today, or simply not a due day — bridge, don't break.
+    } else {
+      break
+    }
+    cursor = subCalendarDays(cursor, 1)
+  }
+
+  // ─── Longest streak: scan the full history forward with the same rule —
+  // a run continues across a gap as long as no due day fell inside it.
+  const allDates = [
+    ...[...completedDates].map(logDate => ({ logDate, completed: true })),
+    ...[...frozenDates].map(logDate => ({ logDate, completed: false }))
+  ].sort((a, b) => (a.logDate < b.logDate ? -1 : a.logDate > b.logDate ? 1 : 0))
+
+  let longestStreak = 0
+  let runCount = 0
+  let prevDate: string | null = null
+
+  for (const entry of allDates) {
+    const gapBroke = prevDate !== null && hasDueDayBetween(prevDate, entry.logDate, frequency, customDays)
+    if (prevDate === null || gapBroke) {
+      longestStreak = Math.max(longestStreak, runCount)
+      runCount = 0
+    }
+    if (entry.completed) runCount++
+    prevDate = entry.logDate
+  }
+  longestStreak = Math.max(longestStreak, runCount, currentStreak)
+
+  const lastCompletedDate = [...completedDates].sort().at(-1) ?? null
+  const status = anchorIsFrozen ? 'frozen' : currentStreak > 0 ? 'active' : 'broken'
+
+  return { currentStreak, longestStreak, lastCompletedDate, status }
 }
 
 export function mapIdentity(row: Record<string, unknown> | null | undefined): Record<string, unknown> | null {

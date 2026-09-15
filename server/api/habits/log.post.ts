@@ -3,7 +3,8 @@ import { getSupabaseAdminClient } from '../../utils/supabase'
 import { requireAuthUser } from '../../utils/require-auth'
 import { resolveHabitVersionIdForDate } from '../../utils/habit-versions'
 import { resolveUserTimezone } from '../../utils/user-timezone'
-import { differenceInCalendarDaysInZone, subCalendarDays, todayInZone } from '#shared/utils/dateTime'
+import { computeStreak, MAX_STREAK_LOOKBACK_DAYS } from '../../utils/habits'
+import { todayInZone } from '#shared/utils/dateTime'
 
 const bodySchema = z.object({
   habitId: z.string().uuid(),
@@ -34,7 +35,7 @@ export default eventHandler(async (event) => {
   // Verify habit ownership
   const { data: habit, error: habitError } = await supabase
     .from('habits')
-    .select('id')
+    .select('id, frequency, custom_days')
     .eq('id', parsed.habitId)
     .eq('user_id', user.id)
     .single()
@@ -103,10 +104,17 @@ export default eventHandler(async (event) => {
   // Keep the log action successful even if the cache refresh fails — `streak`
   // just stays null in the response, and the client keeps whatever streak
   // badge it already had instead of updating it.
-  let streak: { currentStreak: number, longestStreak: number, status: 'active' | 'frozen' } | null = null
+  let streak: { currentStreak: number, longestStreak: number, status: 'active' | 'frozen' | 'broken' } | null = null
   try {
     const timezone = await resolveUserTimezone(supabase, user.id, parsed.tz)
-    streak = await updateStreakCache(supabase, user.id, parsed.habitId, timezone)
+    streak = await updateStreakCache(
+      supabase,
+      user.id,
+      parsed.habitId,
+      timezone,
+      (habit as Record<string, unknown>).frequency,
+      (habit as Record<string, unknown>).custom_days
+    )
   } catch (error) {
     console.error('[habits/log] streak cache update failed', {
       habitId: parsed.habitId,
@@ -122,9 +130,14 @@ async function updateStreakCache(
   supabase: ReturnType<typeof getSupabaseAdminClient>,
   userId: string,
   habitId: string,
-  timezone: string
-): Promise<{ currentStreak: number, longestStreak: number, status: 'active' | 'frozen' } | null> {
-  // Get recent logs (completed or frozen) ordered by date desc
+  timezone: string,
+  frequency: unknown,
+  customDays: unknown
+): Promise<{ currentStreak: number, longestStreak: number, status: 'active' | 'frozen' | 'broken' } | null> {
+  // Get recent logs (completed or frozen) ordered by date desc. Capped at
+  // MAX_STREAK_LOOKBACK_DAYS, not an arbitrary number — computeStreak never
+  // looks further back than that, so nothing beyond it could change the
+  // result (see docs/habits/ANALISE_STREAK.md, item 4).
   const { data: logs } = await supabase
     .from('habit_logs')
     .select('log_date, status')
@@ -132,91 +145,15 @@ async function updateStreakCache(
     .eq('user_id', userId)
     .in('status', ['done', 'done_later', 'frozen'])
     .order('log_date', { ascending: false })
-    .limit(400)
+    .limit(MAX_STREAK_LOOKBACK_DAYS)
 
-  if (!logs || logs.length === 0) {
-    await supabase.from('habit_streaks').upsert({
-      habit_id: habitId,
-      user_id: userId,
-      current_streak: 0,
-      longest_streak: 0,
-      last_completed_date: null,
-      status: 'active',
-      updated_at: new Date().toISOString()
-    }, { onConflict: 'habit_id' })
-    return { currentStreak: 0, longestStreak: 0, status: 'active' }
-  }
-
-  const completedDates = new Set(
-    logs
-      .filter((l: Record<string, unknown>) => l.status === 'done' || l.status === 'done_later')
-      .map((l: Record<string, unknown>) => l.log_date as string)
-  )
-  const frozenDates = new Set(
-    logs
-      .filter((l: Record<string, unknown>) => l.status === 'frozen')
-      .map((l: Record<string, unknown>) => l.log_date as string)
-  )
+  const streakLogs = (logs ?? []).map((l: Record<string, unknown>) => ({
+    logDate: l.log_date as string,
+    status: l.status as 'done' | 'done_later' | 'frozen'
+  }))
 
   const today = todayInZone(timezone)
-  const yesterday = subCalendarDays(today, 1)
-
-  // Determine streak start: today or yesterday (if today has no log yet).
-  // A frozen day counts as "activity" for anchoring, same as a real completion.
-  const mostRecentDateStr = [...completedDates, ...frozenDates].sort().reverse()[0]
-
-  let streakAnchor: string
-  if (mostRecentDateStr === today) {
-    streakAnchor = today
-  } else if (mostRecentDateStr === yesterday) {
-    streakAnchor = yesterday
-  } else {
-    // Last activity was before yesterday — streak is 0
-    streakAnchor = today
-  }
-
-  // Walk backward day by day from the anchor. A completed day increments the
-  // streak; a frozen day preserves it (doesn't increment, doesn't break it);
-  // any other day breaks the walk.
-  let currentStreak = 0
-  let anchorIsFrozen = false
-  let cursor = streakAnchor
-
-  for (let i = 0; ; i++) {
-    if (completedDates.has(cursor)) {
-      currentStreak++
-    } else if (frozenDates.has(cursor)) {
-      if (i === 0) anchorIsFrozen = true
-    } else {
-      break
-    }
-
-    cursor = subCalendarDays(cursor, 1)
-  }
-
-  // Calculate longest streak — real completions only, freezes don't inflate it.
-  let longestStreak = 0
-  let tempStreak = 1
-  const sortedCompletedDates = [...completedDates].sort()
-
-  for (let i = 1; i < sortedCompletedDates.length; i++) {
-    const prev = sortedCompletedDates[i - 1]!
-    const curr = sortedCompletedDates[i]!
-    const diff = differenceInCalendarDaysInZone(prev, curr)
-
-    if (diff === 1) {
-      tempStreak++
-    } else {
-      longestStreak = Math.max(longestStreak, tempStreak)
-      tempStreak = 1
-    }
-  }
-  if (sortedCompletedDates.length > 0) {
-    longestStreak = Math.max(longestStreak, tempStreak, currentStreak)
-  }
-
-  const lastCompletedDate = sortedCompletedDates.at(-1) ?? null
-  const status = anchorIsFrozen ? 'frozen' : 'active'
+  const { currentStreak, longestStreak, lastCompletedDate, status } = computeStreak(streakLogs, frequency, customDays, today)
 
   await supabase.from('habit_streaks').upsert({
     habit_id: habitId,
