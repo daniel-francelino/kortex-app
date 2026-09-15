@@ -12,7 +12,23 @@ function trackNavigation(label: string, target: string, location: 'header' | 'he
   })
 }
 
-const items = computed(() => [{
+const items = computed(() => route.path === '/' ? [{
+  label: 'Recursos',
+  to: '/#recursos',
+  onSelect: () => trackNavigation('Recursos', '/#recursos', 'header')
+}, {
+  label: 'Como funciona',
+  to: '/#como-funciona',
+  onSelect: () => trackNavigation('Como funciona', '/#como-funciona', 'header')
+}, {
+  label: 'Planos',
+  to: '/pricing',
+  onSelect: () => trackNavigation('Pricing', '/pricing', 'header')
+}, {
+  label: 'Documentação',
+  to: '/docs',
+  onSelect: () => trackNavigation('Documentation', '/docs', 'header')
+}] : [{
   label: 'Documentação',
   to: '/docs',
   active: route.path.startsWith('/docs'),

@@ -1,131 +1,57 @@
 <script setup lang="ts">
 import { PostHogEvent } from '~/types/analytics'
 
-const columns = [{
-  label: 'Recursos',
-  children: [{
-    label: 'Ajuda'
-  }, {
-    label: 'Documentação'
-  }, {
-    label: 'Roadmap'
-  }, {
-    label: 'Novidades'
-  }]
-}, {
-  label: 'Produto',
-  children: [{
-    label: 'Hábitos'
-  }, {
-    label: 'Notas'
-  }, {
-    label: 'Coleções'
-  }, {
-    label: 'Tags'
-  }]
-}, {
-  label: 'Empresa',
-  children: [{
-    label: 'Sobre'
-  }, {
-    label: 'Planos'
-  }, {
-    label: 'Carreiras'
-  }, {
-    label: 'Blog'
-  }]
-}]
-
-const toast = useToast()
 const { capture } = usePostHog()
-
-const email = ref('')
-const loading = ref(false)
-
-function onSubmit() {
-  loading.value = true
-  capture(PostHogEvent.PublicNewsletterSubmitted, {
-    has_email: Boolean(email.value.trim()),
-    location: 'footer'
-  })
-
-  toast.add({
-    title: 'Inscrição confirmada!',
-    description: 'Você vai receber novidades do Kortex por email.'
-  })
-}
+const columns = [{
+  label: 'Produto',
+  children: [
+    { label: 'Recursos', to: '/#recursos' },
+    { label: 'Como funciona', to: '/#como-funciona' },
+    { label: 'Planos', to: '/pricing' }
+  ]
+}, {
+  label: 'Explore',
+  children: [
+    { label: 'Documenta??o', to: '/docs' },
+    { label: 'Blog', to: '/blog' },
+    { label: 'Novidades', to: '/changelog' }
+  ]
+}]
 </script>
 
 <template>
-  <USeparator
-    icon="i-simple-icons-nuxtdotjs"
-    class="h-px"
-  />
-
-  <UFooter :ui="{ top: 'border-b border-default' }">
-    <template #top>
-      <UContainer>
-        <UFooterColumns :columns="columns">
-          <template #right>
-            <form @submit.prevent="onSubmit">
-              <UFormField
-                name="email"
-                label="Receba novidades do Kortex"
-                size="lg"
-              >
-                <UInput
-                  v-model="email"
-                  type="email"
-                  class="w-full"
-                  placeholder="Digite seu email"
-                >
-                  <template #trailing>
-                    <UButton
-                      type="submit"
-                      size="xs"
-                      color="neutral"
-                      label="Inscrever"
-                    />
-                  </template>
-                </UInput>
-              </UFormField>
-            </form>
-          </template>
-        </UFooterColumns>
-      </UContainer>
-    </template>
-
-    <template #left>
-      <p class="text-muted text-sm">
-        Kortex • © {{ new Date().getFullYear() }}
-      </p>
-    </template>
-
-    <template #right>
-      <UButton
-        to="/docs/getting-started"
-        icon="i-lucide-book-open"
-        aria-label="Abrir documentação"
-        color="neutral"
-        variant="ghost"
-        @click="capture(PostHogEvent.PublicFooterCtaClicked, { location: 'footer', target: '/docs/getting-started', target_label: 'Documentation' })"
-      />
-      <UButton
-        to="/changelog"
-        icon="i-lucide-history"
-        aria-label="Ver novidades"
-        color="neutral"
-        variant="ghost"
-        @click="capture(PostHogEvent.PublicFooterCtaClicked, { location: 'footer', target: '/changelog', target_label: 'Changelog' })"
-      />
-      <UButton
-        to="/blog"
-        icon="i-lucide-pencil"
-        aria-label="Abrir blog"
-        color="neutral"
-        variant="ghost"
-        @click="capture(PostHogEvent.PublicFooterCtaClicked, { location: 'footer', target: '/blog', target_label: 'Blog' })"
-      />
-    </template>
-  </UFooter>
+  <footer class="border-t border-default bg-default">
+    <UContainer>
+      <div class="grid gap-12 py-14 sm:grid-cols-2 lg:grid-cols-[2fr_1fr_1fr]">
+        <div>
+          <NuxtLink to="/" aria-label="Kortex ? in?cio" class="inline-flex"><AppLogo /></NuxtLink>
+          <p class="mt-5 max-w-xs text-sm leading-7 text-muted">Um lugar para organizar suas ideias.<br>Mais espa?o para viver as suas prioridades.</p>
+          <UButton
+            to="/signup"
+            label="Come?ar meu Kortex"
+            trailing-icon="i-lucide-arrow-up-right"
+            variant="link"
+            class="mt-5 min-h-11 px-0"
+            @click="capture(PostHogEvent.PublicFooterCtaClicked, { location: 'footer', target: '/signup', target_label: 'Come?ar meu Kortex' })"
+          />
+        </div>
+        <nav v-for="column in columns" :key="column.label" :aria-label="column.label">
+          <h2 class="text-xs font-semibold uppercase tracking-widest text-highlighted">{{ column.label }}</h2>
+          <ul class="mt-4 space-y-1">
+            <li v-for="link in column.children" :key="link.to">
+              <NuxtLink
+                :to="link.to"
+                class="inline-flex min-h-11 items-center text-sm text-muted transition-colors hover:text-highlighted"
+                @click="capture(PostHogEvent.PublicFooterCtaClicked, { location: 'footer', target: link.to, target_label: link.label })"
+              >{{ link.label }}</NuxtLink>
+            </li>
+          </ul>
+        </nav>
+      </div>
+      <div class="flex flex-wrap items-center justify-between gap-4 border-t border-default py-6 text-xs text-dimmed">
+        <p>? {{ new Date().getFullYear() }} Kortex</p>
+        <p>Clareza para pensar. Espa?o para agir.</p>
+      </div>
+    </UContainer>
+  </footer>
 </template>
