@@ -112,15 +112,18 @@ export const collections = {
     source: '3.blog/**/*',
     type: 'page',
     schema: z.object({
-      image: z.object({ src: z.string().nonempty().editor({ input: 'media' }) }),
+      image: z.object({ src: z.string().nonempty().editor({ input: 'media' }) }).optional(),
       authors: z.array(
         z.object({
           name: z.string().nonempty(),
           to: z.string().nonempty(),
           avatar: z.object({ src: z.string().nonempty().editor({ input: 'media' }) })
         })
-      ),
+      ).optional(),
       date: z.date(),
+      updatedAt: z.date().optional(),
+      readingMinutes: z.number().int().positive(),
+      action: z.object({ label: z.string(), to: z.string() }),
       badge: z.object({ label: z.string().nonempty() })
     })
   }),

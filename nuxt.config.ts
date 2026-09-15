@@ -51,6 +51,12 @@ export default defineNuxtConfig({
   },
 
   routeRules: {
+    '/blog/asian-cuisine': { redirect: { to: '/blog/um-habito-pequeno-para-o-seu-dia', statusCode: 301 } },
+    '/blog/pyrenees': { redirect: { to: '/blog/tres-perguntas-para-fechar-o-dia', statusCode: 301 } },
+    '/blog/james-webb': { redirect: { to: '/blog/notas-que-voce-encontra-depois', statusCode: 301 } },
+    '/blog/meditation': { redirect: { to: '/blog/revisao-semanal-com-um-proximo-passo', statusCode: 301 } },
+    '/blog/animals': { redirect: { to: '/blog/adaptar-habitos-a-uma-semana-corrida', statusCode: 301 } },
+    '/blog/cryptocurrencies': { redirect: { to: '/blog/transforme-referencias-em-proximos-passos', statusCode: 301 } },
     '/docs': { redirect: '/docs/getting-started', prerender: false },
     '/app': { prerender: false },
     '/app/**': { prerender: false },
