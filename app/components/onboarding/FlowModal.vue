@@ -8,6 +8,7 @@ import {
 } from '~/types/onboarding'
 
 const { user } = useAuth()
+const isMobile = useMediaQuery('(max-width: 1023px)')
 const {
   close,
   completeAndStartFirstHabit,
@@ -34,28 +35,24 @@ const selectedTimezone = ref('UTC')
 const goalOptions = [
   {
     value: 'consistency' as const,
-    emoji: '🔥',
     icon: 'i-lucide-flame',
     label: 'Criar constância',
     description: 'Quero manter hábitos simples sem perder ritmo.'
   },
   {
     value: 'productivity' as const,
-    emoji: '⚡',
     icon: 'i-lucide-zap',
     label: 'Organizar rotina',
     description: 'Quero estruturar melhor o meu dia.'
   },
   {
     value: 'wellbeing' as const,
-    emoji: '🧘',
     icon: 'i-lucide-leaf',
     label: 'Cuidar de mim',
     description: 'Quero melhorar energia, saúde e bem-estar.'
   },
   {
     value: 'identity' as const,
-    emoji: '🧠',
     icon: 'i-lucide-sparkles',
     label: 'Mudar identidade',
     description: 'Quero reforçar quem eu quero me tornar.'
@@ -65,21 +62,18 @@ const goalOptions = [
 const experienceOptions = [
   {
     value: 'new' as const,
-    emoji: '🌱',
     icon: 'i-lucide-sprout',
     label: 'Primeira vez',
     description: 'Ainda estou começando a organizar meus hábitos.'
   },
   {
     value: 'returning' as const,
-    emoji: '🔁',
     icon: 'i-lucide-refresh-cw',
     label: 'Já tentei antes',
     description: 'Preciso voltar a ter consistência.'
   },
   {
     value: 'structured' as const,
-    emoji: '📊',
     icon: 'i-lucide-chart-column',
     label: 'Já tenho método',
     description: 'Quero um sistema melhor para acompanhar.'
@@ -89,14 +83,12 @@ const experienceOptions = [
 const guidanceOptions = [
   {
     value: 'guided' as const,
-    emoji: '🧭',
     icon: 'i-lucide-compass',
     label: 'Mais guiado',
     description: 'Prefiro passos mais claros e sugeridos.'
   },
   {
     value: 'flexible' as const,
-    emoji: '🎛️',
     icon: 'i-lucide-sliders-horizontal',
     label: 'Mais flexível',
     description: 'Prefiro ajustar o sistema do meu jeito.'
@@ -106,25 +98,21 @@ const guidanceOptions = [
 const productTourCards = [
   {
     title: 'Hoje',
-    emoji: '☀️',
     icon: 'i-lucide-sun',
     description: 'É a operação diária. Você vê o que precisa fazer e registra a execução.'
   },
   {
     title: 'Todos',
-    emoji: '🗂️',
     icon: 'i-lucide-list-tree',
     description: 'É a visão completa do sistema de hábitos, com busca, filtros e organização.'
   },
   {
     title: 'Revisão',
-    emoji: '📝',
     icon: 'i-lucide-notebook-pen',
     description: 'É onde você aprende com a semana e ajusta o que precisa melhorar.'
   },
   {
     title: 'Insights',
-    emoji: '📈',
     icon: 'i-lucide-bar-chart-3',
     description: 'É onde o sistema mostra padrões, consistência e sinais de evolução.'
   }
@@ -193,6 +181,21 @@ const stepPresentation = computed(() => {
 
   return map[currentStep.value]
 })
+
+// The header (progress badge, title) and footer (Continuar depois/Próximo)
+// stay pinned; only the step content in between scrolls. Without this, a
+// step taller than the viewport (the `profile` step's 9 option cards, on a
+// short mobile screen) clipped the footer buttons out of reach — there's no
+// close button on this modal by design (see `:close="false"` below), so an
+// unreachable footer meant no way out at all.
+const modalUi = computed(() => ({
+  content: isMobile.value
+    ? 'flex h-dvh max-h-dvh flex-col'
+    : 'max-w-3xl max-h-[85dvh] flex flex-col',
+  header: 'shrink-0',
+  body: 'min-h-0 flex-1 overflow-y-auto',
+  footer: 'shrink-0'
+}))
 
 function hydrateLocalState() {
   profile.primaryGoal = state.value.onboarding.profile.primaryGoal
@@ -279,45 +282,47 @@ onMounted(async () => {
 <template>
   <UModal
     v-model:open="isOpen"
-    :prevent-close="true"
-    :ui="{ content: 'max-w-3xl' }"
+    :dismissible="false"
+    :close="false"
+    :fullscreen="isMobile"
+    :ui="modalUi"
   >
-    <template #content>
-      <UCard class="overflow-hidden border-default/70 bg-elevated/70">
-        <template #header>
-          <div class="rounded-2xl border border-primary/15 bg-gradient-to-br from-primary/20 via-primary/8 to-transparent p-5">
-            <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-              <div class="flex items-start gap-4">
-                <div class="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/10 text-3xl shadow-sm ring-1 ring-white/10">
-                  <span>{{ stepPresentation.emoji }}</span>
-                </div>
+    <template #header>
+      <div class="rounded-2xl border border-primary/15 bg-gradient-to-br from-primary/20 via-primary/8 to-transparent p-4 lg:p-5">
+        <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div class="flex items-start gap-4">
+            <div class="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-white/10 text-3xl shadow-sm ring-1 ring-white/10">
+              <span>{{ stepPresentation.emoji }}</span>
+            </div>
 
-                <div class="space-y-1">
-                  <p class="text-xs font-semibold uppercase tracking-[0.24em] text-primary">
-                    {{ stepPresentation.eyebrow }}
-                  </p>
-                  <h2 class="text-2xl font-semibold text-highlighted">
-                    {{ stepPresentation.title }}
-                  </h2>
-                  <p class="text-sm text-muted">
-                    {{ stepPresentation.description }}
-                  </p>
-                </div>
-              </div>
-
-              <div class="flex items-center gap-2">
-                <UBadge color="neutral" variant="subtle" size="lg">
-                  {{ currentStepIndex + 1 }} / {{ ONBOARDING_STEPS.length }}
-                </UBadge>
-
-                <UBadge color="primary" variant="soft" size="lg">
-                  <span class="mr-1">⚡</span>
-                  Menos de 2 min
-                </UBadge>
-              </div>
+            <div class="space-y-1">
+              <p class="text-xs font-semibold uppercase tracking-[0.24em] text-primary">
+                {{ stepPresentation.eyebrow }}
+              </p>
+              <h2 class="text-xl lg:text-2xl font-semibold text-highlighted">
+                {{ stepPresentation.title }}
+              </h2>
+              <p class="text-sm text-muted">
+                {{ stepPresentation.description }}
+              </p>
             </div>
           </div>
-        </template>
+
+          <div class="flex items-center gap-2">
+            <UBadge color="neutral" variant="subtle" size="lg">
+              {{ currentStepIndex + 1 }} / {{ ONBOARDING_STEPS.length }}
+            </UBadge>
+
+            <UBadge color="primary" variant="soft" size="lg">
+              <span class="mr-1">⚡</span>
+              Menos de 2 min
+            </UBadge>
+          </div>
+        </div>
+      </div>
+    </template>
+
+    <template #body>
 
         <div v-if="currentStep === 'welcome'" class="space-y-6">
           <div class="rounded-2xl border border-primary/15 bg-primary/5 p-5">
@@ -398,13 +403,10 @@ onMounted(async () => {
                   @click="profile.primaryGoal = option.value"
                 >
                   <div class="flex items-center gap-3">
-                    <span class="text-2xl">{{ option.emoji }}</span>
-                    <div>
-                      <p class="font-medium text-highlighted">
-                        {{ option.label }}
-                      </p>
-                      <UIcon :name="option.icon" class="mt-1 text-base text-primary" />
-                    </div>
+                    <UIcon :name="option.icon" class="size-6 shrink-0 text-primary" />
+                    <p class="font-medium text-highlighted">
+                      {{ option.label }}
+                    </p>
                   </div>
                   <p class="mt-1 text-sm text-muted">
                     {{ option.description }}
@@ -427,13 +429,10 @@ onMounted(async () => {
                   @click="profile.experienceLevel = option.value"
                 >
                   <div class="flex items-center gap-3">
-                    <span class="text-2xl">{{ option.emoji }}</span>
-                    <div>
-                      <p class="font-medium text-highlighted">
-                        {{ option.label }}
-                      </p>
-                      <UIcon :name="option.icon" class="mt-1 text-base text-primary" />
-                    </div>
+                    <UIcon :name="option.icon" class="size-6 shrink-0 text-primary" />
+                    <p class="font-medium text-highlighted">
+                      {{ option.label }}
+                    </p>
                   </div>
                   <p class="mt-1 text-sm text-muted">
                     {{ option.description }}
@@ -456,13 +455,10 @@ onMounted(async () => {
                   @click="profile.guidanceStyle = option.value"
                 >
                   <div class="flex items-center gap-3">
-                    <span class="text-2xl">{{ option.emoji }}</span>
-                    <div>
-                      <p class="font-medium text-highlighted">
-                        {{ option.label }}
-                      </p>
-                      <UIcon :name="option.icon" class="mt-1 text-base text-primary" />
-                    </div>
+                    <UIcon :name="option.icon" class="size-6 shrink-0 text-primary" />
+                    <p class="font-medium text-highlighted">
+                      {{ option.label }}
+                    </p>
                   </div>
                   <p class="mt-1 text-sm text-muted">
                     {{ option.description }}
@@ -523,13 +519,10 @@ onMounted(async () => {
               class="border-primary/10 bg-primary/5"
             >
               <div class="flex items-center gap-3">
-                <span class="text-2xl">{{ card.emoji }}</span>
-                <div>
-                  <p class="font-medium text-highlighted">
-                    {{ card.title }}
-                  </p>
-                  <UIcon :name="card.icon" class="mt-1 text-base text-primary" />
-                </div>
+                <UIcon :name="card.icon" class="size-6 shrink-0 text-primary" />
+                <p class="font-medium text-highlighted">
+                  {{ card.title }}
+                </p>
               </div>
               <p class="mt-3 text-sm text-muted">
                 {{ card.description }}
@@ -565,33 +558,35 @@ onMounted(async () => {
             </div>
           </UCard>
         </div>
+    </template>
 
-        <template #footer>
-          <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <UButton
-              color="neutral"
-              variant="ghost"
-              label="Continuar depois"
-              icon="i-lucide-coffee"
-              @click="onContinueLater"
-            />
-            <div class="flex items-center justify-end gap-2">
-              <UButton
-                v-if="!isFirstStep"
-                color="neutral"
-                variant="subtle"
-                label="Anterior"
-                @click="onPrevious"
-              />
-              <UButton
-                :label="isLastStep ? 'Ir para hábitos' : 'Próximo'"
-                :disabled="!canAdvance"
-                @click="onNext"
-              />
-            </div>
-          </div>
-        </template>
-      </UCard>
+    <template #footer>
+      <div class="flex w-full flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <UButton
+          color="neutral"
+          variant="ghost"
+          label="Continuar depois"
+          icon="i-lucide-coffee"
+          :size="isMobile ? 'lg' : 'md'"
+          @click="onContinueLater"
+        />
+        <div class="flex items-center justify-end gap-2">
+          <UButton
+            v-if="!isFirstStep"
+            color="neutral"
+            variant="subtle"
+            label="Anterior"
+            :size="isMobile ? 'lg' : 'md'"
+            @click="onPrevious"
+          />
+          <UButton
+            :label="isLastStep ? 'Ir para hábitos' : 'Próximo'"
+            :disabled="!canAdvance"
+            :size="isMobile ? 'lg' : 'md'"
+            @click="onNext"
+          />
+        </div>
+      </div>
     </template>
   </UModal>
 </template>
