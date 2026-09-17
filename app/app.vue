@@ -2,6 +2,7 @@
 import { pt_br } from '@nuxt/ui/locale'
 
 const route = useRoute()
+const splashVisible = ref(false)
 const colorMode = useColorMode()
 const { state: preferencesState, applyBrandTheme, applyPublicTheme, applyStoredTheme } = useUserPreferences()
 const runtimeConfig = useRuntimeConfig()
@@ -129,10 +130,13 @@ useSeoMeta({
     <ClientOnly>
       <ViewportMetrics />
       <CapacitorInit />
+      <AppSplash @update:visible="splashVisible = $event" />
     </ClientOnly>
 
-    <NuxtLayout>
-      <NuxtPage />
-    </NuxtLayout>
+    <div class="contents" :inert="splashVisible || undefined">
+      <NuxtLayout>
+        <NuxtPage />
+      </NuxtLayout>
+    </div>
   </UApp>
 </template>
