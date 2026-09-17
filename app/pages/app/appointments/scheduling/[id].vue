@@ -752,10 +752,32 @@ if (import.meta.client) {
       </UDashboardNavbar>
     </template>
     <template #body>
-      <div v-if="loading" class="mx-auto max-w-2xl space-y-4 p-4">
-        <USkeleton class="h-8 w-1/2" />
-        <USkeleton class="h-32 w-full" />
-        <USkeleton class="h-32 w-full" />
+      <div
+        v-if="loading"
+        class="mx-auto grid w-full max-w-7xl items-start gap-6 px-1 py-3 sm:px-4 sm:py-6 lg:grid-cols-[200px_minmax(0,1fr)] xl:grid-cols-[200px_minmax(0,1fr)_260px]"
+      >
+        <aside class="space-y-5 lg:sticky lg:top-0">
+          <USkeleton class="hidden h-9 w-32 lg:block" />
+          <div class="flex gap-1 overflow-x-auto pb-2 lg:flex-col lg:overflow-visible">
+            <USkeleton
+              v-for="i in 6"
+              :key="i"
+              class="h-10 w-24 shrink-0 rounded-lg lg:w-full"
+            />
+          </div>
+          <USkeleton class="hidden h-20 w-full rounded-xl lg:block" />
+        </aside>
+        <div class="min-w-0 space-y-6">
+          <div class="space-y-2">
+            <USkeleton class="h-8 w-48" />
+            <USkeleton class="h-4 w-72" />
+          </div>
+          <USkeleton v-for="i in 3" :key="i" class="h-40 w-full rounded-xl" />
+        </div>
+        <aside class="hidden space-y-4 xl:block">
+          <USkeleton class="h-80 w-full rounded-xl" />
+          <USkeleton class="h-10 w-full rounded-lg" />
+        </aside>
       </div>
       <div
         v-else-if="notFound"

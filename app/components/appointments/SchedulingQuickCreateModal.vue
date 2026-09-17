@@ -94,20 +94,6 @@ async function onSubmit() {
         <div
           class="flex items-center gap-3 rounded-xl border border-default bg-elevated/40 p-4"
         >
-          <div
-            class="flex size-10 shrink-0 items-center justify-center rounded-lg bg-default ring-1 ring-default"
-          >
-            <UIcon name="i-lucide-calendar-plus" class="size-5 text-primary" />
-          </div>
-          <div>
-            <p class="text-sm font-medium text-highlighted">
-              Um convite, sem troca de mensagens
-            </p>
-            <p class="mt-1 text-xs leading-relaxed text-muted">
-              Seus convidados escolhem um horário livre pelo link.
-            </p>
-          </div>
-        </div>
         <UFormField
           label="Nome do evento"
           description="Use um nome que seus convidados reconheçam."
