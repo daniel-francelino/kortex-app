@@ -23,12 +23,25 @@ onMounted(() => {
   if (calendarsStatus.value === "idle") refreshCalendars();
 });
 
+// Só pra montar o preview "kortex.app/{username}/{slug}" no campo URL —
+// username mora em user_preferences, não vem de useAuth() (que só carrega
+// user_metadata). Ver docs/appointments/PLANO_USERNAME_PERFIL_PUBLICO.md §4.
+const { data: authProfile } = await useAsyncData<{ username: string | null }>(
+  "settings-username-preview",
+  () => $fetch("/api/auth/profile"),
+);
+const username = computed(() => authProfile.value?.username ?? null);
+
 // ─── Load ────────────────────────────────────────────────────────────────────
 const loading = ref(true);
 const notFound = ref(false);
 const saving = ref(false);
 const shareToken = ref("");
 const isActive = ref(true);
+// Guarda o slug já salvo — usado pro aviso "isso muda o link" só aparecer
+// quando o campo de fato mudou, e pra não disparar a checagem de
+// disponibilidade contra o próprio valor atual.
+const savedSlug = ref("");
 
 interface DayWindow {
   startTime: string;
@@ -47,6 +60,8 @@ const state = reactive({
   locationDetails: "",
   color: null as string | null,
   coverImageUrl: null as string | null,
+  slug: "",
+  showOnProfile: true,
   timezone: detectBrowserTimeZone() ?? "UTC",
   bufferBeforeMinutes: 0,
   bufferAfterMinutes: 0,
@@ -87,6 +102,9 @@ function applyPageToState(
   state.locationDetails = page.locationDetails ?? "";
   state.color = page.color;
   state.coverImageUrl = page.coverImageUrl;
+  state.slug = page.slug;
+  state.showOnProfile = page.showOnProfile;
+  savedSlug.value = page.slug;
   state.timezone = page.timezone;
   state.bufferBeforeMinutes = page.bufferBeforeMinutes;
   state.bufferAfterMinutes = page.bufferAfterMinutes;
@@ -443,6 +461,44 @@ const shareUrl = computed(() => {
   return `${base}/agendar/${shareToken.value}`;
 });
 
+// ─── URL pública (username + slug) ──────────────────────────────────────────
+const publicProfileUrl = computed(() => {
+  if (!username.value || !state.slug) return "";
+  const base = typeof window !== "undefined" ? window.location.origin : "";
+  return `${base}/${username.value}/${state.slug}`;
+});
+
+type SlugCheckState = { status: "idle" | "checking" | "available" | "unavailable", reason?: string };
+const slugCheck = ref<SlugCheckState>({ status: "idle" });
+const SLUG_CHECK_REASONS: Record<string, string> = {
+  format: "Use só letras minúsculas, números e hífen (sem hífens repetidos)",
+  taken: "Você já tem outra página de agendamento com essa URL",
+};
+
+const runSlugCheck = useDebounceFn(async (value: string) => {
+  const normalized = value.trim().toLowerCase();
+  if (!normalized || normalized === savedSlug.value) {
+    slugCheck.value = { status: "idle" };
+    return;
+  }
+  slugCheck.value = { status: "checking" };
+  try {
+    const result = await $fetch<{ available: boolean; reason?: string }>(
+      `/api/appointments/scheduling-pages/${pageId}/slug-check`,
+      { query: { value: normalized } },
+    );
+    slugCheck.value = result.available
+      ? { status: "available" }
+      : { status: "unavailable", reason: SLUG_CHECK_REASONS[result.reason ?? "taken"] };
+  } catch {
+    slugCheck.value = { status: "idle" };
+  }
+}, 400);
+
+watch(() => state.slug, (value) => {
+  void runSlugCheck(value);
+});
+
 async function copyLink() {
   try {
     await navigator.clipboard.writeText(shareUrl.value);
@@ -516,6 +572,8 @@ function buildPayload() {
     timezone: state.timezone,
     color: state.color,
     coverImageUrl: state.coverImageUrl,
+    slug: state.slug,
+    showOnProfile: state.showOnProfile,
     bufferBeforeMinutes: state.bufferBeforeMinutes,
     bufferAfterMinutes: state.bufferAfterMinutes,
     slotIncrementMinutes: state.slotIncrementMinutes,
@@ -575,6 +633,16 @@ async function onSave() {
     toast.add({
       title: "Erro",
       description: "Preencha título e calendário.",
+      color: "error",
+    });
+    invalidTab.value = "evento";
+    activeTab.value = "evento";
+    return;
+  }
+  if (slugCheck.value.status === "unavailable") {
+    toast.add({
+      title: "Erro",
+      description: slugCheck.value.reason ?? "Essa URL não está disponível.",
       color: "error",
     });
     invalidTab.value = "evento";
@@ -800,6 +868,39 @@ if (import.meta.client) {
               <div class="space-y-4">
                 <UFormField label="Título">
                   <UInput v-model="state.title" class="w-full" />
+                </UFormField>
+                <UFormField
+                  label="URL"
+                  :description="username ? `kortex.app/${username}/…` : 'Defina seu username em Configurações para publicar esta página no seu perfil.'"
+                >
+                  <UInput v-model="state.slug" class="w-full">
+                    <template v-if="username" #leading>
+                      <span class="text-xs text-dimmed">{{ username }}/</span>
+                    </template>
+                    <template #trailing>
+                      <UIcon
+                        v-if="slugCheck.status === 'checking'"
+                        name="i-lucide-loader-2"
+                        class="size-4 animate-spin text-dimmed"
+                      />
+                      <UIcon
+                        v-else-if="slugCheck.status === 'available'"
+                        name="i-lucide-check"
+                        class="size-4 text-success"
+                      />
+                      <UIcon
+                        v-else-if="slugCheck.status === 'unavailable'"
+                        name="i-lucide-x"
+                        class="size-4 text-error"
+                      />
+                    </template>
+                  </UInput>
+                  <p v-if="slugCheck.status === 'unavailable'" class="mt-1 text-xs text-error">
+                    {{ slugCheck.reason }}
+                  </p>
+                  <p v-else-if="publicProfileUrl" class="mt-1 truncate text-xs text-muted">
+                    {{ publicProfileUrl }}
+                  </p>
                 </UFormField>
                 <UFormField label="Descrição" description="Aparece para o convidado no topo da página.">
                   <UTextarea v-model="state.description" :rows="3" class="w-full" />
@@ -1348,6 +1449,21 @@ if (import.meta.client) {
                   Privacidade
                 </p>
               </template>
+              <div class="flex items-center justify-between">
+                <div>
+                  <p class="text-sm font-medium text-highlighted">
+                    Mostrar no meu perfil público
+                  </p>
+                  <p class="text-xs text-muted">
+                    Aparece na lista de eventos de
+                    {{ username ? `kortex.app/${username}` : "sua página pública" }}.
+                    Desativado, a página continua acessível pelo link direto.
+                  </p>
+                </div>
+                <USwitch v-model="state.showOnProfile" />
+              </div>
+            </UCard>
+            <UCard>
               <div class="flex items-center justify-between">
                 <div>
                   <p class="text-sm font-medium text-highlighted">

@@ -49,6 +49,8 @@ function normalizeSchedulingPage(input: unknown): SchedulingPage {
     timezone: String(page.timezone ?? ''),
     color: (page.color as string | null) ?? null,
     coverImageUrl: (page.coverImageUrl as string | null) ?? (page.cover_image_url as string | null) ?? null,
+    slug: String(page.slug ?? ''),
+    showOnProfile: Boolean(page.showOnProfile ?? page.show_on_profile ?? true),
     bufferBeforeMinutes: Number(page.bufferBeforeMinutes ?? page.buffer_before_minutes ?? 0),
     bufferAfterMinutes: Number(page.bufferAfterMinutes ?? page.buffer_after_minutes ?? 0),
     slotIncrementMinutes: Number(page.slotIncrementMinutes ?? page.slot_increment_minutes ?? 15),
@@ -164,6 +166,10 @@ export function useSchedulingPages() {
       timezone: payload.timezone,
       color: payload.color ?? null,
       coverImageUrl: payload.coverImageUrl ?? null,
+      // Placeholder até o servidor gerar o slug de verdade (server/utils/slug.ts)
+      // — mesma convenção já usada para shareToken abaixo.
+      slug: payload.slug ?? '',
+      showOnProfile: payload.showOnProfile ?? true,
       bufferBeforeMinutes: payload.bufferBeforeMinutes ?? 0,
       bufferAfterMinutes: payload.bufferAfterMinutes ?? 0,
       slotIncrementMinutes: payload.slotIncrementMinutes ?? 15,
@@ -248,6 +254,8 @@ export function useSchedulingPages() {
       timezone: payload.timezone !== undefined ? payload.timezone : (previous?.timezone ?? ''),
       color: payload.color !== undefined ? payload.color : (previous?.color ?? null),
       coverImageUrl: payload.coverImageUrl !== undefined ? payload.coverImageUrl : (previous?.coverImageUrl ?? null),
+      slug: payload.slug !== undefined ? payload.slug : (previous?.slug ?? ''),
+      showOnProfile: payload.showOnProfile !== undefined ? payload.showOnProfile : (previous?.showOnProfile ?? true),
       bufferBeforeMinutes: payload.bufferBeforeMinutes !== undefined ? payload.bufferBeforeMinutes : (previous?.bufferBeforeMinutes ?? 0),
       bufferAfterMinutes: payload.bufferAfterMinutes !== undefined ? payload.bufferAfterMinutes : (previous?.bufferAfterMinutes ?? 0),
       slotIncrementMinutes: payload.slotIncrementMinutes !== undefined ? payload.slotIncrementMinutes : (previous?.slotIncrementMinutes ?? 15),

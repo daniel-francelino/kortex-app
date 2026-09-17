@@ -58,6 +58,13 @@ export interface SchedulingPage {
   timezone: string
   color: string | null
   coverImageUrl: string | null
+  /** Único por (userId, slug) — não globalmente. Reservas via username+slug
+   * usam `kortex.app/{username}/{slug}`; o token opaco continua funcionando
+   * em paralelo (ver docs/appointments/PLANO_USERNAME_PERFIL_PUBLICO.md §7.1). */
+  slug: string
+  /** Oculta a página do perfil público sem desativá-la — continua acessível
+   * pelo link direto (token ou username+slug). */
+  showOnProfile: boolean
   bufferBeforeMinutes: number
   bufferAfterMinutes: number
   slotIncrementMinutes: number
@@ -127,6 +134,9 @@ export interface CreateSchedulingPagePayload {
   timezone: string
   color?: string | null
   coverImageUrl?: string | null
+  /** Omitido na criação = gerado automaticamente do título (server/utils/slug.ts). */
+  slug?: string
+  showOnProfile?: boolean
   bufferBeforeMinutes?: number
   bufferAfterMinutes?: number
   slotIncrementMinutes?: number

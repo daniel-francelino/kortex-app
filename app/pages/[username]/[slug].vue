@@ -4,11 +4,13 @@ import type { PublicSchedulingPage } from "~/types/scheduling";
 definePageMeta({ layout: false, ssr: true });
 
 const route = useRoute();
-const token = route.params.token as string;
+const username = route.params.username as string;
+const slug = route.params.slug as string;
+const apiBase = `/api/profile/${username}/${slug}`;
 
 const { data: page, error } = await useAsyncData<PublicSchedulingPage>(
-  `schedule-${token}`,
-  () => $fetch<PublicSchedulingPage>(`/api/schedule/${token}`),
+  `profile-${username}-${slug}`,
+  () => $fetch<PublicSchedulingPage>(apiBase),
 );
 
 if (error.value || !page.value) {
@@ -30,8 +32,5 @@ useSeoMeta({
 </script>
 
 <template>
-  <AppointmentsPublicBookingFlow
-    :public-page="publicPage"
-    :api-base="`/api/schedule/${token}`"
-  />
+  <AppointmentsPublicBookingFlow :public-page="publicPage" :api-base="apiBase" />
 </template>

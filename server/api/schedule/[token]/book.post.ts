@@ -1,10 +1,6 @@
 import { z } from 'zod'
 import { getSupabaseAdminClient } from '../../../utils/supabase'
-import { createShareToken } from '../../../utils/share-token'
-import { createEventInternal } from '../../../utils/appointments-events'
-import { computeAvailableSlots } from '../../../utils/schedule-availability'
-import { mapBooking } from '../../../utils/scheduling'
-import { getTimeZoneParts } from '../../../utils/timezone'
+import { bookSlotForPage, requireActiveSchedulingPageByToken } from '../../../utils/schedule-public'
 
 const bodySchema = z.object({
   startAt: z.string().datetime(),
@@ -20,105 +16,9 @@ export default eventHandler(async (event) => {
   const payload = bodySchema.parse(body)
   const supabase = getSupabaseAdminClient()
 
-  const { data: page } = await supabase
-    .from('scheduling_pages')
-    .select('*')
-    .eq('share_token', token)
-    .maybeSingle()
-
-  if (!page || !page.is_active || page.archived_at) {
-    throw createError({ statusCode: 404, statusMessage: 'Página de agendamento não encontrada' })
-  }
-
-  const { data: rulesData } = await supabase
-    .from('scheduling_availability_rules')
-    .select('day_of_week, start_time, end_time')
-    .eq('scheduling_page_id', page.id)
-
-  const rules = (rulesData ?? []).map((r: Record<string, unknown>) => ({
-    dayOfWeek: r.day_of_week as number,
-    startTime: r.start_time as string,
-    endTime: r.end_time as string
-  }))
-
-  // Revalidate this exact slot is still free — narrow re-check of the same
-  // algorithm the guest's UI used to display availability in the first place,
-  // scoped to just the requested day, to close (not fully eliminate — see
-  // docs/appointments/PLANO_LINK_AGENDAMENTO.md section 6) the race window
-  // between the guest loading the page and clicking "Confirmar".
-  const requestedStart = new Date(payload.startAt)
-  const requestedStartParts = getTimeZoneParts(requestedStart, page.timezone as string)
-  const dayStr = `${requestedStartParts.year}-${String(requestedStartParts.month).padStart(2, '0')}-${String(requestedStartParts.day).padStart(2, '0')}`
-  const slotsForDay = await computeAvailableSlots(
-    supabase,
-    {
-      id: page.id as string,
-      userId: page.user_id as string,
-      timezone: page.timezone as string,
-      durationMinutes: page.duration_minutes as number,
-      bufferBeforeMinutes: page.buffer_before_minutes as number,
-      bufferAfterMinutes: page.buffer_after_minutes as number,
-      slotIncrementMinutes: page.slot_increment_minutes as number,
-      minNoticeHours: page.min_notice_hours as number,
-      maxAdvanceDays: page.max_advance_days as number,
-      maxBookingsPerDay: (page.max_bookings_per_day as number | null) ?? null
-    },
-    rules,
-    dayStr,
-    dayStr
-  )
-
-  const stillFree = slotsForDay.some(s => s.start.getTime() === requestedStart.getTime())
-  if (!stillFree) {
-    throw createError({ statusCode: 409, statusMessage: 'Esse horário acabou de ser reservado por outra pessoa. Escolha outro horário.' })
-  }
-
-  const endAt = new Date(requestedStart.getTime() + (page.duration_minutes as number) * 60000).toISOString()
-
-  const titleTemplate = (page.calendar_event_title_template as string | null) || '{titulo} com {convidado}'
-  const eventTitle = titleTemplate
-    .replaceAll('{titulo}', page.title as string)
-    .replaceAll('{convidado}', payload.guestName)
-    .replaceAll('{email}', payload.guestEmail)
-
-  const newEvent = await createEventInternal(supabase, page.user_id as string, {
-    calendarId: page.calendar_id as string,
-    title: eventTitle,
-    location: page.location_details as string | null,
-    startAt: payload.startAt,
-    endAt,
-    eventTimezone: page.timezone as string,
-    allDay: false
-  })
-
-  // The event above is created either way — it already blocks the slot for
-  // everyone else. `requires_confirmation` only affects whether the booking
-  // itself starts as 'pending' (awaiting host approval) or 'confirmed'; see
-  // docs/appointments/AUDITORIA_LINK_AGENDAMENTO_UX.md §3.3.
-  const initialStatus = page.requires_confirmation ? 'pending' : 'confirmed'
-
-  const { data: booking, error: bookingError } = await supabase
-    .from('bookings')
-    .insert({
-      scheduling_page_id: page.id,
-      event_id: newEvent.id,
-      guest_name: payload.guestName,
-      guest_email: payload.guestEmail,
-      guest_timezone: payload.guestTimezone,
-      answers: payload.answers ?? {},
-      manage_token: createShareToken(),
-      status: initialStatus
-    })
-    .select('*')
-    .single()
-
-  if (bookingError || !booking) {
-    throw createError({ statusCode: 500, statusMessage: 'Falha ao criar reserva', data: bookingError?.message })
-  }
+  const page = await requireActiveSchedulingPageByToken(supabase, token)
+  const result = await bookSlotForPage(supabase, page, payload)
 
   setResponseStatus(event, 201)
-  return {
-    booking: mapBooking(booking as Record<string, unknown>),
-    manageUrl: `/agendar/gerenciar/${booking.manage_token as string}`
-  }
+  return result
 })

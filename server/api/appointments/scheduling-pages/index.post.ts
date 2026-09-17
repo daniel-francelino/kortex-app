@@ -3,6 +3,8 @@ import { getSupabaseAdminClient } from '../../../utils/supabase'
 import { requireAuthUser } from '../../../utils/require-auth'
 import { createShareToken } from '../../../utils/share-token'
 import { mapSchedulingPage } from '../../../utils/scheduling'
+import { ensureUniqueSlug, slugify } from '../../../utils/slug'
+import { isValidUsernameFormat } from '../../../utils/username'
 import { parseOrThrow } from '../../../utils/validation'
 
 const availabilityRuleSchema = z.object({
@@ -34,6 +36,8 @@ const bodySchema = z.object({
   timezone: z.string().min(1).max(100),
   color: z.string().max(20).nullable().optional(),
   coverImageUrl: z.string().url().max(2000).nullable().optional(),
+  slug: z.string().refine(isValidUsernameFormat, 'Use só letras minúsculas, números e hífen (sem hífens repetidos)').optional(),
+  showOnProfile: z.boolean().default(true),
   bufferBeforeMinutes: z.number().int().min(0).max(120).default(0),
   bufferAfterMinutes: z.number().int().min(0).max(120).default(0),
   slotIncrementMinutes: z.number().int().min(5).max(120).default(15),
@@ -70,6 +74,12 @@ export default eventHandler(async (event) => {
     throw createError({ statusCode: 404, statusMessage: 'Calendário não encontrado' })
   }
 
+  // Slug nasce do título e é único só dentro deste usuário — nunca exposto
+  // no modal de criação rápida (docs/appointments/PLANO_USERNAME_PERFIL_
+  // PUBLICO.md §6.2), editável depois no editor completo.
+  const slugBase = payload.slug ?? slugify(payload.title)
+  const slug = await ensureUniqueSlug(supabase, user.id, slugBase)
+
   const insertRow: Record<string, unknown> = {
     user_id: user.id,
     calendar_id: payload.calendarId,
@@ -81,6 +91,8 @@ export default eventHandler(async (event) => {
     timezone: payload.timezone,
     color: payload.color ?? null,
     cover_image_url: payload.coverImageUrl ?? null,
+    slug,
+    show_on_profile: payload.showOnProfile,
     buffer_before_minutes: payload.bufferBeforeMinutes,
     buffer_after_minutes: payload.bufferAfterMinutes,
     slot_increment_minutes: payload.slotIncrementMinutes,

@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { getSupabaseAdminClient } from '../../../utils/supabase'
 import { requireAuthUser } from '../../../utils/require-auth'
 import { mapSchedulingPage } from '../../../utils/scheduling'
+import { isValidUsernameFormat } from '../../../utils/username'
 import { parseOrThrow } from '../../../utils/validation'
 
 const availabilityRuleSchema = z.object({
@@ -32,6 +33,8 @@ const bodySchema = z.object({
   timezone: z.string().min(1).max(100).optional(),
   color: z.string().max(20).nullable().optional(),
   coverImageUrl: z.string().url().max(2000).nullable().optional(),
+  slug: z.string().refine(isValidUsernameFormat, 'Use só letras minúsculas, números e hífen (sem hífens repetidos)').optional(),
+  showOnProfile: z.boolean().optional(),
   bufferBeforeMinutes: z.number().int().min(0).max(120).optional(),
   bufferAfterMinutes: z.number().int().min(0).max(120).optional(),
   slotIncrementMinutes: z.number().int().min(5).max(120).optional(),
@@ -83,6 +86,24 @@ export default eventHandler(async (event) => {
     }
   }
 
+  // Diferente da criação (que gera um slug livre e resolve colisão sozinha
+  // acrescentando -2/-3), aqui o slug foi digitado à mão pelo anfitrião no
+  // editor — se já está em uso por outra página dele, erra explicitamente em
+  // vez de trocar silenciosamente o valor que ele escolheu.
+  if (payload.slug !== undefined) {
+    const { data: slugOwner } = await supabase
+      .from('scheduling_pages')
+      .select('id')
+      .eq('user_id', user.id)
+      .eq('slug', payload.slug)
+      .neq('id', id)
+      .maybeSingle()
+
+    if (slugOwner) {
+      throw createError({ statusCode: 409, statusMessage: 'Você já tem outra página de agendamento com essa URL.' })
+    }
+  }
+
   const updateData: Record<string, unknown> = { updated_at: new Date().toISOString() }
 
   if (payload.calendarId !== undefined) updateData.calendar_id = payload.calendarId
@@ -94,6 +115,8 @@ export default eventHandler(async (event) => {
   if (payload.timezone !== undefined) updateData.timezone = payload.timezone
   if (payload.color !== undefined) updateData.color = payload.color
   if (payload.coverImageUrl !== undefined) updateData.cover_image_url = payload.coverImageUrl
+  if (payload.slug !== undefined) updateData.slug = payload.slug
+  if (payload.showOnProfile !== undefined) updateData.show_on_profile = payload.showOnProfile
   if (payload.bufferBeforeMinutes !== undefined) updateData.buffer_before_minutes = payload.bufferBeforeMinutes
   if (payload.bufferAfterMinutes !== undefined) updateData.buffer_after_minutes = payload.bufferAfterMinutes
   if (payload.slotIncrementMinutes !== undefined) updateData.slot_increment_minutes = payload.slotIncrementMinutes

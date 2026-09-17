@@ -21,6 +21,8 @@ type ProfileResponse = {
   email: string | null
   name: string
   avatar_url: string
+  username: string | null
+  bio: string
 }
 
 type PreferencesResponse = {
@@ -34,7 +36,11 @@ type PreferencesResponse = {
 const profileSchema = z.object({
   name: z.string().min(2, 'Deve ter pelo menos 2 caracteres'),
   email: z.string().email('Email inválido'),
-  avatar_url: z.string().optional()
+  avatar_url: z.string().optional(),
+  // Formato/disponibilidade são checados ao vivo (usernameCheck abaixo) e de
+  // novo no servidor ao salvar — não duplicamos a regex aqui.
+  username: z.string().optional(),
+  bio: z.string().max(280, 'Máximo de 280 caracteres').optional()
 })
 
 type ProfileSchema = z.output<typeof profileSchema>
@@ -52,14 +58,25 @@ const { data: preferencesData, status: preferencesStatus } = await useAsyncData(
 const profile = reactive<Partial<ProfileSchema>>({
   name: profileData.value?.name || '',
   email: profileData.value?.email || '',
-  avatar_url: profileData.value?.avatar_url || undefined
+  avatar_url: profileData.value?.avatar_url || undefined,
+  username: profileData.value?.username || '',
+  bio: profileData.value?.bio || ''
 })
+
+// Guarda o username já salvo (separado de `profile.username`, que muda a
+// cada tecla digitada) — usado para não checar disponibilidade contra o
+// próprio valor atual e para o aviso de "isso vai trocar seu link" só
+// aparecer quando o campo de fato mudou.
+const savedUsername = ref(profileData.value?.username || '')
 
 watch(profileData, (newData) => {
   if (newData) {
     profile.name = newData.name
     profile.email = newData.email || ''
     profile.avatar_url = newData.avatar_url || undefined
+    profile.username = newData.username || ''
+    profile.bio = newData.bio || ''
+    savedUsername.value = newData.username || ''
   }
 })
 
@@ -79,8 +96,42 @@ watch(preferencesData, (newData) => {
 const isSaving = ref(false)
 const isSavingTimezone = ref(false)
 
+// ─── Username: checagem de disponibilidade ao vivo ──────────────────────────
+type UsernameCheckState = { status: 'idle' | 'checking' | 'available' | 'unavailable', reason?: string }
+const usernameCheck = ref<UsernameCheckState>({ status: 'idle' })
+
+const USERNAME_CHECK_REASONS: Record<string, string> = {
+  format: 'Use só letras minúsculas, números e hífen (sem hífens repetidos)',
+  reserved: 'Este username não está disponível',
+  taken: 'Este username já está em uso'
+}
+
+const runUsernameCheck = useDebounceFn(async (value: string) => {
+  const normalized = value.trim().toLowerCase()
+  if (!normalized || normalized === savedUsername.value) {
+    usernameCheck.value = { status: 'idle' }
+    return
+  }
+  usernameCheck.value = { status: 'checking' }
+  try {
+    const result = await $fetch<{ available: boolean, reason?: string }>('/api/auth/username/check', {
+      query: { value: normalized }
+    })
+    usernameCheck.value = result.available
+      ? { status: 'available' }
+      : { status: 'unavailable', reason: USERNAME_CHECK_REASONS[result.reason ?? 'taken'] }
+  } catch {
+    usernameCheck.value = { status: 'idle' }
+  }
+}, 400)
+
+watch(() => profile.username, (value) => {
+  void runUsernameCheck(value ?? '')
+})
+
 async function onSubmit(_event: FormSubmitEvent<ProfileSchema>) {
   if (isSaving.value) return
+  if (usernameCheck.value.status === 'unavailable') return
   isSaving.value = true
 
   try {
@@ -88,9 +139,13 @@ async function onSubmit(_event: FormSubmitEvent<ProfileSchema>) {
       method: 'PUT',
       body: {
         name: profile.name,
-        avatar_url: profile.avatar_url || ''
+        avatar_url: profile.avatar_url || '',
+        username: (profile.username ?? '').trim().toLowerCase(),
+        bio: profile.bio ?? ''
       }
     })
+
+    savedUsername.value = (profile.username ?? '').trim().toLowerCase()
 
     await fetchUser()
 
@@ -221,7 +276,7 @@ function onFileClick() {
         color="neutral"
         type="submit"
         :loading="isSaving"
-        :disabled="isSaving"
+        :disabled="isSaving || usernameCheck.status === 'unavailable'"
         class="w-fit lg:ms-auto"
       />
     </UPageCard>
@@ -292,6 +347,69 @@ function onFileClick() {
             @change="onFileChange"
           >
         </div>
+      </UFormField>
+      <USeparator />
+      <UFormField
+        name="username"
+        label="Username"
+        description="Sua página de agendamento fica em kortex.app/{username}."
+        class="flex max-sm:flex-col justify-between items-start gap-4"
+      >
+        <div class="w-full max-w-xs space-y-1.5">
+          <UInput
+            v-model="profile.username"
+            autocomplete="off"
+            placeholder="michaelnorris"
+          >
+            <template #leading>
+              <span class="text-sm text-dimmed">kortex.app/</span>
+            </template>
+            <template #trailing>
+              <UIcon
+                v-if="usernameCheck.status === 'checking'"
+                name="i-lucide-loader-2"
+                class="size-4 animate-spin text-dimmed"
+              />
+              <UIcon
+                v-else-if="usernameCheck.status === 'available'"
+                name="i-lucide-check"
+                class="size-4 text-success"
+              />
+              <UIcon
+                v-else-if="usernameCheck.status === 'unavailable'"
+                name="i-lucide-x"
+                class="size-4 text-error"
+              />
+            </template>
+          </UInput>
+          <p v-if="usernameCheck.status === 'unavailable'" class="text-xs text-error">
+            {{ usernameCheck.reason }}
+          </p>
+          <p v-else-if="usernameCheck.status === 'available'" class="text-xs text-success">
+            Disponível
+          </p>
+          <p
+            v-if="savedUsername && profile.username !== savedUsername"
+            class="text-xs text-warning"
+          >
+            Trocar seu username quebra links já compartilhados com o endereço atual.
+          </p>
+        </div>
+      </UFormField>
+      <USeparator />
+      <UFormField
+        name="bio"
+        label="Bio"
+        description="Aparece no topo da sua página pública. Até 280 caracteres."
+        class="flex max-sm:flex-col justify-between items-start gap-4"
+      >
+        <UTextarea
+          v-model="profile.bio"
+          :rows="3"
+          :maxlength="280"
+          autocomplete="off"
+          class="w-full max-w-xs"
+        />
       </UFormField>
     </UPageCard>
   </UForm>
