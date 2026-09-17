@@ -46,6 +46,7 @@ const state = reactive({
   locationType: SchedulingLocationType.VideoLink,
   locationDetails: "",
   color: null as string | null,
+  coverImageUrl: null as string | null,
   timezone: detectBrowserTimeZone() ?? "UTC",
   bufferBeforeMinutes: 0,
   bufferAfterMinutes: 0,
@@ -85,6 +86,7 @@ function applyPageToState(
   state.locationType = page.locationType;
   state.locationDetails = page.locationDetails ?? "";
   state.color = page.color;
+  state.coverImageUrl = page.coverImageUrl;
   state.timezone = page.timezone;
   state.bufferBeforeMinutes = page.bufferBeforeMinutes;
   state.bufferAfterMinutes = page.bufferAfterMinutes;
@@ -233,6 +235,42 @@ const colorOptions = [
   { label: "Roxo", value: "#8b5cf6" },
   { label: "Rosa", value: "#ec4899" },
 ];
+
+// ─── Capa ────────────────────────────────────────────────────────────────────
+const coverInputRef = ref<HTMLInputElement | null>(null);
+const coverUploading = ref(false);
+
+async function onCoverFileSelected(event: Event) {
+  const file = (event.target as HTMLInputElement).files?.[0];
+  if (!file) return;
+
+  coverUploading.value = true;
+  try {
+    const form = new FormData();
+    form.append("file", file);
+    form.append("kind", "image");
+
+    const uploaded = await $fetch<{ url: string }>("/api/editor/uploads", {
+      method: "POST",
+      body: form,
+    });
+
+    state.coverImageUrl = uploaded.url;
+  } catch {
+    toast.add({
+      title: "Erro",
+      description: "Não foi possível enviar a imagem.",
+      color: "error",
+    });
+  } finally {
+    coverUploading.value = false;
+    if (coverInputRef.value) coverInputRef.value.value = "";
+  }
+}
+
+function onRemoveCoverImage() {
+  state.coverImageUrl = null;
+}
 
 // Shared with the Settings "Regional" picker (docs/timezone/ANALISE_TIMEZONE.md,
 // seção 5) — same ordering (browser zone, then current selection, then most
@@ -477,6 +515,7 @@ function buildPayload() {
     locationDetails: state.locationDetails || undefined,
     timezone: state.timezone,
     color: state.color,
+    coverImageUrl: state.coverImageUrl,
     bufferBeforeMinutes: state.bufferBeforeMinutes,
     bufferAfterMinutes: state.bufferAfterMinutes,
     slotIncrementMinutes: state.slotIncrementMinutes,
@@ -846,6 +885,64 @@ if (import.meta.client) {
                 <p class="text-xs text-muted">
                   Usada só para diferenciar suas páginas na lista. O convidado
                   não vê.
+                </p>
+              </div>
+            </UCard>
+            <UCard>
+              <template #header>
+                <p class="text-sm font-medium text-highlighted">
+                  Capa
+                </p>
+              </template>
+              <div class="space-y-2">
+                <div
+                  v-if="state.coverImageUrl"
+                  class="relative h-32 overflow-hidden rounded-lg"
+                >
+                  <img
+                    :src="state.coverImageUrl"
+                    alt=""
+                    class="size-full object-cover"
+                  >
+                  <div class="absolute inset-x-0 bottom-0 flex justify-end gap-1 bg-gradient-to-t from-black/60 to-transparent p-2">
+                    <UButton
+                      icon="i-lucide-image"
+                      size="xs"
+                      color="neutral"
+                      variant="solid"
+                      :loading="coverUploading"
+                      aria-label="Trocar capa"
+                      @click="coverInputRef?.click()"
+                    />
+                    <UButton
+                      icon="i-lucide-trash-2"
+                      size="xs"
+                      color="neutral"
+                      variant="solid"
+                      aria-label="Remover capa"
+                      @click="onRemoveCoverImage"
+                    />
+                  </div>
+                </div>
+                <UButton
+                  v-else
+                  label="Adicionar capa"
+                  icon="i-lucide-image-plus"
+                  size="sm"
+                  color="neutral"
+                  variant="subtle"
+                  :loading="coverUploading"
+                  @click="coverInputRef?.click()"
+                />
+                <input
+                  ref="coverInputRef"
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp,image/gif"
+                  class="hidden"
+                  @change="onCoverFileSelected"
+                >
+                <p class="text-xs text-muted">
+                  Aparece no topo da página pública. Recomendado: 1200×400px.
                 </p>
               </div>
             </UCard>

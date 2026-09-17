@@ -4,6 +4,7 @@ import { createShareToken } from '../../../utils/share-token'
 import { createEventInternal } from '../../../utils/appointments-events'
 import { computeAvailableSlots } from '../../../utils/schedule-availability'
 import { mapBooking } from '../../../utils/scheduling'
+import { getTimeZoneParts } from '../../../utils/timezone'
 
 const bodySchema = z.object({
   startAt: z.string().datetime(),
@@ -46,7 +47,8 @@ export default eventHandler(async (event) => {
   // docs/appointments/PLANO_LINK_AGENDAMENTO.md section 6) the race window
   // between the guest loading the page and clicking "Confirmar".
   const requestedStart = new Date(payload.startAt)
-  const dayStr = requestedStart.toISOString().split('T')[0]!
+  const requestedStartParts = getTimeZoneParts(requestedStart, page.timezone as string)
+  const dayStr = `${requestedStartParts.year}-${String(requestedStartParts.month).padStart(2, '0')}-${String(requestedStartParts.day).padStart(2, '0')}`
   const slotsForDay = await computeAvailableSlots(
     supabase,
     {

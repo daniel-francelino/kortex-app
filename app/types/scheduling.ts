@@ -57,6 +57,7 @@ export interface SchedulingPage {
   locationDetails: string | null
   timezone: string
   color: string | null
+  coverImageUrl: string | null
   bufferBeforeMinutes: number
   bufferAfterMinutes: number
   slotIncrementMinutes: number
@@ -125,6 +126,7 @@ export interface CreateSchedulingPagePayload {
   locationDetails?: string
   timezone: string
   color?: string | null
+  coverImageUrl?: string | null
   bufferBeforeMinutes?: number
   bufferAfterMinutes?: number
   slotIncrementMinutes?: number
@@ -152,6 +154,7 @@ export interface PublicSchedulingPage {
   durationMinutes: number
   locationType: SchedulingLocationType
   locationDetails: string | null
+  coverImageUrl: string | null
   hostName: string
   hostAvatarUrl: string | null
   maxAdvanceDays: number

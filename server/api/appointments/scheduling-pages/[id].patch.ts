@@ -31,6 +31,7 @@ const bodySchema = z.object({
   locationDetails: z.string().max(500).nullable().optional(),
   timezone: z.string().min(1).max(100).optional(),
   color: z.string().max(20).nullable().optional(),
+  coverImageUrl: z.string().url().max(2000).nullable().optional(),
   bufferBeforeMinutes: z.number().int().min(0).max(120).optional(),
   bufferAfterMinutes: z.number().int().min(0).max(120).optional(),
   slotIncrementMinutes: z.number().int().min(5).max(120).optional(),
@@ -92,6 +93,7 @@ export default eventHandler(async (event) => {
   if (payload.locationDetails !== undefined) updateData.location_details = payload.locationDetails
   if (payload.timezone !== undefined) updateData.timezone = payload.timezone
   if (payload.color !== undefined) updateData.color = payload.color
+  if (payload.coverImageUrl !== undefined) updateData.cover_image_url = payload.coverImageUrl
   if (payload.bufferBeforeMinutes !== undefined) updateData.buffer_before_minutes = payload.bufferBeforeMinutes
   if (payload.bufferAfterMinutes !== undefined) updateData.buffer_after_minutes = payload.bufferAfterMinutes
   if (payload.slotIncrementMinutes !== undefined) updateData.slot_increment_minutes = payload.slotIncrementMinutes

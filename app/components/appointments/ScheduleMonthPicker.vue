@@ -1,10 +1,17 @@
 <script setup lang="ts">
-import { formatDisplay } from "#shared/utils/dateTime";
+import { formatDisplay, getZonedDateParts, todayInZone } from "#shared/utils/dateTime";
 
 const props = defineProps<{
   modelValue: string | null;
   availableDates: Set<string>;
   loading?: boolean;
+  // "Hoje"/"passado" e o mês inicial precisam ser calculados no fuso do
+  // convidado (livremente escolhido no dropdown da página pública, não
+  // necessariamente o fuso real do navegador) — do contrário este grid e o
+  // `availableDates` do pai (calculado em guestTimezone) falam "linguagens"
+  // de fuso diferentes perto de virada de dia/mês. Ver AUDITORIA_TIMEZONE_
+  // CAPA_AGENDAMENTO.md §1.3, achado 3.
+  timeZone: string;
 }>();
 
 const emit = defineEmits<{
@@ -12,9 +19,9 @@ const emit = defineEmits<{
   "month-change": [year: number, month: number];
 }>();
 
-const today = new Date();
-const viewYear = ref(today.getFullYear());
-const viewMonth = ref(today.getMonth());
+const initialParts = getZonedDateParts(new Date(), props.timeZone);
+const viewYear = ref(initialParts.year);
+const viewMonth = ref(initialParts.month - 1);
 
 const dayHeaders = ["D", "S", "T", "Q", "Q", "S", "S"];
 
@@ -22,7 +29,7 @@ function formatDate(date: Date): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
 
-const todayStr = formatDate(today);
+const todayStr = computed(() => todayInZone(props.timeZone));
 
 interface DayCell {
   dateStr: string;
@@ -49,7 +56,7 @@ const grid = computed((): DayCell[][] => {
         dateStr,
         day: cursor.getDate(),
         isCurrentMonth: cursor.getMonth() === viewMonth.value,
-        isPast: dateStr < todayStr,
+        isPast: dateStr < todayStr.value,
         hasAvailability: props.availableDates.has(dateStr),
       });
       cursor.setDate(cursor.getDate() + 1);

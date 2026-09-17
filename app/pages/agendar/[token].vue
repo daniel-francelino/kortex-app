@@ -38,6 +38,7 @@ useSeoMeta({
   title: publicPage.value.title,
   description: publicPage.value.description ?? "Agende um horário.",
   robots: "noindex",
+  ogImage: publicPage.value.coverImageUrl ?? undefined,
 });
 
 const locationMeta = computed(
@@ -146,6 +147,7 @@ function formatSelectedDate(): string {
   const raw = formatDisplay(
     new Date(`${selectedDate.value}T12:00:00Z`),
     "EEEE, dd 'de' MMMM",
+    { timeZone: "UTC" },
   );
   return raw.charAt(0).toUpperCase() + raw.slice(1);
 }
@@ -204,10 +206,8 @@ async function onConfirm() {
       selectedDate.value
     ) {
       step.value = "pick-time";
-      await onMonthChange(
-        new Date(selectedDate.value).getFullYear(),
-        new Date(selectedDate.value).getMonth(),
-      );
+      const conflictDate = parseCalendarDate(selectedDate.value);
+      await onMonthChange(conflictDate.getFullYear(), conflictDate.getMonth());
     }
   } finally {
     submitting.value = false;
@@ -304,8 +304,19 @@ const icsDataUrl = computed(() => {
     class="min-h-screen bg-elevated/40 px-4 py-6 sm:px-6 sm:py-12 lg:flex lg:items-center lg:py-16"
   >
     <div
-      class="mx-auto grid w-full max-w-5xl overflow-hidden rounded-2xl border border-default bg-default shadow-sm lg:grid-cols-[280px_minmax(0,1fr)]"
+      class="mx-auto w-full max-w-5xl overflow-hidden rounded-2xl border border-default bg-default shadow-sm"
     >
+      <div
+        v-if="publicPage.coverImageUrl"
+        class="h-32 w-full overflow-hidden sm:h-40"
+      >
+        <img
+          :src="publicPage.coverImageUrl"
+          alt=""
+          class="size-full object-cover"
+        >
+      </div>
+      <div class="grid lg:grid-cols-[280px_minmax(0,1fr)]">
       <header
         class="border-b border-default p-6 sm:p-8 lg:border-r lg:border-b-0"
       >
@@ -404,6 +415,7 @@ const icsDataUrl = computed(() => {
               v-model="selectedDate"
               :available-dates="availableDates"
               :loading="slotsLoading"
+              :time-zone="guestTimezone"
               @month-change="onMonthChange"
             />
 
@@ -636,6 +648,7 @@ const icsDataUrl = computed(() => {
           </p>
         </div>
       </main>
+      </div>
     </div>
   </div>
 </template>

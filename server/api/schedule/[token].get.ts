@@ -16,7 +16,7 @@ export default eventHandler(async (event) => {
 
   const { data: page } = await supabase
     .from('scheduling_pages')
-    .select('id, user_id, title, description, duration_minutes, location_type, location_details, max_advance_days, requires_confirmation, is_active, archived_at')
+    .select('id, user_id, title, description, duration_minutes, location_type, location_details, cover_image_url, max_advance_days, requires_confirmation, is_active, archived_at')
     .eq('share_token', token)
     .maybeSingle()
 
@@ -42,6 +42,7 @@ export default eventHandler(async (event) => {
     durationMinutes: page.duration_minutes,
     locationType: page.location_type,
     locationDetails: page.location_details ?? null,
+    coverImageUrl: page.cover_image_url ?? null,
     hostName,
     hostAvatarUrl,
     maxAdvanceDays: page.max_advance_days,

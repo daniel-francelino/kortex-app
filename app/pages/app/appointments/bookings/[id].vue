@@ -40,7 +40,7 @@ const STATUS_META: Record<
 };
 
 function formatDate(iso: string): string {
-  return formatDisplay(iso, "dd 'de' MMM'.' 'de' yyyy, HH:mm");
+  return formatDisplay(iso, "dd 'de' MMM'.' 'de' yyyy, HH:mm", { timeZone: page.value?.timezone });
 }
 
 // ─── Filtro por aba + busca ──────────────────────────────────────────────────

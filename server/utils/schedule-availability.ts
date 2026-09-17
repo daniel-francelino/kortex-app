@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { addCalendarDays, endOfDayInZone, todayInZone } from '#shared/utils/dateTime'
 import { expandRecurrence } from './recurrence'
 import { getTimeZoneParts, zonedDateTimeToUtcIso } from './timezone'
 
@@ -206,7 +207,11 @@ export async function computeAvailableSlots(
 
   const now = new Date()
   const noticeThreshold = new Date(now.getTime() + page.minNoticeHours * 3600000)
-  const advanceThreshold = new Date(now.getTime() + page.maxAdvanceDays * 86400000)
+  // Dias-calendário completos no fuso do anfitrião — mesma definição usada no
+  // texto "Horários disponíveis até {data}" exibido ao convidado
+  // (agendar/[token].vue, availableUntilLabel), não aritmética de milissegundos
+  // sobre o instante atual (que divergia do texto em até ~1 dia).
+  const advanceThreshold = endOfDayInZone(addCalendarDays(todayInZone(page.timezone), page.maxAdvanceDays), page.timezone)
 
   const allSlots: FreeRange[] = []
 

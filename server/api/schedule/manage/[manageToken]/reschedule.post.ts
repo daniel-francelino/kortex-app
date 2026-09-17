@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { getSupabaseAdminClient } from '../../../../utils/supabase'
 import { computeAvailableSlots } from '../../../../utils/schedule-availability'
 import { mapBooking } from '../../../../utils/scheduling'
+import { getTimeZoneParts } from '../../../../utils/timezone'
 
 const paramsSchema = z.object({
   manageToken: z.string().min(1)
@@ -50,7 +51,8 @@ export default eventHandler(async (event) => {
   }))
 
   const newStart = new Date(payload.newStartAt)
-  const dayStr = newStart.toISOString().split('T')[0]!
+  const newStartParts = getTimeZoneParts(newStart, page.timezone as string)
+  const dayStr = `${newStartParts.year}-${String(newStartParts.month).padStart(2, '0')}-${String(newStartParts.day).padStart(2, '0')}`
 
   const slotsForDay = await computeAvailableSlots(
     supabase,

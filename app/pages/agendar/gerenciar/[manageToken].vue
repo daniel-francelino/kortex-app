@@ -202,6 +202,7 @@ async function confirmReschedule() {
               v-model="selectedDate"
               :available-dates="availableDates"
               :loading="slotsLoading"
+              :time-zone="guestTimezone"
               @month-change="onMonthChange"
             />
 

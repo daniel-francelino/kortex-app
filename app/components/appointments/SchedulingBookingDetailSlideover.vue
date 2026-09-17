@@ -46,7 +46,7 @@ const locationMeta = computed(() => props.page ? LOCATION_TYPE_META[props.page.l
 
 function formatDateTime(iso: string | null): string {
   if (!iso) return 'Horário não disponível'
-  const raw = formatDisplay(iso, "EEEE, dd 'de' MMMM 'às' HH:mm")
+  const raw = formatDisplay(iso, "EEEE, dd 'de' MMMM 'às' HH:mm", { timeZone: props.page?.timezone })
   return raw.charAt(0).toUpperCase() + raw.slice(1)
 }
 
