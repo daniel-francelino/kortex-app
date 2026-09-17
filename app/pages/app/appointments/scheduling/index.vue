@@ -24,7 +24,15 @@ const {
 
 onMounted(() => {
   if (calendarsStatus.value === "idle") refreshCalendars();
-  if (pagesStatus.value === "idle") refreshPages();
+  // Não confiamos só em pagesStatus === "idle": a key "scheduling-pages" é
+  // compartilhada com o editor, o modal de criação rápida e a página de
+  // reservas — se o status ficar em outro estado sem dados (ex.: um F5
+  // enquanto essa key já tinha sido tocada por outro desses lugares), essa
+  // checagem sozinha deixava a lista presa vazia. Refaz o fetch sempre que
+  // não há páginas carregadas e não há um fetch em andamento.
+  if (pagesStatus.value !== "pending" && pages.value.length === 0) {
+    refreshPages();
+  }
 });
 
 useMobileContextNav().registerMobileContextNav(
@@ -155,7 +163,7 @@ function openPreview(page: SchedulingPage) {
 <template>
   <UDashboardPanel id="scheduling">
     <template #header>
-      <UDashboardNavbar title="Páginas de agendamento">
+      <UDashboardNavbar title="Agendamento">
         <template #leading>
           <AppSidebarCollapse />
         </template>
@@ -245,6 +253,7 @@ function openPreview(page: SchedulingPage) {
           icon="i-lucide-cloud-alert"
           title="Não foi possível carregar suas páginas"
           description="Tente novamente para acessar seus links de agendamento."
+          class="flex min-h-[50vh] flex-col items-center justify-center"
           :actions="[
             { label: 'Tentar novamente', onClick: () => refreshPages() },
           ]"
@@ -254,7 +263,7 @@ function openPreview(page: SchedulingPage) {
           icon="i-lucide-calendar-plus"
           title="Nenhuma página de agendamento ainda"
           description="Crie sua primeira página para compartilhar um link de agendamento."
-          class="py-16"
+          class="flex min-h-[50vh] flex-col items-center justify-center"
           :actions="[
             {
               label: 'Criar a primeira',
@@ -268,6 +277,7 @@ function openPreview(page: SchedulingPage) {
           icon="i-lucide-search"
           title="Nenhuma página encontrada"
           description="Experimente outro título ou filtro."
+          class="flex min-h-[50vh] flex-col items-center justify-center"
           :actions="[
             {
               label: 'Limpar filtros',

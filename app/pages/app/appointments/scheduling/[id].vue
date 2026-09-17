@@ -5,6 +5,8 @@ import { detectBrowserTimeZone } from "#shared/utils/dateTime";
 
 definePageMeta({ layout: "app" });
 
+useSeoMeta({ title: "Agendamento" });
+
 const route = useRoute();
 const router = useRouter();
 const toast = useToast();
@@ -28,7 +30,7 @@ onMounted(() => {
 // user_metadata). Ver docs/appointments/PLANO_USERNAME_PERFIL_PUBLICO.md §4.
 const { data: authProfile } = await useAsyncData<{ username: string | null }>(
   "settings-username-preview",
-  () => $fetch("/api/auth/profile"),
+  () => $fetch("/api/auth/profile")
 );
 const username = computed(() => authProfile.value?.username ?? null);
 
@@ -92,7 +94,7 @@ const dayWindows = reactive<Record<number, DayWindow[]>>({
 const questions = ref<Array<Omit<SchedulingQuestion, "id">>>([]);
 
 function applyPageToState(
-  page: NonNullable<Awaited<ReturnType<typeof fetchSchedulingPage>>>,
+  page: NonNullable<Awaited<ReturnType<typeof fetchSchedulingPage>>>
 ) {
   state.title = page.title;
   state.description = page.description ?? "";
@@ -158,7 +160,7 @@ function serializeState(): string {
 
 const snapshot = ref("");
 const isDirty = computed(
-  () => snapshot.value !== "" && snapshot.value !== serializeState(),
+  () => snapshot.value !== "" && snapshot.value !== serializeState()
 );
 
 async function load() {
@@ -194,7 +196,7 @@ const activeTab = ref(
   typeof route.query.tab === "string" &&
     tabs.some((t) => t.value === route.query.tab)
     ? route.query.tab
-    : "evento",
+    : "evento"
 );
 const tabDescriptions: Record<string, string> = {
   evento: "Apresente seu evento e defina como o encontro vai acontecer.",
@@ -206,11 +208,10 @@ const tabDescriptions: Record<string, string> = {
   privacidade: "Controle os detalhes compartilhados e o acesso à sua página.",
 };
 const currentTab = computed(
-  () => tabs.find((tab) => tab.value === activeTab.value) ?? tabs[0]!,
+  () => tabs.find((tab) => tab.value === activeTab.value) ?? tabs[0]!
 );
 const availableDays = computed(
-  () =>
-    Object.values(dayWindows).filter((windows) => windows.length > 0).length,
+  () => Object.values(dayWindows).filter((windows) => windows.length > 0).length
 );
 watch(activeTab, (v) => {
   router.replace({ query: { ...route.query, tab: v } });
@@ -218,7 +219,7 @@ watch(activeTab, (v) => {
 
 // ─── Evento ──────────────────────────────────────────────────────────────────
 const calendarOptions = computed(() =>
-  (calendars.value ?? []).map((c) => ({ label: c.name, value: c.id })),
+  (calendars.value ?? []).map((c) => ({ label: c.name, value: c.id }))
 );
 const locationOptions = Object.values(SchedulingLocationType).map((value) => ({
   label: LOCATION_TYPE_META[value].label,
@@ -294,7 +295,7 @@ function onRemoveCoverImage() {
 // seção 5) — same ordering (browser zone, then current selection, then most
 // used, then the rest alphabetically), so both pickers behave consistently.
 const { options: timezoneOptions } = useTimezoneOptions(
-  computed(() => state.timezone),
+  computed(() => state.timezone)
 );
 
 // ─── Disponibilidade ─────────────────────────────────────────────────────────
@@ -377,10 +378,10 @@ function buildBufferOptions(current: number) {
   }));
 }
 const bufferBeforeOptions = computed(() =>
-  buildBufferOptions(state.bufferBeforeMinutes),
+  buildBufferOptions(state.bufferBeforeMinutes)
 );
 const bufferAfterOptions = computed(() =>
-  buildBufferOptions(state.bufferAfterMinutes),
+  buildBufferOptions(state.bufferAfterMinutes)
 );
 
 // "Usar a duração do evento" não é um valor persistido à parte — selecioná-la
@@ -410,7 +411,7 @@ const editingQuestionIndex = ref<number | null>(null);
 const editingQuestion = computed(() =>
   editingQuestionIndex.value === null
     ? null
-    : (questions.value[editingQuestionIndex.value] ?? null),
+    : questions.value[editingQuestionIndex.value] ?? null
 );
 
 function openNewQuestion() {
@@ -488,7 +489,7 @@ const runSlugCheck = useDebounceFn(async (value: string) => {
   try {
     const result = await $fetch<{ available: boolean; reason?: string }>(
       `/api/appointments/scheduling-pages/${pageId}/slug-check`,
-      { query: { value: normalized } },
+      { query: { value: normalized } }
     );
     slugCheck.value = result.available
       ? { status: "available" }
@@ -505,7 +506,7 @@ watch(
   () => state.slug,
   (value) => {
     void runSlugCheck(value);
-  },
+  }
 );
 
 async function copyLink() {
@@ -568,7 +569,7 @@ function buildPayload() {
         dayOfWeek: Number(day),
         startTime: w.startTime,
         endTime: w.endTime,
-      })),
+      }))
   );
 
   return {
@@ -626,7 +627,7 @@ async function onSave() {
     return;
   }
   const badSelect = questions.value.find(
-    (q) => q.type === "select" && (q.options?.length ?? 0) < 2,
+    (q) => q.type === "select" && (q.options?.length ?? 0) < 2
   );
   if (badSelect) {
     toast.add({
@@ -690,7 +691,11 @@ if (import.meta.client) {
 <template>
   <UDashboardPanel id="scheduling-editor">
     <template #header>
-      <UDashboardNavbar title="Editar Página de agendamento">
+      <UDashboardNavbar title="Agendamento">
+        <template #leading>
+          <AppSidebarCollapse />
+        </template>
+        
         <template #right>
           <UDropdownMenu
             v-if="!loading && !notFound"
@@ -758,7 +763,9 @@ if (import.meta.client) {
       >
         <aside class="space-y-5 lg:sticky lg:top-0">
           <USkeleton class="hidden h-9 w-32 lg:block" />
-          <div class="flex gap-1 overflow-x-auto pb-2 lg:flex-col lg:overflow-visible">
+          <div
+            class="flex gap-1 overflow-x-auto pb-2 lg:flex-col lg:overflow-visible"
+          >
             <USkeleton
               v-for="i in 6"
               :key="i"
@@ -1152,7 +1159,7 @@ if (import.meta.client) {
                                   :label="dayLabels[target - 1]"
                                   :model-value="
                                     (copyTargetsByDay[day - 1] ?? []).includes(
-                                      target - 1,
+                                      target - 1
                                     )
                                   "
                                   @update:model-value="
@@ -1193,7 +1200,9 @@ if (import.meta.client) {
                           v-model="w.startTime"
                           type="time"
                           size="sm"
-                          :aria-label="`Início do horário de ${dayLabels[day - 1]}`"
+                          :aria-label="`Início do horário de ${
+                            dayLabels[day - 1]
+                          }`"
                           class="min-w-0 flex-1 sm:max-w-36"
                         />
                         <span class="text-xs text-muted"> até </span>
@@ -1201,7 +1210,9 @@ if (import.meta.client) {
                           v-model="w.endTime"
                           type="time"
                           size="sm"
-                          :aria-label="`Fim do horário de ${dayLabels[day - 1]}`"
+                          :aria-label="`Fim do horário de ${
+                            dayLabels[day - 1]
+                          }`"
                           class="min-w-0 flex-1 sm:max-w-36"
                         />
                         <UButton
