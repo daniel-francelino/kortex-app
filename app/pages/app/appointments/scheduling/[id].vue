@@ -468,7 +468,10 @@ const publicProfileUrl = computed(() => {
   return `${base}/${username.value}/${state.slug}`;
 });
 
-type SlugCheckState = { status: "idle" | "checking" | "available" | "unavailable", reason?: string };
+type SlugCheckState = {
+  status: "idle" | "checking" | "available" | "unavailable";
+  reason?: string;
+};
 const slugCheck = ref<SlugCheckState>({ status: "idle" });
 const SLUG_CHECK_REASONS: Record<string, string> = {
   format: "Use só letras minúsculas, números e hífen (sem hífens repetidos)",
@@ -489,15 +492,21 @@ const runSlugCheck = useDebounceFn(async (value: string) => {
     );
     slugCheck.value = result.available
       ? { status: "available" }
-      : { status: "unavailable", reason: SLUG_CHECK_REASONS[result.reason ?? "taken"] };
+      : {
+          status: "unavailable",
+          reason: SLUG_CHECK_REASONS[result.reason ?? "taken"],
+        };
   } catch {
     slugCheck.value = { status: "idle" };
   }
 }, 400);
 
-watch(() => state.slug, (value) => {
-  void runSlugCheck(value);
-});
+watch(
+  () => state.slug,
+  (value) => {
+    void runSlugCheck(value);
+  },
+);
 
 async function copyLink() {
   try {
@@ -681,70 +690,47 @@ if (import.meta.client) {
 <template>
   <UDashboardPanel id="scheduling-editor">
     <template #header>
-      <UDashboardNavbar
-        :title="
-        loading ? 'Carregando…' : state.title || 'Página de agendamento'
-        "
-      >
-        <template #leading>
-          <UButton
-            icon="i-lucide-arrow-left"
-            color="neutral"
-            variant="ghost"
-            square
-            to="/app/appointments/scheduling"
-          />
-        </template>
+      <UDashboardNavbar title="Editar Página de agendamento">
         <template #right>
-          <div v-if="!loading && !notFound" class="hidden items-center gap-2 sm:flex">
-            <UButton
-              icon="i-lucide-copy"
-              label="Copiar link"
-              size="sm"
-              color="neutral"
-              variant="subtle"
-              @click="copyLink"
-            />
-          </div>
           <UDropdownMenu
             v-if="!loading && !notFound"
             :items="[
-            [
-            {
-            label: 'Pré-visualizar',
-            icon: 'i-lucide-external-link',
-            onSelect: onPreview,
-            },
-            {
-            label: 'Copiar link',
-            icon: 'i-lucide-copy',
-            onSelect: copyLink,
-            },
-            {
-            label: 'Duplicar página',
-            icon: 'i-lucide-copy-plus',
-            onSelect: onDuplicate,
-            },
-            ],
-            [
-            {
-            label: 'Regenerar link',
-            icon: 'i-lucide-refresh-cw',
-            onSelect: () => {
-            regenerateConfirmOpen = true;
-            },
-            },
-            ],
-            [
-            {
-            label: 'Arquivar',
-            icon: 'i-lucide-archive',
-            color: 'error' as const,
-            onSelect: () => {
-            archiveConfirmOpen = true;
-            },
-            },
-            ],
+              [
+                {
+                  label: 'Pré-visualizar',
+                  icon: 'i-lucide-external-link',
+                  onSelect: onPreview,
+                },
+                {
+                  label: 'Copiar link',
+                  icon: 'i-lucide-copy',
+                  onSelect: copyLink,
+                },
+                {
+                  label: 'Duplicar página',
+                  icon: 'i-lucide-copy-plus',
+                  onSelect: onDuplicate,
+                },
+              ],
+              [
+                {
+                  label: 'Regenerar link',
+                  icon: 'i-lucide-refresh-cw',
+                  onSelect: () => {
+                    regenerateConfirmOpen = true;
+                  },
+                },
+              ],
+              [
+                {
+                  label: 'Arquivar',
+                  icon: 'i-lucide-archive',
+                  color: 'error' as const,
+                  onSelect: () => {
+                    archiveConfirmOpen = true;
+                  },
+                },
+              ],
             ]"
             :content="{ align: 'end' }"
           >
@@ -771,11 +757,12 @@ if (import.meta.client) {
         <USkeleton class="h-32 w-full" />
         <USkeleton class="h-32 w-full" />
       </div>
-      <div v-else-if="notFound" class="flex flex-col items-center gap-3 py-16 text-center">
+      <div
+        v-else-if="notFound"
+        class="flex flex-col items-center gap-3 py-16 text-center"
+      >
         <UIcon name="i-lucide-calendar-x" class="size-10 text-dimmed" />
-        <p class="text-sm text-muted">
-          Página de agendamento não encontrada.
-        </p>
+        <p class="text-sm text-muted">Página de agendamento não encontrada.</p>
         <UButton label="Voltar" to="/app/appointments/scheduling" />
       </div>
       <div
@@ -802,23 +789,25 @@ if (import.meta.client) {
               :aria-current="activeTab === tab.value ? 'page' : undefined"
               class="flex shrink-0 items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-sm transition-colors focus-visible:outline-2 focus-visible:outline-primary"
               :class="
-              activeTab === tab.value
-              ? 'bg-elevated font-medium text-highlighted'
-              : 'text-muted hover:bg-elevated/60 hover:text-highlighted'
+                activeTab === tab.value
+                  ? 'bg-elevated font-medium text-highlighted'
+                  : 'text-muted hover:bg-elevated/60 hover:text-highlighted'
               "
               @click="activeTab = tab.value"
             >
               <UIcon :name="tab.icon" class="size-4 shrink-0" />
               {{ tab.label }}
-              <UIcon v-if="invalidTab === tab.value" name="i-lucide-circle-alert" class="ml-auto size-4 text-error" />
+              <UIcon
+                v-if="invalidTab === tab.value"
+                name="i-lucide-circle-alert"
+                class="ml-auto size-4 text-error"
+              />
             </button>
           </nav>
           <div class="hidden rounded-xl border border-default p-4 lg:block">
             <div class="flex items-center justify-between gap-3">
               <span class="text-sm font-medium text-highlighted">
-                {{
-                isActive ? "Página ativa" : "Página pausada"
-                }}
+                {{ isActive ? "Página ativa" : "Página pausada" }}
               </span>
               <USwitch
                 :model-value="isActive"
@@ -828,9 +817,9 @@ if (import.meta.client) {
             </div>
             <p class="mt-2 text-xs leading-relaxed text-muted">
               {{
-              isActive
-              ? "Seu link está disponível para receber reservas."
-              : "Seu link não está recebendo novas reservas."
+                isActive
+                  ? "Seu link está disponível para receber reservas."
+                  : "Seu link não está recebendo novas reservas."
               }}
             </p>
           </div>
@@ -838,7 +827,9 @@ if (import.meta.client) {
         <div class="min-w-0 space-y-6">
           <div>
             <div class="flex items-center justify-between gap-3">
-              <h1 class="text-2xl font-semibold tracking-tight text-highlighted">
+              <h1
+                class="text-2xl font-semibold tracking-tight text-highlighted"
+              >
                 {{ currentTab.label }}
               </h1>
               <USwitch
@@ -861,9 +852,7 @@ if (import.meta.client) {
             </UCard>
             <UCard>
               <template #header>
-                <p class="text-sm font-medium text-highlighted">
-                  Detalhes
-                </p>
+                <p class="text-sm font-medium text-highlighted">Detalhes</p>
               </template>
               <div class="space-y-4">
                 <UFormField label="Título">
@@ -871,7 +860,11 @@ if (import.meta.client) {
                 </UFormField>
                 <UFormField
                   label="URL"
-                  :description="username ? `kortex.app/${username}/…` : 'Defina seu username em Configurações para publicar esta página no seu perfil.'"
+                  :description="
+                    username
+                      ? `kortex.app/${username}/…`
+                      : 'Defina seu username em Configurações para publicar esta página no seu perfil.'
+                  "
                 >
                   <UInput v-model="state.slug" class="w-full">
                     <template v-if="username" #leading>
@@ -895,23 +888,34 @@ if (import.meta.client) {
                       />
                     </template>
                   </UInput>
-                  <p v-if="slugCheck.status === 'unavailable'" class="mt-1 text-xs text-error">
+                  <p
+                    v-if="slugCheck.status === 'unavailable'"
+                    class="mt-1 text-xs text-error"
+                  >
                     {{ slugCheck.reason }}
                   </p>
-                  <p v-else-if="publicProfileUrl" class="mt-1 truncate text-xs text-muted">
+                  <p
+                    v-else-if="publicProfileUrl"
+                    class="mt-1 truncate text-xs text-muted"
+                  >
                     {{ publicProfileUrl }}
                   </p>
                 </UFormField>
-                <UFormField label="Descrição" description="Aparece para o convidado no topo da página.">
-                  <UTextarea v-model="state.description" :rows="3" class="w-full" />
+                <UFormField
+                  label="Descrição"
+                  description="Aparece para o convidado no topo da página."
+                >
+                  <UTextarea
+                    v-model="state.description"
+                    :rows="3"
+                    class="w-full"
+                  />
                 </UFormField>
               </div>
             </UCard>
             <UCard>
               <template #header>
-                <p class="text-sm font-medium text-highlighted">
-                  Agendamento
-                </p>
+                <p class="text-sm font-medium text-highlighted">Agendamento</p>
               </template>
               <div class="grid gap-4 sm:grid-cols-2">
                 <UFormField label="Calendário">
@@ -934,9 +938,7 @@ if (import.meta.client) {
             </UCard>
             <UCard>
               <template #header>
-                <p class="text-sm font-medium text-highlighted">
-                  Local
-                </p>
+                <p class="text-sm font-medium text-highlighted">Local</p>
               </template>
               <div class="grid gap-4 sm:grid-cols-2">
                 <UFormField label="Tipo">
@@ -947,11 +949,13 @@ if (import.meta.client) {
                     class="w-full"
                   />
                 </UFormField>
-                <UFormField :label="locationDetailMeta[state.locationType].label">
+                <UFormField
+                  :label="locationDetailMeta[state.locationType].label"
+                >
                   <UInput
                     v-model="state.locationDetails"
                     :placeholder="
-                    locationDetailMeta[state.locationType].placeholder
+                      locationDetailMeta[state.locationType].placeholder
                     "
                     class="w-full"
                   />
@@ -960,9 +964,7 @@ if (import.meta.client) {
             </UCard>
             <UCard>
               <template #header>
-                <p class="text-sm font-medium text-highlighted">
-                  Cor
-                </p>
+                <p class="text-sm font-medium text-highlighted">Cor</p>
               </template>
               <div class="space-y-2">
                 <div class="flex gap-2">
@@ -972,14 +974,14 @@ if (import.meta.client) {
                     type="button"
                     class="size-8 rounded-full ring-2 ring-offset-2 ring-offset-default transition-all"
                     :class="
-                    state.color === opt.value
-                    ? 'ring-primary'
-                    : 'ring-transparent'
+                      state.color === opt.value
+                        ? 'ring-primary'
+                        : 'ring-transparent'
                     "
                     :style="{ backgroundColor: opt.value }"
                     :title="opt.label"
                     @click="
-                    state.color = state.color === opt.value ? null : opt.value
+                      state.color = state.color === opt.value ? null : opt.value
                     "
                   />
                 </div>
@@ -991,9 +993,7 @@ if (import.meta.client) {
             </UCard>
             <UCard>
               <template #header>
-                <p class="text-sm font-medium text-highlighted">
-                  Capa
-                </p>
+                <p class="text-sm font-medium text-highlighted">Capa</p>
               </template>
               <div class="space-y-2">
                 <div
@@ -1004,8 +1004,10 @@ if (import.meta.client) {
                     :src="state.coverImageUrl"
                     alt=""
                     class="size-full object-cover"
+                  />
+                  <div
+                    class="absolute inset-x-0 bottom-0 flex justify-end gap-1 bg-gradient-to-t from-black/60 to-transparent p-2"
                   >
-                  <div class="absolute inset-x-0 bottom-0 flex justify-end gap-1 bg-gradient-to-t from-black/60 to-transparent p-2">
                     <UButton
                       icon="i-lucide-image"
                       size="xs"
@@ -1041,7 +1043,7 @@ if (import.meta.client) {
                   accept="image/png,image/jpeg,image/webp,image/gif"
                   class="hidden"
                   @change="onCoverFileSelected"
-                >
+                />
                 <p class="text-xs text-muted">
                   Aparece no topo da página pública. Recomendado: 1200×400px.
                 </p>
@@ -1050,7 +1052,10 @@ if (import.meta.client) {
           </div>
           <!-- DISPONIBILIDADE -->
           <div v-if="activeTab === 'disponibilidade'" class="space-y-5">
-            <UCard v-if="invalidTab === 'disponibilidade'" :ui="{ root: 'ring-error' }">
+            <UCard
+              v-if="invalidTab === 'disponibilidade'"
+              :ui="{ root: 'ring-error' }"
+            >
               <p class="text-sm text-error">
                 Defina ao menos uma janela de disponibilidade.
               </p>
@@ -1077,9 +1082,9 @@ if (import.meta.client) {
                     :key="day - 1"
                     class="rounded-lg border border-default p-3 sm:p-4"
                     :class="
-                    dayWindows[day - 1]!.length
-                    ? 'bg-default'
-                    : 'bg-elevated/30'
+                      dayWindows[day - 1]!.length
+                        ? 'bg-default'
+                        : 'bg-elevated/30'
                     "
                   >
                     <div class="flex items-center gap-2">
@@ -1088,14 +1093,20 @@ if (import.meta.client) {
                         :label="dayLabels[day - 1]"
                         @update:model-value="toggleDay(day - 1)"
                       />
-                      <span v-if="!dayWindows[day - 1]!.length" class="ml-auto text-xs text-dimmed">
+                      <span
+                        v-if="!dayWindows[day - 1]!.length"
+                        class="ml-auto text-xs text-dimmed"
+                      >
                         Indisponível
                       </span>
-                      <div v-if="dayWindows[day - 1]!.length > 0" class="ml-auto flex items-center gap-1">
+                      <div
+                        v-if="dayWindows[day - 1]!.length > 0"
+                        class="ml-auto flex items-center gap-1"
+                      >
                         <UPopover
                           :content="{ align: 'end' }"
                           @update:open="
-                          (v: boolean) => onCopyPopoverOpen(day - 1, v)
+                            (v: boolean) => onCopyPopoverOpen(day - 1, v)
                           "
                         >
                           <UButton
@@ -1118,13 +1129,13 @@ if (import.meta.client) {
                                   :key="target"
                                   :label="dayLabels[target - 1]"
                                   :model-value="
-                                  (copyTargetsByDay[day - 1] ?? []).includes(
-                                  target - 1,
-                                  )
+                                    (copyTargetsByDay[day - 1] ?? []).includes(
+                                      target - 1,
+                                    )
                                   "
                                   @update:model-value="
-                                  (v: boolean) =>
-                                  toggleCopyTarget(day - 1, target - 1, v)
+                                    (v: boolean) =>
+                                      toggleCopyTarget(day - 1, target - 1, v)
                                   "
                                 />
                               </div>
@@ -1147,8 +1158,15 @@ if (import.meta.client) {
                         />
                       </div>
                     </div>
-                    <div v-if="dayWindows[day - 1]!.length > 0" class="mt-3 space-y-2 sm:pl-6">
-                      <div v-for="(w, wi) in dayWindows[day - 1]" :key="wi" class="flex items-center gap-2">
+                    <div
+                      v-if="dayWindows[day - 1]!.length > 0"
+                      class="mt-3 space-y-2 sm:pl-6"
+                    >
+                      <div
+                        v-for="(w, wi) in dayWindows[day - 1]"
+                        :key="wi"
+                        class="flex items-center gap-2"
+                      >
                         <UInput
                           v-model="w.startTime"
                           type="time"
@@ -1156,9 +1174,7 @@ if (import.meta.client) {
                           :aria-label="`Início do horário de ${dayLabels[day - 1]}`"
                           class="min-w-0 flex-1 sm:max-w-36"
                         />
-                        <span class="text-xs text-muted">
-                          até
-                        </span>
+                        <span class="text-xs text-muted"> até </span>
                         <UInput
                           v-model="w.endTime"
                           type="time"
@@ -1186,7 +1202,10 @@ if (import.meta.client) {
                 </p>
               </template>
               <div class="space-y-4">
-                <UFormField label="Antecedência mínima" description="Impede reservas de última hora.">
+                <UFormField
+                  label="Antecedência mínima"
+                  description="Impede reservas de última hora."
+                >
                   <div class="flex items-center gap-2">
                     <UInputNumber
                       v-model="minNoticeDisplayValue"
@@ -1234,7 +1253,10 @@ if (import.meta.client) {
           </div>
           <!-- FORMULÁRIO -->
           <div v-if="activeTab === 'formulario'" class="space-y-5">
-            <UCard v-if="invalidTab === 'formulario'" :ui="{ root: 'ring-error' }">
+            <UCard
+              v-if="invalidTab === 'formulario'"
+              :ui="{ root: 'ring-error' }"
+            >
               <p class="text-sm text-error">
                 Alguma pergunta de seleção está sem opções suficientes.
               </p>
@@ -1248,12 +1270,8 @@ if (import.meta.client) {
               <div class="divide-y divide-default">
                 <div class="flex items-center justify-between py-2.5">
                   <div>
-                    <p class="text-sm text-highlighted">
-                      Seu nome
-                    </p>
-                    <p class="text-xs text-muted">
-                      Identificação do convidado
-                    </p>
+                    <p class="text-sm text-highlighted">Seu nome</p>
+                    <p class="text-xs text-muted">Identificação do convidado</p>
                   </div>
                   <UBadge color="neutral" variant="subtle" size="sm">
                     Obrigatório
@@ -1261,18 +1279,18 @@ if (import.meta.client) {
                 </div>
                 <div class="flex items-center justify-between py-2.5">
                   <div>
-                    <p class="text-sm text-highlighted">
-                      Endereço de e-mail
-                    </p>
-                    <p class="text-xs text-muted">
-                      Contato para a reserva
-                    </p>
+                    <p class="text-sm text-highlighted">Endereço de e-mail</p>
+                    <p class="text-xs text-muted">Contato para a reserva</p>
                   </div>
                   <UBadge color="neutral" variant="subtle" size="sm">
                     Obrigatório
                   </UBadge>
                 </div>
-                <div v-for="(q, i) in questions" :key="i" class="flex items-center gap-2 py-2.5">
+                <div
+                  v-for="(q, i) in questions"
+                  :key="i"
+                  class="flex items-center gap-2 py-2.5"
+                >
                   <div class="flex flex-col">
                     <UButton
                       icon="i-lucide-chevron-up"
@@ -1302,7 +1320,10 @@ if (import.meta.client) {
                   <UBadge color="neutral" variant="subtle" size="sm">
                     {{ q.isRequired ? "Obrigatória" : "Opcional" }}
                   </UBadge>
-                  <USwitch :model-value="!q.isHidden" @update:model-value="toggleQuestionHidden(i)" />
+                  <USwitch
+                    :model-value="!q.isHidden"
+                    @update:model-value="toggleQuestionHidden(i)"
+                  />
                   <UButton
                     label="Editar"
                     size="xs"
@@ -1347,7 +1368,10 @@ if (import.meta.client) {
                     class="w-full"
                   />
                 </UFormField>
-                <UFormField label="Intervalo entre horários" description="Ex.: 30 min = oferece 9:00, 9:30, 10:00…">
+                <UFormField
+                  label="Intervalo entre horários"
+                  description="Ex.: 30 min = oferece 9:00, 9:30, 10:00…"
+                >
                   <USelect
                     v-model="state.slotIncrementMinutes"
                     :items="slotIncrementOptions"
@@ -1362,9 +1386,7 @@ if (import.meta.client) {
           <div v-if="activeTab === 'politicas'" class="space-y-5">
             <UCard>
               <template #header>
-                <p class="text-sm font-medium text-highlighted">
-                  Confirmação
-                </p>
+                <p class="text-sm font-medium text-highlighted">Confirmação</p>
               </template>
               <div class="flex items-center justify-between">
                 <div>
@@ -1411,7 +1433,10 @@ if (import.meta.client) {
                   </div>
                   <USwitch v-model="state.cancellationEnabled" />
                 </div>
-                <div v-if="state.cancellationEnabled" class="space-y-3 border-l-2 border-default/60 pl-4">
+                <div
+                  v-if="state.cancellationEnabled"
+                  class="space-y-3 border-l-2 border-default/60 pl-4"
+                >
                   <div class="flex items-center justify-between">
                     <p class="text-sm text-highlighted">
                       Exigir antecedência mínima
@@ -1445,9 +1470,7 @@ if (import.meta.client) {
           <div v-if="activeTab === 'privacidade'" class="space-y-5">
             <UCard>
               <template #header>
-                <p class="text-sm font-medium text-highlighted">
-                  Privacidade
-                </p>
+                <p class="text-sm font-medium text-highlighted">Privacidade</p>
               </template>
               <div class="flex items-center justify-between">
                 <div>
@@ -1456,8 +1479,12 @@ if (import.meta.client) {
                   </p>
                   <p class="text-xs text-muted">
                     Aparece na lista de eventos de
-                    {{ username ? `kortex.app/${username}` : "sua página pública" }}.
-                    Desativado, a página continua acessível pelo link direto.
+                    {{
+                      username
+                        ? `kortex.app/${username}`
+                        : "sua página pública"
+                    }}. Desativado, a página continua acessível pelo link
+                    direto.
                   </p>
                 </div>
                 <USwitch v-model="state.showOnProfile" />
@@ -1479,9 +1506,7 @@ if (import.meta.client) {
             </UCard>
             <UCard>
               <template #header>
-                <p class="text-sm font-medium text-error">
-                  Zona de perigo
-                </p>
+                <p class="text-sm font-medium text-error">Zona de perigo</p>
               </template>
               <div class="space-y-3">
                 <div class="flex items-center justify-between">
@@ -1503,9 +1528,7 @@ if (import.meta.client) {
                 </div>
                 <div class="flex items-center justify-between">
                   <div>
-                    <p class="text-sm text-highlighted">
-                      Arquivar página
-                    </p>
+                    <p class="text-sm text-highlighted">Arquivar página</p>
                     <p class="text-xs text-muted">
                       Remove a página da sua lista e desativa o link.
                     </p>
@@ -1521,36 +1544,24 @@ if (import.meta.client) {
               </div>
             </UCard>
           </div>
-          <div
-            class="sticky bottom-0 z-10 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-default bg-default p-3 shadow-sm"
-            role="status"
-            aria-live="polite"
-          >
-            <span class="flex items-center gap-2 text-xs text-muted">
-              <UIcon :name="isDirty ? 'i-lucide-circle-dot' : 'i-lucide-check-check'" class="size-4" />
-              {{
-              isDirty
-              ? "Você tem alterações não salvas"
-              : "Todas as alterações estão salvas"
-              }}
-            </span>
-            <UButton
-              label="Salvar alterações"
-              size="sm"
-              :loading="saving"
-              :disabled="!isDirty || saving"
-              @click="onSave"
-            />
-          </div>
         </div>
         <aside class="hidden space-y-4 xl:sticky xl:top-0 xl:block">
-          <div class="overflow-hidden rounded-xl border border-default bg-default">
-            <div class="border-b border-default bg-elevated/40 px-5 py-3 text-xs font-medium text-muted">
+          <div
+            class="overflow-hidden rounded-xl border border-default bg-default"
+          >
+            <div
+              class="border-b border-default bg-elevated/40 px-5 py-3 text-xs font-medium text-muted"
+            >
               Resumo do evento
             </div>
             <div class="space-y-5 p-5">
-              <div class="flex size-10 items-center justify-center rounded-xl bg-elevated">
-                <UIcon name="i-lucide-calendar-clock" class="size-5 text-highlighted" />
+              <div
+                class="flex size-10 items-center justify-center rounded-xl bg-elevated"
+              >
+                <UIcon
+                  name="i-lucide-calendar-clock"
+                  class="size-5 text-highlighted"
+                />
               </div>
               <div>
                 <h2 class="break-words text-lg font-semibold text-highlighted">
@@ -1566,25 +1577,27 @@ if (import.meta.client) {
               <div class="space-y-3 text-xs text-muted">
                 <p class="flex items-center gap-2">
                   <UIcon name="i-lucide-clock" class="size-4 shrink-0" />
-                  {{
-                  state.durationMinutes
-                  }}
+                  {{ state.durationMinutes }}
                   minutos
                 </p>
                 <p class="flex items-center gap-2">
-                  <UIcon :name="LOCATION_TYPE_META[state.locationType].icon" class="size-4 shrink-0" />
+                  <UIcon
+                    :name="LOCATION_TYPE_META[state.locationType].icon"
+                    class="size-4 shrink-0"
+                  />
                   {{ LOCATION_TYPE_META[state.locationType].label }}
                 </p>
                 <p class="flex items-center gap-2">
-                  <UIcon name="i-lucide-calendar-days" class="size-4 shrink-0" />
+                  <UIcon
+                    name="i-lucide-calendar-days"
+                    class="size-4 shrink-0"
+                  />
                   {{ availableDays }}
                   dias disponíveis por semana
                 </p>
                 <p class="flex items-start gap-2 break-all">
                   <UIcon name="i-lucide-globe" class="size-4 shrink-0" />
-                  {{
-                  state.timezone
-                  }}
+                  {{ state.timezone }}
                 </p>
               </div>
               <UButton
