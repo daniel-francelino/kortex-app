@@ -64,7 +64,8 @@ export default defineAppConfig({
     },
     drawer: {
       slots: {
-        content: 'max-lg:max-h-dvh',
+        overlay: 'z-[320]',
+        content: 'z-[320] max-lg:max-h-dvh',
         container: 'max-lg:pt-[max(1rem,var(--safe-area-top))] max-lg:pb-[max(1rem,var(--safe-area-bottom))]'
       }
     }
