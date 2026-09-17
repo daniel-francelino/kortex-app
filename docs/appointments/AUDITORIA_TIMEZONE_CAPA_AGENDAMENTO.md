@@ -4,6 +4,8 @@ Este documento faz duas coisas independentes, pedidas juntas: (1) **audita** o t
 
 > Leitura de apoio: [`../timezone/ANALISE_TIMEZONE.md`](../timezone/ANALISE_TIMEZONE.md) documenta as convenções gerais de fuso horário do app (Regra 1: só o cliente conhece o fuso do navegador). Este documento assume essas convenções e audita se o módulo de Agendamento as segue de fato.
 
+> **Status: implementado em 2026-09-17.** Os 6 achados corrigíveis da Parte 1 (achado #7 é só informativo, sem ação) e toda a Parte 2 (capa personalizada) foram implementados — ver checkboxes marcados na seção 1.4 e checklist da seção 2.10. A migration `20260917000000_scheduling_pages_cover_image.sql` precisa rodar antes do deploy do código. `node_modules` está vazio neste ambiente — sem build/typecheck/lint real disponível; verificação foi leitura cuidadosa linha a linha de cada arquivo tocado, incluindo os construtores de objeto `SchedulingPage` no `useSchedulingPages.ts` que precisavam do campo novo (`normalizeSchedulingPage`, o optimistic update de `createSchedulingPage`/`updateSchedulingPage`, e o payload de `duplicateSchedulingPage`) para não quebrar o tipo. Rode `pnpm install && pnpm typecheck` antes de confiar em produção.
+
 ---
 
 ## Parte 1 — Auditoria de datas, fuso horário e horários
@@ -202,13 +204,13 @@ Não é uma correção urgente — registrar como limitação conhecida. Se for 
 
 ### 1.4 Checklist de correção recomendada (por prioridade)
 
-1. [ ] **#1** — trocar `toISOString().split('T')[0]` por `getTimeZoneParts(..., page.timezone)` em `book.post.ts` e `reschedule.post.ts` (revalidação de vaga no fuso certo).
-2. [ ] **#2** — passar `{ timeZone: page.timezone }` em `SchedulingBookingDetailSlideover.vue:49` e `bookings/[id].vue:43`.
-3. [ ] **#3** — tornar `ScheduleMonthPicker` ciente de `guestTimezone` (prop nova + `getZonedDateParts`/`formatZonedDateKey` em vez de `new Date(y,m,d)` local).
-4. [ ] **#4** — trocar `new Date(selectedDate.value)` por `parseCalendarDate(selectedDate.value)` em `agendar/[token].vue:207-210`.
-5. [ ] **#5** — adicionar `{ timeZone: 'UTC' }` em `formatSelectedDate()`.
-6. [ ] **#6** — alinhar `advanceThreshold` do servidor à mesma definição de "dias-calendário no fuso do anfitrião" usada no texto do cliente.
-7. [ ] **#7** — só documentar; sem ação imediata.
+1. [x] **#1** — trocar `toISOString().split('T')[0]` por `getTimeZoneParts(..., page.timezone)` em `book.post.ts` e `reschedule.post.ts` (revalidação de vaga no fuso certo).
+2. [x] **#2** — passar `{ timeZone: page.timezone }` em `SchedulingBookingDetailSlideover.vue:49` e `bookings/[id].vue:43`.
+3. [x] **#3** — tornar `ScheduleMonthPicker` ciente de `guestTimezone` (prop nova `timeZone` + `getZonedDateParts`/`todayInZone` em vez de `new Date()`/getters locais para "hoje" e o mês inicial).
+4. [x] **#4** — trocar `new Date(selectedDate.value)` por `parseCalendarDate(selectedDate.value)` em `agendar/[token].vue:207-210`.
+5. [x] **#5** — adicionar `{ timeZone: 'UTC' }` em `formatSelectedDate()`.
+6. [x] **#6** — alinhar `advanceThreshold` do servidor à mesma definição de "dias-calendário no fuso do anfitrião" usada no texto do cliente.
+7. [ ] **#7** — só documentar; sem ação imediata (limitação conhecida, não corrigida).
 
 Nenhum item requer migration de banco — são todos ajustes de lógica em arquivos já existentes.
 
@@ -391,3 +393,17 @@ Adicionar `state.coverImageUrl` ao `state` reativo, a `applyPageToState`, e ao `
 - Biblioteca de templates/gradientes prontos para quem não quer subir uma imagem própria.
 - Capa como plano de fundo ambiente com blur (Opção B da seção 2.7).
 - Reaproveitar a mesma capa como imagem de compartilhamento (`og:image`) com dimensões otimizadas separadas (hoje a mesma URL serve para os dois usos, o que é aceitável para o primeiro corte mas não é o ideal para Open Graph, que prefere 1200×630).
+
+### 2.10 Checklist de implementação (concluído em 2026-09-17)
+
+- [x] Migration `20260917000000_scheduling_pages_cover_image.sql` (`scheduling_pages.cover_image_url`).
+- [x] `server/utils/scheduling.ts` — `mapSchedulingPage` expõe `coverImageUrl`.
+- [x] `server/api/appointments/scheduling-pages/[id].patch.ts` — schema + handler aceitam `coverImageUrl`.
+- [x] `server/api/appointments/scheduling-pages/index.post.ts` — schema + handler aceitam `coverImageUrl` (necessário porque `duplicateSchedulingPage` agora copia a capa da página original).
+- [x] `server/api/schedule/[token].get.ts` — `select` explícito e retorno público incluem `cover_image_url`/`coverImageUrl`.
+- [x] `app/types/scheduling.ts` — `coverImageUrl` em `SchedulingPage`, `CreateSchedulingPagePayload` e `PublicSchedulingPage`.
+- [x] `app/composables/useSchedulingPages.ts` — `coverImageUrl` no `normalizeSchedulingPage` (parse da resposta do servidor) e nos três construtores otimistas (`createSchedulingPage`, `updateSchedulingPage`, `duplicateSchedulingPage`) — sem isso o TS reclamaria de propriedade faltando e/ou a capa sumiria da UI logo após salvar, antes do round-trip ao servidor.
+- [x] Editor (`scheduling/[id].vue`) — card "Capa" na aba Evento, reaproveitando `/api/editor/uploads`.
+- [x] Página pública (`agendar/[token].vue`) — banner no topo do card (Opção A da seção 2.7) + `ogImage` no `useSeoMeta`.
+
+Uma decisão que diverge do pseudocódigo da seção 2.2: em vez de salvar a capa no servidor imediatamente após o upload (como `goals/DetailSlideover.vue` faz, com `updateGoal` direto no `onCoverFileSelected`), o editor de agendamento só atualiza `state.coverImageUrl` localmente — a persistência acontece no próximo clique em "Salvar", junto com todos os outros campos. Isso é consistente com o resto deste editor específico (que já tem `isDirty`/`snapshot` e um botão "Salvar" explícito para *todos* os campos, incluindo `color`) e evita um caso estranho de "capa já salva, resto do formulário ainda não" se o anfitrião fechar a aba sem clicar em Salvar depois de trocar a imagem.
