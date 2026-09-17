@@ -442,6 +442,38 @@ function toggleCalendarsPanel() {
   calendarsExpanded.value = !calendarsExpanded.value
 }
 
+// Click-outside-to-close for the desktop calendars panel (mobile's UDrawer
+// already closes on backdrop click on its own). Mirrors the hand-rolled
+// mousedown+contains() pattern used by EventPopover/QuickCreatePopover/
+// DayEventsPopover in this same folder — plain DOM refs, not a library ref
+// on `motion.div`/`UButton`, since neither reliably forwards `ref` to its
+// underlying element. The toggle button itself is excluded, otherwise its
+// own mousedown would close the panel a beat before its click handler
+// re-opens it (open → close → reopen on the same click).
+const calendarsPanelRef = ref<HTMLElement | null>(null)
+const calendarsToggleRef = ref<HTMLElement | null>(null)
+
+function onCalendarsPanelClickOutside(e: MouseEvent) {
+  const target = e.target as Node
+  if (calendarsPanelRef.value?.contains(target)) return
+  if (calendarsToggleRef.value?.contains(target)) return
+  calendarsExpanded.value = false
+}
+
+watch(calendarsExpanded, (open) => {
+  if (open && !isMobile.value) {
+    setTimeout(() => {
+      document.addEventListener('mousedown', onCalendarsPanelClickOutside)
+    }, 10)
+  } else {
+    document.removeEventListener('mousedown', onCalendarsPanelClickOutside)
+  }
+})
+
+onBeforeUnmount(() => {
+  document.removeEventListener('mousedown', onCalendarsPanelClickOutside)
+})
+
 function onToggleCalendar(calendarId: string) {
   activeCalendarIds.value = selectedCalendarId.value === calendarId ? [] : [calendarId]
 }
@@ -654,17 +686,19 @@ onMounted(() => {
           </UTooltip>
 
           <!-- Calendar sidebar toggle -->
-          <UTooltip text="Calendários" class="hidden lg:flex">
-            <UButton
-              color="neutral"
-              variant="ghost"
-              square
-              :class="calendarsExpanded ? 'text-primary' : ''"
-              @click="toggleCalendarsPanel"
-            >
-              <UIcon name="i-lucide-calendar-range" class="size-5 shrink-0" />
-            </UButton>
-          </UTooltip>
+          <span ref="calendarsToggleRef" class="contents">
+            <UTooltip text="Calendários" class="hidden lg:flex">
+              <UButton
+                color="neutral"
+                variant="ghost"
+                square
+                :class="calendarsExpanded ? 'text-primary' : ''"
+                @click="toggleCalendarsPanel"
+              >
+                <UIcon name="i-lucide-calendar-range" class="size-5 shrink-0" />
+              </UButton>
+            </UTooltip>
+          </span>
 
           <!-- Mobile: overflow menu for less-frequent actions -->
           <UDropdownMenu
@@ -726,25 +760,47 @@ onMounted(() => {
           <span v-else>{{ pendingSyncCount }} alteração(ões) pendente(s) de sincronização</span>
         </div>
 
-        <div class="flex min-h-0 flex-1">
-          <!-- Sidebar: Calendar list (desktop only — a bottom drawer takes over on mobile below) -->
-          <div
-            v-if="calendarsExpanded && !isMobile"
-            class="w-56 shrink-0 border-r border-default p-3 overflow-y-auto"
-          >
-            <AppointmentsCalendarList
-              :calendars="calendars"
-              :archived-calendars="archivedCalendars"
-              :loading="calendarsStatus === 'pending'"
-              :archived-loading="archivedCalendarsStatus === 'pending'"
-              :active-calendar-id="selectedCalendarId"
-              @create="onCreateCalendar"
-              @toggle="onToggleCalendar"
-              @archive="onArchiveCalendar"
-              @edit="onEditCalendar"
-              @restore="onRestoreCalendar"
-            />
-          </div>
+        <div class="relative flex min-h-0 flex-1 overflow-hidden">
+          <!-- Sidebar: Calendar list (desktop only — a bottom drawer takes over on
+               mobile below). Absolutely positioned so opening/closing it overlays
+               the calendar instead of pushing it over — a fixed-width flex sibling
+               used to reflow the whole calendar grid every toggle. -->
+          <AnimatePresence>
+            <motion.div
+              v-if="calendarsExpanded && !isMobile"
+              key="calendars-panel"
+              class="absolute inset-y-0 left-0 z-20 w-56 overflow-y-auto border-r border-default bg-default p-3 shadow-lg"
+              :initial="{ x: -224, opacity: 0 }"
+              :animate="{ x: 0, opacity: 1 }"
+              :exit="{ x: -224, opacity: 0 }"
+              :transition="{ duration: 0.2, ease: 'easeOut' }"
+            >
+              <div ref="calendarsPanelRef" class="contents">
+                <div class="mb-1 flex justify-end">
+                  <UButton
+                    icon="i-lucide-x"
+                    size="xs"
+                    color="neutral"
+                    variant="ghost"
+                    aria-label="Fechar calendários"
+                    @click="calendarsExpanded = false"
+                  />
+                </div>
+                <AppointmentsCalendarList
+                  :calendars="calendars"
+                  :archived-calendars="archivedCalendars"
+                  :loading="calendarsStatus === 'pending'"
+                  :archived-loading="archivedCalendarsStatus === 'pending'"
+                  :active-calendar-id="selectedCalendarId"
+                  @create="onCreateCalendar"
+                  @toggle="onToggleCalendar"
+                  @archive="onArchiveCalendar"
+                  @edit="onEditCalendar"
+                  @restore="onRestoreCalendar"
+                />
+              </div>
+            </motion.div>
+          </AnimatePresence>
 
           <!-- Main calendar area -->
           <div ref="calendarBodyRef" class="relative min-w-0 flex-1 overflow-hidden">

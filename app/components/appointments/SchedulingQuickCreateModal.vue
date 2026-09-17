@@ -91,9 +91,6 @@ async function onSubmit() {
   >
     <template #body>
       <div class="space-y-6">
-        <div
-          class="flex items-center gap-3 rounded-xl border border-default bg-elevated/40 p-4"
-        >
         <UFormField
           label="Nome do evento"
           description="Use um nome que seus convidados reconheçam."

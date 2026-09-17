@@ -695,7 +695,6 @@ if (import.meta.client) {
         <template #leading>
           <AppSidebarCollapse />
         </template>
-        
         <template #right>
           <UDropdownMenu
             v-if="!loading && !notFound"
