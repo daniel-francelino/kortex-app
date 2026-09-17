@@ -1,52 +1,52 @@
 <script setup lang="ts">
-import type { SchedulingQuestion } from '~/types/scheduling'
-import { SchedulingLocationType, LOCATION_TYPE_META } from '~/types/scheduling'
-import { detectBrowserTimeZone } from '#shared/utils/dateTime'
+import type { SchedulingQuestion } from "~/types/scheduling";
+import { SchedulingLocationType, LOCATION_TYPE_META } from "~/types/scheduling";
+import { detectBrowserTimeZone } from "#shared/utils/dateTime";
 
-definePageMeta({ layout: 'app' })
+definePageMeta({ layout: "app" });
 
-const route = useRoute()
-const router = useRouter()
-const toast = useToast()
-const pageId = route.params.id as string
+const route = useRoute();
+const router = useRouter();
+const toast = useToast();
+const pageId = route.params.id as string;
 
-const { calendars, calendarsStatus, refreshCalendars } = useAppointments()
+const { calendars, calendarsStatus, refreshCalendars } = useAppointments();
 const {
   fetchSchedulingPage,
   updateSchedulingPage,
   archiveSchedulingPage,
   regenerateShareToken,
-  duplicateSchedulingPage
-} = useSchedulingPages()
+  duplicateSchedulingPage,
+} = useSchedulingPages();
 
 onMounted(() => {
-  if (calendarsStatus.value === 'idle') refreshCalendars()
-})
+  if (calendarsStatus.value === "idle") refreshCalendars();
+});
 
 // ─── Load ────────────────────────────────────────────────────────────────────
-const loading = ref(true)
-const notFound = ref(false)
-const saving = ref(false)
-const shareToken = ref('')
-const isActive = ref(true)
+const loading = ref(true);
+const notFound = ref(false);
+const saving = ref(false);
+const shareToken = ref("");
+const isActive = ref(true);
 
 interface DayWindow {
-  startTime: string
-  endTime: string
+  startTime: string;
+  endTime: string;
 }
 
-const dayLabels = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
-const weekdayIndexes = [1, 2, 3, 4, 5]
+const dayLabels = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+const weekdayIndexes = [1, 2, 3, 4, 5];
 
 const state = reactive({
-  title: '',
-  description: '',
-  calendarId: '',
+  title: "",
+  description: "",
+  calendarId: "",
   durationMinutes: 30,
   locationType: SchedulingLocationType.VideoLink,
-  locationDetails: '',
+  locationDetails: "",
   color: null as string | null,
-  timezone: detectBrowserTimeZone() ?? 'UTC',
+  timezone: detectBrowserTimeZone() ?? "UTC",
   bufferBeforeMinutes: 0,
   bufferAfterMinutes: 0,
   slotIncrementMinutes: 15,
@@ -54,317 +54,419 @@ const state = reactive({
   maxAdvanceDays: 60,
   maxBookingsPerDayEnabled: false,
   maxBookingsPerDay: 5,
-  calendarEventTitleTemplate: '',
+  calendarEventTitleTemplate: "",
   cancellationEnabled: true,
   rescheduleEnabled: true,
   cancellationMinNoticeEnabled: false,
   cancellationMinNoticeHours: 24,
   cancellationReasonRequired: false,
   hideDetailsOnManagePage: false,
-  requiresConfirmation: false
-})
+  requiresConfirmation: false,
+});
 
-const dayWindows = reactive<Record<number, DayWindow[]>>({ 0: [], 1: [], 2: [], 3: [], 4: [], 5: [], 6: [] })
-const questions = ref<Array<Omit<SchedulingQuestion, 'id'>>>([])
+const dayWindows = reactive<Record<number, DayWindow[]>>({
+  0: [],
+  1: [],
+  2: [],
+  3: [],
+  4: [],
+  5: [],
+  6: [],
+});
+const questions = ref<Array<Omit<SchedulingQuestion, "id">>>([]);
 
-function applyPageToState(page: NonNullable<Awaited<ReturnType<typeof fetchSchedulingPage>>>) {
-  state.title = page.title
-  state.description = page.description ?? ''
-  state.calendarId = page.calendarId
-  state.durationMinutes = page.durationMinutes
-  state.locationType = page.locationType
-  state.locationDetails = page.locationDetails ?? ''
-  state.color = page.color
-  state.timezone = page.timezone
-  state.bufferBeforeMinutes = page.bufferBeforeMinutes
-  state.bufferAfterMinutes = page.bufferAfterMinutes
-  state.slotIncrementMinutes = page.slotIncrementMinutes
-  state.minNoticeHours = page.minNoticeHours
-  minNoticeUnit.value = detectMinNoticeUnit(page.minNoticeHours)
-  state.maxAdvanceDays = page.maxAdvanceDays
-  state.maxBookingsPerDayEnabled = page.maxBookingsPerDay !== null
-  state.maxBookingsPerDay = page.maxBookingsPerDay ?? 5
-  state.calendarEventTitleTemplate = page.calendarEventTitleTemplate ?? ''
-  state.cancellationEnabled = page.cancellationEnabled
-  state.rescheduleEnabled = page.rescheduleEnabled
-  state.cancellationMinNoticeEnabled = page.cancellationMinNoticeHours !== null
-  state.cancellationMinNoticeHours = page.cancellationMinNoticeHours ?? 24
-  state.cancellationReasonRequired = page.cancellationReasonRequired
-  state.hideDetailsOnManagePage = page.hideDetailsOnManagePage
-  state.requiresConfirmation = page.requiresConfirmation
+function applyPageToState(
+  page: NonNullable<Awaited<ReturnType<typeof fetchSchedulingPage>>>,
+) {
+  state.title = page.title;
+  state.description = page.description ?? "";
+  state.calendarId = page.calendarId;
+  state.durationMinutes = page.durationMinutes;
+  state.locationType = page.locationType;
+  state.locationDetails = page.locationDetails ?? "";
+  state.color = page.color;
+  state.timezone = page.timezone;
+  state.bufferBeforeMinutes = page.bufferBeforeMinutes;
+  state.bufferAfterMinutes = page.bufferAfterMinutes;
+  state.slotIncrementMinutes = page.slotIncrementMinutes;
+  state.minNoticeHours = page.minNoticeHours;
+  minNoticeUnit.value = detectMinNoticeUnit(page.minNoticeHours);
+  state.maxAdvanceDays = page.maxAdvanceDays;
+  state.maxBookingsPerDayEnabled = page.maxBookingsPerDay !== null;
+  state.maxBookingsPerDay = page.maxBookingsPerDay ?? 5;
+  state.calendarEventTitleTemplate = page.calendarEventTitleTemplate ?? "";
+  state.cancellationEnabled = page.cancellationEnabled;
+  state.rescheduleEnabled = page.rescheduleEnabled;
+  state.cancellationMinNoticeEnabled = page.cancellationMinNoticeHours !== null;
+  state.cancellationMinNoticeHours = page.cancellationMinNoticeHours ?? 24;
+  state.cancellationReasonRequired = page.cancellationReasonRequired;
+  state.hideDetailsOnManagePage = page.hideDetailsOnManagePage;
+  state.requiresConfirmation = page.requiresConfirmation;
 
-  shareToken.value = page.shareToken
-  isActive.value = page.isActive
+  shareToken.value = page.shareToken;
+  isActive.value = page.isActive;
 
-  for (let d = 0; d <= 6; d++) dayWindows[d] = []
+  for (let d = 0; d <= 6; d++) dayWindows[d] = [];
   for (const rule of page.availabilityRules ?? []) {
-    dayWindows[rule.dayOfWeek]!.push({ startTime: rule.startTime, endTime: rule.endTime })
+    dayWindows[rule.dayOfWeek]!.push({
+      startTime: rule.startTime,
+      endTime: rule.endTime,
+    });
   }
 
   questions.value = (page.questions ?? [])
     .slice()
     .sort((a, b) => a.sortOrder - b.sortOrder)
-    .map(q => ({
+    .map((q) => ({
       label: q.label,
       type: q.type,
       isRequired: q.isRequired,
       isHidden: q.isHidden,
       options: q.options,
-      sortOrder: q.sortOrder
-    }))
+      sortOrder: q.sortOrder,
+    }));
 }
 
 function serializeState(): string {
   const sortedWindows = Object.keys(dayWindows)
     .map(Number)
     .sort((a, b) => a - b)
-    .map(day => ({ day, windows: dayWindows[day] }))
+    .map((day) => ({ day, windows: dayWindows[day] }));
 
-  return JSON.stringify({ state, sortedWindows, questions: questions.value })
+  return JSON.stringify({ state, sortedWindows, questions: questions.value });
 }
 
-const snapshot = ref('')
-const isDirty = computed(() => snapshot.value !== '' && snapshot.value !== serializeState())
+const snapshot = ref("");
+const isDirty = computed(
+  () => snapshot.value !== "" && snapshot.value !== serializeState(),
+);
 
 async function load() {
-  loading.value = true
-  const page = await fetchSchedulingPage(pageId)
+  loading.value = true;
+  const page = await fetchSchedulingPage(pageId);
   if (!page) {
-    notFound.value = true
-    loading.value = false
-    return
+    notFound.value = true;
+    loading.value = false;
+    return;
   }
-  applyPageToState(page)
-  await nextTick()
-  snapshot.value = serializeState()
-  loading.value = false
+  applyPageToState(page);
+  await nextTick();
+  snapshot.value = serializeState();
+  loading.value = false;
 }
 
-load()
+load();
 
 // ─── Tabs ────────────────────────────────────────────────────────────────────
 const tabs = [
-  { label: 'Evento', value: 'evento', icon: 'i-lucide-calendar' },
-  { label: 'Disponibilidade', value: 'disponibilidade', icon: 'i-lucide-clock' },
-  { label: 'Formulário', value: 'formulario', icon: 'i-lucide-list-checks' },
-  { label: 'Limites', value: 'limites', icon: 'i-lucide-shield' },
-  { label: 'Políticas', value: 'politicas', icon: 'i-lucide-repeat' },
-  { label: 'Privacidade', value: 'privacidade', icon: 'i-lucide-lock' }
-]
-const activeTab = ref((typeof route.query.tab === 'string' && tabs.some(t => t.value === route.query.tab)) ? route.query.tab : 'evento')
+  { label: "Evento", value: "evento", icon: "i-lucide-calendar" },
+  {
+    label: "Disponibilidade",
+    value: "disponibilidade",
+    icon: "i-lucide-clock",
+  },
+  { label: "Formulário", value: "formulario", icon: "i-lucide-list-checks" },
+  { label: "Limites", value: "limites", icon: "i-lucide-shield" },
+  { label: "Políticas", value: "politicas", icon: "i-lucide-repeat" },
+  { label: "Privacidade", value: "privacidade", icon: "i-lucide-lock" },
+];
+const activeTab = ref(
+  typeof route.query.tab === "string" &&
+    tabs.some((t) => t.value === route.query.tab)
+    ? route.query.tab
+    : "evento",
+);
+const tabDescriptions: Record<string, string> = {
+  evento: "Apresente seu evento e defina como o encontro vai acontecer.",
+  disponibilidade:
+    "Escolha os dias e horários em que você quer receber reservas.",
+  formulario: "Peça as informações necessárias para preparar seu encontro.",
+  limites: "Reserve tempo entre encontros e organize o ritmo da sua agenda.",
+  politicas: "Defina como confirmar, reagendar e cancelar suas reservas.",
+  privacidade: "Controle os detalhes compartilhados e o acesso à sua página.",
+};
+const currentTab = computed(
+  () => tabs.find((tab) => tab.value === activeTab.value) ?? tabs[0]!,
+);
+const availableDays = computed(
+  () =>
+    Object.values(dayWindows).filter((windows) => windows.length > 0).length,
+);
 watch(activeTab, (v) => {
-  router.replace({ query: { ...route.query, tab: v } })
-})
+  router.replace({ query: { ...route.query, tab: v } });
+});
 
 // ─── Evento ──────────────────────────────────────────────────────────────────
-const calendarOptions = computed(() => (calendars.value ?? []).map(c => ({ label: c.name, value: c.id })))
-const locationOptions = Object.values(SchedulingLocationType).map(value => ({ label: LOCATION_TYPE_META[value].label, value }))
-const locationDetailMeta: Record<SchedulingLocationType, { label: string, placeholder: string }> = {
-  [SchedulingLocationType.VideoLink]: { label: 'Link da chamada', placeholder: 'https://meet.google.com/…' },
-  [SchedulingLocationType.Phone]: { label: 'Número de telefone', placeholder: '+55 11 90000-0000' },
-  [SchedulingLocationType.InPerson]: { label: 'Endereço', placeholder: 'Rua Exemplo, 123' },
-  [SchedulingLocationType.Custom]: { label: 'Instruções para o convidado', placeholder: 'Ex.: aguarde na recepção' }
-}
+const calendarOptions = computed(() =>
+  (calendars.value ?? []).map((c) => ({ label: c.name, value: c.id })),
+);
+const locationOptions = Object.values(SchedulingLocationType).map((value) => ({
+  label: LOCATION_TYPE_META[value].label,
+  value,
+}));
+const locationDetailMeta: Record<
+  SchedulingLocationType,
+  { label: string; placeholder: string }
+> = {
+  [SchedulingLocationType.VideoLink]: {
+    label: "Link da chamada",
+    placeholder: "https://meet.google.com/…",
+  },
+  [SchedulingLocationType.Phone]: {
+    label: "Número de telefone",
+    placeholder: "+55 11 90000-0000",
+  },
+  [SchedulingLocationType.InPerson]: {
+    label: "Endereço",
+    placeholder: "Rua Exemplo, 123",
+  },
+  [SchedulingLocationType.Custom]: {
+    label: "Instruções para o convidado",
+    placeholder: "Ex.: aguarde na recepção",
+  },
+};
 const colorOptions = [
-  { label: 'Verde', value: '#10b981' },
-  { label: 'Azul', value: '#3b82f6' },
-  { label: 'Amarelo', value: '#f59e0b' },
-  { label: 'Vermelho', value: '#ef4444' },
-  { label: 'Roxo', value: '#8b5cf6' },
-  { label: 'Rosa', value: '#ec4899' }
-]
+  { label: "Verde", value: "#10b981" },
+  { label: "Azul", value: "#3b82f6" },
+  { label: "Amarelo", value: "#f59e0b" },
+  { label: "Vermelho", value: "#ef4444" },
+  { label: "Roxo", value: "#8b5cf6" },
+  { label: "Rosa", value: "#ec4899" },
+];
 
 // Shared with the Settings "Regional" picker (docs/timezone/ANALISE_TIMEZONE.md,
 // seção 5) — same ordering (browser zone, then current selection, then most
 // used, then the rest alphabetically), so both pickers behave consistently.
-const { options: timezoneOptions } = useTimezoneOptions(computed(() => state.timezone))
+const { options: timezoneOptions } = useTimezoneOptions(
+  computed(() => state.timezone),
+);
 
 // ─── Disponibilidade ─────────────────────────────────────────────────────────
 function addWindow(day: number) {
-  dayWindows[day]!.push({ startTime: '09:00', endTime: '18:00' })
+  dayWindows[day]!.push({ startTime: "09:00", endTime: "18:00" });
 }
 function removeWindow(day: number, index: number) {
-  dayWindows[day]!.splice(index, 1)
+  dayWindows[day]!.splice(index, 1);
 }
 function toggleDay(day: number) {
-  dayWindows[day] = dayWindows[day]!.length > 0 ? [] : [{ startTime: '09:00', endTime: '18:00' }]
+  dayWindows[day] =
+    dayWindows[day]!.length > 0
+      ? []
+      : [{ startTime: "09:00", endTime: "18:00" }];
 }
 // Popover "copiar horários para…" — substitui o antigo copyToWeekdays (que só
 // cobria dias úteis fixos) por uma seleção arbitrária de dias de destino.
-const copyTargetsByDay = reactive<Record<number, number[]>>({})
+const copyTargetsByDay = reactive<Record<number, number[]>>({});
 
 function onCopyPopoverOpen(day: number, open: boolean) {
-  if (!open) return
+  if (!open) return;
   // Pré-seleciona os dias úteis (exceto a origem) como ponto de partida útil
   // — o caso mais comum continua sendo 1 clique, sem obrigar a marcar tudo.
-  copyTargetsByDay[day] = weekdayIndexes.filter(d => d !== day)
+  copyTargetsByDay[day] = weekdayIndexes.filter((d) => d !== day);
 }
 
 function toggleCopyTarget(day: number, target: number, checked: boolean) {
-  const current = copyTargetsByDay[day] ?? []
-  copyTargetsByDay[day] = checked ? [...current, target] : current.filter(d => d !== target)
+  const current = copyTargetsByDay[day] ?? [];
+  copyTargetsByDay[day] = checked
+    ? [...current, target]
+    : current.filter((d) => d !== target);
 }
 
 function applyCopyToTargets(day: number) {
-  const targets = copyTargetsByDay[day] ?? []
-  if (targets.length === 0) return
-  const source = dayWindows[day]!.map(w => ({ ...w }))
+  const targets = copyTargetsByDay[day] ?? [];
+  if (targets.length === 0) return;
+  const source = dayWindows[day]!.map((w) => ({ ...w }));
   for (const target of targets) {
-    dayWindows[target] = source.map(w => ({ ...w }))
+    dayWindows[target] = source.map((w) => ({ ...w }));
   }
-  toast.add({ title: `Horários copiados para ${targets.length} dia(s)`, color: 'success' })
+  toast.add({
+    title: `Horários copiados para ${targets.length} dia(s)`,
+    color: "success",
+  });
 }
 
 // "Antecedência mínima" — sempre guardada em horas no banco (state.minNoticeHours),
 // a unidade (Horas/Dias) é só apresentação (docs/appointments/AUDITORIA_LINK_AGENDAMENTO_UX.md §1.2).
-const minNoticeUnit = ref<'hours' | 'days'>('hours')
-function detectMinNoticeUnit(hours: number): 'hours' | 'days' {
-  return hours > 0 && hours % 24 === 0 ? 'days' : 'hours'
+const minNoticeUnit = ref<"hours" | "days">("hours");
+function detectMinNoticeUnit(hours: number): "hours" | "days" {
+  return hours > 0 && hours % 24 === 0 ? "days" : "hours";
 }
 const minNoticeUnitOptions = [
-  { label: 'Horas', value: 'hours' as const },
-  { label: 'Dias', value: 'days' as const }
-]
+  { label: "Horas", value: "hours" as const },
+  { label: "Dias", value: "days" as const },
+];
 const minNoticeDisplayValue = computed({
-  get: () => minNoticeUnit.value === 'days' ? Math.round(state.minNoticeHours / 24) : state.minNoticeHours,
+  get: () =>
+    minNoticeUnit.value === "days"
+      ? Math.round(state.minNoticeHours / 24)
+      : state.minNoticeHours,
   set: (value: number) => {
-    state.minNoticeHours = minNoticeUnit.value === 'days' ? value * 24 : value
-  }
-})
+    state.minNoticeHours = minNoticeUnit.value === "days" ? value * 24 : value;
+  },
+});
 
 // ─── Limites — buffers e incremento como valores discretos (padrão Cal.com,
 // docs/appointments/AUDITORIA_LINK_AGENDAMENTO_UX.md §1.2) em vez de um
 // UInputNumber livre. Cada `buildOptions` inclui o valor atual mesmo que ele
 // não esteja na lista fixa (ex.: uma página antiga com buffer de 7 min) — sem
 // isso o USelect ficaria em branco em vez de mostrar o valor real salvo.
-const BUFFER_MINUTE_OPTIONS = [0, 5, 10, 15, 20, 30, 45, 60]
+const BUFFER_MINUTE_OPTIONS = [0, 5, 10, 15, 20, 30, 45, 60];
 function buildBufferOptions(current: number) {
-  const values = BUFFER_MINUTE_OPTIONS.includes(current) ? BUFFER_MINUTE_OPTIONS : [...BUFFER_MINUTE_OPTIONS, current].sort((a, b) => a - b)
-  return values.map(v => ({ label: v === 0 ? 'Sem intervalo' : `${v} min`, value: v }))
+  const values = BUFFER_MINUTE_OPTIONS.includes(current)
+    ? BUFFER_MINUTE_OPTIONS
+    : [...BUFFER_MINUTE_OPTIONS, current].sort((a, b) => a - b);
+  return values.map((v) => ({
+    label: v === 0 ? "Sem intervalo" : `${v} min`,
+    value: v,
+  }));
 }
-const bufferBeforeOptions = computed(() => buildBufferOptions(state.bufferBeforeMinutes))
-const bufferAfterOptions = computed(() => buildBufferOptions(state.bufferAfterMinutes))
+const bufferBeforeOptions = computed(() =>
+  buildBufferOptions(state.bufferBeforeMinutes),
+);
+const bufferAfterOptions = computed(() =>
+  buildBufferOptions(state.bufferAfterMinutes),
+);
 
 // "Usar a duração do evento" não é um valor persistido à parte — selecioná-la
 // só copia state.durationMinutes para state.slotIncrementMinutes na hora
 // (atalho, não um vínculo permanente: se a duração mudar depois, o incremento
 // não re-sincroniza sozinho, evitando um campo derivado "mágico" no schema).
-const SLOT_INCREMENT_MINUTE_OPTIONS = [5, 10, 15, 20, 30, 45, 60]
+const SLOT_INCREMENT_MINUTE_OPTIONS = [5, 10, 15, 20, 30, 45, 60];
 const slotIncrementOptions = computed(() => {
-  const useDurationLabel = `Usar a duração do evento (${state.durationMinutes} min)`
-  const opts = [{ label: useDurationLabel, value: state.durationMinutes }]
+  const useDurationLabel = `Usar a duração do evento (${state.durationMinutes} min)`;
+  const opts = [{ label: useDurationLabel, value: state.durationMinutes }];
   for (const v of SLOT_INCREMENT_MINUTE_OPTIONS) {
-    if (v === state.durationMinutes) continue
-    opts.push({ label: `${v} min`, value: v })
+    if (v === state.durationMinutes) continue;
+    opts.push({ label: `${v} min`, value: v });
   }
-  if (!opts.some(o => o.value === state.slotIncrementMinutes)) {
-    opts.push({ label: `${state.slotIncrementMinutes} min`, value: state.slotIncrementMinutes })
+  if (!opts.some((o) => o.value === state.slotIncrementMinutes)) {
+    opts.push({
+      label: `${state.slotIncrementMinutes} min`,
+      value: state.slotIncrementMinutes,
+    });
   }
-  return opts
-})
+  return opts;
+});
 
 // ─── Formulário ──────────────────────────────────────────────────────────────
-const questionSlideoverOpen = ref(false)
-const editingQuestionIndex = ref<number | null>(null)
-const editingQuestion = computed(() => editingQuestionIndex.value === null ? null : questions.value[editingQuestionIndex.value] ?? null)
+const questionSlideoverOpen = ref(false);
+const editingQuestionIndex = ref<number | null>(null);
+const editingQuestion = computed(() =>
+  editingQuestionIndex.value === null
+    ? null
+    : (questions.value[editingQuestionIndex.value] ?? null),
+);
 
 function openNewQuestion() {
-  editingQuestionIndex.value = null
-  questionSlideoverOpen.value = true
+  editingQuestionIndex.value = null;
+  questionSlideoverOpen.value = true;
 }
 function openEditQuestion(index: number) {
-  editingQuestionIndex.value = index
-  questionSlideoverOpen.value = true
+  editingQuestionIndex.value = index;
+  questionSlideoverOpen.value = true;
 }
-function onSaveQuestion(value: Omit<SchedulingQuestion, 'id'>) {
+function onSaveQuestion(value: Omit<SchedulingQuestion, "id">) {
   if (editingQuestionIndex.value === null) {
-    questions.value.push({ ...value, sortOrder: questions.value.length })
+    questions.value.push({ ...value, sortOrder: questions.value.length });
   } else {
-    const existing = questions.value[editingQuestionIndex.value]!
-    questions.value[editingQuestionIndex.value] = { ...value, isHidden: existing.isHidden, sortOrder: existing.sortOrder }
+    const existing = questions.value[editingQuestionIndex.value]!;
+    questions.value[editingQuestionIndex.value] = {
+      ...value,
+      isHidden: existing.isHidden,
+      sortOrder: existing.sortOrder,
+    };
   }
-  questionSlideoverOpen.value = false
+  questionSlideoverOpen.value = false;
 }
 function onRemoveQuestion() {
-  if (editingQuestionIndex.value === null) return
-  questions.value.splice(editingQuestionIndex.value, 1)
-  questionSlideoverOpen.value = false
+  if (editingQuestionIndex.value === null) return;
+  questions.value.splice(editingQuestionIndex.value, 1);
+  questionSlideoverOpen.value = false;
 }
 function toggleQuestionHidden(index: number) {
-  const q = questions.value[index]!
-  questions.value[index] = { ...q, isHidden: !q.isHidden }
+  const q = questions.value[index]!;
+  questions.value[index] = { ...q, isHidden: !q.isHidden };
 }
 function moveQuestion(index: number, direction: -1 | 1) {
-  const target = index + direction
-  if (target < 0 || target >= questions.value.length) return
-  const list = questions.value
-  ;[list[index], list[target]] = [list[target]!, list[index]!]
+  const target = index + direction;
+  if (target < 0 || target >= questions.value.length) return;
+  const list = questions.value;
+  [list[index], list[target]] = [list[target]!, list[index]!];
 }
-function questionTypeLabel(q: Omit<SchedulingQuestion, 'id'>): string {
-  if (q.type === 'select') return `Seleção · ${q.options?.length ?? 0} opções`
-  if (q.type === 'textarea') return 'Texto longo'
-  return 'Texto curto'
+function questionTypeLabel(q: Omit<SchedulingQuestion, "id">): string {
+  if (q.type === "select") return `Seleção · ${q.options?.length ?? 0} opções`;
+  if (q.type === "textarea") return "Texto longo";
+  return "Texto curto";
 }
 
 // ─── Header actions ──────────────────────────────────────────────────────────
 const shareUrl = computed(() => {
-  const base = typeof window !== 'undefined' ? window.location.origin : ''
-  return `${base}/agendar/${shareToken.value}`
-})
+  const base = typeof window !== "undefined" ? window.location.origin : "";
+  return `${base}/agendar/${shareToken.value}`;
+});
 
 async function copyLink() {
   try {
-    await navigator.clipboard.writeText(shareUrl.value)
-    toast.add({ title: 'Link copiado!', color: 'success' })
+    await navigator.clipboard.writeText(shareUrl.value);
+    toast.add({ title: "Link copiado!", color: "success" });
   } catch {
-    toast.add({ title: 'Erro', description: 'Não foi possível copiar o link.', color: 'error' })
+    toast.add({
+      title: "Erro",
+      description: "Não foi possível copiar o link.",
+      color: "error",
+    });
   }
 }
 
 async function onToggleActive(value: boolean) {
-  isActive.value = value
-  await updateSchedulingPage(pageId, { isActive: value })
+  const updated = await updateSchedulingPage(pageId, { isActive: value });
+  if (updated) isActive.value = updated.isActive;
 }
 
-const duplicating = ref(false)
+const duplicating = ref(false);
 async function onDuplicate() {
-  if (duplicating.value) return
-  duplicating.value = true
-  const created = await duplicateSchedulingPage(pageId)
-  duplicating.value = false
-  if (created) router.push(`/app/appointments/scheduling/${created.id}`)
+  if (duplicating.value) return;
+  duplicating.value = true;
+  const created = await duplicateSchedulingPage(pageId);
+  duplicating.value = false;
+  if (created) router.push(`/app/appointments/scheduling/${created.id}`);
 }
 
-const regenerateConfirmOpen = ref(false)
-const regenerating = ref(false)
+const regenerateConfirmOpen = ref(false);
+const regenerating = ref(false);
 async function onRegenerateToken() {
-  regenerating.value = true
-  const updated = await regenerateShareToken(pageId)
-  regenerating.value = false
+  regenerating.value = true;
+  const updated = await regenerateShareToken(pageId);
+  regenerating.value = false;
   if (updated) {
-    shareToken.value = updated.shareToken
-    regenerateConfirmOpen.value = false
+    shareToken.value = updated.shareToken;
+    regenerateConfirmOpen.value = false;
   }
 }
 
-const archiveConfirmOpen = ref(false)
-const archiving = ref(false)
+const archiveConfirmOpen = ref(false);
+const archiving = ref(false);
 async function onArchive() {
-  archiving.value = true
-  const success = await archiveSchedulingPage(pageId)
-  archiving.value = false
-  if (success) router.push('/app/appointments/scheduling')
+  archiving.value = true;
+  const success = await archiveSchedulingPage(pageId);
+  archiving.value = false;
+  if (success) router.push("/app/appointments/scheduling");
 }
 
 function onPreview() {
-  window.open(shareUrl.value, '_blank')
+  window.open(shareUrl.value, "_blank", "noopener,noreferrer");
 }
 
 // ─── Save ────────────────────────────────────────────────────────────────────
 function buildPayload() {
-  const availabilityRules = Object.entries(dayWindows).flatMap(([day, windows]) =>
-    windows.map(w => ({ dayOfWeek: Number(day), startTime: w.startTime, endTime: w.endTime }))
-  )
+  const availabilityRules = Object.entries(dayWindows).flatMap(
+    ([day, windows]) =>
+      windows.map((w) => ({
+        dayOfWeek: Number(day),
+        startTime: w.startTime,
+        endTime: w.endTime,
+      })),
+  );
 
   return {
     calendarId: state.calendarId,
@@ -380,74 +482,103 @@ function buildPayload() {
     slotIncrementMinutes: state.slotIncrementMinutes,
     minNoticeHours: state.minNoticeHours,
     maxAdvanceDays: state.maxAdvanceDays,
-    maxBookingsPerDay: state.maxBookingsPerDayEnabled ? state.maxBookingsPerDay : null,
+    maxBookingsPerDay: state.maxBookingsPerDayEnabled
+      ? state.maxBookingsPerDay
+      : null,
     calendarEventTitleTemplate: state.calendarEventTitleTemplate || null,
     cancellationEnabled: state.cancellationEnabled,
     rescheduleEnabled: state.rescheduleEnabled,
-    cancellationMinNoticeHours: state.cancellationMinNoticeEnabled ? state.cancellationMinNoticeHours : null,
+    cancellationMinNoticeHours: state.cancellationMinNoticeEnabled
+      ? state.cancellationMinNoticeHours
+      : null,
     cancellationReasonRequired: state.cancellationReasonRequired,
     hideDetailsOnManagePage: state.hideDetailsOnManagePage,
     requiresConfirmation: state.requiresConfirmation,
     availabilityRules,
-    questions: questions.value.map((q, i) => ({ ...q, options: q.options ?? undefined, sortOrder: i }))
-  }
+    questions: questions.value.map((q, i) => ({
+      ...q,
+      options: q.options ?? undefined,
+      sortOrder: i,
+    })),
+  };
 }
 
-const invalidTab = ref<string | null>(null)
+const invalidTab = ref<string | null>(null);
 
 async function onSave() {
-  if (saving.value) return
+  if (saving.value) return;
 
-  const availabilityRules = Object.values(dayWindows).flat()
+  const availabilityRules = Object.values(dayWindows).flat();
   if (availabilityRules.length === 0) {
-    toast.add({ title: 'Erro', description: 'Defina ao menos uma janela de disponibilidade.', color: 'error' })
-    invalidTab.value = 'disponibilidade'
-    return
+    toast.add({
+      title: "Erro",
+      description: "Defina ao menos uma janela de disponibilidade.",
+      color: "error",
+    });
+    invalidTab.value = "disponibilidade";
+    activeTab.value = "disponibilidade";
+    return;
   }
-  const badSelect = questions.value.find(q => q.type === 'select' && (q.options?.length ?? 0) < 2)
+  const badSelect = questions.value.find(
+    (q) => q.type === "select" && (q.options?.length ?? 0) < 2,
+  );
   if (badSelect) {
-    toast.add({ title: 'Erro', description: `A pergunta "${badSelect.label}" precisa de ao menos 2 opções.`, color: 'error' })
-    invalidTab.value = 'formulario'
-    return
+    toast.add({
+      title: "Erro",
+      description: `A pergunta "${badSelect.label}" precisa de ao menos 2 opções.`,
+      color: "error",
+    });
+    invalidTab.value = "formulario";
+    activeTab.value = "formulario";
+    return;
   }
   if (!state.title.trim() || !state.calendarId) {
-    toast.add({ title: 'Erro', description: 'Preencha título e calendário.', color: 'error' })
-    invalidTab.value = 'evento'
-    return
+    toast.add({
+      title: "Erro",
+      description: "Preencha título e calendário.",
+      color: "error",
+    });
+    invalidTab.value = "evento";
+    activeTab.value = "evento";
+    return;
   }
 
-  invalidTab.value = null
-  saving.value = true
+  invalidTab.value = null;
+  saving.value = true;
   try {
-    const updated = await updateSchedulingPage(pageId, buildPayload())
+    const updated = await updateSchedulingPage(pageId, buildPayload());
     if (updated) {
-      applyPageToState(updated)
-      await nextTick()
-      snapshot.value = serializeState()
+      applyPageToState(updated);
+      await nextTick();
+      snapshot.value = serializeState();
     }
   } finally {
-    saving.value = false
+    saving.value = false;
   }
 }
 
 // ─── Leave guard ─────────────────────────────────────────────────────────────
 onBeforeRouteLeave(() => {
-  if (!isDirty.value) return true
-  return window.confirm('Você tem alterações não salvas. Sair mesmo assim?')
-})
+  if (!isDirty.value) return true;
+  return window.confirm("Você tem alterações não salvas. Sair mesmo assim?");
+});
 
 if (import.meta.client) {
-  useEventListener(window, 'beforeunload', (e: BeforeUnloadEvent) => {
-    if (!isDirty.value) return
-    e.preventDefault()
-  })
+  useEventListener(window, "beforeunload", (e: BeforeUnloadEvent) => {
+    if (!isDirty.value) return;
+    e.preventDefault();
+  });
 }
 </script>
 
 <template>
   <UDashboardPanel id="scheduling-editor">
     <template #header>
-      <UDashboardNavbar :title="loading ? 'Carregando…' : state.title || 'Página de agendamento'">
+      <UDashboardNavbar
+        :title="
+        loading ? 'Carregando…' : state.title || 'Página de agendamento'
+        "
+      >
         <template #leading>
           <UButton
             icon="i-lucide-arrow-left"
@@ -457,36 +588,57 @@ if (import.meta.client) {
             to="/app/appointments/scheduling"
           />
         </template>
-
         <template #right>
-          <div class="hidden items-center gap-2 sm:flex">
-            <UInput
-              :model-value="shareUrl"
-              readonly
-              size="sm"
-              class="w-64"
-            />
+          <div v-if="!loading && !notFound" class="hidden items-center gap-2 sm:flex">
             <UButton
               icon="i-lucide-copy"
+              label="Copiar link"
               size="sm"
               color="neutral"
               variant="subtle"
               @click="copyLink"
             />
           </div>
-
-          <USwitch :model-value="isActive" @update:model-value="onToggleActive" />
-
           <UDropdownMenu
-            :items="[[
-              { label: 'Pré-visualizar', icon: 'i-lucide-external-link', onSelect: onPreview },
-              { label: 'Copiar link', icon: 'i-lucide-copy', onSelect: copyLink },
-              { label: 'Duplicar página', icon: 'i-lucide-copy-plus', onSelect: onDuplicate }
-            ], [
-              { label: 'Regenerar link', icon: 'i-lucide-refresh-cw', onSelect: () => { regenerateConfirmOpen = true } }
-            ], [
-              { label: 'Arquivar', icon: 'i-lucide-archive', color: 'error' as const, onSelect: () => { archiveConfirmOpen = true } }
-            ]]"
+            v-if="!loading && !notFound"
+            :items="[
+            [
+            {
+            label: 'Pré-visualizar',
+            icon: 'i-lucide-external-link',
+            onSelect: onPreview,
+            },
+            {
+            label: 'Copiar link',
+            icon: 'i-lucide-copy',
+            onSelect: copyLink,
+            },
+            {
+            label: 'Duplicar página',
+            icon: 'i-lucide-copy-plus',
+            onSelect: onDuplicate,
+            },
+            ],
+            [
+            {
+            label: 'Regenerar link',
+            icon: 'i-lucide-refresh-cw',
+            onSelect: () => {
+            regenerateConfirmOpen = true;
+            },
+            },
+            ],
+            [
+            {
+            label: 'Arquivar',
+            icon: 'i-lucide-archive',
+            color: 'error' as const,
+            onSelect: () => {
+            archiveConfirmOpen = true;
+            },
+            },
+            ],
+            ]"
             :content="{ align: 'end' }"
           >
             <UButton
@@ -497,28 +649,21 @@ if (import.meta.client) {
               aria-label="Mais opções"
             />
           </UDropdownMenu>
-
           <UButton
             label="Salvar"
             :loading="saving"
-            :disabled="!isDirty || saving || loading"
+            :disabled="!isDirty || saving || loading || notFound"
             @click="onSave"
           />
         </template>
       </UDashboardNavbar>
-
-      <div class="border-b border-default px-4 py-1">
-        <UTabs :items="tabs" :model-value="activeTab" @update:model-value="activeTab = $event as string" />
-      </div>
     </template>
-
     <template #body>
       <div v-if="loading" class="mx-auto max-w-2xl space-y-4 p-4">
         <USkeleton class="h-8 w-1/2" />
         <USkeleton class="h-32 w-full" />
         <USkeleton class="h-32 w-full" />
       </div>
-
       <div v-else-if="notFound" class="flex flex-col items-center gap-3 py-16 text-center">
         <UIcon name="i-lucide-calendar-x" class="size-10 text-dimmed" />
         <p class="text-sm text-muted">
@@ -526,541 +671,734 @@ if (import.meta.client) {
         </p>
         <UButton label="Voltar" to="/app/appointments/scheduling" />
       </div>
-
-      <div v-else class="mx-auto max-w-2xl space-y-5 p-4">
-        <!-- EVENTO -->
-        <div v-if="activeTab === 'evento'" class="space-y-5">
-          <UCard v-if="invalidTab === 'evento'" :ui="{ root: 'ring-error' }">
-            <p class="text-sm text-error">
-              Corrija os campos abaixo antes de salvar.
+      <div
+        v-else
+        class="mx-auto grid w-full max-w-7xl items-start gap-6 px-1 py-3 sm:px-4 sm:py-6 lg:grid-cols-[200px_minmax(0,1fr)] xl:grid-cols-[200px_minmax(0,1fr)_260px]"
+      >
+        <aside class="space-y-5 lg:sticky lg:top-0">
+          <UButton
+            label="Todas as páginas"
+            icon="i-lucide-arrow-left"
+            color="neutral"
+            variant="link"
+            to="/app/appointments/scheduling"
+            class="hidden lg:inline-flex"
+          />
+          <nav
+            aria-label="Configurações do agendamento"
+            class="flex gap-1 overflow-x-auto pb-2 lg:flex-col lg:overflow-visible"
+          >
+            <button
+              v-for="tab in tabs"
+              :key="tab.value"
+              type="button"
+              :aria-current="activeTab === tab.value ? 'page' : undefined"
+              class="flex shrink-0 items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-sm transition-colors focus-visible:outline-2 focus-visible:outline-primary"
+              :class="
+              activeTab === tab.value
+              ? 'bg-elevated font-medium text-highlighted'
+              : 'text-muted hover:bg-elevated/60 hover:text-highlighted'
+              "
+              @click="activeTab = tab.value"
+            >
+              <UIcon :name="tab.icon" class="size-4 shrink-0" />
+              {{ tab.label }}
+              <UIcon v-if="invalidTab === tab.value" name="i-lucide-circle-alert" class="ml-auto size-4 text-error" />
+            </button>
+          </nav>
+          <div class="hidden rounded-xl border border-default p-4 lg:block">
+            <div class="flex items-center justify-between gap-3">
+              <span class="text-sm font-medium text-highlighted">
+                {{
+                isActive ? "Página ativa" : "Página pausada"
+                }}
+              </span>
+              <USwitch
+                :model-value="isActive"
+                aria-label="Ativar página de agendamento"
+                @update:model-value="onToggleActive"
+              />
+            </div>
+            <p class="mt-2 text-xs leading-relaxed text-muted">
+              {{
+              isActive
+              ? "Seu link está disponível para receber reservas."
+              : "Seu link não está recebendo novas reservas."
+              }}
             </p>
-          </UCard>
-
-          <UCard>
-            <template #header>
-              <p class="text-sm font-medium text-highlighted">
-                Detalhes
-              </p>
-            </template>
-            <div class="space-y-4">
-              <UFormField label="Título">
-                <UInput v-model="state.title" class="w-full" />
-              </UFormField>
-              <UFormField label="Descrição" description="Aparece para o convidado no topo da página.">
-                <UTextarea v-model="state.description" :rows="3" class="w-full" />
-              </UFormField>
+          </div>
+        </aside>
+        <div class="min-w-0 space-y-6">
+          <div>
+            <div class="flex items-center justify-between gap-3">
+              <h1 class="text-2xl font-semibold tracking-tight text-highlighted">
+                {{ currentTab.label }}
+              </h1>
+              <USwitch
+                :model-value="isActive"
+                label="Ativa"
+                class="lg:hidden"
+                @update:model-value="onToggleActive"
+              />
             </div>
-          </UCard>
-
-          <UCard>
-            <template #header>
-              <p class="text-sm font-medium text-highlighted">
-                Agendamento
+            <p class="mt-2 text-sm leading-relaxed text-muted">
+              {{ tabDescriptions[activeTab] }}
+            </p>
+          </div>
+          <!-- EVENTO -->
+          <div v-if="activeTab === 'evento'" class="space-y-5">
+            <UCard v-if="invalidTab === 'evento'" :ui="{ root: 'ring-error' }">
+              <p class="text-sm text-error">
+                Corrija os campos abaixo antes de salvar.
               </p>
-            </template>
-            <div class="grid gap-4 sm:grid-cols-2">
-              <UFormField label="Calendário">
-                <USelect
-                  v-model="state.calendarId"
-                  :items="calendarOptions"
-                  value-key="value"
-                  class="w-full"
-                />
-              </UFormField>
-              <UFormField label="Duração (min)">
-                <UInputNumber
-                  v-model="state.durationMinutes"
-                  :min="5"
-                  :max="480"
-                  class="w-full"
-                />
-              </UFormField>
-            </div>
-          </UCard>
-
-          <UCard>
-            <template #header>
-              <p class="text-sm font-medium text-highlighted">
-                Local
-              </p>
-            </template>
-            <div class="grid gap-4 sm:grid-cols-2">
-              <UFormField label="Tipo">
-                <USelect
-                  v-model="state.locationType"
-                  :items="locationOptions"
-                  value-key="value"
-                  class="w-full"
-                />
-              </UFormField>
-              <UFormField :label="locationDetailMeta[state.locationType].label">
-                <UInput v-model="state.locationDetails" :placeholder="locationDetailMeta[state.locationType].placeholder" class="w-full" />
-              </UFormField>
-            </div>
-          </UCard>
-
-          <UCard>
-            <template #header>
-              <p class="text-sm font-medium text-highlighted">
-                Cor
-              </p>
-            </template>
-            <div class="space-y-2">
-              <div class="flex gap-2">
-                <button
-                  v-for="opt in colorOptions"
-                  :key="opt.value"
-                  type="button"
-                  class="size-8 rounded-full ring-2 ring-offset-2 ring-offset-default transition-all"
-                  :class="state.color === opt.value ? 'ring-primary' : 'ring-transparent'"
-                  :style="{ backgroundColor: opt.value }"
-                  :title="opt.label"
-                  @click="state.color = state.color === opt.value ? null : opt.value"
-                />
+            </UCard>
+            <UCard>
+              <template #header>
+                <p class="text-sm font-medium text-highlighted">
+                  Detalhes
+                </p>
+              </template>
+              <div class="space-y-4">
+                <UFormField label="Título">
+                  <UInput v-model="state.title" class="w-full" />
+                </UFormField>
+                <UFormField label="Descrição" description="Aparece para o convidado no topo da página.">
+                  <UTextarea v-model="state.description" :rows="3" class="w-full" />
+                </UFormField>
               </div>
-              <p class="text-xs text-muted">
-                Usada só para diferenciar suas páginas na lista. O convidado não vê.
-              </p>
-            </div>
-          </UCard>
-        </div>
-
-        <!-- DISPONIBILIDADE -->
-        <div v-if="activeTab === 'disponibilidade'" class="space-y-5">
-          <UCard v-if="invalidTab === 'disponibilidade'" :ui="{ root: 'ring-error' }">
-            <p class="text-sm text-error">
-              Defina ao menos uma janela de disponibilidade.
-            </p>
-          </UCard>
-
-          <UCard>
-            <template #header>
-              <p class="text-sm font-medium text-highlighted">
-                Grade semanal
-              </p>
-            </template>
-            <div class="space-y-3">
-              <UFormField label="Fuso horário">
-                <USelect
-                  v-model="state.timezone"
-                  :items="timezoneOptions"
-                  value-key="value"
-                  searchable
-                  class="w-full sm:w-72"
-                />
-              </UFormField>
-
+            </UCard>
+            <UCard>
+              <template #header>
+                <p class="text-sm font-medium text-highlighted">
+                  Agendamento
+                </p>
+              </template>
+              <div class="grid gap-4 sm:grid-cols-2">
+                <UFormField label="Calendário">
+                  <USelect
+                    v-model="state.calendarId"
+                    :items="calendarOptions"
+                    value-key="value"
+                    class="w-full"
+                  />
+                </UFormField>
+                <UFormField label="Duração (min)">
+                  <UInputNumber
+                    v-model="state.durationMinutes"
+                    :min="5"
+                    :max="480"
+                    class="w-full"
+                  />
+                </UFormField>
+              </div>
+            </UCard>
+            <UCard>
+              <template #header>
+                <p class="text-sm font-medium text-highlighted">
+                  Local
+                </p>
+              </template>
+              <div class="grid gap-4 sm:grid-cols-2">
+                <UFormField label="Tipo">
+                  <USelect
+                    v-model="state.locationType"
+                    :items="locationOptions"
+                    value-key="value"
+                    class="w-full"
+                  />
+                </UFormField>
+                <UFormField :label="locationDetailMeta[state.locationType].label">
+                  <UInput
+                    v-model="state.locationDetails"
+                    :placeholder="
+                    locationDetailMeta[state.locationType].placeholder
+                    "
+                    class="w-full"
+                  />
+                </UFormField>
+              </div>
+            </UCard>
+            <UCard>
+              <template #header>
+                <p class="text-sm font-medium text-highlighted">
+                  Cor
+                </p>
+              </template>
               <div class="space-y-2">
-                <div v-for="day in 7" :key="day - 1" class="rounded-lg border border-default/60 p-2.5">
-                  <div class="flex items-center gap-2">
-                    <UCheckbox
-                      :model-value="dayWindows[day - 1]!.length > 0"
-                      :label="dayLabels[day - 1]"
-                      @update:model-value="toggleDay(day - 1)"
-                    />
-                    <div v-if="dayWindows[day - 1]!.length > 0" class="ml-auto flex items-center gap-1">
-                      <UPopover :content="{ align: 'end' }" @update:open="(v: boolean) => onCopyPopoverOpen(day - 1, v)">
+                <div class="flex gap-2">
+                  <button
+                    v-for="opt in colorOptions"
+                    :key="opt.value"
+                    type="button"
+                    class="size-8 rounded-full ring-2 ring-offset-2 ring-offset-default transition-all"
+                    :class="
+                    state.color === opt.value
+                    ? 'ring-primary'
+                    : 'ring-transparent'
+                    "
+                    :style="{ backgroundColor: opt.value }"
+                    :title="opt.label"
+                    @click="
+                    state.color = state.color === opt.value ? null : opt.value
+                    "
+                  />
+                </div>
+                <p class="text-xs text-muted">
+                  Usada só para diferenciar suas páginas na lista. O convidado
+                  não vê.
+                </p>
+              </div>
+            </UCard>
+          </div>
+          <!-- DISPONIBILIDADE -->
+          <div v-if="activeTab === 'disponibilidade'" class="space-y-5">
+            <UCard v-if="invalidTab === 'disponibilidade'" :ui="{ root: 'ring-error' }">
+              <p class="text-sm text-error">
+                Defina ao menos uma janela de disponibilidade.
+              </p>
+            </UCard>
+            <UCard>
+              <template #header>
+                <p class="text-sm font-medium text-highlighted">
+                  Grade semanal
+                </p>
+              </template>
+              <div class="space-y-3">
+                <UFormField label="Fuso horário">
+                  <USelect
+                    v-model="state.timezone"
+                    :items="timezoneOptions"
+                    value-key="value"
+                    searchable
+                    class="w-full sm:w-72"
+                  />
+                </UFormField>
+                <div class="space-y-2">
+                  <div
+                    v-for="day in 7"
+                    :key="day - 1"
+                    class="rounded-lg border border-default p-3 sm:p-4"
+                    :class="
+                    dayWindows[day - 1]!.length
+                    ? 'bg-default'
+                    : 'bg-elevated/30'
+                    "
+                  >
+                    <div class="flex items-center gap-2">
+                      <UCheckbox
+                        :model-value="dayWindows[day - 1]!.length > 0"
+                        :label="dayLabels[day - 1]"
+                        @update:model-value="toggleDay(day - 1)"
+                      />
+                      <span v-if="!dayWindows[day - 1]!.length" class="ml-auto text-xs text-dimmed">
+                        Indisponível
+                      </span>
+                      <div v-if="dayWindows[day - 1]!.length > 0" class="ml-auto flex items-center gap-1">
+                        <UPopover
+                          :content="{ align: 'end' }"
+                          @update:open="
+                          (v: boolean) => onCopyPopoverOpen(day - 1, v)
+                          "
+                        >
+                          <UButton
+                            icon="i-lucide-copy"
+                            size="xs"
+                            color="neutral"
+                            variant="ghost"
+                            aria-label="Copiar horários para outros dias"
+                          />
+                          <template #content>
+                            <div class="w-56 space-y-2 p-3">
+                              <p class="text-xs font-medium text-highlighted">
+                                Copiar horários de
+                                {{ dayLabels[day - 1] }} para:
+                              </p>
+                              <div class="space-y-1.5">
+                                <UCheckbox
+                                  v-for="target in 7"
+                                  v-show="target - 1 !== day - 1"
+                                  :key="target"
+                                  :label="dayLabels[target - 1]"
+                                  :model-value="
+                                  (copyTargetsByDay[day - 1] ?? []).includes(
+                                  target - 1,
+                                  )
+                                  "
+                                  @update:model-value="
+                                  (v: boolean) =>
+                                  toggleCopyTarget(day - 1, target - 1, v)
+                                  "
+                                />
+                              </div>
+                              <UButton
+                                label="Copiar"
+                                size="xs"
+                                block
+                                class="mt-1"
+                                @click="applyCopyToTargets(day - 1)"
+                              />
+                            </div>
+                          </template>
+                        </UPopover>
                         <UButton
-                          icon="i-lucide-copy"
+                          icon="i-lucide-plus"
                           size="xs"
                           color="neutral"
                           variant="ghost"
-                          aria-label="Copiar horários para outros dias"
+                          @click="addWindow(day - 1)"
                         />
-                        <template #content>
-                          <div class="w-56 space-y-2 p-3">
-                            <p class="text-xs font-medium text-highlighted">
-                              Copiar horários de {{ dayLabels[day - 1] }} para:
-                            </p>
-                            <div class="space-y-1.5">
-                              <UCheckbox
-                                v-for="target in 7"
-                                v-show="target - 1 !== day - 1"
-                                :key="target"
-                                :label="dayLabels[target - 1]"
-                                :model-value="(copyTargetsByDay[day - 1] ?? []).includes(target - 1)"
-                                @update:model-value="(v: boolean) => toggleCopyTarget(day - 1, target - 1, v)"
-                              />
-                            </div>
-                            <UButton
-                              label="Copiar"
-                              size="xs"
-                              block
-                              class="mt-1"
-                              @click="applyCopyToTargets(day - 1)"
-                            />
-                          </div>
-                        </template>
-                      </UPopover>
-                      <UButton
-                        icon="i-lucide-plus"
-                        size="xs"
-                        color="neutral"
-                        variant="ghost"
-                        @click="addWindow(day - 1)"
-                      />
+                      </div>
                     </div>
-                  </div>
-                  <div v-if="dayWindows[day - 1]!.length > 0" class="mt-2 space-y-1.5 pl-6">
-                    <div v-for="(w, wi) in dayWindows[day - 1]" :key="wi" class="flex items-center gap-2">
-                      <UInput
-                        v-model="w.startTime"
-                        type="time"
-                        size="sm"
-                        class="w-28"
-                      />
-                      <span class="text-xs text-muted">até</span>
-                      <UInput
-                        v-model="w.endTime"
-                        type="time"
-                        size="sm"
-                        class="w-28"
-                      />
-                      <UButton
-                        icon="i-lucide-x"
-                        size="xs"
-                        color="neutral"
-                        variant="ghost"
-                        @click="removeWindow(day - 1, wi)"
-                      />
+                    <div v-if="dayWindows[day - 1]!.length > 0" class="mt-3 space-y-2 sm:pl-6">
+                      <div v-for="(w, wi) in dayWindows[day - 1]" :key="wi" class="flex items-center gap-2">
+                        <UInput
+                          v-model="w.startTime"
+                          type="time"
+                          size="sm"
+                          :aria-label="`Início do horário de ${dayLabels[day - 1]}`"
+                          class="min-w-0 flex-1 sm:max-w-36"
+                        />
+                        <span class="text-xs text-muted">
+                          até
+                        </span>
+                        <UInput
+                          v-model="w.endTime"
+                          type="time"
+                          size="sm"
+                          :aria-label="`Fim do horário de ${dayLabels[day - 1]}`"
+                          class="min-w-0 flex-1 sm:max-w-36"
+                        />
+                        <UButton
+                          icon="i-lucide-x"
+                          size="xs"
+                          color="neutral"
+                          variant="ghost"
+                          @click="removeWindow(day - 1, wi)"
+                        />
+                      </div>
                     </div>
                   </div>
                 </div>
               </div>
-            </div>
-          </UCard>
-
-          <UCard>
-            <template #header>
-              <p class="text-sm font-medium text-highlighted">
-                Janela de reserva
-              </p>
-            </template>
-            <div class="space-y-4">
-              <UFormField label="Antecedência mínima" description="Impede reservas de última hora.">
-                <div class="flex items-center gap-2">
+            </UCard>
+            <UCard>
+              <template #header>
+                <p class="text-sm font-medium text-highlighted">
+                  Janela de reserva
+                </p>
+              </template>
+              <div class="space-y-4">
+                <UFormField label="Antecedência mínima" description="Impede reservas de última hora.">
+                  <div class="flex items-center gap-2">
+                    <UInputNumber
+                      v-model="minNoticeDisplayValue"
+                      :min="0"
+                      :max="minNoticeUnit === 'days' ? 30 : 720"
+                      class="w-32"
+                    />
+                    <USelect
+                      v-model="minNoticeUnit"
+                      :items="minNoticeUnitOptions"
+                      value-key="value"
+                      class="w-28"
+                    />
+                  </div>
+                </UFormField>
+                <UFormField label="Reservas até quantos dias no futuro">
                   <UInputNumber
-                    v-model="minNoticeDisplayValue"
-                    :min="0"
-                    :max="minNoticeUnit === 'days' ? 30 : 720"
-                    class="w-32"
+                    v-model="state.maxAdvanceDays"
+                    :min="1"
+                    :max="365"
+                    class="w-full sm:w-40"
                   />
-                  <USelect
-                    v-model="minNoticeUnit"
-                    :items="minNoticeUnitOptions"
-                    value-key="value"
-                    class="w-28"
-                  />
+                </UFormField>
+                <div class="flex items-center justify-between">
+                  <div>
+                    <p class="text-sm font-medium text-highlighted">
+                      Máximo de reservas por dia
+                    </p>
+                    <p class="text-xs text-muted">
+                      Limita quantos horários podem ser preenchidos no mesmo
+                      dia.
+                    </p>
+                  </div>
+                  <USwitch v-model="state.maxBookingsPerDayEnabled" />
                 </div>
-              </UFormField>
-              <UFormField label="Reservas até quantos dias no futuro">
                 <UInputNumber
-                  v-model="state.maxAdvanceDays"
+                  v-if="state.maxBookingsPerDayEnabled"
+                  v-model="state.maxBookingsPerDay"
                   :min="1"
-                  :max="365"
+                  :max="100"
                   class="w-full sm:w-40"
                 />
-              </UFormField>
-              <div class="flex items-center justify-between">
-                <div>
-                  <p class="text-sm font-medium text-highlighted">
-                    Máximo de reservas por dia
-                  </p>
-                  <p class="text-xs text-muted">
-                    Limita quantos horários podem ser preenchidos no mesmo dia.
-                  </p>
-                </div>
-                <USwitch v-model="state.maxBookingsPerDayEnabled" />
               </div>
-              <UInputNumber
-                v-if="state.maxBookingsPerDayEnabled"
-                v-model="state.maxBookingsPerDay"
-                :min="1"
-                :max="100"
-                class="w-full sm:w-40"
+            </UCard>
+          </div>
+          <!-- FORMULÁRIO -->
+          <div v-if="activeTab === 'formulario'" class="space-y-5">
+            <UCard v-if="invalidTab === 'formulario'" :ui="{ root: 'ring-error' }">
+              <p class="text-sm text-error">
+                Alguma pergunta de seleção está sem opções suficientes.
+              </p>
+            </UCard>
+            <UCard>
+              <template #header>
+                <p class="text-sm font-medium text-highlighted">
+                  Perguntas da reserva
+                </p>
+              </template>
+              <div class="divide-y divide-default">
+                <div class="flex items-center justify-between py-2.5">
+                  <div>
+                    <p class="text-sm text-highlighted">
+                      Seu nome
+                    </p>
+                    <p class="text-xs text-muted">
+                      Identificação do convidado
+                    </p>
+                  </div>
+                  <UBadge color="neutral" variant="subtle" size="sm">
+                    Obrigatório
+                  </UBadge>
+                </div>
+                <div class="flex items-center justify-between py-2.5">
+                  <div>
+                    <p class="text-sm text-highlighted">
+                      Endereço de e-mail
+                    </p>
+                    <p class="text-xs text-muted">
+                      Contato para a reserva
+                    </p>
+                  </div>
+                  <UBadge color="neutral" variant="subtle" size="sm">
+                    Obrigatório
+                  </UBadge>
+                </div>
+                <div v-for="(q, i) in questions" :key="i" class="flex items-center gap-2 py-2.5">
+                  <div class="flex flex-col">
+                    <UButton
+                      icon="i-lucide-chevron-up"
+                      size="2xs"
+                      color="neutral"
+                      variant="ghost"
+                      :disabled="i === 0"
+                      @click="moveQuestion(i, -1)"
+                    />
+                    <UButton
+                      icon="i-lucide-chevron-down"
+                      size="2xs"
+                      color="neutral"
+                      variant="ghost"
+                      :disabled="i === questions.length - 1"
+                      @click="moveQuestion(i, 1)"
+                    />
+                  </div>
+                  <div class="min-w-0 flex-1">
+                    <p class="truncate text-sm text-highlighted">
+                      {{ q.label || "(sem rótulo)" }}
+                    </p>
+                    <p class="text-xs text-muted">
+                      {{ questionTypeLabel(q) }}
+                    </p>
+                  </div>
+                  <UBadge color="neutral" variant="subtle" size="sm">
+                    {{ q.isRequired ? "Obrigatória" : "Opcional" }}
+                  </UBadge>
+                  <USwitch :model-value="!q.isHidden" @update:model-value="toggleQuestionHidden(i)" />
+                  <UButton
+                    label="Editar"
+                    size="xs"
+                    color="neutral"
+                    variant="ghost"
+                    @click="openEditQuestion(i)"
+                  />
+                </div>
+              </div>
+              <UButton
+                label="Adicionar pergunta"
+                icon="i-lucide-plus"
+                variant="subtle"
+                size="sm"
+                class="mt-3"
+                @click="openNewQuestion"
               />
-            </div>
-          </UCard>
-        </div>
-
-        <!-- FORMULÁRIO -->
-        <div v-if="activeTab === 'formulario'" class="space-y-5">
-          <UCard v-if="invalidTab === 'formulario'" :ui="{ root: 'ring-error' }">
-            <p class="text-sm text-error">
-              Alguma pergunta de seleção está sem opções suficientes.
-            </p>
-          </UCard>
-
-          <UCard>
-            <template #header>
-              <p class="text-sm font-medium text-highlighted">
-                Perguntas da reserva
-              </p>
-            </template>
-            <div class="divide-y divide-default">
-              <div class="flex items-center justify-between py-2.5">
-                <div>
-                  <p class="text-sm text-highlighted">
-                    Seu nome
-                  </p>
-                  <p class="text-xs text-muted">
-                    Name
-                  </p>
-                </div>
-                <UBadge color="neutral" variant="subtle" size="sm">
-                  Obrigatório
-                </UBadge>
-              </div>
-              <div class="flex items-center justify-between py-2.5">
-                <div>
-                  <p class="text-sm text-highlighted">
-                    Endereço de e-mail
-                  </p>
-                  <p class="text-xs text-muted">
-                    Email
-                  </p>
-                </div>
-                <UBadge color="neutral" variant="subtle" size="sm">
-                  Obrigatório
-                </UBadge>
-              </div>
-
-              <div v-for="(q, i) in questions" :key="i" class="flex items-center gap-2 py-2.5">
-                <div class="flex flex-col">
-                  <UButton
-                    icon="i-lucide-chevron-up"
-                    size="2xs"
-                    color="neutral"
-                    variant="ghost"
-                    :disabled="i === 0"
-                    @click="moveQuestion(i, -1)"
-                  />
-                  <UButton
-                    icon="i-lucide-chevron-down"
-                    size="2xs"
-                    color="neutral"
-                    variant="ghost"
-                    :disabled="i === questions.length - 1"
-                    @click="moveQuestion(i, 1)"
-                  />
-                </div>
-                <div class="min-w-0 flex-1">
-                  <p class="truncate text-sm text-highlighted">
-                    {{ q.label || '(sem rótulo)' }}
-                  </p>
-                  <p class="text-xs text-muted">
-                    {{ questionTypeLabel(q) }}
-                  </p>
-                </div>
-                <UBadge color="neutral" variant="subtle" size="sm">
-                  {{ q.isRequired ? 'Obrigatória' : 'Opcional' }}
-                </UBadge>
-                <USwitch :model-value="!q.isHidden" @update:model-value="toggleQuestionHidden(i)" />
-                <UButton
-                  label="Editar"
-                  size="xs"
-                  color="neutral"
-                  variant="ghost"
-                  @click="openEditQuestion(i)"
-                />
-              </div>
-            </div>
-            <UButton
-              label="Adicionar pergunta"
-              icon="i-lucide-plus"
-              variant="subtle"
-              size="sm"
-              class="mt-3"
-              @click="openNewQuestion"
-            />
-          </UCard>
-        </div>
-
-        <!-- LIMITES -->
-        <div v-if="activeTab === 'limites'" class="space-y-5">
-          <UCard>
-            <template #header>
-              <p class="text-sm font-medium text-highlighted">
-                Buffers e intervalos
-              </p>
-            </template>
-            <div class="grid gap-4 sm:grid-cols-3">
-              <UFormField label="Antes do evento">
-                <USelect
-                  v-model="state.bufferBeforeMinutes"
-                  :items="bufferBeforeOptions"
-                  value-key="value"
-                  class="w-full"
-                />
-              </UFormField>
-              <UFormField label="Após o evento">
-                <USelect
-                  v-model="state.bufferAfterMinutes"
-                  :items="bufferAfterOptions"
-                  value-key="value"
-                  class="w-full"
-                />
-              </UFormField>
-              <UFormField label="Intervalo entre horários" description="Ex.: 30 min = oferece 9:00, 9:30, 10:00…">
-                <USelect
-                  v-model="state.slotIncrementMinutes"
-                  :items="slotIncrementOptions"
-                  value-key="value"
-                  class="w-full"
-                />
-              </UFormField>
-            </div>
-          </UCard>
-        </div>
-
-        <!-- POLÍTICAS -->
-        <div v-if="activeTab === 'politicas'" class="space-y-5">
-          <UCard>
-            <template #header>
-              <p class="text-sm font-medium text-highlighted">
-                Confirmação
-              </p>
-            </template>
-            <div class="flex items-center justify-between">
-              <div>
+            </UCard>
+          </div>
+          <!-- LIMITES -->
+          <div v-if="activeTab === 'limites'" class="space-y-5">
+            <UCard>
+              <template #header>
                 <p class="text-sm font-medium text-highlighted">
-                  Confirmação manual
+                  Intervalos entre encontros
                 </p>
-                <p class="text-xs text-muted">
-                  Você aprova cada reserva antes de ela valer — enquanto isso, ela fica como "Pendente" na sua lista de reservas e o horário continua bloqueado na sua agenda.
-                </p>
+              </template>
+              <div class="grid gap-4 sm:grid-cols-3">
+                <UFormField label="Antes do evento">
+                  <USelect
+                    v-model="state.bufferBeforeMinutes"
+                    :items="bufferBeforeOptions"
+                    value-key="value"
+                    class="w-full"
+                  />
+                </UFormField>
+                <UFormField label="Após o evento">
+                  <USelect
+                    v-model="state.bufferAfterMinutes"
+                    :items="bufferAfterOptions"
+                    value-key="value"
+                    class="w-full"
+                  />
+                </UFormField>
+                <UFormField label="Intervalo entre horários" description="Ex.: 30 min = oferece 9:00, 9:30, 10:00…">
+                  <USelect
+                    v-model="state.slotIncrementMinutes"
+                    :items="slotIncrementOptions"
+                    value-key="value"
+                    class="w-full"
+                  />
+                </UFormField>
               </div>
-              <USwitch v-model="state.requiresConfirmation" />
-            </div>
-          </UCard>
-
-          <UCard>
-            <template #header>
-              <p class="text-sm font-medium text-highlighted">
-                Nome do evento na agenda
-              </p>
-            </template>
-            <UFormField description="Como a reserva aparece no seu calendário. Variáveis: {titulo}, {convidado}, {email}.">
-              <UInput v-model="state.calendarEventTitleTemplate" placeholder="{titulo} com {convidado}" class="w-full" />
-            </UFormField>
-          </UCard>
-
-          <UCard>
-            <template #header>
-              <p class="text-sm font-medium text-highlighted">
-                Reagendar e cancelar
-              </p>
-            </template>
-            <div class="space-y-4">
+            </UCard>
+          </div>
+          <!-- POLÍTICAS -->
+          <div v-if="activeTab === 'politicas'" class="space-y-5">
+            <UCard>
+              <template #header>
+                <p class="text-sm font-medium text-highlighted">
+                  Confirmação
+                </p>
+              </template>
               <div class="flex items-center justify-between">
                 <div>
                   <p class="text-sm font-medium text-highlighted">
-                    Permitir cancelamento pelo convidado
+                    Confirmação manual
+                  </p>
+                  <p class="text-xs text-muted">
+                    Você aprova cada reserva antes de ela valer — enquanto isso,
+                    ela fica como "Pendente" na sua lista de reservas e o
+                    horário continua bloqueado na sua agenda.
                   </p>
                 </div>
-                <USwitch v-model="state.cancellationEnabled" />
+                <USwitch v-model="state.requiresConfirmation" />
               </div>
-              <div v-if="state.cancellationEnabled" class="space-y-3 border-l-2 border-default/60 pl-4">
-                <div class="flex items-center justify-between">
-                  <p class="text-sm text-highlighted">
-                    Exigir antecedência mínima
-                  </p>
-                  <USwitch v-model="state.cancellationMinNoticeEnabled" />
-                </div>
-                <UInputNumber
-                  v-if="state.cancellationMinNoticeEnabled"
-                  v-model="state.cancellationMinNoticeHours"
-                  :min="1"
-                  :max="720"
-                  class="w-full sm:w-40"
-                />
-                <div class="flex items-center justify-between">
-                  <p class="text-sm text-highlighted">
-                    Exigir motivo do cancelamento
-                  </p>
-                  <USwitch v-model="state.cancellationReasonRequired" />
-                </div>
-              </div>
-
-              <div class="flex items-center justify-between">
+            </UCard>
+            <UCard>
+              <template #header>
                 <p class="text-sm font-medium text-highlighted">
-                  Permitir reagendamento pelo convidado
+                  Nome do evento na agenda
                 </p>
-                <USwitch v-model="state.rescheduleEnabled" />
+              </template>
+              <UFormField
+                description="Como a reserva aparece no seu calendário. Variáveis: {titulo}, {convidado}, {email}."
+              >
+                <UInput
+                  v-model="state.calendarEventTitleTemplate"
+                  placeholder="{titulo} com {convidado}"
+                  class="w-full"
+                />
+              </UFormField>
+            </UCard>
+            <UCard>
+              <template #header>
+                <p class="text-sm font-medium text-highlighted">
+                  Reagendar e cancelar
+                </p>
+              </template>
+              <div class="space-y-4">
+                <div class="flex items-center justify-between">
+                  <div>
+                    <p class="text-sm font-medium text-highlighted">
+                      Permitir cancelamento pelo convidado
+                    </p>
+                  </div>
+                  <USwitch v-model="state.cancellationEnabled" />
+                </div>
+                <div v-if="state.cancellationEnabled" class="space-y-3 border-l-2 border-default/60 pl-4">
+                  <div class="flex items-center justify-between">
+                    <p class="text-sm text-highlighted">
+                      Exigir antecedência mínima
+                    </p>
+                    <USwitch v-model="state.cancellationMinNoticeEnabled" />
+                  </div>
+                  <UInputNumber
+                    v-if="state.cancellationMinNoticeEnabled"
+                    v-model="state.cancellationMinNoticeHours"
+                    :min="1"
+                    :max="720"
+                    class="w-full sm:w-40"
+                  />
+                  <div class="flex items-center justify-between">
+                    <p class="text-sm text-highlighted">
+                      Exigir motivo do cancelamento
+                    </p>
+                    <USwitch v-model="state.cancellationReasonRequired" />
+                  </div>
+                </div>
+                <div class="flex items-center justify-between">
+                  <p class="text-sm font-medium text-highlighted">
+                    Permitir reagendamento pelo convidado
+                  </p>
+                  <USwitch v-model="state.rescheduleEnabled" />
+                </div>
               </div>
-            </div>
-          </UCard>
+            </UCard>
+          </div>
+          <!-- PRIVACIDADE -->
+          <div v-if="activeTab === 'privacidade'" class="space-y-5">
+            <UCard>
+              <template #header>
+                <p class="text-sm font-medium text-highlighted">
+                  Privacidade
+                </p>
+              </template>
+              <div class="flex items-center justify-between">
+                <div>
+                  <p class="text-sm font-medium text-highlighted">
+                    Ocultar detalhes na página de gerenciamento
+                  </p>
+                  <p class="text-xs text-muted">
+                    O convidado vê só data, hora e status — sem local — ao abrir
+                    o link de gerenciamento.
+                  </p>
+                </div>
+                <USwitch v-model="state.hideDetailsOnManagePage" />
+              </div>
+            </UCard>
+            <UCard>
+              <template #header>
+                <p class="text-sm font-medium text-error">
+                  Zona de perigo
+                </p>
+              </template>
+              <div class="space-y-3">
+                <div class="flex items-center justify-between">
+                  <div>
+                    <p class="text-sm text-highlighted">
+                      Regenerar link público
+                    </p>
+                    <p class="text-xs text-muted">
+                      O link atual deixa de funcionar na hora.
+                    </p>
+                  </div>
+                  <UButton
+                    label="Regenerar"
+                    color="neutral"
+                    variant="outline"
+                    size="sm"
+                    @click="regenerateConfirmOpen = true"
+                  />
+                </div>
+                <div class="flex items-center justify-between">
+                  <div>
+                    <p class="text-sm text-highlighted">
+                      Arquivar página
+                    </p>
+                    <p class="text-xs text-muted">
+                      Remove a página da sua lista e desativa o link.
+                    </p>
+                  </div>
+                  <UButton
+                    label="Arquivar"
+                    color="error"
+                    variant="outline"
+                    size="sm"
+                    @click="archiveConfirmOpen = true"
+                  />
+                </div>
+              </div>
+            </UCard>
+          </div>
+          <div
+            class="sticky bottom-0 z-10 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-default bg-default p-3 shadow-sm"
+            role="status"
+            aria-live="polite"
+          >
+            <span class="flex items-center gap-2 text-xs text-muted">
+              <UIcon :name="isDirty ? 'i-lucide-circle-dot' : 'i-lucide-check-check'" class="size-4" />
+              {{
+              isDirty
+              ? "Você tem alterações não salvas"
+              : "Todas as alterações estão salvas"
+              }}
+            </span>
+            <UButton
+              label="Salvar alterações"
+              size="sm"
+              :loading="saving"
+              :disabled="!isDirty || saving"
+              @click="onSave"
+            />
+          </div>
         </div>
-
-        <!-- PRIVACIDADE -->
-        <div v-if="activeTab === 'privacidade'" class="space-y-5">
-          <UCard>
-            <template #header>
-              <p class="text-sm font-medium text-highlighted">
-                Privacidade
-              </p>
-            </template>
-            <div class="flex items-center justify-between">
+        <aside class="hidden space-y-4 xl:sticky xl:top-0 xl:block">
+          <div class="overflow-hidden rounded-xl border border-default bg-default">
+            <div class="border-b border-default bg-elevated/40 px-5 py-3 text-xs font-medium text-muted">
+              Resumo do evento
+            </div>
+            <div class="space-y-5 p-5">
+              <div class="flex size-10 items-center justify-center rounded-xl bg-elevated">
+                <UIcon name="i-lucide-calendar-clock" class="size-5 text-highlighted" />
+              </div>
               <div>
-                <p class="text-sm font-medium text-highlighted">
-                  Ocultar detalhes na página de gerenciamento
-                </p>
-                <p class="text-xs text-muted">
-                  O convidado vê só data, hora e status — sem local — ao abrir o link de gerenciamento.
+                <h2 class="break-words text-lg font-semibold text-highlighted">
+                  {{ state.title || "Seu evento" }}
+                </h2>
+                <p
+                  v-if="state.description"
+                  class="mt-2 line-clamp-4 whitespace-pre-line text-sm leading-relaxed text-muted"
+                >
+                  {{ state.description }}
                 </p>
               </div>
-              <USwitch v-model="state.hideDetailsOnManagePage" />
-            </div>
-          </UCard>
-
-          <UCard>
-            <template #header>
-              <p class="text-sm font-medium text-error">
-                Zona de perigo
+              <div class="space-y-3 text-xs text-muted">
+                <p class="flex items-center gap-2">
+                  <UIcon name="i-lucide-clock" class="size-4 shrink-0" />
+                  {{
+                  state.durationMinutes
+                  }}
+                  minutos
+                </p>
+                <p class="flex items-center gap-2">
+                  <UIcon :name="LOCATION_TYPE_META[state.locationType].icon" class="size-4 shrink-0" />
+                  {{ LOCATION_TYPE_META[state.locationType].label }}
+                </p>
+                <p class="flex items-center gap-2">
+                  <UIcon name="i-lucide-calendar-days" class="size-4 shrink-0" />
+                  {{ availableDays }}
+                  dias disponíveis por semana
+                </p>
+                <p class="flex items-start gap-2 break-all">
+                  <UIcon name="i-lucide-globe" class="size-4 shrink-0" />
+                  {{
+                  state.timezone
+                  }}
+                </p>
+              </div>
+              <UButton
+                label="Abrir página pública"
+                icon="i-lucide-external-link"
+                color="neutral"
+                variant="outline"
+                block
+                @click="onPreview"
+              />
+              <p v-if="isDirty" class="text-xs leading-relaxed text-muted">
+                Salve as alterações para vê-las na página pública.
               </p>
-            </template>
-            <div class="space-y-3">
-              <div class="flex items-center justify-between">
-                <div>
-                  <p class="text-sm text-highlighted">
-                    Regenerar link público
-                  </p>
-                  <p class="text-xs text-muted">
-                    O link atual deixa de funcionar na hora.
-                  </p>
-                </div>
-                <UButton
-                  label="Regenerar"
-                  color="neutral"
-                  variant="outline"
-                  size="sm"
-                  @click="regenerateConfirmOpen = true"
-                />
-              </div>
-              <div class="flex items-center justify-between">
-                <div>
-                  <p class="text-sm text-highlighted">
-                    Arquivar página
-                  </p>
-                  <p class="text-xs text-muted">
-                    Remove a página da sua lista e desativa o link.
-                  </p>
-                </div>
-                <UButton
-                  label="Arquivar"
-                  color="error"
-                  variant="outline"
-                  size="sm"
-                  @click="archiveConfirmOpen = true"
-                />
-              </div>
             </div>
-          </UCard>
-        </div>
+          </div>
+          <UButton
+            label="Ver reservas"
+            icon="i-lucide-list"
+            color="neutral"
+            variant="ghost"
+            block
+            :to="`/app/appointments/bookings/${pageId}`"
+          />
+        </aside>
       </div>
     </template>
   </UDashboardPanel>
-
   <AppointmentsSchedulingQuestionEditSlideover
     :open="questionSlideoverOpen"
     :question="editingQuestion"
@@ -1068,11 +1406,11 @@ if (import.meta.client) {
     @save="onSaveQuestion"
     @remove="onRemoveQuestion"
   />
-
   <UModal v-model:open="regenerateConfirmOpen" title="Regenerar link?">
     <template #body>
       <p class="text-sm text-muted">
-        O link atual ({{ shareUrl }}) deixará de funcionar imediatamente. Qualquer pessoa que já tenha esse link não conseguirá mais acessá-lo.
+        O link atual ({{ shareUrl }}) deixará de funcionar imediatamente.
+        Qualquer pessoa que já tenha esse link não conseguirá mais acessá-lo.
       </p>
     </template>
     <template #footer>
@@ -1092,11 +1430,11 @@ if (import.meta.client) {
       </div>
     </template>
   </UModal>
-
   <UModal v-model:open="archiveConfirmOpen" title="Arquivar página?">
     <template #body>
       <p class="text-sm text-muted">
-        A página some da sua lista e o link público deixa de funcionar. Reservas já feitas continuam na sua Agenda.
+        A página some da sua lista e o link público deixa de funcionar. Reservas
+        já feitas continuam na sua Agenda.
       </p>
     </template>
     <template #footer>

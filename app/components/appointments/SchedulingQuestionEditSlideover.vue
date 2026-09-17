@@ -1,74 +1,85 @@
 <script setup lang="ts">
-import type { SchedulingQuestion } from '~/types/scheduling'
-import { SchedulingQuestionType } from '~/types/scheduling'
+import type { SchedulingQuestion } from "~/types/scheduling";
+import { SchedulingQuestionType } from "~/types/scheduling";
 
 const props = defineProps<{
-  open: boolean
-  question: Omit<SchedulingQuestion, 'id'> | null
-}>()
+  open: boolean;
+  question: Omit<SchedulingQuestion, "id"> | null;
+}>();
 
 const emit = defineEmits<{
-  'update:open': [value: boolean]
-  'save': [value: Omit<SchedulingQuestion, 'id'>]
-  'remove': []
-}>()
+  "update:open": [value: boolean];
+  save: [value: Omit<SchedulingQuestion, "id">];
+  remove: [];
+}>();
 
-const label = ref('')
-const type = ref<SchedulingQuestionType>(SchedulingQuestionType.Text)
-const isRequired = ref(false)
-const options = ref<string[]>([])
-const newOption = ref('')
+const label = ref("");
+const type = ref<SchedulingQuestionType>(SchedulingQuestionType.Text);
+const isRequired = ref(false);
+const options = ref<string[]>([]);
+const newOption = ref("");
 
 const questionTypeOptions = [
-  { label: 'Texto curto', value: SchedulingQuestionType.Text },
-  { label: 'Texto longo', value: SchedulingQuestionType.Textarea },
-  { label: 'Seleção', value: SchedulingQuestionType.Select }
-]
+  { label: "Texto curto", value: SchedulingQuestionType.Text },
+  { label: "Texto longo", value: SchedulingQuestionType.Textarea },
+  { label: "Seleção", value: SchedulingQuestionType.Select },
+];
 
-watch(() => [props.open, props.question] as const, ([open, question]) => {
-  if (!open) return
-  label.value = question?.label ?? ''
-  type.value = question?.type ?? SchedulingQuestionType.Text
-  isRequired.value = question?.isRequired ?? false
-  options.value = [...(question?.options ?? [])]
-  newOption.value = ''
-}, { immediate: true })
+watch(
+  () => [props.open, props.question] as const,
+  ([open, question]) => {
+    if (!open) return;
+    label.value = question?.label ?? "";
+    type.value = question?.type ?? SchedulingQuestionType.Text;
+    isRequired.value = question?.isRequired ?? false;
+    options.value = [...(question?.options ?? [])];
+    newOption.value = "";
+  },
+  { immediate: true },
+);
 
 const canSave = computed(() => {
-  if (!label.value.trim()) return false
-  if (type.value === SchedulingQuestionType.Select && options.value.length < 2) return false
-  return true
-})
+  if (!label.value.trim()) return false;
+  if (type.value === SchedulingQuestionType.Select && options.value.length < 2)
+    return false;
+  return true;
+});
 
 function addOption() {
-  const value = newOption.value.trim()
-  if (!value) return
-  options.value.push(value)
-  newOption.value = ''
+  const value = newOption.value.trim();
+  if (!value) return;
+  options.value.push(value);
+  newOption.value = "";
 }
 
 function removeOption(index: number) {
-  options.value.splice(index, 1)
+  options.value.splice(index, 1);
 }
 
 function onSave() {
-  if (!canSave.value) return
-  emit('save', {
+  if (!canSave.value) return;
+  emit("save", {
     label: label.value.trim(),
     type: type.value,
     isRequired: isRequired.value,
     isHidden: false,
-    options: type.value === SchedulingQuestionType.Select ? options.value : null,
-    sortOrder: 0
-  })
+    options:
+      type.value === SchedulingQuestionType.Select ? options.value : null,
+    sortOrder: 0,
+  });
 }
 </script>
 
 <template>
-  <USlideover :open="open" title="Editar pergunta" @update:open="emit('update:open', $event)">
+  <USlideover
+    :open="open"
+    :title="question ? 'Editar pergunta' : 'Adicionar pergunta'"
+    description="Personalize as informações que você recebe junto com a reserva."
+    @update:open="emit('update:open', $event)"
+  >
     <template #body>
-      <div class="space-y-4">
-        <UFormField label="Rótulo">
+      <div class="space-y-6">
+        <UFormField label="Pergunta" required>
           <UInput
             v-model="label"
             placeholder="Ex.: De que se trata esta reunião?"
@@ -76,7 +87,6 @@ function onSave() {
             autofocus
           />
         </UFormField>
-
         <UFormField label="Tipo">
           <USelect
             v-model="type"
@@ -85,15 +95,17 @@ function onSave() {
             class="w-full"
           />
         </UFormField>
-
         <div v-if="type === SchedulingQuestionType.Select" class="space-y-2">
-          <p class="text-sm font-medium text-highlighted">
-            Opções
-          </p>
-          <div v-for="(opt, i) in options" :key="i" class="flex items-center gap-2">
+          <p class="text-sm font-medium text-highlighted">Opções</p>
+          <div
+            v-for="(opt, i) in options"
+            :key="i"
+            class="flex items-center gap-2"
+          >
             <UInput v-model="options[i]" size="sm" class="flex-1" />
             <UButton
               icon="i-lucide-x"
+              :aria-label="`Remover opção ${i + 1}`"
               size="xs"
               color="neutral"
               variant="ghost"
@@ -110,6 +122,7 @@ function onSave() {
             />
             <UButton
               icon="i-lucide-plus"
+              aria-label="Adicionar opção"
               size="xs"
               color="neutral"
               variant="subtle"
@@ -120,11 +133,9 @@ function onSave() {
             Adicione ao menos 2 opções.
           </p>
         </div>
-
         <UCheckbox v-model="isRequired" label="Obrigatória" />
       </div>
     </template>
-
     <template #footer>
       <div class="flex w-full items-center justify-between gap-2">
         <UButton
