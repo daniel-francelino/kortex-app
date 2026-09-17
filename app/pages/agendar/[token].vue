@@ -140,7 +140,9 @@ const availableUntilLabel = computed(() => {
 });
 
 function formatSlotTime(iso: string): string {
-  return formatDisplay(iso, hourFormat.value === "12" ? "h:mma" : "HH:mm", { timeZone: guestTimezone.value });
+  return formatDisplay(iso, hourFormat.value === "12" ? "h:mma" : "HH:mm", {
+    timeZone: guestTimezone.value,
+  });
 }
 
 function formatSelectedDate(): string {
@@ -308,32 +310,75 @@ const icsDataUrl = computed(() => {
 
 <template>
   <div class="booking-page">
-    <div class="booking-shell" :class="{ 'booking-shell--compact': step !== 'pick-time' }">
+    <div
+      class="booking-shell"
+      :class="{ 'booking-shell--compact': step !== 'pick-time' }"
+    >
       <div class="booking-card">
-        <img v-if="publicPage.coverImageUrl" :src="publicPage.coverImageUrl" alt="" class="booking-cover">
+        <img
+          v-if="publicPage.coverImageUrl"
+          :src="publicPage.coverImageUrl"
+          alt=""
+          class="booking-cover"
+        />
         <div class="booking-layout">
           <header class="booking-summary">
-            <UAvatar :src="publicPage.hostAvatarUrl ?? undefined" :alt="publicPage.hostName" size="xs" />
-            <p class="mt-2 text-sm font-medium text-muted">{{ publicPage.hostName }}</p>
-            <h1 class="mt-2 break-words text-xl font-semibold tracking-tight text-highlighted">{{ publicPage.title }}</h1>
-            <p v-if="publicPage.description" class="mt-2 whitespace-pre-line text-sm leading-5 text-toned">{{ publicPage.description }}</p>
+            <UAvatar
+              :src="publicPage.hostAvatarUrl ?? undefined"
+              :alt="publicPage.hostName"
+              size="xs"
+            />
+            <p class="mt-2 text-sm font-medium text-muted">
+              {{ publicPage.hostName }}
+            </p>
+            <h1
+              class="mt-2 break-words text-xl font-semibold tracking-tight text-highlighted"
+            >
+              {{ publicPage.title }}
+            </h1>
+            <p
+              v-if="publicPage.description"
+              class="mt-2 whitespace-pre-line text-sm leading-5 text-toned"
+            >
+              {{ publicPage.description }}
+            </p>
 
             <div class="mt-8 space-y-5 text-sm text-toned">
-              <div v-if="selectedSlot && step !== 'pick-time'" class="flex items-start gap-2.5">
-                <UIcon name="i-lucide-calendar" class="mt-0.5 size-4 shrink-0" />
+              <div
+                v-if="selectedSlot && step !== 'pick-time'"
+                class="flex items-start gap-2.5"
+              >
+                <UIcon
+                  name="i-lucide-calendar"
+                  class="mt-0.5 size-4 shrink-0"
+                />
                 <div>
                   <p>{{ formatSelectedDate() }}</p>
-                  <p class="mt-1">{{ formatSlotTime(selectedSlot.startAt) }} – {{ formatSlotTime(selectedSlot.endAt) }}</p>
+                  <p class="mt-1">
+                    {{ formatSlotTime(selectedSlot.startAt) }} –
+                    {{ formatSlotTime(selectedSlot.endAt) }}
+                  </p>
                 </div>
               </div>
-              <p v-if="publicPage.requiresConfirmation" class="flex items-center gap-2.5">
-                <UIcon name="i-lucide-calendar-check" class="size-4 shrink-0" />Requer confirmação
+              <p
+                v-if="publicPage.requiresConfirmation"
+                class="flex items-center gap-2.5"
+              >
+                <UIcon
+                  name="i-lucide-calendar-check"
+                  class="size-4 shrink-0"
+                />Requer confirmação
               </p>
               <p class="flex items-center gap-2.5">
-                <UIcon name="i-lucide-clock" class="size-4 shrink-0" />{{ publicPage.durationMinutes }} min
+                <UIcon name="i-lucide-clock" class="size-4 shrink-0" />{{
+                  publicPage.durationMinutes
+                }}
+                min
               </p>
               <p class="flex items-center gap-2.5">
-                <UIcon :name="locationMeta.icon" class="size-4 shrink-0" />{{ locationMeta.label }}
+                <UIcon :name="locationMeta.icon" class="size-4 shrink-0" />{{
+                  locationMeta.label
+                }}
               </p>
               <div class="flex min-w-0 items-center gap-2">
                 <UIcon name="i-lucide-globe" class="size-4 shrink-0" />
@@ -365,148 +410,283 @@ const icsDataUrl = computed(() => {
                 embedded
                 @month-change="onMonthChange"
               />
-              <p class="mt-5 text-xs leading-relaxed text-muted">Horários disponíveis até {{ availableUntilLabel }}.</p>
+              <p class="mt-5 text-xs leading-relaxed text-muted">
+                Horários disponíveis até {{ availableUntilLabel }}.
+              </p>
             </section>
 
-            <section class="booking-times" aria-label="Escolha um horário" :aria-busy="slotsLoading">
+            <section
+              class="booking-times"
+              aria-label="Escolha um horário"
+              :aria-busy="slotsLoading"
+            >
               <div class="mb-4 flex min-h-8 items-center justify-between gap-2">
-                <h2 class="text-sm font-medium text-highlighted">{{ selectedDate ? formatDisplay(new Date(selectedDate + 'T12:00:00Z'), 'EEE, dd', { timeZone: 'UTC' }) : 'Horários' }}</h2>
-                <div class="booking-hour-format" role="group" aria-label="Formato de hora">
-                  <button v-for="format in (['12', '24'] as const)" :key="format" type="button" :aria-pressed="hourFormat === format" :class="{ 'is-selected': hourFormat === format }" @click="hourFormat = format">{{ format }}h</button>
+                <h2 class="text-sm font-medium text-highlighted">
+                  {{
+                    selectedDate
+                      ? formatDisplay(
+                          new Date(selectedDate + "T12:00:00Z"),
+                          "EEE, dd",
+                          { timeZone: "UTC" },
+                        )
+                      : "Horários"
+                  }}
+                </h2>
+                <div
+                  class="booking-hour-format"
+                  role="group"
+                  aria-label="Formato de hora"
+                >
+                  <button
+                    v-for="format in ['12', '24'] as const"
+                    :key="format"
+                    type="button"
+                    :aria-pressed="hourFormat === format"
+                    :class="{ 'is-selected': hourFormat === format }"
+                    @click="hourFormat = format"
+                  >
+                    {{ format }}h
+                  </button>
                 </div>
               </div>
               <div class="booking-time-list" aria-live="polite">
                 <div v-if="slotsError" class="booking-placeholder">
                   <UIcon name="i-lucide-cloud-alert" class="size-6" />
                   <p>Não foi possível carregar os horários.</p>
-                  <UButton label="Tentar novamente" color="neutral" variant="outline" size="sm" @click="onMonthChange(displayedMonth.year, displayedMonth.month)" />
+                  <UButton
+                    label="Tentar novamente"
+                    color="neutral"
+                    variant="outline"
+                    size="sm"
+                    @click="
+                      onMonthChange(displayedMonth.year, displayedMonth.month)
+                    "
+                  />
                 </div>
                 <div v-else-if="slotsLoading" class="space-y-2">
-                  <USkeleton v-for="i in 8" :key="i" class="h-10 w-full rounded-lg" />
+                  <USkeleton
+                    v-for="i in 8"
+                    :key="i"
+                    class="h-10 w-full rounded-lg"
+                  />
                   <span class="sr-only">Buscando horários disponíveis</span>
                 </div>
-                <div v-else-if="monthLoaded && availableDates.size === 0" class="booking-placeholder">
+                <div
+                  v-else-if="monthLoaded && availableDates.size === 0"
+                  class="booking-placeholder"
+                >
                   <UIcon name="i-lucide-calendar-x" class="size-6" />
                   <p>Nenhum horário disponível neste mês.</p>
-                  <UButton label="Ver próximo mês" color="neutral" variant="outline" size="sm" @click="goToNextAvailableMonth" />
+                  <UButton
+                    label="Ver próximo mês"
+                    color="neutral"
+                    variant="outline"
+                    size="sm"
+                    @click="goToNextAvailableMonth"
+                  />
                 </div>
                 <div v-else-if="!selectedDate" class="booking-placeholder">
                   <UIcon name="i-lucide-calendar-days" class="size-6" />
                   <p>Selecione um dia para ver os horários disponíveis.</p>
                 </div>
                 <template v-else>
-                  <button v-for="slot in slotsForSelectedDate" :key="slot.startAt" type="button" class="booking-time" @click="onPickSlot(slot)">
-                    <span class="size-2 rounded-full bg-emerald-500" aria-hidden="true" />{{ formatSlotTime(slot.startAt) }}
+                  <button
+                    v-for="slot in slotsForSelectedDate"
+                    :key="slot.startAt"
+                    type="button"
+                    class="booking-time"
+                    @click="onPickSlot(slot)"
+                  >
+                    <span
+                      class="size-2 rounded-full bg-emerald-500"
+                      aria-hidden="true"
+                    />{{ formatSlotTime(slot.startAt) }}
                   </button>
-                  <p v-if="!slotsForSelectedDate.length" class="booking-placeholder">Sem horários livres neste dia.</p>
+                  <p
+                    v-if="!slotsForSelectedDate.length"
+                    class="booking-placeholder"
+                  >
+                    Sem horários livres neste dia.
+                  </p>
                 </template>
               </div>
             </section>
           </div>
 
-          <form v-if="step === 'details'" class="booking-form" @submit.prevent="onConfirm">
+          <form
+            v-if="step === 'details'"
+            class="booking-form"
+            @submit.prevent="onConfirm"
+          >
             <h2 class="sr-only">Seus dados para o agendamento</h2>
             <UFormField label="Seu nome" required>
-              <UInput v-model="guestName" autocomplete="name" placeholder="Seu nome completo" required class="w-full" />
+              <UInput
+                v-model="guestName"
+                autocomplete="name"
+                placeholder="Seu nome completo"
+                required
+                class="w-full"
+              />
             </UFormField>
             <UFormField label="Endereço de e-mail" required>
-              <UInput v-model="guestEmail" type="email" autocomplete="email" placeholder="voce@exemplo.com" required class="w-full" />
+              <UInput
+                v-model="guestEmail"
+                type="email"
+                autocomplete="email"
+                placeholder="voce@exemplo.com"
+                required
+                class="w-full"
+              />
             </UFormField>
-            <UFormField v-for="q in publicPage.questions" :key="q.id" :label="q.label" :required="q.isRequired">
-              <UTextarea v-if="q.type === 'textarea'" v-model="answers[q.id]" :required="q.isRequired" :rows="3" class="w-full" />
-              <USelect v-else-if="q.type === 'select'" v-model="answers[q.id]" :items="(q.options ?? []).map(o => ({ label: o, value: o }))" value-key="value" :required="q.isRequired" placeholder="Selecione uma opção" class="w-full" />
-              <UInput v-else v-model="answers[q.id]" :required="q.isRequired" class="w-full" />
+            <UFormField
+              v-for="q in publicPage.questions"
+              :key="q.id"
+              :label="q.label"
+              :required="q.isRequired"
+            >
+              <UTextarea
+                v-if="q.type === 'textarea'"
+                v-model="answers[q.id]"
+                :required="q.isRequired"
+                :rows="3"
+                class="w-full"
+              />
+              <USelect
+                v-else-if="q.type === 'select'"
+                v-model="answers[q.id]"
+                :items="(q.options ?? []).map((o) => ({ label: o, value: o }))"
+                value-key="value"
+                :required="q.isRequired"
+                placeholder="Selecione uma opção"
+                class="w-full"
+              />
+              <UInput
+                v-else
+                v-model="answers[q.id]"
+                :required="q.isRequired"
+                class="w-full"
+              />
             </UFormField>
             <div class="booking-form-actions">
-              <p v-if="publicPage.requiresConfirmation" class="mb-5 text-xs leading-relaxed text-muted">Sua reserva será enviada para confirmação de {{ publicPage.hostName }}.</p>
+              <p
+                v-if="publicPage.requiresConfirmation"
+                class="mb-5 text-xs leading-relaxed text-muted"
+              >
+                Sua reserva será enviada para confirmação de
+                {{ publicPage.hostName }}.
+              </p>
               <div class="flex justify-end gap-2">
-                <UButton type="button" label="Voltar" color="neutral" variant="ghost" :disabled="submitting" @click="step = 'pick-time'" />
-                <UButton type="submit" :label="publicPage.requiresConfirmation ? 'Solicitar reserva' : 'Confirmar'" color="neutral" :loading="submitting" :disabled="submitting" />
+                <UButton
+                  type="button"
+                  label="Voltar"
+                  color="neutral"
+                  variant="ghost"
+                  :disabled="submitting"
+                  @click="step = 'pick-time'"
+                />
+                <UButton
+                  type="submit"
+                  :label="
+                    publicPage.requiresConfirmation
+                      ? 'Solicitar reserva'
+                      : 'Confirmar'
+                  "
+                  color="neutral"
+                  :loading="submitting"
+                  :disabled="submitting"
+                />
               </div>
             </div>
           </form>
-        <!-- Step 3: confirmation -->
-        <div v-if="step === 'confirmed'" class="booking-confirmation space-y-5 text-center" role="status">
-          <UIcon
-            :name="
-              isPendingConfirmation
-                ? 'i-lucide-clock'
-                : 'i-lucide-check-circle-2'
-            "
-            class="mx-auto size-14"
-            :class="isPendingConfirmation ? 'text-warning' : 'text-success'"
-          />
-          <h2 class="text-xl font-semibold text-highlighted">
-            {{
-              isPendingConfirmation
-                ? `Pedido enviado — aguardando confirmação de ${publicPage.hostName}`
-                : "Reserva confirmada!"
-            }}
-          </h2>
-          <p class="text-sm text-muted">
-            {{ formatSelectedDate() }} às
-            {{ selectedSlot ? formatSlotTime(selectedSlot.startAt) : "" }} ({{
-              guestTimezone
-            }})
-          </p>
-
+          <!-- Step 3: confirmation -->
           <div
-            v-if="!isPendingConfirmation"
-            class="flex flex-wrap items-center justify-center gap-2"
+            v-if="step === 'confirmed'"
+            class="booking-confirmation space-y-5 text-center"
+            role="status"
           >
-            <UButton
-              label="Google Calendar"
-              icon="i-lucide-calendar-plus"
-              size="sm"
-              color="neutral"
-              variant="outline"
-              :to="googleCalendarUrl"
-              target="_blank"
+            <UIcon
+              :name="
+                isPendingConfirmation
+                  ? 'i-lucide-clock'
+                  : 'i-lucide-check-circle-2'
+              "
+              class="mx-auto size-14"
+              :class="isPendingConfirmation ? 'text-warning' : 'text-success'"
             />
-            <UButton
-              label="Outlook"
-              icon="i-lucide-calendar-plus"
-              size="sm"
-              color="neutral"
-              variant="outline"
-              :to="outlookCalendarUrl"
-              target="_blank"
-            />
-            <UButton
-              label="Apple / .ics"
-              icon="i-lucide-download"
-              size="sm"
-              color="neutral"
-              variant="outline"
-              :to="icsDataUrl"
-              download="reserva.ics"
-            />
-          </div>
+            <h2 class="text-xl font-semibold text-highlighted">
+              {{
+                isPendingConfirmation
+                  ? `Pedido enviado — aguardando confirmação de ${publicPage.hostName}`
+                  : "Reserva confirmada!"
+              }}
+            </h2>
+            <p class="text-sm text-muted">
+              {{ formatSelectedDate() }} às
+              {{ selectedSlot ? formatSlotTime(selectedSlot.startAt) : "" }} ({{
+                guestTimezone
+              }})
+            </p>
 
-          <div class="mx-auto flex max-w-md items-center gap-2">
-            <UInput
-              :model-value="manageUrl"
-              readonly
-              size="sm"
-              class="flex-1"
-            />
-            <UButton
-              icon="i-lucide-copy"
-              size="sm"
-              color="neutral"
-              variant="subtle"
-              @click="copyManageUrl"
-            />
-          </div>
-          <p class="text-xs text-dimmed">
-            Guarde este link para reagendar ou cancelar depois.
-          </p>
-        </div>
+            <div
+              v-if="!isPendingConfirmation"
+              class="flex flex-wrap items-center justify-center gap-2"
+            >
+              <UButton
+                label="Google Calendar"
+                icon="i-lucide-calendar-plus"
+                size="sm"
+                color="neutral"
+                variant="outline"
+                :to="googleCalendarUrl"
+                target="_blank"
+              />
+              <UButton
+                label="Outlook"
+                icon="i-lucide-calendar-plus"
+                size="sm"
+                color="neutral"
+                variant="outline"
+                :to="outlookCalendarUrl"
+                target="_blank"
+              />
+              <UButton
+                label="Apple / .ics"
+                icon="i-lucide-download"
+                size="sm"
+                color="neutral"
+                variant="outline"
+                :to="icsDataUrl"
+                download="reserva.ics"
+              />
+            </div>
 
+            <div class="mx-auto flex max-w-md items-center gap-2">
+              <UInput
+                :model-value="manageUrl"
+                readonly
+                size="sm"
+                class="flex-1"
+              />
+              <UButton
+                icon="i-lucide-copy"
+                size="sm"
+                color="neutral"
+                variant="subtle"
+                @click="copyManageUrl"
+              />
+            </div>
+            <p class="text-xs text-dimmed">
+              Guarde este link para reagendar ou cancelar depois.
+            </p>
+          </div>
         </div>
       </div>
       <footer class="booking-brand">
-        <NuxtLink to="/" aria-label="Kortex — página inicial" class="inline-flex rounded-md focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary">
+        <NuxtLink
+          to="/"
+          aria-label="Kortex — página inicial"
+          class="inline-flex rounded-md focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary"
+        >
           <AppLogo size="sm" />
         </NuxtLink>
       </footer>
@@ -520,47 +700,197 @@ const icsDataUrl = computed(() => {
   display: flex;
   align-items: center;
   padding: 64px 24px;
-  background: #fafafa;
 }
-:global(.dark) .booking-page { background: #111113; }
-.booking-shell { width: 100%; max-width: 1040px; margin: 0 auto; }
-.booking-shell--compact { max-width: 760px; }
-.booking-card { overflow: hidden; border: 1px solid var(--ui-border); border-radius: 8px; background: var(--ui-bg); }
-.booking-cover { display: block; width: 100%; height: 160px; object-fit: cover; }
-.booking-layout { display: grid; grid-template-columns: 280px minmax(0, 1fr); }
-.booking-shell--compact .booking-layout { grid-template-columns: 340px minmax(0, 1fr); }
-.booking-summary { min-width: 0; padding: 24px; border-right: 1px solid var(--ui-border); }
-.booking-selection { min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr) 280px; }
-.booking-calendar { min-width: 0; padding: 20px; }
-.booking-times { min-width: 0; height: 488px; display: flex; flex-direction: column; padding: 12px 20px 20px; border-left: 1px solid var(--ui-border); }
-.booking-time-list { min-height: 0; flex: 1; overflow-y: auto; scrollbar-width: thin; padding: 1px 2px 2px; }
-.booking-time { display: flex; width: 100%; align-items: center; justify-content: center; gap: 12px; min-height: 38px; margin-bottom: 8px; border: 1px solid var(--ui-border-accented); border-radius: 9px; background: var(--ui-bg); color: var(--ui-text-highlighted); font-size: 14px; box-shadow: 0 1px 2px #00000008; cursor: pointer; transition: border-color 150ms, background 150ms; }
-.booking-time:hover { border-color: var(--ui-text-highlighted); background: var(--ui-bg-elevated); }
-.booking-time:focus-visible, .booking-hour-format button:focus-visible { outline: 2px solid var(--ui-text-highlighted); outline-offset: 2px; }
-.booking-hour-format { display: flex; padding: 3px; border-radius: 9px; background: var(--ui-bg-elevated); }
-.booking-hour-format button { padding: 3px 6px; border-radius: 6px; font-size: 12px; color: var(--ui-text-toned); cursor: pointer; }
-.booking-hour-format .is-selected { background: var(--ui-bg); color: var(--ui-text-highlighted); box-shadow: 0 1px 3px #00000020; }
-.booking-placeholder { display: flex; min-height: 180px; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 16px 4px; text-align: center; color: var(--ui-text-muted); font-size: 13px; line-height: 1.6; }
-.booking-form { display: flex; min-width: 0; min-height: 488px; flex-direction: column; gap: 20px; padding: 24px; }
-.booking-form-actions { margin-top: auto; padding-top: 24px; }
-.booking-confirmation { min-width: 0; align-self: center; padding: 32px 24px; }
-.booking-brand { display: flex; justify-content: center; padding-top: 28px; }
+
+.booking-shell {
+  width: 100%;
+  max-width: 1040px;
+  margin: 0 auto;
+}
+.booking-shell--compact {
+  max-width: 760px;
+}
+.booking-card {
+  overflow: hidden;
+  border: 1px solid var(--ui-border);
+  border-radius: 8px;
+  background: var(--ui-bg);
+}
+.booking-cover {
+  display: block;
+  width: 100%;
+  height: 160px;
+  object-fit: cover;
+}
+.booking-layout {
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr);
+}
+.booking-shell--compact .booking-layout {
+  grid-template-columns: 340px minmax(0, 1fr);
+}
+.booking-summary {
+  min-width: 0;
+  padding: 24px;
+  border-right: 1px solid var(--ui-border);
+}
+.booking-selection {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 280px;
+}
+.booking-calendar {
+  min-width: 0;
+  padding: 20px;
+}
+.booking-times {
+  min-width: 0;
+  height: 488px;
+  display: flex;
+  flex-direction: column;
+  padding: 12px 20px 20px;
+  border-left: 1px solid var(--ui-border);
+}
+.booking-time-list {
+  min-height: 0;
+  flex: 1;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  padding: 1px 2px 2px;
+}
+.booking-time {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  min-height: 38px;
+  margin-bottom: 8px;
+  border: 1px solid var(--ui-border-accented);
+  border-radius: 9px;
+  background: var(--ui-bg);
+  color: var(--ui-text-highlighted);
+  font-size: 14px;
+  box-shadow: 0 1px 2px #00000008;
+  cursor: pointer;
+  transition:
+    border-color 150ms,
+    background 150ms;
+}
+.booking-time:hover {
+  border-color: var(--ui-text-highlighted);
+  background: var(--ui-bg-elevated);
+}
+.booking-time:focus-visible,
+.booking-hour-format button:focus-visible {
+  outline: 2px solid var(--ui-text-highlighted);
+  outline-offset: 2px;
+}
+.booking-hour-format {
+  display: flex;
+  padding: 3px;
+  border-radius: 9px;
+  background: var(--ui-bg-elevated);
+}
+.booking-hour-format button {
+  padding: 3px 6px;
+  border-radius: 6px;
+  font-size: 12px;
+  color: var(--ui-text-toned);
+  cursor: pointer;
+}
+.booking-hour-format .is-selected {
+  background: var(--ui-bg);
+  color: var(--ui-text-highlighted);
+  box-shadow: 0 1px 3px #00000020;
+}
+.booking-placeholder {
+  display: flex;
+  min-height: 180px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 16px 4px;
+  text-align: center;
+  color: var(--ui-text-muted);
+  font-size: 13px;
+  line-height: 1.6;
+}
+.booking-form {
+  display: flex;
+  min-width: 0;
+  min-height: 488px;
+  flex-direction: column;
+  gap: 20px;
+  padding: 24px;
+}
+.booking-form-actions {
+  margin-top: auto;
+  padding-top: 24px;
+}
+.booking-confirmation {
+  min-width: 0;
+  align-self: center;
+  padding: 32px 24px;
+}
+.booking-brand {
+  display: flex;
+  justify-content: center;
+  padding-top: 28px;
+}
 @media (min-width: 768px) and (max-width: 1099px) {
-  .booking-layout { grid-template-columns: 240px minmax(0, 1fr); }
-  .booking-selection { grid-template-columns: minmax(0, 1fr) 200px; }
-  .booking-summary { padding: 20px; }
-  .booking-calendar { padding: 16px; }
-  .booking-times { padding-left: 12px; padding-right: 12px; }
-  .booking-shell--compact .booking-layout { grid-template-columns: 300px minmax(0, 1fr); }
+  .booking-layout {
+    grid-template-columns: 240px minmax(0, 1fr);
+  }
+  .booking-selection {
+    grid-template-columns: minmax(0, 1fr) 200px;
+  }
+  .booking-summary {
+    padding: 20px;
+  }
+  .booking-calendar {
+    padding: 16px;
+  }
+  .booking-times {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+  .booking-shell--compact .booking-layout {
+    grid-template-columns: 300px minmax(0, 1fr);
+  }
 }
 @media (max-width: 767px) {
-  .booking-page { align-items: flex-start; padding: 24px 16px; }
-  .booking-layout, .booking-shell--compact .booking-layout { grid-template-columns: minmax(0, 1fr); }
-  .booking-summary { border-right: 0; border-bottom: 1px solid var(--ui-border); }
-  .booking-selection { grid-template-columns: minmax(0, 1fr); }
-  .booking-calendar { padding: 24px; }
-  .booking-times { height: auto; max-height: 400px; border-left: 0; border-top: 1px solid var(--ui-border); padding: 20px 24px; }
-  .booking-form { min-height: 0; }
-  .booking-brand { padding-top: 24px; }
+  .booking-page {
+    align-items: flex-start;
+    padding: 24px 16px;
+  }
+  .booking-layout,
+  .booking-shell--compact .booking-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .booking-summary {
+    border-right: 0;
+    border-bottom: 1px solid var(--ui-border);
+  }
+  .booking-selection {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .booking-calendar {
+    padding: 24px;
+  }
+  .booking-times {
+    height: auto;
+    max-height: 400px;
+    border-left: 0;
+    border-top: 1px solid var(--ui-border);
+    padding: 20px 24px;
+  }
+  .booking-form {
+    min-height: 0;
+  }
+  .booking-brand {
+    padding-top: 24px;
+  }
 }
 </style>
