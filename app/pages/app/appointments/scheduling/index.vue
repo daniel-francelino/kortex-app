@@ -54,7 +54,7 @@ useMobileContextNav().registerMobileContextNav(
       icon: "i-lucide-calendar-clock",
     },
   ],
-  ref("scheduling-link"),
+  ref("scheduling-link")
 );
 
 const quickCreateOpen = ref(false);
@@ -68,7 +68,7 @@ const statusOptions = [
   { label: "Pausadas", value: "paused" },
 ];
 const activeCount = computed(
-  () => pages.value.filter((page) => page.isActive).length,
+  () => pages.value.filter((page) => page.isActive).length
 );
 const filteredPages = computed(() =>
   pages.value.filter((page) => {
@@ -81,7 +81,7 @@ const filteredPages = computed(() =>
         .toLocaleLowerCase()
         .includes(search.value.trim().toLocaleLowerCase())
     );
-  }),
+  })
 );
 const confirmPage = ref<SchedulingPage | null>(null);
 const confirmAction = ref<"archive" | "regenerate">("archive");
@@ -156,7 +156,22 @@ function openPreview(page: SchedulingPage) {
   <UDashboardPanel id="scheduling">
     <template #header>
       <UDashboardNavbar title="Páginas de agendamento">
+        <template #leading>
+          <AppSidebarCollapse />
+        </template>
+
         <template #right>
+          <!-- Public scheduling pages -->
+          <UTooltip text="Agenda" class="hidden lg:flex">
+            <UButton
+              square
+              color="neutral"
+              variant="ghost"
+              icon="i-lucide-calendar"
+              to="/app/appointments/"
+            />
+          </UTooltip>
+
           <UButton
             v-if="!isMobile"
             icon="i-lucide-plus"
@@ -167,24 +182,26 @@ function openPreview(page: SchedulingPage) {
       </UDashboardNavbar>
     </template>
     <template #body>
-      <div class="mx-auto w-full max-w-6xl space-y-6 px-1 py-3 pb-24 sm:px-4 sm:py-6">
+      <div
+        class="mx-auto w-full max-w-6xl space-y-6 px-1 py-3 pb-24 sm:px-4 sm:py-6"
+      >
         <!-- Offline / pending sync indicator -->
         <div
           v-if="!isOnline || pendingSyncCount > 0"
           class="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs"
           :class="
-          !isOnline
-          ? 'text-warning bg-warning/5'
-          : 'text-muted bg-elevated/40'
+            !isOnline
+              ? 'text-warning bg-warning/5'
+              : 'text-muted bg-elevated/40'
           "
         >
           <UIcon
             :name="
-            !isOnline
-            ? 'i-lucide-cloud-off'
-            : syncingOffline
-            ? 'i-lucide-loader-2'
-            : 'i-lucide-cloud-upload'
+              !isOnline
+                ? 'i-lucide-cloud-off'
+                : syncingOffline
+                ? 'i-lucide-loader-2'
+                : 'i-lucide-cloud-upload'
             "
             class="size-3.5 shrink-0"
             :class="syncingOffline ? 'animate-spin' : ''"
@@ -196,11 +213,13 @@ function openPreview(page: SchedulingPage) {
             Sincronizando alterações offline...
           </span>
           <span v-else>
-            {{ pendingSyncCount }} alteração(ões) pendente(s) de
-            sincronização
+            {{ pendingSyncCount }} alteração(ões) pendente(s) de sincronização
           </span>
         </div>
-        <div v-if="pages.length" class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div
+          v-if="pages.length"
+          class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
+        >
           <UInput
             v-model="search"
             icon="i-lucide-search"
@@ -215,7 +234,10 @@ function openPreview(page: SchedulingPage) {
             class="w-full sm:w-40"
           />
         </div>
-        <div v-if="pagesStatus === 'pending' || pagesStatus === 'idle'" class="space-y-3">
+        <div
+          v-if="pagesStatus === 'pending' || pagesStatus === 'idle'"
+          class="space-y-3"
+        >
           <USkeleton v-for="i in 3" :key="i" class="h-24 w-full rounded-xl" />
         </div>
         <UEmpty
@@ -224,7 +246,7 @@ function openPreview(page: SchedulingPage) {
           title="Não foi possível carregar suas páginas"
           description="Tente novamente para acessar seus links de agendamento."
           :actions="[
-          { label: 'Tentar novamente', onClick: () => refreshPages() },
+            { label: 'Tentar novamente', onClick: () => refreshPages() },
           ]"
         />
         <UEmpty
@@ -234,11 +256,11 @@ function openPreview(page: SchedulingPage) {
           description="Crie sua primeira página para compartilhar um link de agendamento."
           class="py-16"
           :actions="[
-          {
-          label: 'Criar a primeira',
-          icon: 'i-lucide-plus',
-          onClick: onCreate,
-          },
+            {
+              label: 'Criar a primeira',
+              icon: 'i-lucide-plus',
+              onClick: onCreate,
+            },
           ]"
         />
         <UEmpty
@@ -247,18 +269,21 @@ function openPreview(page: SchedulingPage) {
           title="Nenhuma página encontrada"
           description="Experimente outro título ou filtro."
           :actions="[
-          {
-          label: 'Limpar filtros',
-          color: 'neutral',
-          variant: 'outline',
-          onClick: () => {
-          search = '';
-          statusFilter = 'all';
-          },
-          },
+            {
+              label: 'Limpar filtros',
+              color: 'neutral',
+              variant: 'outline',
+              onClick: () => {
+                search = '';
+                statusFilter = 'all';
+              },
+            },
           ]"
         />
-        <div v-else class="overflow-hidden rounded-xl border border-default bg-default divide-y divide-default">
+        <div
+          v-else
+          class="overflow-hidden rounded-xl border border-default bg-default divide-y divide-default"
+        >
           <UCard
             v-for="page in filteredPages"
             :key="page.id"
@@ -270,7 +295,9 @@ function openPreview(page: SchedulingPage) {
                 class="my-5 ml-4 w-1 shrink-0 rounded-full"
                 :style="{ backgroundColor: page.color || 'var(--ui-primary)' }"
               />
-              <div class="flex min-w-0 flex-1 flex-wrap items-start justify-between gap-4 p-4 sm:p-5">
+              <div
+                class="flex min-w-0 flex-1 flex-wrap items-start justify-between gap-4 p-4 sm:p-5"
+              >
                 <div class="min-w-0 flex-1">
                   <div class="flex items-center gap-2">
                     <NuxtLink
@@ -288,20 +315,31 @@ function openPreview(page: SchedulingPage) {
                       Pausada
                     </UBadge>
                   </div>
-                  <p v-if="page.description" class="mt-1 line-clamp-1 text-sm text-muted">
+                  <p
+                    v-if="page.description"
+                    class="mt-1 line-clamp-1 text-sm text-muted"
+                  >
                     {{ page.description }}
                   </p>
-                  <div class="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-muted">
+                  <div
+                    class="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-muted"
+                  >
                     <span class="flex items-center gap-1">
                       <UIcon name="i-lucide-clock" class="size-3.5" />
                       {{ page.durationMinutes }}
                       min
                     </span>
                     <span class="flex items-center gap-1">
-                      <UIcon :name="LOCATION_TYPE_META[page.locationType].icon" class="size-3.5" />
+                      <UIcon
+                        :name="LOCATION_TYPE_META[page.locationType].icon"
+                        class="size-3.5"
+                      />
                       {{ LOCATION_TYPE_META[page.locationType].label }}
                     </span>
-                    <span v-if="page.bookingsCount" class="flex items-center gap-1">
+                    <span
+                      v-if="page.bookingsCount"
+                      class="flex items-center gap-1"
+                    >
                       <UIcon name="i-lucide-users" class="size-3.5" />
                       {{ page.bookingsCount }}
                       {{ page.bookingsCount === 1 ? "reserva" : "reservas" }}
@@ -400,8 +438,8 @@ function openPreview(page: SchedulingPage) {
     square
     class="fixed z-30 size-14 items-center justify-center rounded-full shadow-lg shadow-black/30"
     :style="{
-    right: 'calc(1rem + var(--safe-area-right, 0px))',
-    bottom: 'calc(var(--mobile-bottom-nav-height, 4.75rem) + 1rem)',
+      right: 'calc(1rem + var(--safe-area-right, 0px))',
+      bottom: 'calc(var(--mobile-bottom-nav-height, 4.75rem) + 1rem)',
     }"
     aria-label="Nova página"
     @click="onCreate"
@@ -415,7 +453,7 @@ function openPreview(page: SchedulingPage) {
   <UModal
     :open="Boolean(confirmPage)"
     :title="
-    confirmAction === 'archive' ? 'Arquivar página?' : 'Regenerar link?'
+      confirmAction === 'archive' ? 'Arquivar página?' : 'Regenerar link?'
     "
     @update:open="
     (open: boolean) => {
@@ -426,9 +464,9 @@ function openPreview(page: SchedulingPage) {
     <template #body>
       <p class="text-sm leading-relaxed text-muted">
         {{
-        confirmAction === "archive"
-        ? "A página será removida da lista e o link será desativado. As reservas existentes serão mantidas."
-        : "O link atual deixará de funcionar. Você precisará compartilhar o novo link com seus convidados."
+          confirmAction === "archive"
+            ? "A página será removida da lista e o link será desativado. As reservas existentes serão mantidas."
+            : "O link atual deixará de funcionar. Você precisará compartilhar o novo link com seus convidados."
         }}
       </p>
     </template>
@@ -443,7 +481,7 @@ function openPreview(page: SchedulingPage) {
         />
         <UButton
           :label="
-          confirmAction === 'archive' ? 'Arquivar página' : 'Regenerar link'
+            confirmAction === 'archive' ? 'Arquivar página' : 'Regenerar link'
           "
           color="error"
           :loading="confirming"
