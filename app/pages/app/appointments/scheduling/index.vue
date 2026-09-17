@@ -155,7 +155,7 @@ function openPreview(page: SchedulingPage) {
 <template>
   <UDashboardPanel id="scheduling">
     <template #header>
-      <UDashboardNavbar title="Agendamento">
+      <UDashboardNavbar title="Páginas de agendamento">
         <template #right>
           <UButton
             v-if="!isMobile"
@@ -168,28 +168,6 @@ function openPreview(page: SchedulingPage) {
     </template>
     <template #body>
       <div class="mx-auto w-full max-w-6xl space-y-6 px-1 py-3 pb-24 sm:px-4 sm:py-6">
-        <div class="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <p class="mb-2 text-xs font-medium uppercase tracking-widest text-muted">
-              Sua disponibilidade, em um link
-            </p>
-            <h1 class="text-2xl font-semibold tracking-tight text-highlighted">
-              Páginas de agendamento
-            </h1>
-            <p class="mt-2 max-w-xl text-sm leading-relaxed text-muted">
-              Defina quando você está disponível e deixe seus convidados
-              escolherem o melhor horário.
-            </p>
-          </div>
-          <UBadge
-            v-if="pages.length"
-            color="neutral"
-            variant="subtle"
-            size="lg"
-          >
-            {{ activeCount }}{{ activeCount === 1 ? "página ativa" : "páginas ativas" }}
-          </UBadge>
-        </div>
         <!-- Offline / pending sync indicator -->
         <div
           v-if="!isOnline || pendingSyncCount > 0"
@@ -226,8 +204,8 @@ function openPreview(page: SchedulingPage) {
           <UInput
             v-model="search"
             icon="i-lucide-search"
-            placeholder="Buscar página de agendamento"
-            aria-label="Buscar página de agendamento"
+            placeholder="Buscar..."
+            aria-label="Buscar..."
             class="w-full sm:max-w-sm"
           />
           <USelect
