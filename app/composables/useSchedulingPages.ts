@@ -573,6 +573,18 @@ export function useSchedulingPages() {
     }
   }
 
+  // Every booking across every one of the user's scheduling pages — backs
+  // /app/appointments/bookings (the "ver todas as reservas" screen), as
+  // opposed to fetchBookings() above which is scoped to a single page.
+  async function fetchAllBookings(): Promise<Booking[]> {
+    try {
+      const data = await $fetch<unknown[]>("/api/appointments/bookings");
+      return (data ?? []).map(normalizeBooking);
+    } catch {
+      return [];
+    }
+  }
+
   // These two are deliberately not routed through runOptimisticAction/the
   // offline queue like the rest of this composable: bookings aren't kept in
   // `pagesById` (they live in the caller's own useAsyncData, e.g.
@@ -709,6 +721,7 @@ export function useSchedulingPages() {
     regenerateShareToken,
     duplicateSchedulingPage,
     fetchBookings,
+    fetchAllBookings,
     approveBooking,
     cancelBookingAsHost,
     // Offline

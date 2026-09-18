@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import '~/assets/css/scheduling-editor.css';
 import type { SchedulingQuestion } from "~/types/scheduling";
 import { SchedulingLocationType, LOCATION_TYPE_META } from "~/types/scheduling";
 import { detectBrowserTimeZone } from "#shared/utils/dateTime";
@@ -689,7 +690,11 @@ if (import.meta.client) {
 </script>
 
 <template>
-  <UDashboardPanel id="scheduling-editor">
+  <UDashboardPanel
+    id="scheduling-editor"
+    class="scheduling-editor-mobile min-w-0 max-w-full"
+    :ui="{ body: 'min-w-0 p-3 sm:p-6' }"
+  >
     <template #header>
       <UDashboardNavbar title="Agendamento">
         <template #leading>
@@ -737,6 +742,7 @@ if (import.meta.client) {
               ],
             ]"
             :content="{ align: 'end' }"
+            :ui="{ content: 'scheduling-editor-mobile' }"
           >
             <UButton
               icon="i-lucide-ellipsis-vertical"
@@ -758,12 +764,12 @@ if (import.meta.client) {
     <template #body>
       <div
         v-if="loading"
-        class="mx-auto grid w-full max-w-7xl items-start gap-6 px-1 py-3 sm:px-4 sm:py-6 lg:grid-cols-[200px_minmax(0,1fr)] xl:grid-cols-[200px_minmax(0,1fr)_260px]"
+        class="mx-auto grid w-full min-w-0 max-w-7xl grid-cols-1 items-start gap-6 py-3 sm:px-4 sm:py-6 lg:grid-cols-[200px_minmax(0,1fr)] xl:grid-cols-[200px_minmax(0,1fr)_260px]"
       >
-        <aside class="space-y-5 lg:sticky lg:top-0">
+        <aside class="min-w-0 space-y-5 lg:sticky lg:top-0">
           <USkeleton class="hidden h-9 w-32 lg:block" />
           <div
-            class="flex gap-1 overflow-x-auto pb-2 lg:flex-col lg:overflow-visible"
+            class="flex max-w-full gap-1 overflow-x-auto pb-2 lg:flex-col lg:overflow-visible"
           >
             <USkeleton
               v-for="i in 6"
@@ -776,7 +782,7 @@ if (import.meta.client) {
         <div class="min-w-0 space-y-6">
           <div class="space-y-2">
             <USkeleton class="h-8 w-48" />
-            <USkeleton class="h-4 w-72" />
+            <USkeleton class="h-4 w-72 max-w-full" />
           </div>
           <USkeleton v-for="i in 3" :key="i" class="h-40 w-full rounded-xl" />
         </div>
@@ -795,20 +801,20 @@ if (import.meta.client) {
       </div>
       <div
         v-else
-        class="mx-auto grid w-full max-w-7xl items-start gap-6 px-1 py-3 sm:px-4 sm:py-6 lg:grid-cols-[200px_minmax(0,1fr)] xl:grid-cols-[200px_minmax(0,1fr)_260px]"
+        class="mx-auto grid w-full min-w-0 max-w-7xl grid-cols-1 items-start gap-6 py-3 sm:px-4 sm:py-6 lg:grid-cols-[200px_minmax(0,1fr)] xl:grid-cols-[200px_minmax(0,1fr)_260px]"
       >
-        <aside class="space-y-5 lg:sticky lg:top-0">
+        <aside class="min-w-0 space-y-5 lg:sticky lg:top-0">
           <UButton
             label="Todas as páginas"
             icon="i-lucide-arrow-left"
             color="neutral"
             variant="link"
             to="/app/appointments/scheduling"
-            class="hidden lg:inline-flex"
+            class="inline-flex"
           />
           <nav
             aria-label="Configurações do agendamento"
-            class="flex gap-1 overflow-x-auto pb-2 lg:flex-col lg:overflow-visible"
+            class="flex max-w-full gap-1 overflow-x-auto overscroll-x-contain pb-2 lg:flex-col lg:overflow-visible"
           >
             <button
               v-for="tab in tabs"
@@ -833,7 +839,7 @@ if (import.meta.client) {
             </button>
           </nav>
           <div class="hidden rounded-xl border border-default p-4 lg:block">
-            <div class="flex items-center justify-between gap-3">
+            <div class="flex flex-wrap items-center justify-between gap-3">
               <span class="text-sm font-medium text-highlighted">
                 {{ isActive ? "Página ativa" : "Página pausada" }}
               </span>
@@ -854,9 +860,9 @@ if (import.meta.client) {
         </aside>
         <div class="min-w-0 space-y-6">
           <div>
-            <div class="flex items-center justify-between gap-3">
+            <div class="flex flex-wrap items-center justify-between gap-3">
               <h1
-                class="text-2xl font-semibold tracking-tight text-highlighted"
+                class="min-w-0 break-words text-xl font-semibold tracking-tight text-highlighted sm:text-2xl"
               >
                 {{ currentTab.label }}
               </h1>
@@ -895,9 +901,6 @@ if (import.meta.client) {
                   "
                 >
                   <UInput v-model="state.slug" class="w-full">
-                    <template v-if="username" #leading>
-                      <span class="text-xs text-dimmed">{{ username }}/</span>
-                    </template>
                     <template #trailing>
                       <UIcon
                         v-if="slugCheck.status === 'checking'"
@@ -995,7 +998,7 @@ if (import.meta.client) {
                 <p class="text-sm font-medium text-highlighted">Cor</p>
               </template>
               <div class="space-y-2">
-                <div class="flex gap-2">
+                <div class="flex flex-wrap gap-3">
                   <button
                     v-for="opt in colorOptions"
                     :key="opt.value"
@@ -1008,6 +1011,8 @@ if (import.meta.client) {
                     "
                     :style="{ backgroundColor: opt.value }"
                     :title="opt.label"
+                    :aria-label="`Cor ${opt.label}`"
+                    :aria-pressed="state.color === opt.value"
                     @click="
                       state.color = state.color === opt.value ? null : opt.value
                     "
@@ -1131,7 +1136,8 @@ if (import.meta.client) {
                         v-if="dayWindows[day - 1]!.length > 0"
                         class="ml-auto flex items-center gap-1"
                       >
-                        <UPopover
+                      <UPopover
+                        :ui="{ content: 'scheduling-editor-mobile' }"
                           :content="{ align: 'end' }"
                           @update:open="
                             (v: boolean) => onCopyPopoverOpen(day - 1, v)
@@ -1179,6 +1185,7 @@ if (import.meta.client) {
                         </UPopover>
                         <UButton
                           icon="i-lucide-plus"
+                          aria-label="Adicionar intervalo de disponibilidade"
                           size="xs"
                           color="neutral"
                           variant="ghost"
@@ -1188,12 +1195,12 @@ if (import.meta.client) {
                     </div>
                     <div
                       v-if="dayWindows[day - 1]!.length > 0"
-                      class="mt-3 space-y-2 sm:pl-6"
+                      class="mt-3 space-y-3 sm:pl-6"
                     >
                       <div
                         v-for="(w, wi) in dayWindows[day - 1]"
                         :key="wi"
-                        class="flex items-center gap-2"
+                        class="grid grid-cols-2 gap-2 sm:flex sm:items-center"
                       >
                         <UInput
                           v-model="w.startTime"
@@ -1204,7 +1211,7 @@ if (import.meta.client) {
                           }`"
                           class="min-w-0 flex-1 sm:max-w-36"
                         />
-                        <span class="text-xs text-muted"> até </span>
+                        <span class="hidden text-sm text-muted sm:inline"> até </span>
                         <UInput
                           v-model="w.endTime"
                           type="time"
@@ -1216,6 +1223,8 @@ if (import.meta.client) {
                         />
                         <UButton
                           icon="i-lucide-x"
+                          aria-label="Remover intervalo de disponibilidade"
+                          class="col-span-2 justify-self-end"
                           size="xs"
                           color="neutral"
                           variant="ghost"
@@ -1238,18 +1247,18 @@ if (import.meta.client) {
                   label="Antecedência mínima"
                   description="Impede reservas de última hora."
                 >
-                  <div class="flex items-center gap-2">
+                  <div class="flex flex-wrap items-center gap-2">
                     <UInputNumber
                       v-model="minNoticeDisplayValue"
                       :min="0"
                       :max="minNoticeUnit === 'days' ? 30 : 720"
-                      class="w-32"
+                      class="w-full sm:w-40"
                     />
                     <USelect
                       v-model="minNoticeUnit"
                       :items="minNoticeUnitOptions"
                       value-key="value"
-                      class="w-28"
+                      class="w-full sm:w-28"
                     />
                   </div>
                 </UFormField>
@@ -1271,7 +1280,7 @@ if (import.meta.client) {
                       dia.
                     </p>
                   </div>
-                  <USwitch v-model="state.maxBookingsPerDayEnabled" />
+                  <USwitch v-model="state.maxBookingsPerDayEnabled" aria-label="Limitar reservas por dia" />
                 </div>
                 <UInputNumber
                   v-if="state.maxBookingsPerDayEnabled"
@@ -1321,11 +1330,12 @@ if (import.meta.client) {
                 <div
                   v-for="(q, i) in questions"
                   :key="i"
-                  class="flex items-center gap-2 py-2.5"
+                  class="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-3 py-4 sm:flex"
                 >
-                  <div class="flex flex-col">
+                  <div class="col-start-2 row-start-2 flex gap-1 sm:order-first sm:flex-col">
                     <UButton
                       icon="i-lucide-chevron-up"
+                      :aria-label="`Mover pergunta ${i + 1} para cima`"
                       size="2xs"
                       color="neutral"
                       variant="ghost"
@@ -1334,6 +1344,7 @@ if (import.meta.client) {
                     />
                     <UButton
                       icon="i-lucide-chevron-down"
+                      :aria-label="`Mover pergunta ${i + 1} para baixo`"
                       size="2xs"
                       color="neutral"
                       variant="ghost"
@@ -1341,23 +1352,25 @@ if (import.meta.client) {
                       @click="moveQuestion(i, 1)"
                     />
                   </div>
-                  <div class="min-w-0 flex-1">
-                    <p class="truncate text-sm text-highlighted">
+                  <div class="col-span-2 row-start-1 min-w-0 flex-1">
+                    <p class="break-words text-sm text-highlighted">
                       {{ q.label || "(sem rótulo)" }}
                     </p>
                     <p class="text-xs text-muted">
                       {{ questionTypeLabel(q) }}
                     </p>
                   </div>
-                  <UBadge color="neutral" variant="subtle" size="sm">
+                  <UBadge color="neutral" variant="subtle" size="sm" class="col-start-1 row-start-2 justify-self-start">
                     {{ q.isRequired ? "Obrigatória" : "Opcional" }}
                   </UBadge>
                   <USwitch
                     :model-value="!q.isHidden"
+                    :aria-label="`Exibir pergunta ${q.label || i + 1}`"
                     @update:model-value="toggleQuestionHidden(i)"
                   />
                   <UButton
                     label="Editar"
+                    class="justify-self-end"
                     size="xs"
                     color="neutral"
                     variant="ghost"
@@ -1431,7 +1444,7 @@ if (import.meta.client) {
                     horário continua bloqueado na sua agenda.
                   </p>
                 </div>
-                <USwitch v-model="state.requiresConfirmation" />
+                <USwitch v-model="state.requiresConfirmation" aria-label="Exigir confirmação manual" />
               </div>
             </UCard>
             <UCard>
@@ -1463,7 +1476,7 @@ if (import.meta.client) {
                       Permitir cancelamento pelo convidado
                     </p>
                   </div>
-                  <USwitch v-model="state.cancellationEnabled" />
+                  <USwitch v-model="state.cancellationEnabled" aria-label="Permitir cancelamento pelo convidado" />
                 </div>
                 <div
                   v-if="state.cancellationEnabled"
@@ -1473,7 +1486,7 @@ if (import.meta.client) {
                     <p class="text-sm text-highlighted">
                       Exigir antecedência mínima
                     </p>
-                    <USwitch v-model="state.cancellationMinNoticeEnabled" />
+                    <USwitch v-model="state.cancellationMinNoticeEnabled" aria-label="Exigir antecedência para cancelar" />
                   </div>
                   <UInputNumber
                     v-if="state.cancellationMinNoticeEnabled"
@@ -1486,14 +1499,14 @@ if (import.meta.client) {
                     <p class="text-sm text-highlighted">
                       Exigir motivo do cancelamento
                     </p>
-                    <USwitch v-model="state.cancellationReasonRequired" />
+                    <USwitch v-model="state.cancellationReasonRequired" aria-label="Exigir motivo do cancelamento" />
                   </div>
                 </div>
                 <div class="flex items-center justify-between">
                   <p class="text-sm font-medium text-highlighted">
                     Permitir reagendamento pelo convidado
                   </p>
-                  <USwitch v-model="state.rescheduleEnabled" />
+                  <USwitch v-model="state.rescheduleEnabled" aria-label="Permitir reagendamento pelo convidado" />
                 </div>
               </div>
             </UCard>
@@ -1519,7 +1532,7 @@ if (import.meta.client) {
                     direto.
                   </p>
                 </div>
-                <USwitch v-model="state.showOnProfile" />
+                <USwitch v-model="state.showOnProfile" aria-label="Exibir página no perfil público" />
               </div>
             </UCard>
             <UCard>
@@ -1533,7 +1546,7 @@ if (import.meta.client) {
                     o link de gerenciamento.
                   </p>
                 </div>
-                <USwitch v-model="state.hideDetailsOnManagePage" />
+                <USwitch v-model="state.hideDetailsOnManagePage" aria-label="Ocultar detalhes na página de gerenciamento" />
               </div>
             </UCard>
             <UCard>
@@ -1541,7 +1554,7 @@ if (import.meta.client) {
                 <p class="text-sm font-medium text-error">Zona de perigo</p>
               </template>
               <div class="space-y-3">
-                <div class="flex items-center justify-between">
+                <div class="scheduling-danger-action flex items-center justify-between">
                   <div>
                     <p class="text-sm text-highlighted">
                       Regenerar link público
@@ -1558,7 +1571,7 @@ if (import.meta.client) {
                     @click="regenerateConfirmOpen = true"
                   />
                 </div>
-                <div class="flex items-center justify-between">
+                <div class="scheduling-danger-action flex items-center justify-between">
                   <div>
                     <p class="text-sm text-highlighted">Arquivar página</p>
                     <p class="text-xs text-muted">
@@ -1664,7 +1677,7 @@ if (import.meta.client) {
     @save="onSaveQuestion"
     @remove="onRemoveQuestion"
   />
-  <UModal v-model:open="regenerateConfirmOpen" title="Regenerar link?">
+  <UModal v-model:open="regenerateConfirmOpen" title="Regenerar link?" :ui="{ content: 'scheduling-editor-mobile' }">
     <template #body>
       <p class="text-sm text-muted">
         O link atual ({{ shareUrl }}) deixará de funcionar imediatamente.
@@ -1688,7 +1701,7 @@ if (import.meta.client) {
       </div>
     </template>
   </UModal>
-  <UModal v-model:open="archiveConfirmOpen" title="Arquivar página?">
+  <UModal v-model:open="archiveConfirmOpen" title="Arquivar página?" :ui="{ content: 'scheduling-editor-mobile' }">
     <template #body>
       <p class="text-sm text-muted">
         A página some da sua lista e o link público deixa de funcionar. Reservas

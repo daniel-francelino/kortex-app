@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import '~/assets/css/scheduling-editor.css';
 import type { SchedulingQuestion } from "~/types/scheduling";
 import { SchedulingQuestionType } from "~/types/scheduling";
 
@@ -75,6 +76,7 @@ function onSave() {
     :open="open"
     :title="question ? 'Editar pergunta' : 'Adicionar pergunta'"
     description="Personalize as informações que você recebe junto com a reserva."
+    :ui="{ content: 'scheduling-editor-mobile' }"
     @update:open="emit('update:open', $event)"
   >
     <template #body>
@@ -102,7 +104,7 @@ function onSave() {
             :key="i"
             class="flex items-center gap-2"
           >
-            <UInput v-model="options[i]" size="sm" class="flex-1" />
+            <UInput v-model="options[i]" :aria-label="`Opção ${i + 1}`" size="sm" class="min-w-0 flex-1" />
             <UButton
               icon="i-lucide-x"
               :aria-label="`Remover opção ${i + 1}`"
@@ -117,7 +119,7 @@ function onSave() {
               v-model="newOption"
               placeholder="Nova opção"
               size="sm"
-              class="flex-1"
+              class="min-w-0 flex-1"
               @keyup.enter="addOption"
             />
             <UButton
@@ -137,7 +139,7 @@ function onSave() {
       </div>
     </template>
     <template #footer>
-      <div class="flex w-full items-center justify-between gap-2">
+      <div class="flex w-full flex-wrap items-center justify-between gap-3">
         <UButton
           v-if="question"
           label="Excluir pergunta"
@@ -147,7 +149,7 @@ function onSave() {
           @click="emit('remove')"
         />
         <div v-else />
-        <div class="flex gap-2">
+        <div class="ml-auto flex gap-2">
           <UButton
             label="Cancelar"
             color="neutral"

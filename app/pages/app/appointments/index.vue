@@ -685,6 +685,18 @@ onMounted(() => {
             />
           </UTooltip>
 
+          <!-- Reservas ficava só acessível por dentro de uma página de
+               agendamento específica — atalho direto pra ver todas juntas. -->
+          <UTooltip text="Reservas" class="hidden lg:flex">
+            <UButton
+              square
+              color="neutral"
+              variant="ghost"
+              icon="i-lucide-list-checks"
+              to="/app/appointments/bookings"
+            />
+          </UTooltip>
+
           <!-- Calendar sidebar toggle -->
           <span ref="calendarsToggleRef" class="contents">
             <UTooltip text="Calendários" class="hidden lg:flex">

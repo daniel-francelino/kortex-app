@@ -180,6 +180,16 @@ function openPreview(page: SchedulingPage) {
             />
           </UTooltip>
 
+          <UTooltip text="Reservas" class="hidden lg:flex">
+            <UButton
+              square
+              color="neutral"
+              variant="ghost"
+              icon="i-lucide-list-checks"
+              to="/app/appointments/bookings"
+            />
+          </UTooltip>
+
           <UButton
             v-if="!isMobile"
             icon="i-lucide-plus"

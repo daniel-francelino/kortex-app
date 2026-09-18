@@ -1,0 +1,76 @@
+/* Scoped to scheduling editor controls, including teleported menus and dialogs. */
+@media (max-width: 1023px) {
+  .scheduling-editor-mobile {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .scheduling-editor-mobile :is(input:not([type="hidden"]):not([type="file"]):not([type="checkbox"]), textarea, [role="combobox"]) {
+    min-width: 0;
+    min-height: 44px;
+    max-width: 100%;
+    font-size: 16px;
+  }
+
+  .scheduling-editor-mobile button:not([role="switch"]):not([role="checkbox"]),
+  .scheduling-editor-mobile [role="menuitem"],
+  .scheduling-editor-mobile a[data-slot="base"] {
+    min-height: 44px;
+    min-width: 44px;
+    font-size: 14px;
+  }
+
+  .scheduling-editor-mobile :is(.text-xs, [data-slot="description"], [data-slot="help"], [data-slot="error"]) {
+    font-size: 14px;
+    line-height: 1.5;
+  }
+
+  .scheduling-editor-mobile [data-slot="root"]:has(> [data-slot="increment"]) > input {
+    padding-inline: 48px;
+  }
+
+  .scheduling-editor-mobile [data-slot="root"]:has(> [data-slot="increment"]) > :is([data-slot="increment"], [data-slot="decrement"]) {
+    padding-inline: 0;
+  }
+
+  .scheduling-editor-mobile input[type="time"] {
+    width: 100%;
+    padding-inline: 8px;
+  }
+
+  .scheduling-editor-mobile .flex.items-center.justify-between {
+    gap: 16px;
+  }
+
+  .scheduling-editor-mobile .flex.items-center.justify-between > :first-child {
+    min-width: 0;
+  }
+
+  .scheduling-editor-mobile [data-slot="root"]:has(> [data-slot="container"] > [role="switch"]) {
+    flex-shrink: 0;
+    padding-block: 12px;
+  }
+
+  .scheduling-editor-mobile :is([role="switch"], [role="checkbox"]) {
+    position: relative;
+  }
+
+  .scheduling-editor-mobile :is([role="switch"], [role="checkbox"])::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: max(100%, 44px);
+    height: 44px;
+    transform: translate(-50%, -50%);
+  }
+
+  .scheduling-editor-mobile [data-slot="root"]:has(> [data-slot="container"] > [role="checkbox"]) {
+    min-height: 44px;
+    align-items: center;
+  }
+
+  .scheduling-editor-mobile .scheduling-danger-action {
+    flex-wrap: wrap;
+  }
+}
