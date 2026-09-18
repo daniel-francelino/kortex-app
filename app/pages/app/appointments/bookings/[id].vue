@@ -26,7 +26,7 @@ const { data: bookingsData, status: bookingsStatus } = useAsyncData<Booking[]>(
 const bookings = computed(() => bookingsData.value ?? []);
 
 useSeoMeta({
-  title: page.value ? `Reservas — ${page.value.title}` : "Reservas",
+  title: "Reservas",
 });
 
 const STATUS_META: Record<
@@ -150,7 +150,7 @@ async function onCancel(bookingId: string, reason: string | undefined) {
 <template>
   <UDashboardPanel id="scheduling-bookings">
     <template #header>
-      <UDashboardNavbar :title="page ? `Reservas — ${page.title}` : 'Reservas'">
+      <UDashboardNavbar title="Reservas">
         <template #leading>
           <UButton
             icon="i-lucide-arrow-left"

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
  * Composable that initializes Capacitor plugins when running as a native app.
- * Handles: status bar, keyboard and back button. AppSplash owns the splash handoff.
+ * Handles: status bar, keyboard, back button and the native splash handoff.
  */
 import { Capacitor } from '@capacitor/core'
 import { extractNotificationTarget } from '~/utils/notification-target'
@@ -17,6 +17,7 @@ onMounted(async () => {
   const runtimeConfig = useRuntimeConfig()
   const { StatusBar, Style } = await import('@capacitor/status-bar')
   const { Keyboard } = await import('@capacitor/keyboard')
+  const { SplashScreen } = await import('@capacitor/splash-screen')
   const { App } = await import('@capacitor/app')
 
   const colorMode = useColorMode()
@@ -59,6 +60,8 @@ onMounted(async () => {
     void router.push(target)
   })
 
+  // Native keeps the static platform splash; the animated art is web-only.
+  await SplashScreen.hide()
 })
 
 onUnmounted(() => {

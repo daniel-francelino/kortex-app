@@ -2,12 +2,12 @@
 import { Capacitor } from '@capacitor/core'
 
 const emit = defineEmits<{ 'update:visible': [value: boolean] }>()
-const route = useRoute()
 const { loading } = useAuth()
 const visible = ref(false)
 const minimumElapsed = ref(false)
 let minimumTimer: ReturnType<typeof setTimeout> | undefined
 let fallbackTimer: ReturnType<typeof setTimeout> | undefined
+let tabletViewport: MediaQueryList | undefined
 let disposed = false
 
 function dismiss() {
@@ -21,10 +21,12 @@ watch([minimumElapsed, loading], ([elapsed, busy]) => {
 })
 
 onMounted(async () => {
-  const native = Capacitor.isNativePlatform()
-  const standalone = window.matchMedia('(display-mode: standalone)').matches
-    || (navigator as Navigator & { standalone?: boolean }).standalone === true
-  if (!native && !standalone && !route.path.startsWith('/app')) return
+  // The animated artwork belongs to the web experience on tablet/desktop.
+  // Native apps keep their platform splash, and phones go straight to content.
+  tabletViewport = window.matchMedia('(min-width: 768px)')
+  if (Capacitor.isNativePlatform() || !tabletViewport.matches) return
+
+  tabletViewport.addEventListener('change', onViewportChange)
 
   visible.value = true
   emit('update:visible', true)
@@ -32,19 +34,14 @@ onMounted(async () => {
   fallbackTimer = setTimeout(dismiss, 4000)
   await nextTick()
 
-  if (native) {
-    try {
-      const { SplashScreen } = await import('@capacitor/splash-screen')
-      await SplashScreen.hide()
-    } catch (error) {
-      console.warn('[Splash] Native splash handoff failed', error)
-    }
-  }
-
   if (disposed || !visible.value) return
   const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
   minimumTimer = setTimeout(() => { minimumElapsed.value = true }, reducedMotion ? 0 : 1100)
 })
+
+function onViewportChange(event: MediaQueryListEvent) {
+  if (!event.matches) dismiss()
+}
 
 function onAfterLeave() {
   emit('update:visible', false)
@@ -54,6 +51,7 @@ onBeforeUnmount(() => {
   disposed = true
   clearTimeout(minimumTimer)
   clearTimeout(fallbackTimer)
+  tabletViewport?.removeEventListener('change', onViewportChange)
   emit('update:visible', false)
 })
 </script>
