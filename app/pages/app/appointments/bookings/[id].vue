@@ -51,12 +51,12 @@ const hasPendingTab = computed(
 );
 
 const tabs = computed(() => {
-  const base: { label: string; value: string }[] = [];
-  if (hasPendingTab.value) base.push({ label: "Pendentes", value: "pending" });
+  const base: { label: string; value: string; icon: string }[] = [];
+  if (hasPendingTab.value) base.push({ label: "Pendentes", value: "pending", icon: "i-lucide-hourglass" });
   base.push(
-    { label: "Próximas", value: "upcoming" },
-    { label: "Passadas", value: "past" },
-    { label: "Canceladas", value: "cancelled" },
+    { label: "Próximas", value: "upcoming", icon: "i-lucide-calendar-clock" },
+    { label: "Passadas", value: "past", icon: "i-lucide-history" },
+    { label: "Canceladas", value: "cancelled", icon: "i-lucide-calendar-x" },
   );
   return base;
 });
@@ -70,6 +70,7 @@ watch(hasPendingTab, () => {
 });
 
 const searchQuery = ref("");
+useMobileContextNav().registerMobileContextNav("page-bookings", tabs, activeFilter);
 
 const filteredBookings = computed(() => {
   const now = Date.now();
@@ -188,7 +189,7 @@ async function onCancel(bookingId: string, reason: string | undefined) {
           <UTabs
             :items="tabs"
             :content="false"
-            class="min-w-0"
+            class="hidden min-w-0 lg:block"
             :model-value="activeFilter"
             @update:model-value="
               activeFilter = $event as

@@ -1,4 +1,5 @@
-import type { Ref } from 'vue'
+import { toValue } from 'vue'
+import type { MaybeRefOrGetter, Ref } from 'vue'
 
 export interface MobileContextNavItem {
   value: string
@@ -50,14 +51,14 @@ export function useMobileContextNav() {
     }
   }
 
-  function registerMobileContextNav(owner: string, items: MobileContextNavItem[], activeRef: Ref<string>) {
-    watch(activeRef, (activeValue) => {
-      setMobileContextNav(owner, items, activeValue)
+  function registerMobileContextNav(owner: string, navItems: MaybeRefOrGetter<MobileContextNavItem[]>, activeRef: Ref<string>) {
+    watch([activeRef, () => toValue(navItems)], ([activeValue, currentItems]) => {
+      setMobileContextNav(owner, currentItems, activeValue)
     }, { immediate: true })
 
     watch(active, (activeValue) => {
       if (state.value.owner !== owner) return
-      if (!activeValue || !items.some(item => item.value === activeValue)) return
+      if (!activeValue || !toValue(navItems).some(item => item.value === activeValue)) return
       if (activeRef.value === activeValue) return
       activeRef.value = activeValue
     })

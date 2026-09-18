@@ -211,6 +211,11 @@ const tabDescriptions: Record<string, string> = {
 const currentTab = computed(
   () => tabs.find((tab) => tab.value === activeTab.value) ?? tabs[0]!
 );
+useMobileContextNav().registerMobileContextNav(
+  "scheduling-editor",
+  computed(() => loading.value || notFound.value ? [] : tabs),
+  activeTab
+);
 const availableDays = computed(
   () => Object.values(dayWindows).filter((windows) => windows.length > 0).length
 );
@@ -769,7 +774,7 @@ if (import.meta.client) {
         <aside class="min-w-0 space-y-5 lg:sticky lg:top-0">
           <USkeleton class="hidden h-9 w-32 lg:block" />
           <div
-            class="flex max-w-full gap-1 overflow-x-auto pb-2 lg:flex-col lg:overflow-visible"
+            class="hidden max-w-full gap-1 overflow-x-auto pb-2 lg:flex lg:flex-col lg:overflow-visible"
           >
             <USkeleton
               v-for="i in 6"
@@ -814,7 +819,7 @@ if (import.meta.client) {
           />
           <nav
             aria-label="Configurações do agendamento"
-            class="flex max-w-full gap-1 overflow-x-auto overscroll-x-contain pb-2 lg:flex-col lg:overflow-visible"
+            class="hidden max-w-full gap-1 pb-2 lg:flex lg:flex-col"
           >
             <button
               v-for="tab in tabs"

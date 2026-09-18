@@ -667,7 +667,7 @@ onBeforeUnmount(() => {
     </template>
 
     <template #body>
-      <div class="space-y-6 pb-10 sm:pb-4">
+      <div class="space-y-6 pb-4">
         <!-- Tabs -->
         <div data-tour="habits-tabs" class="hidden lg:block">
           <UTabs

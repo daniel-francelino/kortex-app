@@ -268,6 +268,19 @@ body.keyboard-open .mobile-bottom-nav {
   .app-content-with-bottom-nav [data-slot="body"] {
     scroll-padding-bottom: calc(var(--mobile-bottom-nav-height, 4.75rem) + 1rem);
   }
+
+  /* Real reserved space so the fixed bottom nav never covers the last bit of
+     a page's content — scroll-padding-bottom above only affects
+     scroll-into-view/anchor targeting, not actual layout space. Applied here
+     instead of per page, so new pages get it automatically. A flex spacer
+     (not padding-bottom) so it doesn't fight Nuxt UI's own responsive
+     p-4/sm:p-6 on this element ([data-slot="body"] is `flex flex-col`, see
+     DashboardPanel's theme). */
+  .app-content-with-bottom-nav [data-slot="body"]::after {
+    content: "";
+    flex-shrink: 0;
+    height: calc(var(--mobile-bottom-nav-height, 4.75rem) + 1rem);
+  }
 }
 
 /* ─── Note outline: temporary highlight on scroll-to-heading ────── */

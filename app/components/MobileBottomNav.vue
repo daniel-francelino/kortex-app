@@ -118,17 +118,18 @@ onUnmounted(() => {
               v-for="(item, index) in contextItems"
               :key="item.value"
               type="button"
-              class="flex min-h-14 flex-1 basis-0 flex-col items-center justify-center gap-0.5 rounded-xl px-3 text-center transition-colors"
+              class="flex min-h-14 flex-1 basis-0 flex-col items-center justify-center gap-0.5 rounded-xl px-2 text-center transition-colors"
               :class="
-                isContextItemActive(item)
+                [contextItems.length > 4 ? 'min-w-24' : 'min-w-0', isContextItemActive(item)
                   ? 'text-primary'
-                  : 'text-muted active:bg-elevated/80'
+                  : 'text-muted active:bg-elevated/80']
               "
               :initial="{ opacity: 0, y: 8 }"
               :animate="{ opacity: 1, y: 0 }"
               :transition="{ duration: 0.16, delay: Math.min(index * 0.025, 0.1), ease: 'easeOut' }"
               :while-tap="{ scale: 0.98 }"
               :aria-pressed="!item.to ? isContextItemActive(item) : undefined"
+              :aria-label="item.label"
               @click="onContextItemClick(item)"
             >
               <UIcon :name="item.icon" class="size-5 shrink-0" />

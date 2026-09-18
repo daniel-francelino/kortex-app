@@ -35,46 +35,17 @@ onMounted(() => {
   }
 });
 
-useMobileContextNav().registerMobileContextNav(
-  "scheduling",
-  [
-    {
-      label: "Dia",
-      value: "day",
-      icon: "i-lucide-square",
-      to: "/app/appointments?view=day",
-    },
-    {
-      label: "Semana",
-      value: "week",
-      icon: "i-lucide-columns-3",
-      to: "/app/appointments?view=week",
-    },
-    {
-      label: "Mês",
-      value: "month",
-      icon: "i-lucide-grid-3x3",
-      to: "/app/appointments?view=month",
-    },
-    {
-      label: "Link",
-      value: "scheduling-link",
-      icon: "i-lucide-calendar-clock",
-    },
-  ],
-  ref("scheduling-link")
-);
-
 const quickCreateOpen = ref(false);
 const toast = useToast();
 const duplicatingId = ref<string | null>(null);
 const search = ref("");
 const statusFilter = ref("all");
 const statusOptions = [
-  { label: "Todas", value: "all" },
-  { label: "Ativas", value: "active" },
-  { label: "Pausadas", value: "paused" },
+  { label: "Todas", value: "all", icon: "i-lucide-list" },
+  { label: "Ativas", value: "active", icon: "i-lucide-calendar-check" },
+  { label: "Pausadas", value: "paused", icon: "i-lucide-pause" },
 ];
+useMobileContextNav().registerMobileContextNav("scheduling", statusOptions, statusFilter);
 const activeCount = computed(
   () => pages.value.filter((page) => page.isActive).length
 );
@@ -201,7 +172,7 @@ function openPreview(page: SchedulingPage) {
     </template>
     <template #body>
       <div
-        class="mx-auto w-full max-w-6xl space-y-6 px-1 py-3 pb-24 sm:px-4 sm:py-6"
+        class="mx-auto w-full max-w-6xl space-y-6 px-1 py-3 sm:px-4 sm:py-6"
       >
         <!-- Offline / pending sync indicator -->
         <div
@@ -249,7 +220,7 @@ function openPreview(page: SchedulingPage) {
             v-model="statusFilter"
             :items="statusOptions"
             aria-label="Filtrar por status"
-            class="w-full sm:w-40"
+            class="hidden w-40 lg:inline-flex"
           />
         </div>
         <div

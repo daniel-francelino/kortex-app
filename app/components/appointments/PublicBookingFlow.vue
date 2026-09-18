@@ -395,9 +395,6 @@ const icsDataUrl = computed(() => {
                 embedded
                 @month-change="onMonthChange"
               />
-              <p class="mt-5 text-xs leading-relaxed text-muted">
-                Horários disponíveis até {{ availableUntilLabel }}.
-              </p>
             </section>
 
             <section
