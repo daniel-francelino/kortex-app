@@ -1,4 +1,5 @@
 import { getTimeZoneParts, zonedDateTimeToUtcIso } from './timezone'
+import { resolveUserTimezone } from './user-timezone'
 
 const HABITS_CALENDAR_NAME = 'Hábitos'
 const HABITS_CALENDAR_DESCRIPTION = 'Agendamentos gerados automaticamente a partir de hábitos com horário definido.'
@@ -171,20 +172,6 @@ function buildHabitEventPayload(habit: Record<string, unknown>, timeZone: string
     all_day: false,
     rrule: buildHabitRRule(frequency, customDays)
   }
-}
-
-async function getUserTimezone(supabase: SupabaseClient, userId: string): Promise<string> {
-  const { data, error } = await supabase
-    .from('user_preferences')
-    .select('timezone')
-    .eq('user_id', userId)
-    .single()
-
-  if (error && error.code !== 'PGRST116') {
-    throw createError({ statusCode: 500, statusMessage: 'Não foi possível carregar o timezone do usuário', data: error.message })
-  }
-
-  return data?.timezone ?? 'UTC'
 }
 
 async function getOrCreateHabitsCalendar(supabase: SupabaseClient, userId: string): Promise<string> {
@@ -463,7 +450,7 @@ export async function syncHabitLinkedEvent(
     return
   }
 
-  const timeZone = getHabitTimezone(habit) ?? await getUserTimezone(supabase, userId)
+  const timeZone = getHabitTimezone(habit) ?? await resolveUserTimezone(supabase, userId)
   const calendarId = await resolveTargetCalendarId(supabase, userId, getHabitCalendarId(habit))
   const anchorDate = activeEvent?.startAt ? getDateInTimeZone(activeEvent.startAt, timeZone) : undefined
   const payload = buildHabitEventPayload(habit, timeZone, calendarId, anchorDate)
