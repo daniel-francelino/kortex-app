@@ -352,14 +352,16 @@ function onFileClick() {
       <UFormField
         name="username"
         label="Username"
-        description="Sua página de agendamento fica em kortex.app/{username}."
         class="flex max-sm:flex-col justify-between items-start gap-4"
+        :ui="{ container: 'w-full sm:w-80 sm:shrink-0' }"
       >
-        <div class="w-full max-w-xs space-y-1.5">
+        <div class="w-full min-w-0 space-y-1.5">
           <UInput
             v-model="profile.username"
             autocomplete="off"
             placeholder="michaelnorris"
+            class="w-full"
+            :ui="{ base: 'ps-24 min-h-11 text-base sm:min-h-0 sm:text-sm' }"
           >
             <template #leading>
               <span class="text-sm text-dimmed">kortex.app/</span>
