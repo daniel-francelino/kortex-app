@@ -8,29 +8,40 @@ const username = route.params.username as string;
 const slug = route.params.slug as string;
 const apiBase = `/api/profile/${username}/${slug}`;
 
-const { data: page, error } = await useAsyncData<PublicSchedulingPage>(
+// See agendar/[token].vue for why this is lazy + non-blocking.
+const { data: page, status } = useAsyncData<PublicSchedulingPage>(
   `profile-${username}-${slug}`,
   () => $fetch<PublicSchedulingPage>(apiBase),
+  { lazy: true },
 );
 
-if (error.value || !page.value) {
-  throw createError({
-    statusCode: 404,
-    statusMessage: "Página de agendamento não encontrada",
-    fatal: true,
-  });
-}
+watchEffect(() => {
+  if (status.value === "error" || (status.value === "success" && !page.value)) {
+    showError(
+      createError({
+        statusCode: 404,
+        statusMessage: "Página de agendamento não encontrada",
+        fatal: true,
+      }),
+    );
+  }
+});
 
-const publicPage = computed(() => page.value as PublicSchedulingPage);
+const publicPage = computed(() => page.value);
 
 useSeoMeta({
-  title: publicPage.value.title,
-  description: publicPage.value.description ?? "Agende um horário.",
+  title: () => publicPage.value?.title ?? "Agendar horário",
+  description: () => publicPage.value?.description ?? "Agende um horário.",
   robots: "noindex",
-  ogImage: publicPage.value.coverImageUrl ?? undefined,
+  ogImage: () => publicPage.value?.coverImageUrl ?? undefined,
 });
 </script>
 
 <template>
-  <AppointmentsPublicBookingFlow :public-page="publicPage" :api-base="apiBase" />
+  <AppointmentsPublicBookingSkeleton v-if="!publicPage" />
+  <AppointmentsPublicBookingFlow
+    v-else
+    :public-page="publicPage"
+    :api-base="apiBase"
+  />
 </template>

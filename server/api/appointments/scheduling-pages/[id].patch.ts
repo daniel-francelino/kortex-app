@@ -5,11 +5,7 @@ import { mapSchedulingPage } from '../../../utils/scheduling'
 import { isValidUsernameFormat } from '../../../utils/username'
 import { parseOrThrow } from '../../../utils/validation'
 
-const availabilityRuleSchema = z.object({
-  dayOfWeek: z.number().int().min(0).max(6),
-  startTime: z.string().regex(/^\d{2}:\d{2}$/),
-  endTime: z.string().regex(/^\d{2}:\d{2}$/)
-})
+import { availabilityRuleSchema } from '../../../utils/scheduling-validation'
 
 const questionSchema = z.object({
   label: z.string().min(1).max(200),
@@ -181,5 +177,18 @@ export default eventHandler(async (event) => {
     }
   }
 
-  return mapSchedulingPage(page as Record<string, unknown>)
+  const [rulesResult, questionsResult] = await Promise.all([
+    supabase.from('scheduling_availability_rules').select('*').eq('scheduling_page_id', id).order('day_of_week'),
+    supabase.from('scheduling_questions').select('*').eq('scheduling_page_id', id).order('sort_order')
+  ])
+
+  if (rulesResult.error || questionsResult.error) {
+    throw createError({ statusCode: 500, statusMessage: 'Falha ao carregar os detalhes do agendamento atualizado' })
+  }
+
+  return mapSchedulingPage({
+    ...page,
+    availabilityRules: rulesResult.data ?? [],
+    questions: questionsResult.data ?? []
+  })
 })

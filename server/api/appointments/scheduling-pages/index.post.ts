@@ -7,11 +7,7 @@ import { ensureUniqueSlug, slugify } from '../../../utils/slug'
 import { isValidUsernameFormat } from '../../../utils/username'
 import { parseOrThrow } from '../../../utils/validation'
 
-const availabilityRuleSchema = z.object({
-  dayOfWeek: z.number().int().min(0).max(6),
-  startTime: z.string().regex(/^\d{2}:\d{2}$/),
-  endTime: z.string().regex(/^\d{2}:\d{2}$/)
-})
+import { availabilityRuleSchema } from '../../../utils/scheduling-validation'
 
 const questionSchema = z.object({
   label: z.string().min(1).max(200),

@@ -4,8 +4,8 @@ export function mapAvailabilityRule(row: Record<string, unknown>): Record<string
   return {
     id: row.id,
     dayOfWeek: row.day_of_week,
-    startTime: row.start_time,
-    endTime: row.end_time
+    startTime: String(row.start_time ?? '').replace(/^(\d{2}:\d{2}):00(?:\.0+)?$/, '$1'),
+    endTime: String(row.end_time ?? '').replace(/^(\d{2}:\d{2}):00(?:\.0+)?$/, '$1')
   }
 }
 

@@ -17,8 +17,8 @@ function normalizeAvailabilityRule(input: unknown): AvailabilityRule {
   return {
     id: String(rule.id ?? ""),
     dayOfWeek: Number(rule.dayOfWeek ?? rule.day_of_week ?? 0),
-    startTime: String(rule.startTime ?? rule.start_time ?? ""),
-    endTime: String(rule.endTime ?? rule.end_time ?? ""),
+    startTime: String(rule.startTime ?? rule.start_time ?? "").replace(/^(\d{2}:\d{2}):00(?:\.0+)?$/, "$1"),
+    endTime: String(rule.endTime ?? rule.end_time ?? "").replace(/^(\d{2}:\d{2}):00(?:\.0+)?$/, "$1"),
   };
 }
 
